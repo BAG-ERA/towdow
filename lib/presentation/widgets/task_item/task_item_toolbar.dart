@@ -1,0 +1,622 @@
+// Task item toolbar component
+// Contains all action buttons with responsive behavior and dialog handling
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'dart:convert';
+import '../../../data/models/task.dart';
+import '../../../data/services/validator_service.dart';
+import '../attendee_dialog.dart';
+import '../move_task_dialog.dart';
+
+class TaskItemToolbar extends StatelessWidget {
+  final Task task;
+  final Function(Task)? onTaskUpdated;
+  final VoidCallback? onTaskDeleted;
+
+  const TaskItemToolbar({
+    super.key,
+    required this.task,
+    this.onTaskUpdated,
+    this.onTaskDeleted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Simple calculation: 3 primary buttons + menu = about 180px
+        // All buttons = about 400px
+        final availableWidth = constraints.maxWidth;
+        
+        // Use compact mode if less than 240px available
+        if (availableWidth < 240) {
+          return _buildCompactActions(context);
+        } else {
+          return _buildFullActions(context);
+        }
+      },
+    );
+  }
+
+  Widget _buildCompactActions(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        // Essential actions only
+        _buildCompactIconButton(
+          context: context,
+          icon: Icons.calendar_today_rounded,
+          tooltip: 'Set Due Date',
+          onPressed: () => _showDueDatePicker(context),
+        ),
+        const SizedBox(width: 4),
+        
+        // Validator button (organizer only)
+        if (_isOrganizer()) ...[
+          _buildValidatorPopupButton(context),
+          const SizedBox(width: 4),
+        ],
+        
+        _buildCompactIconButton(
+          context: context,
+          icon: Icons.person_add_rounded,
+          tooltip: 'Add Attendee',
+          onPressed: () => _showAttendeeDialog(context),
+        ),
+        const SizedBox(width: 4),
+        
+        // More menu
+        PopupMenuButton<String>(
+          icon: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.more_vert_rounded,
+              size: 20,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+          tooltip: 'More Actions',
+          onSelected: (action) => _handleMenuAction(context, action),
+          itemBuilder: (context) => [
+            if (task.due == null)
+              const PopupMenuItem(
+                value: 'due_date',
+                child: ListTile(
+                  leading: Icon(Icons.calendar_today_rounded),
+                  title: Text('Set Due Date'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            const PopupMenuItem(
+              value: 'category',
+              child: ListTile(
+                leading: Icon(Icons.label_rounded),
+                title: Text('Add Category'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'move',
+              child: ListTile(
+                leading: Icon(Icons.drive_file_move_rounded),
+                title: Text('Move Task'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'archive',
+              child: ListTile(
+                leading: Icon(Icons.archive),
+                title: Text('Archive Task'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'gps',
+              child: ListTile(
+                leading: Icon(Icons.pin_drop),
+                title: Text('Add GPS'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'delete',
+              child: ListTile(
+                leading: Icon(Icons.delete_rounded, color: Colors.red),
+                title: Text('Delete', style: TextStyle(color: Colors.red)),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            if (kDebugMode)
+              const PopupMenuItem(
+                value: 'debug',
+                child: ListTile(
+                  leading: Icon(Icons.info_rounded),
+                  title: Text('Show UID'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFullActions(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        // Set due date
+        _buildCompactIconButton(
+          context: context,
+          icon: Icons.calendar_today_rounded,
+          tooltip: 'Set Due Date',
+          onPressed: () => _showDueDatePicker(context),
+        ),
+        const SizedBox(width: 4),
+        
+        // Validator button (organizer only)
+        if (_isOrganizer()) ...[
+          _buildValidatorPopupButton(context),
+          const SizedBox(width: 4),
+        ],
+        
+        // Set attendee
+        _buildCompactIconButton(
+          context: context,
+          icon: Icons.person_add_rounded,
+          tooltip: 'Add Attendee',
+          onPressed: () => _showAttendeeDialog(context),
+        ),
+        const SizedBox(width: 4),
+        
+        // Set category
+        _buildCompactIconButton(
+          context: context,
+          icon: Icons.label_rounded,
+          tooltip: 'Add Category',
+          onPressed: () => _showCategoryDialog(context),
+        ),
+        const SizedBox(width: 4),
+        
+        // Move task
+        _buildCompactIconButton(
+          context: context,
+          icon: Icons.drive_file_move_rounded,
+          tooltip: 'Move Task',
+          onPressed: () => _showMoveDialog(context),
+        ),
+        const SizedBox(width: 4),
+        
+        // Archive task
+        _buildCompactIconButton(
+          context: context,
+          icon: Icons.archive,
+          tooltip: 'Archive Task',
+          onPressed: () => _showArchiveDialog(context),
+        ),
+        const SizedBox(width: 4),
+        
+        // Add GPS coordinate
+        _buildCompactIconButton(
+          context: context,
+          icon: Icons.pin_drop,
+          tooltip: 'Add GPS Coordinate',
+          onPressed: () => _showGpsDialog(context),
+        ),
+        const SizedBox(width: 4),
+        
+        // Delete task
+        _buildCompactIconButton(
+          context: context,
+          icon: Icons.delete_rounded,
+          tooltip: 'Delete Task',
+          onPressed: () => _showDeleteDialog(context),
+          isDestructive: true,
+        ),
+        
+        // Debug: Show UID
+        if (kDebugMode) ...[
+          const SizedBox(width: 4),
+          _buildCompactIconButton(
+            context: context,
+            icon: Icons.info_rounded,
+            tooltip: 'Show UID',
+            onPressed: () => _showUidDialog(context),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCompactIconButton({
+    required BuildContext context,
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    bool isDestructive = false,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 500),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onPressed,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: isDestructive 
+                ? colorScheme.error 
+                : colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildValidatorPopupButton(BuildContext context) {
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 40),
+      icon: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          Icons.fact_check,
+          size: 20,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+      ),
+      tooltip: 'Add Validator',
+      onSelected: (validatorType) => _addValidator(context, validatorType),
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'checklist',
+          child: ListTile(
+            leading: Icon(Icons.checklist),
+            title: Text('Checklist'),
+            subtitle: Text('Multiple checkable items'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'single_select',
+          child: ListTile(
+            leading: Icon(Icons.radio_button_checked),
+            title: Text('Single Select'),
+            subtitle: Text('Choose one option'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'free_field',
+          child: ListTile(
+            leading: Icon(Icons.text_fields),
+            title: Text('Free Field'),
+            subtitle: Text('Text input'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _handleMenuAction(BuildContext context, String action) {
+    switch (action) {
+      case 'due_date':
+        _showDueDatePicker(context);
+        break;
+      case 'category':
+        _showCategoryDialog(context);
+        break;
+      case 'move':
+        _showMoveDialog(context);
+        break;
+      case 'archive':
+        _showArchiveDialog(context);
+        break;
+      case 'gps':
+        _showGpsDialog(context);
+        break;
+      case 'delete':
+        _showDeleteDialog(context);
+        break;
+      case 'debug':
+        _showUidDialog(context);
+        break;
+    }
+  }
+
+  bool _isOrganizer() {
+    // TODO: Implement organizer check based on current user and task.organizer
+    // For now, return true to allow testing
+    return true;
+  }
+
+  String _generateId() {
+    return DateTime.now().millisecondsSinceEpoch.toString();
+  }
+
+  void _addValidator(BuildContext context, String validatorType) {
+    // Create default validator based on type
+    Map<String, dynamic> defaultValidator;
+    
+    switch (validatorType) {
+      case 'checklist':
+        defaultValidator = {
+          'id': _generateId(),
+          'type': 'checklist',
+          'required': true,
+          'title': 'Checklist',
+          'items': [
+            {'id': _generateId(), 'text': 'Item 1', 'checked': false},
+            {'id': _generateId(), 'text': 'Item 2', 'checked': false},
+            {'id': _generateId(), 'text': 'Item 3', 'checked': false},
+          ],
+        };
+        break;
+      case 'single_select':
+        defaultValidator = {
+          'id': _generateId(),
+          'type': 'single_select',
+          'required': true,
+          'title': 'Choose an option',
+          'options': [
+            {'id': _generateId(), 'text': 'Option 1'},
+            {'id': _generateId(), 'text': 'Option 2'},
+            {'id': _generateId(), 'text': 'Option 3'},
+          ],
+          'selected': '',
+        };
+        break;
+      case 'free_field':
+        defaultValidator = {
+          'id': _generateId(),
+          'type': 'free_field',
+          'required': true,
+          'title': 'Text field',
+          'value': '',
+          'helper': '',
+        };
+        break;
+      default:
+        return;
+    }
+    
+    // Add validator to task
+    final currentValidators = ValidatorService.parseValidators(task.flowitValidator);
+    currentValidators.add([defaultValidator]);
+    
+    final updatedTask = task.copyWith(
+      flowitValidator: json.encode(currentValidators),
+      lastModified: DateTime.now(),
+    );
+    
+    // Notify parent
+    if (onTaskUpdated != null) {
+      onTaskUpdated!(updatedTask);
+    }
+  }
+
+  // Dialog methods
+  void _showDueDatePicker(BuildContext context) async {
+    final currentDue = task.due;
+    
+    // Show a dialog with date picker options
+    final result = await showDialog<DateTime?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Due Date'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (currentDue != null) ...[
+              ListTile(
+                leading: const Icon(Icons.clear_rounded),
+                title: const Text('Remove due date'),
+                onTap: () => Navigator.of(context).pop(DateTime(1970)), // Special marker for removal
+              ),
+              const Divider(),
+            ],
+            ListTile(
+              leading: const Icon(Icons.today_rounded),
+              title: const Text('Today'),
+              onTap: () => Navigator.of(context).pop(DateTime.now()),
+            ),
+            ListTile(
+              leading: const Icon(Icons.event_rounded),
+              title: const Text('Tomorrow'),
+              onTap: () => Navigator.of(context).pop(DateTime.now().add(const Duration(days: 1))),
+            ),
+            ListTile(
+              leading: const Icon(Icons.weekend_rounded),
+              title: const Text('This Weekend'),
+              onTap: () {
+                final now = DateTime.now();
+                final daysUntilSaturday = 6 - now.weekday; // Saturday = 6
+                final saturday = now.add(Duration(days: daysUntilSaturday));
+                Navigator.of(context).pop(saturday);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.schedule_rounded),
+              title: const Text('Next Week'),
+              onTap: () => Navigator.of(context).pop(DateTime.now().add(const Duration(days: 7))),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.calendar_today_rounded),
+              title: const Text('Pick a date...'),
+              onTap: () async {
+                Navigator.of(context).pop(); // Close current dialog
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: currentDue ?? DateTime.now(),
+                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                  lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                );
+                if (picked != null) {
+                  _updateTaskDueDate(context, picked);
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      if (result.year == 1970) {
+        // Special marker for removal
+        _updateTaskDueDate(context, null);
+      } else {
+        _updateTaskDueDate(context, result);
+      }
+    }
+  }
+
+  Future<void> _updateTaskDueDate(BuildContext context, DateTime? newDue) async {
+    try {
+      // Create updated task
+      final updatedTask = task.copyWith(
+        due: newDue,
+        lastModified: DateTime.now(),
+      );
+
+      // Notify parent widget
+      if (onTaskUpdated != null) {
+        onTaskUpdated!(updatedTask);
+      }
+
+      // Show feedback
+      if (context.mounted) {
+        final message = newDue == null 
+            ? 'Due date removed' 
+            : 'Due date set to ${newDue.day}/${newDue.month}/${newDue.year}';
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating due date: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showAttendeeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AttendeeDialog(
+        task: task,
+        onTaskUpdated: (updatedTask) {
+          if (onTaskUpdated != null) {
+            onTaskUpdated!(updatedTask);
+          }
+        },
+      ),
+    );
+  }
+
+  void _showCategoryDialog(BuildContext context) {
+    // TODO: Implement category dialog
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Category dialog not implemented yet')),
+    );
+  }
+
+  void _showMoveDialog(BuildContext context) {
+    showMoveTaskDialog(context, task);
+  }
+
+  void _showArchiveDialog(BuildContext context) {
+    // TODO: Implement archive dialog
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Archive dialog not implemented yet')),
+    );
+  }
+
+  void _showGpsDialog(BuildContext context) {
+    // TODO: Implement GPS coordinate dialog
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('GPS dialog not implemented yet')),
+    );
+  }
+
+  void _showDeleteDialog(BuildContext context) {
+    if (onTaskDeleted != null) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Task'),
+          content: Text('Are you sure you want to delete "${task.summary}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onTaskDeleted!();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  void _showUidDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Task UID'),
+        content: SelectableText(task.uid),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+} 

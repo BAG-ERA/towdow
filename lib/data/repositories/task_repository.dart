@@ -1,114 +1,130 @@
-import 'package:uuid/uuid.dart';
-import '../models/task_model.dart';
+﻿// Task repository interface and local implementation
+// Follows repository pattern for task data access
+
+import '../../core/result.dart';
+import '../../core/logger.dart';
+import '../models/task.dart';
 import '../services/local_storage_service.dart';
-import '../services/sync_service.dart';
 
-class TaskRepository {
-  final LocalStorageService _storage;
-  final SyncService _sync;
-  final _uuid = const Uuid();
+// Abstract repository interface
+abstract class TaskRepository {
+  Future<Result<List<Task>>> getAll();
+  Future<Result<Task?>> getById(String uid);
+  Future<Result<List<Task>>> getByProject(String projectUid);
+  Future<Result<List<Task>>> getTasksWithDueDate(DateTime date);
+  Future<Result<List<Task>>> getTasksWithoutDueDate();
+  Future<Result<List<Task>>> getUnregisteredTasks();
+  Future<Result<void>> save(Task task);
+  Future<Result<void>> delete(String uid);
+  Stream<List<Task>> watchTasks();
+}
 
-  TaskRepository(this._storage, this._sync);
+// Local implementation using Hive
+class LocalTaskRepository implements TaskRepository {
+  final LocalStorageService _storageService;
 
-  /// Create a new task
-  Future<TaskModel> createTask({
-    required String summary,
-    String description = '',
-    DateTime? dueDate,
-    FlowItType type = FlowItType.task,
-    Map<String, dynamic>? validator,
-    Map<String, dynamic>? requirement,
-    String? templateUid,
-    String? processUid,
-  }) async {
-    final task = TaskModel(
-      uid: _uuid.v4(),
-      summary: summary,
-      description: description,
-      dueDate: dueDate,
-      type: type,
-      validator: validator,
-      requirement: requirement,
-      templateUid: templateUid,
-      processUid: processUid,
+  LocalTaskRepository(this._storageService);
+
+  @override
+  Future<Result<List<Task>>> getAll() async {
+    final result = await _storageService.getAll<Task>(LocalStorageService.tasksBoxName);
+    if (result is Success) {
+      final tasks = (result as Success<List<Task>>).data;
+      // AppLogger.debug('TaskRepository: getAll() returned ${tasks.length} tasks');
+      
+    }
+    return result;
+  }
+
+  @override
+  Future<Result<Task?>> getById(String uid) async {
+    return await _storageService.get<Task>(LocalStorageService.tasksBoxName, uid);
+  }
+
+  @override
+  Future<Result<List<Task>>> getByProject(String projectUid) async {
+    final result = await getAll();
+    return result.when(
+      success: (tasks) {
+        // Filter tasks by their source calendar (Calendar = Project model)
+        final projectTasks = tasks.where((task) => task.sourceCalendarUid == projectUid).toList();
+        return Result.success(projectTasks);
+      },
+      failure: (failure) => Result.failure(failure),
     );
-
-    await _sync.queueTaskForSync(task);
-    return task;
   }
 
-  /// Get a task by its UID
-  TaskModel? getTask(String uid) {
-    return _storage.getTask(uid);
+  @override
+  Future<Result<List<Task>>> getTasksWithDueDate(DateTime date) async {
+    final result = await getAll();
+    return result.when(
+      success: (tasks) {
+        final dueTasks = tasks.where((task) {
+          if (task.due == null) return false;
+          final dueDate = DateTime(task.due!.year, task.due!.month, task.due!.day);
+          final targetDate = DateTime(date.year, date.month, date.day);
+          return dueDate.isAtSameMomentAs(targetDate);
+        }).toList();
+        return Result.success(dueTasks);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
   }
 
-  /// Update an existing task
-  Future<void> updateTask(TaskModel task) async {
-    await _sync.queueTaskForSync(task);
+  @override
+  Future<Result<List<Task>>> getTasksWithoutDueDate() async {
+    final result = await getAll();
+    return result.when(
+      success: (tasks) {
+        final unscheduledTasks = tasks.where((task) => task.due == null).toList();
+        return Result.success(unscheduledTasks);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
   }
 
-  /// Delete a task
-  Future<void> deleteTask(String uid) async {
-    await _sync.queueTaskDeletionForSync(uid);
+  @override
+  Future<Result<List<Task>>> getUnregisteredTasks() async {
+    final result = await getAll();
+    return result.when(
+      success: (tasks) {
+        // TODO: In Calendar = Project model, unregistered tasks would be tasks
+        // not properly synced or belonging to unknown/deleted calendars
+        // For now, return empty list during transition
+        final unregisteredTasks = <Task>[];
+        return Result.success(unregisteredTasks);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
   }
 
-  /// Get all tasks
-  List<TaskModel> getAllTasks() {
-    return _storage.getAllTasks();
+  @override
+  Future<Result<void>> save(Task task) async {
+    return await _storageService.put(LocalStorageService.tasksBoxName, task.uid, task);
   }
 
-  /// Get tasks by type
-  List<TaskModel> getTasksByType(FlowItType type) {
-    return _storage.getTasksByType(type);
+  @override
+  Future<Result<void>> delete(String uid) async {
+    return await _storageService.delete(LocalStorageService.tasksBoxName, uid);
   }
 
-  /// Get tasks due today
-  List<TaskModel> getTasksDueToday() {
-    return _storage.getTasksDueToday()
-        .where((task) => task.type == FlowItType.task)
-        .toList();
-  }
-
-  /// Get tasks due soon
-  List<TaskModel> getTasksDueSoon() {
-    return _storage.getTasksDueSoon()
-        .where((task) => task.type == FlowItType.task)
-        .toList();
-  }
-
-  /// Get unregistered tasks (no due date or project)
-  List<TaskModel> getUnregisteredTasks() {
-    return _storage.getUnregisteredTasks()
-        .where((task) => task.type == FlowItType.task)
-        .toList();
-  }
-
-  /// Mark a task as complete
-  Future<void> completeTask(String uid) async {
-    final task = getTask(uid);
-    if (task != null) {
-      final updatedTask = task.copyWith(
-        status: TaskStatus.completed,
-        lastModified: DateTime.now(),
-      );
-      await updateTask(updatedTask);
-    }
-  }
-
-  /// Mark a task as cancelled
-  Future<void> cancelTask(String uid) async {
-    final task = getTask(uid);
-    if (task != null) {
-      final updatedTask = task.copyWith(
-        status: TaskStatus.cancelled,
-        lastModified: DateTime.now(),
-      );
-      await updateTask(updatedTask);
-    }
-  }
-
-  /// Trigger a manual sync
-  Future<void> sync() async {
-    await _sync.sync();
+  @override
+  Stream<List<Task>> watchTasks() async* {
+    // Emit initial value
+    final result = await getAll();
+    yield result.when(
+      success: (tasks) => tasks,
+      failure: (_) => <Task>[],
+    );
+    
+    // Then listen to changes
+    yield* _storageService.getStream(LocalStorageService.tasksBoxName)
+        .asyncMap((_) async {
+          final result = await getAll();
+          return result.when(
+            success: (tasks) => tasks,
+            failure: (_) => <Task>[],
+          );
+        });
   }
 } 

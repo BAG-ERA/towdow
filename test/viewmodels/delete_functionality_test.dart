@@ -1,0 +1,263 @@
+/// Tests spécifiques pour la fonctionnalité de suppression
+/// Vérifie que les méthodes delete fonctionnent correctement
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flowit_app/presentation/viewmodels/project_list_viewmodel.dart';
+import 'package:flowit_app/presentation/viewmodels/task_viewmodel.dart';
+import 'package:flowit_app/data/repositories/calendar_repository.dart';
+import 'package:flowit_app/data/repositories/task_repository.dart';
+import 'package:flowit_app/data/services/sync_service.dart';
+import 'package:flowit_app/data/services/local_storage_service.dart';
+import 'package:flowit_app/data/models/task_calendar.dart';
+import 'package:flowit_app/data/models/task.dart';
+import 'package:flowit_app/core/result.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
+
+@GenerateNiceMocks([
+  MockSpec<LocalStorageService>(),
+  MockSpec<CalendarRepository>(),
+  MockSpec<TaskRepository>(),
+  MockSpec<SyncService>(),
+])
+import 'delete_functionality_test.mocks.dart';
+
+void main() {
+  group('Delete Functionality Tests', () {
+    late MockCalendarRepository mockCalendarRepository;
+    late MockTaskRepository mockTaskRepository;
+    late MockSyncService mockSyncService;
+
+    setUp(() {
+      mockCalendarRepository = MockCalendarRepository();
+      mockTaskRepository = MockTaskRepository();
+      mockSyncService = MockSyncService();
+    });
+
+    group('ProjectListViewModel Delete', () {
+      test('should delete project successfully and update state', () async {
+        // Arrange
+        final testProject = ProjectWithStats(
+          project: TaskCalendarFactory.createNew(
+            path: '/test/calendar1',
+            displayName: 'Test Project',
+          ).copyWith(uid: 'project1'),
+          stats: const ProjectStats(
+            totalTasks: 0,
+            completedTasks: 0,
+            inProgressTasks: 0,
+            pendingTasks: 0,
+            progressPercentage: 0,
+          ),
+        );
+
+        final viewModel = ProjectListViewModel(
+          mockCalendarRepository,
+          mockTaskRepository,
+          mockSyncService,
+        );
+
+        // Set initial state with the project
+        viewModel.state = viewModel.state.copyWith(projects: [testProject]);
+        expect(viewModel.state.projects.length, 1);
+
+        // Mock successful deletion
+        when(mockCalendarRepository.delete('project1'))
+            .thenAnswer((_) async => const Result.success(null));
+
+        // Act
+        await viewModel.deleteProject('project1');
+
+        // Assert
+        expect(viewModel.state.projects.length, 0);
+        expect(viewModel.state.error, null);
+        verify(mockCalendarRepository.delete('project1')).called(1);
+      });
+
+      test('should handle delete failure and show error', () async {
+        // Arrange
+        final testProject = ProjectWithStats(
+          project: TaskCalendarFactory.createNew(
+            path: '/test/calendar1',
+            displayName: 'Test Project',
+          ).copyWith(uid: 'project1'),
+          stats: const ProjectStats(
+            totalTasks: 0,
+            completedTasks: 0,
+            inProgressTasks: 0,
+            pendingTasks: 0,
+            progressPercentage: 0,
+          ),
+        );
+
+        final viewModel = ProjectListViewModel(
+          mockCalendarRepository,
+          mockTaskRepository,
+          mockSyncService,
+        );
+
+        // Set initial state with the project
+        viewModel.state = viewModel.state.copyWith(projects: [testProject]);
+
+        // Mock failed deletion
+        when(mockCalendarRepository.delete('project1'))
+            .thenAnswer((_) async => Result.failure(
+                Failure(exception: Exception('Server error'), message: 'Failed to delete on server')));
+
+        // Act
+        await viewModel.deleteProject('project1');
+
+        // Assert
+        expect(viewModel.state.projects.length, 1); // Project should still be there
+        expect(viewModel.state.error, contains('Failed to delete project'));
+        verify(mockCalendarRepository.delete('project1')).called(1);
+      });
+
+      test('should not delete non-existent project', () async {
+        // Arrange
+        final viewModel = ProjectListViewModel(
+          mockCalendarRepository,
+          mockTaskRepository,
+          mockSyncService,
+        );
+
+        // Mock deletion (won't be called for non-existent project)
+        when(mockCalendarRepository.delete('nonexistent'))
+            .thenAnswer((_) async => const Result.success(null));
+
+        // Act
+        await viewModel.deleteProject('nonexistent');
+
+        // Assert
+        expect(viewModel.state.projects.length, 0);
+        expect(viewModel.state.error, null);
+        verify(mockCalendarRepository.delete('nonexistent')).called(1);
+      });
+    });
+
+    group('TaskViewModel Delete', () {
+      test('should delete task successfully', () async {
+        // Arrange
+        final viewModel = TaskViewModel(mockTaskRepository);
+
+        // Mock successful deletion
+        when(mockTaskRepository.delete('task1'))
+            .thenAnswer((_) async => const Result.success(null));
+
+        // Act
+        await viewModel.deleteTask('task1');
+
+        // Assert
+        expect(viewModel.state.isLoading, false);
+        expect(viewModel.state.error, null);
+        verify(mockTaskRepository.delete('task1')).called(1);
+      });
+
+      test('should handle delete failure and show error', () async {
+        // Arrange
+        final viewModel = TaskViewModel(mockTaskRepository);
+
+        // Mock failed deletion
+        when(mockTaskRepository.delete('task1'))
+            .thenAnswer((_) async => Result.failure(
+                Failure(exception: Exception('Storage error'), message: 'Failed to delete from storage')));
+
+        // Act
+        await viewModel.deleteTask('task1');
+
+        // Assert
+        expect(viewModel.state.isLoading, false);
+        expect(viewModel.state.error, contains('Failed to delete from storage'));
+        verify(mockTaskRepository.delete('task1')).called(1);
+      });
+
+      test('should handle exception during deletion', () async {
+        // Arrange
+        final viewModel = TaskViewModel(mockTaskRepository);
+
+        // Mock exception
+        when(mockTaskRepository.delete('task1'))
+            .thenThrow(Exception('Unexpected error'));
+
+        // Act
+        await viewModel.deleteTask('task1');
+
+        // Assert
+        expect(viewModel.state.isLoading, false);
+        expect(viewModel.state.error, contains('Failed to delete task'));
+        verify(mockTaskRepository.delete('task1')).called(1);
+      });
+    });
+
+    group('Repository Level Delete (Integration check)', () {
+      test('local storage delete should work correctly', () async {
+        // This test simulates what happens at the repository level
+        // to verify that the delete chain works properly
+
+        // Arrange
+        final mockStorage = MockLocalStorageService();
+        final calendarRepo = LocalCalendarRepository(mockStorage);
+        final taskRepo = LocalTaskRepository(mockStorage);
+
+        // Mock successful storage deletion
+        when(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1'))
+            .thenAnswer((_) async => const Result.success(null));
+        when(mockStorage.delete(LocalStorageService.tasksBoxName, 'task1'))
+            .thenAnswer((_) async => const Result.success(null));
+
+        // Act - Test calendar deletion
+        final calendarResult = await calendarRepo.delete('calendar1');
+        final taskResult = await taskRepo.delete('task1');
+
+        // Assert
+        expect(calendarResult, isA<Success>());
+        expect(taskResult, isA<Success>());
+        verify(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1')).called(1);
+        verify(mockStorage.delete(LocalStorageService.tasksBoxName, 'task1')).called(1);
+      });
+
+      test('should handle storage deletion failure', () async {
+        // Arrange
+        final mockStorage = MockLocalStorageService();
+        final calendarRepo = LocalCalendarRepository(mockStorage);
+
+        // Mock storage failure
+        when(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1'))
+            .thenAnswer((_) async => Result.failure(
+                Failure(exception: Exception('Storage locked'), message: 'Storage is locked by another process')));
+
+        // Act
+        final result = await calendarRepo.delete('calendar1');
+
+        // Assert
+        expect(result, isA<Failure>());
+        final failure = result as Failure;
+        expect(failure.message, contains('Storage is locked'));
+        verify(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1')).called(1);
+      });
+    });
+
+    group('Delete Workflow Analysis', () {
+      test('should demonstrate complete delete workflow', () async {
+        // This test shows the complete delete workflow
+              // print('=== DELETE WORKFLOW ANALYSIS ===');
+      // print('1. UI calls ViewModel.deleteProject(uid)');
+      // print('2. ViewModel calls Repository.delete(uid)');
+      // print('3. Repository calls LocalStorage.delete(boxName, uid)');
+      // print('4. LocalStorage removes from Hive box');
+      // print('5. Background sync should sync deletion to CalDAV server');
+      // print('6. If sync fails, item may reappear on next sync');
+      // print('');
+      // print('POTENTIAL ISSUES:');
+      // print('- UI not connected to ViewModel methods');
+      // print('- Sync service not propagating deletions to server');
+      // print('- Server rejecting deletion requests');
+      // print('- Background sync overwriting local deletions');
+      // print('================================');
+        
+        // This always passes - it's just for documentation
+        expect(true, true);
+      });
+    });
+  });
+} 

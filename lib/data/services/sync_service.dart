@@ -1,133 +1,1048 @@
+﻿// Sync service for bidirectional synchronization between local storage and CalDAV
+// Implements offline-first architecture with sync queue
+
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import '../models/task_model.dart';
+import 'package:xml/xml.dart';
+import '../../core/result.dart';
+import '../../core/logger.dart';
+import '../models/task.dart';
+import '../models/caldav_account.dart';
+import '../models/task_calendar.dart';
+import '../repositories/task_repository.dart';
+import '../repositories/account_repository.dart';
+import '../repositories/calendar_repository.dart';
 import 'caldav_service.dart';
 import 'local_storage_service.dart';
+import 'webdav_client.dart';
+import 'parsers/xml_response_parser.dart';
+import 'parsers/vtodo_parser.dart';
 
-/// Service for handling synchronization between local storage and CalDAV server
-class SyncService extends ChangeNotifier {
-  final CalDAVService _caldav;
-  final LocalStorageService _storage;
-  bool _isSyncing = false;
+enum SyncOperation {
+  create,
+  update,
+  delete,
+}
+
+enum SyncStatus {
+  idle,
+  syncing,
+  error,
+  offline,
+}
+
+class SyncQueueItem {
+  final String id;
+  final SyncOperation operation;
+  final String itemId;
+  final Map<String, dynamic> data;
+  final DateTime createdAt;
+  final int retryCount;
+
+  SyncQueueItem({
+    required this.id,
+    required this.operation,
+    required this.itemId,
+    required this.data,
+    required this.createdAt,
+    this.retryCount = 0,
+  });
+
+  SyncQueueItem copyWith({
+    int? retryCount,
+  }) {
+    return SyncQueueItem(
+      id: id,
+      operation: operation,
+      itemId: itemId,
+      data: data,
+      createdAt: createdAt,
+      retryCount: retryCount ?? this.retryCount,
+    );
+  }
+}
+
+class SyncResult {
+  final bool success;
+  final int syncedItems;
+  final int failedItems;
+  final List<String> errors;
+  final DateTime syncTime;
+
+  SyncResult({
+    required this.success,
+    required this.syncedItems,
+    required this.failedItems,
+    required this.errors,
+    required this.syncTime,
+  });
+}
+
+class SyncService {
+  final TaskRepository _taskRepository;
+  final AccountRepository _accountRepository;
+  final CalendarRepository _calendarRepository;
+  final LocalStorageService _localStorage;
+
+  // Sync state
+  SyncStatus _status = SyncStatus.idle;
   DateTime? _lastSyncTime;
-  Timer? _syncTimer;
+  Timer? _periodicSyncTimer;
+  final _statusController = StreamController<SyncStatus>.broadcast();
+  final _progressController = StreamController<double>.broadcast();
+
+  // Configuration
+  static const Duration syncInterval = Duration(seconds: 10);
+  static const int maxRetryCount = 3;
+  static const String syncQueueBoxName = 'sync_queue';
 
   SyncService({
-    required CalDAVService caldav,
-    required LocalStorageService storage,
-  })  : _caldav = caldav,
-        _storage = storage;
+    required TaskRepository taskRepository,
+    required AccountRepository accountRepository,
+    required CalendarRepository calendarRepository,
+    required LocalStorageService localStorage,
+  })  : _taskRepository = taskRepository,
+        _accountRepository = accountRepository,
+        _calendarRepository = calendarRepository,
+        _localStorage = localStorage;
 
-  bool get isSyncing => _isSyncing;
+  // Public streams
+  Stream<SyncStatus> get statusStream => _statusController.stream;
+  Stream<double> get progressStream => _progressController.stream;
+
+  // Public getters
+  SyncStatus get status => _status;
   DateTime? get lastSyncTime => _lastSyncTime;
+  bool get isBackgroundSyncRunning => false;
+  bool get isBackgroundSyncing => false;
 
-  /// Start periodic sync (every 5 minutes)
+  /// Initialize the sync service and start periodic sync
+  Future<Result<void>> initialize() async {
+    try {
+      // AppLogger.info('SyncService: Initializing sync service');
+      
+      // Start periodic sync if we have an active account
+      final accountResult = await _accountRepository.getActiveAccount();
+      await accountResult.when(
+        success: (account) async {
+          if (account != null) {
+            // Start periodic sync (every 10 seconds)
+            startPeriodicSync();
+            
+            // Perform initial sync
+            await syncNow();
+          }
+        },
+        failure: (failure) async {
+          AppLogger.warning('SyncService: No active account found for sync');
+        },
+      );
+
+      // AppLogger.info('SyncService: Initialized successfully');
+      return const Result.success(null);
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Failed to initialize', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to initialize sync service: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Start periodic background sync
   void startPeriodicSync() {
-    _syncTimer?.cancel();
-    _syncTimer = Timer.periodic(const Duration(minutes: 5), (_) => sync());
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = Timer.periodic(syncInterval, (_) {
+      syncNow();
+    });
+    // AppLogger.info('SyncService: Started periodic sync (every ${syncInterval.inSeconds} seconds)');
   }
 
-  /// Stop periodic sync
+  /// Stop periodic background sync
   void stopPeriodicSync() {
-    _syncTimer?.cancel();
-    _syncTimer = null;
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = null;
+    // AppLogger.info('SyncService: Stopped periodic sync');
   }
 
-  /// Perform a sync operation between local storage and CalDAV server
-  Future<void> sync() async {
-    if (_isSyncing) return;
+  /// Perform immediate sync with CalDAV server
+  Future<Result<SyncResult>> syncNow() async {
+    if (_status == SyncStatus.syncing) {
+      // AppLogger.debug('SyncService: Sync already in progress, skipping');
+      return Result.failure(Failure(
+        message: 'Sync already in progress',
+        exception: Exception('Sync in progress'),
+      ));
+    }
 
     try {
-      _isSyncing = true;
-      notifyListeners();
+      _updateStatus(SyncStatus.syncing);
+      _progressController.add(0.0);
 
-      // Fetch remote tasks
-      final remoteTasks = await _caldav.fetchTasks();
-      final localTasks = _storage.getAllTasks();
+      // AppLogger.info('SyncService: Starting sync operation');
 
-      // Create maps for easier lookup
-      final remoteTaskMap = {for (var task in remoteTasks) task.uid: task};
-      final localTaskMap = {for (var task in localTasks) task.uid: task};
+      // Get active account
+      final accountResult = await _accountRepository.getActiveAccount();
+      return await accountResult.when(
+        success: (account) async {
+          if (account == null) {
+            _updateStatus(SyncStatus.offline);
+            return Result.failure(Failure(
+              message: 'No active CalDAV account configured',
+              exception: Exception('No account'),
+            ));
+          }
 
-      // Handle tasks that exist in both local and remote
-      final commonUids = remoteTaskMap.keys.toSet().intersection(localTaskMap.keys.toSet());
-      for (final uid in commonUids) {
-        final remoteTask = remoteTaskMap[uid]!;
-        final localTask = localTaskMap[uid]!;
+          return await _performSync(account);
+        },
+        failure: (failure) async {
+          _updateStatus(SyncStatus.error);
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Sync failed', e, stackTrace);
+      _updateStatus(SyncStatus.error);
+      return Result.failure(Failure(
+        message: 'Sync operation failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
 
-        // If remote is newer, update local
-        if (remoteTask.lastModified.isAfter(localTask.lastModified)) {
-          await _storage.saveTask(remoteTask);
+  /// Perform the actual sync operation with a CalDAV account
+  Future<Result<SyncResult>> _performSync(CaldavAccount account) async {
+    final caldavService = CalDAVService(account: account);
+    final errors = <String>[];
+    int syncedItems = 0;
+    int failedItems = 0;
+
+    try {
+      // DEBUG: Inspect storage contents
+      // AppLogger.info('SyncService: DEBUG - Inspecting storage before sync');
+      await _localStorage.debugAllBoxes();
+      
+      // Get selected calendars from repository (source of truth)
+      final selectedCalendarsResult = await _calendarRepository.getProjectCalendars();
+      final selectedCalendars = selectedCalendarsResult.when(
+        success: (calendars) => calendars,
+        failure: (failure) {
+          AppLogger.error('SyncService: Failed to get selected calendars: ${failure.message}');
+          return <TaskCalendar>[];
+        },
+      );
+      
+      if (selectedCalendars.isEmpty) {
+        AppLogger.warning('SyncService: No calendars selected for sync. Please configure calendar selection.');
+        errors.add('No calendars selected for synchronization. Please go to Settings > CalDAV Connection to select calendars.');
+        failedItems++;
+      } else {
+        // 🎯 NOUVELLE LOGIQUE SIMPLIFIÉE (10 secondes)
+        AppLogger.debug('🔄 SyncService: Starting sync for ${selectedCalendars.length} calendars');
+        
+        for (final calendar in selectedCalendars) {
+          AppLogger.debug('🔄 SyncService: Processing calendar ${calendar.path}');
+          
+          // Étape 1: Obtenir le sync-token actuel du serveur
+          final serverSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
+          
+          await serverSyncTokenResult.when(
+            success: (serverSyncToken) async {
+              final localSyncToken = calendar.syncToken;
+              
+              AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: $localSyncToken, Server: $serverSyncToken');
+              
+              // TEST 1: sync-tokens différents → synchroniser depuis serveur
+              if (localSyncToken != serverSyncToken) {
+                AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing from server');
+                await _syncFromServer(caldavService, calendar, serverSyncToken, errors);
+                syncedItems++;
+              }
+              
+              // TEST 2: queue non vide → pousser modifications vers serveur
+              final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.uid);
+              if (hasQueuedOperations) {
+                AppLogger.debug('🔄 SyncService: Queue has operations - pushing to server');
+                await _processSyncQueueForCalendar(caldavService, calendar.uid, errors);
+                
+                // Récupérer le nouveau sync-token après push
+                final newServerSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
+                await newServerSyncTokenResult.when(
+                  success: (newServerSyncToken) async {
+                    if (newServerSyncToken != serverSyncToken) {
+                      AppLogger.debug('🔄 SyncService: Server sync-token updated after push: $newServerSyncToken');
+                      // Mettre à jour le calendrier avec le nouveau token
+                      final updatedCalendar = calendar.copyWith(
+                        syncToken: newServerSyncToken,
+                        lastSyncAt: DateTime.now(),
+                      );
+                      await _calendarRepository.save(updatedCalendar);
+                    }
+                  },
+                  failure: (failure) async {
+                    AppLogger.warning('🔄 SyncService: Could not get updated sync token after push: ${failure.message}');
+                  },
+                );
+                syncedItems++;
+              }
+              
+              // Si aucun des deux tests n'est vrai, rien à faire
+              if (localSyncToken == serverSyncToken && !hasQueuedOperations) {
+                AppLogger.debug('🔄 SyncService: No changes needed for ${calendar.path}');
+              }
+            },
+            failure: (failure) async {
+              AppLogger.warning('🔄 SyncService: Could not get server sync token for ${calendar.path}: ${failure.message}');
+              // Fallback: traiter la queue si elle existe
+              final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.uid);
+              if (hasQueuedOperations) {
+                AppLogger.debug('🔄 SyncService: Fallback - processing queue without sync token verification');
+                await _processSyncQueueForCalendar(caldavService, calendar.uid, errors);
+              }
+              errors.add('Could not verify sync state for ${calendar.path}: ${failure.message}');
+              failedItems++;
+            },
+          );
+          
+          _progressController.add(0.2 + (0.6 * (selectedCalendars.indexOf(calendar) + 1) / selectedCalendars.length));
         }
-        // If local is newer, update remote
-        else if (localTask.lastModified.isAfter(remoteTask.lastModified)) {
-          await _caldav.updateTask(localTask);
-        }
       }
 
-      // Handle tasks that only exist remotely
-      final remoteOnlyUids = remoteTaskMap.keys.toSet().difference(localTaskMap.keys.toSet());
-      for (final uid in remoteOnlyUids) {
-        await _storage.saveTask(remoteTaskMap[uid]!);
-      }
-
-      // Handle tasks that only exist locally
-      final localOnlyUids = localTaskMap.keys.toSet().difference(remoteTaskMap.keys.toSet());
-      for (final uid in localOnlyUids) {
-        await _caldav.createTask(localTaskMap[uid]!);
-      }
-
+      _progressController.add(1.0);
       _lastSyncTime = DateTime.now();
-      notifyListeners();
-    } catch (e) {
-      // Log the error but don't rethrow - we want sync to fail gracefully
-      debugPrint('Sync error: $e');
-    } finally {
-      _isSyncing = false;
-      notifyListeners();
+
+      final result = SyncResult(
+        success: errors.isEmpty,
+        syncedItems: syncedItems,
+        failedItems: failedItems,
+        errors: errors,
+        syncTime: _lastSyncTime!,
+      );
+
+      _updateStatus(errors.isEmpty ? SyncStatus.idle : SyncStatus.error);
+      
+      // AppLogger.info('SyncService: Sync completed - ${result.syncedItems} synced, ${result.failedItems} failed');
+      return Result.success(result);
+
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Sync operation failed', e, stackTrace);
+      _updateStatus(SyncStatus.error);
+      return Result.failure(Failure(
+        message: 'Sync operation failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
     }
   }
 
-  /// Queue a task for sync
-  Future<void> queueTaskForSync(TaskModel task) async {
-    try {
-      // Save locally first (optimistic update)
-      await _storage.saveTask(task);
+  /// Process a single sync queue item
+  Future<void> _processSyncQueueItem(SyncQueueItem item, CalDAVService caldavService) async {
+    switch (item.operation) {
+      case SyncOperation.create:
+        // Get the complete task from repository using taskUid (same pattern as UPDATE/DELETE)
+        final taskUid = item.data['taskUid'] as String?;
+        final calendarUid = item.data['calendarUid'] as String?;
+        
+        if (taskUid == null || calendarUid == null) {
+          AppLogger.warning('SyncService: Missing taskUid or calendarUid for create');
+          throw Exception('Missing required data for task creation');
+        }
+        
+        // Get the complete task from repository
+        final taskResult = await _taskRepository.getById(taskUid);
+        await taskResult.when(
+          success: (task) async {
+            if (task == null) {
+              throw Exception('Task not found in repository: $taskUid');
+            }
+            
+            // Get calendar path from repository for proper CalDAV path
+            final calendarResult = await _calendarRepository.getById(calendarUid);
+            await calendarResult.when(
+              success: (calendar) async {
+                if (calendar != null) {
+                  final result = await caldavService.createTask(task, calendarPath: calendar.path);
+                  await result.when(
+                    success: (_) async {
+                      AppLogger.debug('SyncService: Created task ${task.uid} on server in calendar ${calendar.path}');
+                    },
+                    failure: (failure) async {
+                      throw Exception('Failed to create task: ${failure.message}');
+                    },
+                  );
+                } else {
+                  throw Exception('Calendar not found: $calendarUid');
+                }
+              },
+              failure: (failure) async {
+                AppLogger.warning('SyncService: Could not find calendar $calendarUid for task creation');
+                throw Exception('Calendar not found for task creation: ${failure.message}');
+              },
+            );
+          },
+          failure: (failure) async {
+            AppLogger.warning('SyncService: Could not find task $taskUid for creation');
+            throw Exception('Task not found for creation: ${failure.message}');
+          },
+        );
+        break;
 
-      // Try to sync immediately if possible
-      if (!_isSyncing) {
-        final existingTask = _storage.getTask(task.uid);
-        if (existingTask != null) {
-          await _caldav.updateTask(task);
+      case SyncOperation.update:
+        // Get the complete task from repository using taskUid
+        final taskUid = item.data['taskUid'] as String?;
+        final calendarUid = item.data['calendarUid'] as String?;
+        
+        if (taskUid == null || calendarUid == null) {
+          AppLogger.warning('SyncService: Missing taskUid or calendarUid for update');
+          throw Exception('Missing required data for task update');
+        }
+        
+        // Get the complete task from repository
+        final taskResult = await _taskRepository.getById(taskUid);
+        await taskResult.when(
+          success: (task) async {
+            if (task == null) {
+              throw Exception('Task not found in repository: $taskUid');
+            }
+            
+            // Get calendar path from repository
+            final calendarResult = await _calendarRepository.getById(calendarUid);
+            await calendarResult.when(
+              success: (calendar) async {
+                if (calendar != null) {
+                  // Construct task URL: calendar.path + taskUid + .ics
+                  final taskUrl = '${calendar.path}${taskUid}.ics';
+                  
+                  final result = await caldavService.updateTask(task, taskUrl);
+                  await result.when(
+                    success: (_) async {
+                      // AppLogger.debug('SyncService: Updated task ${task.uid} on server at $taskUrl');
+                    },
+                    failure: (failure) async {
+                      throw Exception('Failed to update task: ${failure.message}');
+                    },
+                  );
+                } else {
+                  throw Exception('Calendar not found: $calendarUid');
+                }
+              },
+              failure: (failure) async {
+                AppLogger.warning('SyncService: Could not find calendar $calendarUid for task update');
+                throw Exception('Calendar not found for task update: ${failure.message}');
+              },
+            );
+          },
+          failure: (failure) async {
+            AppLogger.warning('SyncService: Could not find task $taskUid for update');
+            throw Exception('Task not found for update: ${failure.message}');
+          },
+        );
+        break;
+
+      case SyncOperation.delete:
+        // Construct task URL from calendar UID and task UID
+        final calendarUid = item.data['calendarUid'] as String?;
+        final taskUid = item.data['taskUid'] as String?;
+        
+        if (calendarUid != null && taskUid != null) {
+          // Get calendar path from repository
+          final calendarResult = await _calendarRepository.getById(calendarUid);
+          await calendarResult.when(
+            success: (calendar) async {
+              if (calendar != null) {
+                // Construct task URL: calendar.path + taskUid + .ics
+                final taskUrl = '${calendar.path}${taskUid}.ics';
+                // AppLogger.debug('SyncService: Constructed delete URL: $taskUrl');
+                
+                final result = await caldavService.deleteTask(taskUrl);
+                await result.when(
+                  success: (_) async {
+                    // AppLogger.info('SyncService: Deleted task ${item.itemId} from server at $taskUrl');
+                  },
+                  failure: (failure) async {
+                    throw Exception('Failed to delete task: ${failure.message}');
+                  },
+                );
+              } else {
+                throw Exception('Calendar not found: $calendarUid');
+              }
+            },
+            failure: (failure) async {
+              AppLogger.warning('SyncService: Could not find calendar $calendarUid for task deletion');
+              throw Exception('Calendar not found for task deletion: ${failure.message}');
+            },
+          );
         } else {
-          await _caldav.createTask(task);
+          AppLogger.warning('SyncService: Missing calendarUid or taskUid for deletion');
+          throw Exception('Missing required data for task deletion');
+        }
+        break;
+    }
+  }
+
+  /// Queue a sync operation for later processing
+  Future<Result<void>> queueSyncOperation(
+    SyncOperation operation,
+    String itemId,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final queueItem = SyncQueueItem(
+        id: 'sync_${DateTime.now().millisecondsSinceEpoch}_$itemId',
+        operation: operation,
+        itemId: itemId,
+        data: data,
+        createdAt: DateTime.now(),
+      );
+
+      final result = await _localStorage.put(
+        syncQueueBoxName,
+        queueItem.id,
+        _mapFromSyncQueueItem(queueItem),
+      );
+
+      return await result.when(
+        success: (_) async {
+          // AppLogger.debug('SyncService: Queued ${operation.name} operation for $itemId');
+          
+          // IMMEDIATE SYNC: Trigger sync immediately instead of waiting for timer
+          _triggerImmediateSync();
+          
+          return const Result.success(null);
+        },
+        failure: (failure) async {
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Failed to queue sync operation', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to queue sync operation: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Trigger immediate sync (called after queuing operations)
+  void _triggerImmediateSync() {
+    // Use Future.microtask to avoid blocking the current operation
+    Future.microtask(() async {
+      try {
+        final result = await syncNow();
+        result.when(
+          success: (syncResult) {
+            // Sync completed successfully
+          },
+          failure: (failure) {
+            // Sync failed, will retry later
+          },
+        );
+      } catch (e, stackTrace) {
+        AppLogger.error('SyncService: Error during immediate sync', e, stackTrace);
+      }
+    });
+  }
+
+  /// Check if there are queued operations for a specific calendar
+  Future<bool> _hasQueuedOperationsForCalendar(String calendarUid) async {
+    try {
+      final queueResult = await _localStorage.getAll<Map<String, dynamic>>(syncQueueBoxName);
+      return await queueResult.when(
+        success: (queueData) async {
+          AppLogger.debug('🔄 SyncService: Total queue items: ${queueData.length}');
+          
+          final queueItems = queueData
+              .map((data) => _mapToSyncQueueItem(data))
+              .where((item) => item != null)
+              .cast<SyncQueueItem>()
+              .toList();
+          
+          AppLogger.debug('🔄 SyncService: Valid queue items: ${queueItems.length}');
+          
+          // Check if any queue item is for this calendar
+          final calendarItems = queueItems.where((item) => 
+            item.data['calendarUid'] == calendarUid
+          ).toList();
+          
+          AppLogger.debug('🔄 SyncService: Queue items for calendar $calendarUid: ${calendarItems.length}');
+          
+          if (calendarItems.isNotEmpty) {
+            for (final item in calendarItems) {
+              AppLogger.debug('🔄 SyncService: Queue item: ${item.operation.name} for ${item.itemId}');
+            }
+          }
+          
+          return calendarItems.isNotEmpty;
+        },
+        failure: (failure) async {
+          AppLogger.warning('SyncService: Could not check queue for calendar $calendarUid: ${failure.message}');
+          return false;
+        },
+      );
+    } catch (e) {
+      AppLogger.error('SyncService: Error checking queue for calendar $calendarUid', e, StackTrace.current);
+      return false;
+    }
+  }
+
+  /// Get current sync token from server for a calendar
+  Future<Result<String>> _getServerSyncToken(CalDAVService caldavService, TaskCalendar calendar) async {
+    try {
+      // Use WebDAVClient to get sync token
+      final webdavClient = WebDAVClient(
+        serverUrl: caldavService.account.serverUrl,
+        username: caldavService.account.username,
+        password: caldavService.account.password ?? '',
+      );
+      
+      final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop>
+    <D:sync-token />
+  </D:prop>
+</D:propfind>''';
+
+      final result = await webdavClient.propfind(calendar.path, body: propfindBody, depth: 0);
+      return await result.when(
+        success: (response) async {
+          if (response.statusCode == 207) {
+            final syncToken = XMLResponseParser.extractSyncToken(response.body);
+            if (syncToken != null) {
+              return Result.success(syncToken);
+            } else {
+              return Result.failure(Failure(
+                message: 'No sync token found in response',
+                exception: Exception('Missing sync token'),
+              ));
+            }
+          } else {
+            return Result.failure(Failure(
+              message: 'PROPFIND failed with status ${response.statusCode}',
+              exception: Exception('HTTP ${response.statusCode}'),
+            ));
+          }
+        },
+        failure: (failure) async => Result.failure(failure),
+      );
+    } catch (e, stackTrace) {
+      return Result.failure(Failure(
+        message: 'Failed to get server sync token: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Sync changes from server using sync-collection REPORT
+  Future<void> _syncFromServer(CalDAVService caldavService, TaskCalendar calendar, String newSyncToken, List<String> errors) async {
+    try {
+      AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
+      
+      // Use BackgroundSyncService logic for incremental sync
+      final webdavClient = WebDAVClient(
+        serverUrl: caldavService.account.serverUrl,
+        username: caldavService.account.username,
+        password: caldavService.account.password ?? '',
+      );
+      
+      if (calendar.syncToken == null) {
+        // First sync - fetch all tasks
+        final tasksResult = await caldavService.fetchTasks(calendarPath: calendar.path);
+        await tasksResult.when(
+          success: (remoteTasks) async {
+            for (final task in remoteTasks) {
+              final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
+              await _taskRepository.save(taskWithCalendar);
+            }
+            AppLogger.debug('🔄 SyncService: Full sync completed - ${remoteTasks.length} tasks from ${calendar.path}');
+          },
+          failure: (failure) async {
+            errors.add('Failed to fetch tasks from ${calendar.path}: ${failure.message}');
+          },
+        );
+      } else {
+        // Incremental sync using sync-collection
+        final changesResult = await _getSyncChanges(webdavClient, calendar.path, calendar.syncToken!);
+        await changesResult.when(
+          success: (result) async {
+            final changes = result['changes'] as List<dynamic>;
+            AppLogger.debug('🔄 SyncService: Processing ${changes.length} changes from server');
+            
+            // Process each change
+            for (final change in changes) {
+              final changeMap = change as Map<String, dynamic>;
+              final changeType = changeMap['type'] as String;
+              final href = changeMap['href'] as String;
+              
+              if (changeType == 'deleted') {
+                // Delete task from local storage
+                await _deleteTaskByHref(href, calendar.uid);
+                AppLogger.debug('🔄 SyncService: Deleted task $href');
+              } else if (changeType == 'updated') {
+                // Create or update task in local storage
+                final taskData = changeMap['task'] as Map<String, dynamic>;
+                final task = Task.fromJson(taskData);
+                final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
+                await _taskRepository.save(taskWithCalendar);
+                AppLogger.debug('🔄 SyncService: Updated task ${task.uid}');
+              }
+            }
+          },
+          failure: (failure) async {
+            errors.add('Failed to get sync changes for ${calendar.path}: ${failure.message}');
+          },
+        );
+      }
+      
+      // Update calendar with new sync token
+      final updatedCalendar = calendar.copyWith(
+        syncToken: newSyncToken,
+        lastSyncAt: DateTime.now(),
+      );
+      await _calendarRepository.save(updatedCalendar);
+      
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Failed to sync from server for ${calendar.path}', e, stackTrace);
+      errors.add('Failed to sync from server for ${calendar.path}: $e');
+    }
+  }
+
+  /// Process sync queue operations for a specific calendar
+  Future<void> _processSyncQueueForCalendar(CalDAVService caldavService, String calendarUid, List<String> errors) async {
+    try {
+      AppLogger.debug('🔄 SyncService: Processing queue for calendar $calendarUid');
+      
+      final queueResult = await _localStorage.getAll<Map<String, dynamic>>(syncQueueBoxName);
+      await queueResult.when(
+        success: (queueData) async {
+          final queueItems = queueData
+              .map((data) => _mapToSyncQueueItem(data))
+              .where((item) => item != null)
+              .cast<SyncQueueItem>()
+              .where((item) => item.data['calendarUid'] == calendarUid)
+              .toList();
+
+          AppLogger.debug('🔄 SyncService: Found ${queueItems.length} queued operations for calendar $calendarUid');
+
+          for (final item in queueItems) {
+            try {
+              await _processSyncQueueItem(item, caldavService);
+              // Remove from queue on success
+              await _localStorage.delete(syncQueueBoxName, item.id);
+              AppLogger.debug('🔄 SyncService: Successfully processed and removed queue item ${item.id}');
+            } catch (e) {
+              AppLogger.error('SyncService: Failed to process queue item ${item.id}', e, StackTrace.current);
+              
+              if (item.retryCount >= maxRetryCount) {
+                // Max retries reached, remove from queue
+                errors.add('Max retries reached for item ${item.id}: $e');
+                await _localStorage.delete(syncQueueBoxName, item.id);
+              } else {
+                // Increment retry count
+                final updatedItem = item.copyWith(retryCount: item.retryCount + 1);
+                await _localStorage.put(syncQueueBoxName, item.id, _mapFromSyncQueueItem(updatedItem));
+              }
+            }
+          }
+        },
+        failure: (failure) async {
+          errors.add('Failed to load sync queue for calendar $calendarUid: ${failure.message}');
+        },
+      );
+    } catch (e) {
+      AppLogger.error('SyncService: Failed to process sync queue for calendar $calendarUid', e, StackTrace.current);
+      errors.add('Failed to process sync queue for calendar $calendarUid: $e');
+    }
+  }
+
+  /// Get sync changes using REPORT sync-collection (RFC 6578)
+  Future<Result<Map<String, dynamic>>> _getSyncChanges(WebDAVClient webdavClient, String calendarPath, String syncToken) async {
+    try {
+      AppLogger.debug('🔄 SyncService: Making sync-collection request for $calendarPath with token: $syncToken');
+      
+      final reportBody = '''<?xml version="1.0" encoding="utf-8" ?>
+<D:sync-collection xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:sync-token>$syncToken</D:sync-token>
+  <D:sync-level>1</D:sync-level>
+  <D:prop>
+    <D:getetag />
+    <C:calendar-data />
+  </D:prop>
+</D:sync-collection>''';
+
+      AppLogger.debug('🔄 SyncService: Request body: $reportBody');
+
+      final result = await webdavClient.report(calendarPath, reportBody);
+      return await result.when(
+        success: (response) async {
+          AppLogger.debug('🔄 SyncService: REPORT sync-collection response: ${response.statusCode}');
+          AppLogger.debug('🔄 SyncService: Response body: ${response.body}');
+          
+          if (response.statusCode == 207) {
+            final parsedResult = _parseSyncCollectionResponse(response.body);
+            AppLogger.debug('🔄 SyncService: Parsed result: $parsedResult');
+            return Result.success(parsedResult);
+          } else {
+            AppLogger.error('🔄 SyncService: REPORT sync-collection failed with status ${response.statusCode}: ${response.body}');
+            return Result.failure(Failure(
+              message: 'REPORT sync-collection failed with status ${response.statusCode}',
+              exception: Exception('HTTP ${response.statusCode}'),
+            ));
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('🔄 SyncService: Failed to send sync-collection request', failure.exception, failure.stackTrace);
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('🔄 SyncService: Exception in _getSyncChanges', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to get sync changes: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Parse REPORT sync-collection response
+  Map<String, dynamic> _parseSyncCollectionResponse(String xmlResponse) {
+    final changes = <Map<String, dynamic>>[];
+    String? newSyncToken;
+
+    try {
+      AppLogger.debug('🔄 SyncService: Parsing sync-collection response...');
+      final document = XmlDocument.parse(xmlResponse);
+      
+      // Extract new sync token
+      final syncTokenElement = document.findAllElements('sync-token').firstOrNull;
+      newSyncToken = syncTokenElement?.innerText;
+      AppLogger.debug('🔄 SyncService: Found new sync token: $newSyncToken');
+      
+      // Extract responses
+      final responseElements = document.findAllElements('response').toList();
+      AppLogger.debug('🔄 SyncService: Found ${responseElements.length} response elements');
+      
+      for (final responseElement in responseElements) {
+        final href = responseElement.findElements('href').firstOrNull?.innerText;
+        AppLogger.debug('🔄 SyncService: Processing href: $href');
+        if (href == null) {
+          AppLogger.warning('🔄 SyncService: Skipping response element without href');
+          continue;
+        }
+        
+        final propstatElement = responseElement.findElements('propstat').firstOrNull;
+        if (propstatElement == null) {
+          // Check for direct status in response element (for deletions)
+          final directStatusElement = responseElement.findElements('status').firstOrNull;
+          if (directStatusElement != null) {
+            final directStatus = directStatusElement.innerText;
+            AppLogger.debug('🔄 SyncService: Direct status for $href: $directStatus');
+            
+            if (directStatus.contains('404')) {
+              // Resource was deleted
+              changes.add({
+                'href': href,
+                'type': 'deleted',
+              });
+              AppLogger.debug('🔄 SyncService: Added deleted change for $href');
+            } else {
+              AppLogger.warning('🔄 SyncService: Unhandled direct status for $href: $directStatus');
+            }
+          } else {
+            AppLogger.warning('🔄 SyncService: Skipping response element without propstat or status for href: $href');
+          }
+          continue;
+        }
+        
+        final statusElement = propstatElement.findElements('status').firstOrNull;
+        final status = statusElement?.innerText ?? '';
+        AppLogger.debug('🔄 SyncService: Status for $href: $status');
+        
+        if (status.contains('404')) {
+          // Resource was deleted
+          changes.add({
+            'href': href,
+            'type': 'deleted',
+          });
+          AppLogger.debug('🔄 SyncService: Added deleted change for $href');
+        } else if (status.contains('200')) {
+          // Resource was created or updated
+          final propElement = propstatElement.findElements('prop').firstOrNull;
+          if (propElement != null) {
+            AppLogger.debug('🔄 SyncService: Prop element children: ${propElement.children.whereType<XmlElement>().map((c) => c.name.local).toList()}');
+            AppLogger.debug('🔄 SyncService: All descendants: ${propElement.descendants.whereType<XmlElement>().map((d) => d.name.local).toList()}');
+            
+            final etag = propElement.findElements('getetag').firstOrNull?.innerText;
+            final calendarDataElement = propElement.findAllElements('calendar-data').firstOrNull;
+            
+            AppLogger.debug('🔄 SyncService: Found etag: $etag, calendar-data present: ${calendarDataElement != null}');
+            
+            if (calendarDataElement == null) {
+              // Try alternative approaches to find calendar-data
+              final allElements = propElement.descendants.whereType<XmlElement>().toList();
+              AppLogger.debug('🔄 SyncService: Looking for calendar-data in ${allElements.length} descendants');
+              for (final element in allElements) {
+                AppLogger.debug('🔄 SyncService: Element: ${element.name.local} (qualified: ${element.name.qualified})');
+                if (element.name.local == 'calendar-data') {
+                  AppLogger.debug('🔄 SyncService: Found calendar-data by local name!');
+                  final vtodoContent = element.innerText;
+                  AppLogger.debug('🔄 SyncService: VTODO content length: ${vtodoContent.length}');
+                  AppLogger.debug('🔄 SyncService: VTODO content: $vtodoContent');
+                  
+                  final task = _parseVTODOFromCalendarData(vtodoContent);
+                  
+                  if (task != null) {
+                    changes.add({
+                      'href': href,
+                      'etag': etag,
+                      'type': 'updated',
+                      'task': task.toJson(),
+                    });
+                    AppLogger.debug('🔄 SyncService: Added updated change for task ${task.uid}');
+                  } else {
+                    AppLogger.warning('🔄 SyncService: Failed to parse VTODO for $href');
+                  }
+                  break;
+                }
+              }
+            } else {
+              final vtodoContent = calendarDataElement.innerText;
+              AppLogger.debug('🔄 SyncService: VTODO content length: ${vtodoContent.length}');
+              AppLogger.debug('🔄 SyncService: VTODO content: $vtodoContent');
+              
+              final task = _parseVTODOFromCalendarData(vtodoContent);
+              
+              if (task != null) {
+                changes.add({
+                  'href': href,
+                  'etag': etag,
+                  'type': 'updated',
+                  'task': task.toJson(),
+                });
+                AppLogger.debug('🔄 SyncService: Added updated change for task ${task.uid}');
+              } else {
+                AppLogger.warning('🔄 SyncService: Failed to parse VTODO for $href');
+              }
+            }
+          } else {
+            AppLogger.warning('🔄 SyncService: No prop element found for $href');
+          }
+        } else {
+          AppLogger.warning('🔄 SyncService: Unhandled status for $href: $status');
         }
       }
+      
+      AppLogger.debug('🔄 SyncService: Parsing complete. Changes: ${changes.length}, New sync token: $newSyncToken');
     } catch (e) {
-      debugPrint('Failed to queue task for sync: $e');
-      // The task is still saved locally and will be synced during the next sync operation
+      AppLogger.error('🔄 SyncService: Failed to parse sync-collection response', e, StackTrace.current);
     }
+
+    return {
+      'changes': changes,
+      'syncToken': newSyncToken,
+    };
   }
 
-  /// Queue a task deletion for sync
-  Future<void> queueTaskDeletionForSync(String uid) async {
+  /// Parse VTODO from calendar data
+  Task? _parseVTODOFromCalendarData(String calendarData) {
     try {
-      // Delete locally first (optimistic update)
-      await _storage.deleteTask(uid);
-
-      // Try to sync immediately if possible
-      if (!_isSyncing) {
-        await _caldav.deleteTask(uid);
-      }
+      // Use VTODOParser for proper parsing with escaping/unescaping
+      return VTODOParser.parseVTODOFromCalendarData(calendarData);
     } catch (e) {
-      debugPrint('Failed to queue task deletion for sync: $e');
-      // The task is still deleted locally and will be synced during the next sync operation
+      AppLogger.error('SyncService: Failed to parse VTODO from calendar data', e, StackTrace.current);
+    }
+    return null;
+  }
+
+  /// Update sync status and notify listeners
+  void _updateStatus(SyncStatus newStatus) {
+    if (_status != newStatus) {
+      _status = newStatus;
+      _statusController.add(_status);
+      // AppLogger.debug('SyncService: Status changed to ${_status.name}');
     }
   }
 
-  @override
+  /// Helper to convert SyncQueueItem to Map for storage
+  Map<String, dynamic> _mapFromSyncQueueItem(SyncQueueItem item) {
+    return {
+      'id': item.id,
+      'operation': item.operation.name,
+      'itemId': item.itemId,
+      'data': item.data,
+      'createdAt': item.createdAt.toIso8601String(),
+      'retryCount': item.retryCount,
+    };
+  }
+
+  /// Helper to convert Map to SyncQueueItem
+  SyncQueueItem? _mapToSyncQueueItem(Map<String, dynamic> data) {
+    try {
+      // Safe conversion of nested data Map
+      Map<String, dynamic> itemData;
+      final rawData = data['data'];
+      
+      if (rawData is Map<String, dynamic>) {
+        itemData = rawData;
+      } else if (rawData is Map) {
+        // Handle Map<dynamic, dynamic> to Map<String, dynamic> conversion
+        itemData = <String, dynamic>{};
+        rawData.forEach((key, value) {
+          itemData[key.toString()] = value;
+        });
+      } else {
+        AppLogger.warning('SyncService: Invalid data field in sync queue item: ${rawData.runtimeType}');
+        return null;
+      }
+      
+      return SyncQueueItem(
+        id: data['id'] as String,
+        operation: SyncOperation.values.firstWhere(
+          (op) => op.name == data['operation'],
+        ),
+        itemId: data['itemId'] as String,
+        data: itemData,
+        createdAt: DateTime.parse(data['createdAt'] as String),
+        retryCount: data['retryCount'] as int? ?? 0,
+      );
+    } catch (e) {
+      AppLogger.error('SyncService: Failed to parse sync queue item', e, StackTrace.current);
+      return null;
+    }
+  }
+
+  /// Delete task by href from local storage
+  Future<void> _deleteTaskByHref(String href, String calendarUid) async {
+    try {
+      // Extract UID from href (assuming href ends with UID.ics)
+      final filename = href.split('/').last;
+      final uid = filename.endsWith('.ics') ? filename.substring(0, filename.length - 4) : filename;
+      
+      final taskResult = await _taskRepository.getById(uid);
+      await taskResult.when(
+        success: (task) async {
+          if (task != null && task.sourceCalendarUid == calendarUid) {
+            await _taskRepository.delete(uid);
+            AppLogger.debug('🔄 SyncService: Deleted local task $uid');
+          }
+        },
+        failure: (failure) async {
+          AppLogger.debug('🔄 SyncService: Task $uid not found locally for deletion');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Failed to delete task by href $href', e, stackTrace);
+    }
+  }
+
+  /// Dispose resources
   void dispose() {
     stopPeriodicSync();
-    super.dispose();
+    _statusController.close();
+    _progressController.close();
+    // AppLogger.info('SyncService: Disposed');
   }
 } 

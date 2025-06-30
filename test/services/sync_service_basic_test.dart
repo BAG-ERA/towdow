@@ -1,0 +1,85 @@
+// Basic sync service test to validate setup
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
+
+import 'package:flowit_app/data/services/sync_service.dart';
+import 'package:flowit_app/data/services/local_storage_service.dart';
+import 'package:flowit_app/data/repositories/task_repository.dart';
+import 'package:flowit_app/data/repositories/account_repository.dart';
+import 'package:flowit_app/data/repositories/calendar_repository.dart';
+import 'package:flowit_app/data/models/caldav_account.dart';
+import 'package:flowit_app/core/result.dart';
+
+import 'sync_service_test.mocks.dart';
+
+@GenerateMocks([
+  TaskRepository,
+  AccountRepository,
+  CalendarRepository,
+  LocalStorageService,
+])
+void main() {
+  group('SyncService Basic Tests', () {
+    late SyncService syncService;
+    late MockTaskRepository mockTaskRepository;
+    late MockAccountRepository mockAccountRepository;
+    late MockCalendarRepository mockCalendarRepository;
+    late MockLocalStorageService mockLocalStorage;
+
+    setUp(() {
+      mockTaskRepository = MockTaskRepository();
+      mockAccountRepository = MockAccountRepository();
+      mockCalendarRepository = MockCalendarRepository();
+      mockLocalStorage = MockLocalStorageService();
+
+      syncService = SyncService(
+        taskRepository: mockTaskRepository,
+        accountRepository: mockAccountRepository,
+        calendarRepository: mockCalendarRepository,
+        localStorage: mockLocalStorage,
+      );
+    });
+
+    test('should initialize with no account', () async {
+      // Arrange
+      when(mockAccountRepository.getActiveAccount())
+          .thenAnswer((_) async => const Result.success(null));
+
+      // Act
+      final result = await syncService.initialize();
+
+      // Assert
+      final isSuccess = result.when(
+        success: (_) => true,
+        failure: (_) => false,
+      );
+      expect(isSuccess, true);
+      verify(mockAccountRepository.getActiveAccount()).called(1);
+    });
+
+    test('should provide streams and status', () {
+      expect(syncService.statusStream, isA<Stream<SyncStatus>>());
+      expect(syncService.progressStream, isA<Stream<double>>());
+      expect(syncService.status, SyncStatus.idle);
+      expect(syncService.lastSyncTime, isNull);
+    });
+
+    test('should handle no account during sync', () async {
+      // Arrange
+      when(mockAccountRepository.getActiveAccount())
+          .thenAnswer((_) async => const Result.success(null));
+
+      // Act
+      final result = await syncService.syncNow();
+
+      // Assert
+      final hasCorrectError = result.when(
+        success: (_) => false,
+        failure: (failure) => failure.message.contains('No active CalDAV account'),
+      );
+      expect(hasCorrectError, true);
+      expect(syncService.status, SyncStatus.offline);
+    });
+  });
+} 

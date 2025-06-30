@@ -1,0 +1,80 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Separation of concerns
+
+    Use clearly defined data and UI layers. : Separation of concerns is the most important architectural principle. The data layer exposes application data to the rest of the app, and contains most of the business logic in your application. The UI layer displays application data and listens for user events from users. The UI layer contains separate classes for UI logic and widgets.
+    Use the repository pattern in the data layer :The repository pattern is a software design pattern that isolates the data access logic from the rest of the application. It creates an abstraction layer between the application's business logic and the underlying data storage mechanisms (databases, APIs, file systems, etc.). In practice, this means creating Repository classes and Service classes.
+    Use ViewModels and Views in the UI layer. Separation of concerns is the most important architectural principle. This particular separation makes your code much less error prone because your widgets remain "dumb".
+    Use ChangeNotifiers and Listenables to handle widget updates. : The ChangeNotifier API is part of the Flutter SDK, and is a convenient way to have your widgets observe changes in your ViewModels.
+    Do not put logic in widgets. Logic should be encapsulated in methods on the ViewModel. The only logic a view should contain is:
+        Simple if-statements to show and hide widgets based on a flag or nullable field in the ViewModel
+        Animation logic that relies on the widget to calculate
+        Layout logic based on device information, like screen size or orientation.
+        Simple routing logic
+
+Handling data:
+    Use unidirectional data flow.
+    Use Commands to handle events from user interaction.
+    Use immutable data models.
+    Use freezed or built_value to generate immutable data models.
+
+App structure
+    Use dependency injection. Dependency injection prevents your app from having globally accessible objects, which makes your code less error prone. We recommend you use the provider package to handle dependency injection.
+    Use standardized naming conventions for classes, files and directories.We recommend naming classes for the architectural component they represent. For example, you may have the following classes:
+        HomeViewModel
+        HomeScreen
+        UserRepository
+        ClientApiService
+    For clarity, we do not recommend using names that can be confused with objects from the Flutter SDK.
+    Use abstract repository classes : Repository classes are the sources of truth for all data in your app, and facilitate communication with external APIs. Creating abstract repository classes allows you to create different implementations, which can be used for different app environments, such as "development" and "staging".
+
+Testing
+    Test architectural components separately, and together. 
+        * Write unit tests for every service, repository and ViewModel class. These tests should test the logic of every method individually.
+    Write widget tests for views. Testing routing and dependency injection are particularly important.
+
+    Make fakes for testing (and write code that takes advantage of fakes.)
+        Make fakes for testing (and write code that takes advantage of fakes.)
+
+
+Design patterns 
+    Optimistic UI: The app updates immediately on user actions, then synchronizes changes in the background.When building user experiences, the perception of performance is sometimes just as important as the actual performance of the code. In general, users don’t like waiting for an action to finish to see the result, and anything that takes more than a few milliseconds could be considered “slow” or “unresponsive” from the user’s perspective.
+    Persistent storage architecture: Key-value
+    An icon showing a generic application.
+
+    Persistent storage architecture: Key-value data Save application data to a user's on-device key-value store. Most Flutter applications, no matter how small or big they are, require storing data on the user’s device at some point, such as API keys, user preferences or data that should be available offline.
+
+    Offline-First: Local storage (key-value) is the source of truth, ensuring reliable usage even when offline. An offline-first application is an app capable of offering most or all of its functionality while being disconnected from the internet. Offline-first applications usually rely on stored data to offer users temporary access to data that would otherwise only be available online.
+
+    The command pattern Simplify view model logic by implementing a Command class.Model-View-ViewModel (MVVM) is a design pattern that separates a feature of an application into three parts: the model, the view model and the view. Views and view models make up the UI layer of an application. Repositories and services represent the data layer of an application, or the model layer of MVVM.
+
+    Non standard vtoto : as we use common calendar with non standard fields we will sync with calendar exposing non well formated vtodo (for instance vtodo without x-flowit-type or wrong value). service and sync should correct and resync those vtodo with missing fields. By default any incompleted or corrup vtodo is a task with default validator and without project.
+
+CodeBase concern,
+
+    Minimal Dependencies: Rely primarily on Flutter's Material widgets and standard libraries to keep the code base maintainable. Error handling with Result objects Improve error handling across classes with Result objects.Dart provides a built-in error handling mechanism with the ability to throw and catch exceptions.As mentioned in the Error handling documentation, Dart's exceptions are unhandled exceptions. This means that methods that throw exceptions don’t need to declare them, and calling methods aren't required to catch them either.
+
+    use layer first project structure
+
+    Cut too large files : for instance if a widget goes more than 600 lines try to create smaller component called by the previous one.
+
+    use propper loggin system, make logs explaining file and position of the call. 
+
+    Add a description at the start of each file to explain its use
+
+    you can safely ignore error coming from /lib.old as it is unused code kept as reference.
+
+    NEVER hardcode something the codebase should be production ready
+
+UX 
+    Adaptive UX: A single codebase supports both desktop (with persistent sidebars) and mobile (with slide-out navigation) layouts, following Flutter's adaptive guidelines and best practices described in Extreme UI Adaptability in Flutter.
+    Interoperability: Standard iCalendar fields let FlowIt integrate with any CalDAV-compliant server or client; custom fields (x-flowit-*) enable advanced features within FlowIt.
+
+Other
+    
+    We use Windows as developement os
+
+

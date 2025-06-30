@@ -1,0 +1,323 @@
+﻿// WebDAV client for CalDAV operations
+// Implements RFC 4791 (CalDAV) and RFC 3744 (WebDAV ACL) HTTP methods
+
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+import '../../core/result.dart';
+import '../../core/logger.dart';
+
+class WebDAVResponse {
+  final int statusCode;
+  final Map<String, String> headers;
+  final String body;
+
+  WebDAVResponse({
+    required this.statusCode,
+    required this.headers,
+    required this.body,
+  });
+
+  bool get isSuccess => statusCode >= 200 && statusCode < 300;
+}
+
+class WebDAVClient {
+  final String serverUrl;
+  final String username;
+  final String password;
+  final Duration timeout;
+
+  late final String _basicAuthHeader;
+
+  WebDAVClient({
+    required this.serverUrl,
+    required this.username,
+    required this.password,
+    this.timeout = const Duration(seconds: 30),
+  }) {
+    // Create Basic Auth header
+    final credentials = base64Encode(utf8.encode('$username:$password'));
+    _basicAuthHeader = 'Basic $credentials';
+  }
+
+  /// Common headers for CalDAV requests
+  Map<String, String> get _commonHeaders => {
+    'Authorization': _basicAuthHeader,
+    'User-Agent': 'FlowIt/1.0 (CalDAV Client)',
+    'Accept': 'application/xml, text/xml',
+    'Content-Type': 'application/xml; charset=utf-8',
+  };
+
+  /// Build URI correctly handling absolute vs relative paths
+  Uri _buildUri(String path) {
+    final serverUri = Uri.parse(serverUrl);
+    
+    if (path.startsWith('/')) {
+      // Absolute path - use server's host but replace the path completely
+      return Uri(
+        scheme: serverUri.scheme,
+        host: serverUri.host,
+        port: serverUri.port,
+        path: path,
+      );
+    } else {
+      // Relative path - append to current server URL
+      return Uri.parse('$serverUrl$path');
+    }
+  }
+
+  /// PROPFIND method - RFC 4918 Section 9.1
+  /// Used for capability discovery and resource listing
+  Future<Result<WebDAVResponse>> propfind(
+    String path, {
+    String? body,
+    int depth = 1,
+  }) async {
+    try {
+      // AppLogger.debug('WebDAVClient: PROPFIND $path (depth: $depth)');
+      
+      final uri = _buildUri(path);
+      final headers = {
+        ..._commonHeaders,
+        'Depth': depth.toString(),
+      };
+
+      final request = http.Request('PROPFIND', uri)
+        ..headers.addAll(headers)
+        ..body = body ?? _defaultPropfindBody;
+
+      final streamedResponse = await request.send().timeout(timeout);
+      final responseBody = await streamedResponse.stream.bytesToString();
+      
+      final result = WebDAVResponse(
+        statusCode: streamedResponse.statusCode,
+        headers: streamedResponse.headers,
+        body: responseBody,
+      );
+
+      // AppLogger.debug('WebDAVClient: PROPFIND response ${streamedResponse.statusCode}');
+      return Result.success(result);
+    } catch (e, stackTrace) {
+      AppLogger.error('WebDAVClient: PROPFIND failed', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'PROPFIND request failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// OPTIONS method - RFC 2616 Section 9.2
+  /// Used to discover server capabilities
+  Future<Result<WebDAVResponse>> options(String path) async {
+    try {
+      // AppLogger.debug('WebDAVClient: OPTIONS $path');
+      
+      final uri = _buildUri(path);
+      final request = http.Request('OPTIONS', uri)
+        ..headers.addAll(_commonHeaders);
+
+      final streamedResponse = await request.send().timeout(timeout);
+      final responseBody = await streamedResponse.stream.bytesToString();
+      
+      final result = WebDAVResponse(
+        statusCode: streamedResponse.statusCode,
+        headers: streamedResponse.headers,
+        body: responseBody,
+      );
+
+      // AppLogger.debug('WebDAVClient: OPTIONS response ${streamedResponse.statusCode}');
+      return Result.success(result);
+    } catch (e, stackTrace) {
+      AppLogger.error('WebDAVClient: OPTIONS failed', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'OPTIONS request failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// GET method - RFC 2616 Section 9.3
+  /// Used to retrieve calendar objects (VTODO)
+  Future<Result<WebDAVResponse>> get(String path) async {
+    try {
+      // AppLogger.debug('WebDAVClient: GET $path');
+      
+      final uri = _buildUri(path);
+      final response = await http.get(uri, headers: _commonHeaders)
+          .timeout(timeout);
+
+      final result = WebDAVResponse(
+        statusCode: response.statusCode,
+        headers: response.headers,
+        body: response.body,
+      );
+
+      // AppLogger.debug('WebDAVClient: GET response ${response.statusCode}');
+      return Result.success(result);
+    } catch (e, stackTrace) {
+      AppLogger.error('WebDAVClient: GET failed', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'GET request failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// PUT method - RFC 2616 Section 9.6
+  /// Used to create/update calendar objects
+  Future<Result<WebDAVResponse>> put(String path, String body, {String? etag}) async {
+    try {
+      // AppLogger.debug('WebDAVClient: PUT $path');
+      
+      final uri = _buildUri(path);
+      final headers = {
+        ..._commonHeaders,
+        'Content-Type': 'text/calendar; charset=utf-8',
+      };
+
+      // Add If-Match header for updates (optimistic locking)
+      if (etag != null) {
+        headers['If-Match'] = etag;
+      }
+
+      final response = await http.put(uri, headers: headers, body: body)
+          .timeout(timeout);
+
+      final result = WebDAVResponse(
+        statusCode: response.statusCode,
+        headers: response.headers,
+        body: response.body,
+      );
+
+      // AppLogger.debug('WebDAVClient: PUT response ${response.statusCode}');
+      return Result.success(result);
+    } catch (e, stackTrace) {
+      AppLogger.error('WebDAVClient: PUT failed', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'PUT request failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// DELETE method - RFC 2616 Section 9.7
+  /// Used to delete calendar objects
+  Future<Result<WebDAVResponse>> delete(String path, {String? etag}) async {
+    try {
+      // AppLogger.debug('WebDAVClient: DELETE $path');
+      
+      final uri = _buildUri(path);
+      final headers = Map<String, String>.from(_commonHeaders);
+
+      // Add If-Match header for conditional deletion
+      if (etag != null) {
+        headers['If-Match'] = etag;
+      }
+
+      final response = await http.delete(uri, headers: headers)
+          .timeout(timeout);
+
+      final result = WebDAVResponse(
+        statusCode: response.statusCode,
+        headers: response.headers,
+        body: response.body,
+      );
+
+      // AppLogger.debug('WebDAVClient: DELETE response ${response.statusCode}');
+      return Result.success(result);
+    } catch (e, stackTrace) {
+      AppLogger.error('WebDAVClient: DELETE failed', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'DELETE request failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// REPORT method - RFC 3253 Section 3.6, enhanced by RFC 4791 Section 7
+  /// Used for CalDAV calendar queries
+  Future<Result<WebDAVResponse>> report(String path, String body) async {
+    try {
+      // AppLogger.debug('WebDAVClient: REPORT $path');
+      
+      final uri = _buildUri(path);
+      final request = http.Request('REPORT', uri)
+        ..headers.addAll(_commonHeaders)
+        ..body = body;
+
+      final streamedResponse = await request.send().timeout(timeout);
+      final responseBody = await streamedResponse.stream.bytesToString();
+      
+      final result = WebDAVResponse(
+        statusCode: streamedResponse.statusCode,
+        headers: streamedResponse.headers,
+        body: responseBody,
+      );
+
+      // AppLogger.debug('WebDAVClient: REPORT response ${streamedResponse.statusCode}');
+      return Result.success(result);
+    } catch (e, stackTrace) {
+      AppLogger.error('WebDAVClient: REPORT failed', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'REPORT request failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// MKCALENDAR method - RFC 4791 Section 5.3.1  
+  /// Used to create new calendar collections
+  Future<Result<WebDAVResponse>> mkcalendar(String path, String body) async {
+    try {
+      // AppLogger.debug('WebDAVClient: MKCALENDAR $path');
+      
+      final uri = _buildUri(path);
+      final headers = {
+        ..._commonHeaders,
+        'Content-Type': 'application/xml; charset=utf-8',
+      };
+      
+      final request = http.Request('MKCALENDAR', uri)
+        ..headers.addAll(headers)
+        ..body = body;
+
+      final streamedResponse = await request.send().timeout(timeout);
+      final responseBody = await streamedResponse.stream.bytesToString();
+      
+      final result = WebDAVResponse(
+        statusCode: streamedResponse.statusCode,
+        headers: streamedResponse.headers,
+        body: responseBody,
+      );
+
+      // AppLogger.debug('WebDAVClient: MKCALENDAR response ${streamedResponse.statusCode}');
+      return Result.success(result);
+    } catch (e, stackTrace) {
+      AppLogger.error('WebDAVClient: MKCALENDAR failed', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'MKCALENDAR request failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Default PROPFIND body for basic resource discovery
+  static const String _defaultPropfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:prop>
+    <D:resourcetype />
+    <D:displayname />
+    <C:supported-calendar-component-set />
+    <C:calendar-description />
+    <C:calendar-timezone />
+    <D:current-user-privilege-set />
+  </D:prop>
+</D:propfind>''';
+} 

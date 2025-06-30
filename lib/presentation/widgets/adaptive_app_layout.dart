@@ -1,0 +1,100 @@
+﻿// Adaptive app layout that switches between desktop and mobile layouts
+// Desktop: permanent sidebar + main content area
+// Mobile: drawer navigation + full-screen content
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'navbar/app_sidebar.dart';
+
+enum AppDestination {
+  myTasks(
+    label: 'My Tasks',
+    icon: Icons.checklist_rounded,
+    route: '/',
+  ),
+  projects(
+    label: 'Projects',
+    icon: Icons.folder_rounded,
+    route: '/projects',
+  ),
+  settings(
+    label: 'Settings',
+    icon: Icons.settings_rounded,
+    route: '/settings',
+  );
+
+  const AppDestination({
+    required this.label,
+    required this.icon,
+    required this.route,
+  });
+
+  final String label;
+  final IconData icon;
+  final String route;
+}
+
+class AdaptiveAppLayout extends ConsumerWidget {
+  const AdaptiveAppLayout({
+    super.key,
+    required this.currentDestination,
+    required this.child,
+  });
+
+  final AppDestination currentDestination;
+  final Widget child;
+
+  static const double _desktopBreakpoint = 800.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDesktop = MediaQuery.of(context).size.width >= _desktopBreakpoint;
+
+    if (isDesktop) {
+      return _buildDesktopLayout(context);
+    } else {
+      return _buildMobileLayout(context);
+    }
+  }
+
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Scaffold(
+      body: Row(
+        children: [
+          // Fixed sidebar
+          AppSidebar(currentDestination: currentDestination),
+          // Main content area
+          Expanded(
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(currentDestination.label),
+        centerTitle: false,
+        leading: Builder(
+          builder: (context) => IconButton(
+          icon: const Icon(Icons.menu_rounded),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            tooltip: 'Menu',
+          ),
+                  ),
+                ),
+      drawer: _buildMobileDrawer(context),
+      body: child,
+    );
+  }
+
+  Widget _buildMobileDrawer(BuildContext context) {
+    return Drawer(
+      child: AppSidebar(currentDestination: currentDestination),
+          );
+  }
+
+
+} 

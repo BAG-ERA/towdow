@@ -1,0 +1,163 @@
+﻿// Task calendar model for CalDAV calendar information
+// Represents projects at VCALENDAR level according to FlowIt specifications
+// Supports persistent storage with Hive and synchronization tracking
+
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:hive/hive.dart';
+import 'task.dart';
+import 'attendee.dart';
+
+part 'task_calendar.freezed.dart';
+part 'task_calendar.g.dart';
+
+@HiveType(typeId: 10)
+@freezed
+class TaskCalendar with _$TaskCalendar {
+  const factory TaskCalendar({
+    // CalDAV server properties
+    @HiveField(0) required String path,
+    @HiveField(1) required String displayName,
+    @HiveField(2) @Default('') String description,
+    @HiveField(3) @Default(true) bool supportsTodos,
+    @HiveField(4) String? etag,
+    @HiveField(5) String? color,
+    @HiveField(6) DateTime? lastSyncAt,
+    @HiveField(7) @Default(false) bool isReadOnly,
+    @HiveField(24) String? syncToken,
+    
+    // Required VCALENDAR properties for FlowIt projects
+    @HiveField(8) required String uid,
+    @HiveField(9) required DateTime dtstamp,
+    @HiveField(10) required DateTime created,
+    @HiveField(11) required DateTime lastModified,
+    @HiveField(12) required String summary,
+    @HiveField(13) required String status,
+    @HiveField(14) @Default(0) int percentComplete,
+    
+    // FlowIt-specific VCALENDAR properties
+    @HiveField(15) @Default('PROJECT') String flowitType, // X-FLOWIT-TYPE
+    @HiveField(16) @Default(false) bool flowitAsFlow, // X-FLOWIT-ASFLOW
+    @HiveField(17) @Default('[]') String flowitKanban, // X-FLOWIT-KANBAN JSON array
+    @HiveField(18) String? flowitOwner, // X-FLOWIT-OWNER
+    @HiveField(19) String? flowitTemplate, // X-FLOWIT-TEMPLATE
+    @HiveField(20) @Default(1) int calendarOrder, // CALENDAR-ORDER
+    @HiveField(21) String? organizer, // ORGANIZER
+    @HiveField(22) @Default([]) List<Attendee> attendees, // ATTENDEE
+    @HiveField(23) @Default([]) List<String> categories, // CATEGORIES
+  }) = _TaskCalendar;
+
+  factory TaskCalendar.fromJson(Map<String, dynamic> json) => _$TaskCalendarFromJson(json);
+}
+
+// Factory methods for creating task calendars
+extension TaskCalendarFactory on TaskCalendar {
+  static TaskCalendar createNew({
+    required String path,
+    required String displayName,
+    String description = '',
+    String? organizer,
+    List<String> categories = const [],
+    List<Attendee> attendees = const [],
+  }) {
+    final now = DateTime.now();
+    return TaskCalendar(
+      path: path,
+      displayName: displayName,
+      description: description,
+      uid: 'project-${now.millisecondsSinceEpoch}-${displayName.hashCode}',
+      dtstamp: now,
+      created: now,
+      lastModified: now,
+      summary: displayName,
+      status: 'NEEDS-ACTION',
+      organizer: organizer,
+      attendees: attendees,
+      categories: categories,
+      flowitOwner: organizer,
+    );
+  }
+  
+  static TaskCalendar fromCalDAVDiscovery({
+    required String path,
+    required String displayName,
+    String description = '',
+    String? etag,
+    String? color,
+    bool isReadOnly = false,
+  }) {
+    final now = DateTime.now();
+    return TaskCalendar(
+      path: path,
+      displayName: displayName,
+      description: description,
+      etag: etag,
+      color: color,
+      isReadOnly: isReadOnly,
+      uid: 'discovered-${path.hashCode}',
+      dtstamp: now,
+      created: now,
+      lastModified: now,
+      summary: displayName,
+      status: 'NEEDS-ACTION',
+    );
+  }
+}
+
+// Extension for dynamic project progress calculation
+extension TaskCalendarProgress on TaskCalendar {
+  /// Calculate project progress based on actual tasks
+  int calculateProgress(List<Task> projectTasks) {
+    if (projectTasks.isEmpty) return 0;
+    
+    final completedTasks = projectTasks.where((task) => task.status == 'COMPLETED').length;
+    return (completedTasks * 100 / projectTasks.length).round();
+  }
+  
+  /// Get project statistics
+  ProjectStats getStats(List<Task> projectTasks) {
+    final totalTasks = projectTasks.length;
+    final completedTasks = projectTasks.where((task) => task.status == 'COMPLETED').length;
+    final inProgressTasks = projectTasks.where((task) => task.status == 'IN-PROCESS').length;
+    final pendingTasks = totalTasks - completedTasks - inProgressTasks;
+    final progress = calculateProgress(projectTasks);
+    
+    return ProjectStats(
+      totalTasks: totalTasks,
+      completedTasks: completedTasks,
+      inProgressTasks: inProgressTasks,
+      pendingTasks: pendingTasks,
+      progressPercentage: progress,
+    );
+  }
+  
+  /// Check if project is completed
+  bool isCompleted(List<Task> projectTasks) {
+    if (projectTasks.isEmpty) return false;
+    return projectTasks.every((task) => task.status == 'COMPLETED');
+  }
+  
+  /// Get dynamic status based on tasks
+  String getDynamicStatus(List<Task> projectTasks) {
+    if (projectTasks.isEmpty) return 'NEEDS-ACTION';
+    if (isCompleted(projectTasks)) return 'COMPLETED';
+    if (projectTasks.any((task) => task.status == 'IN-PROCESS')) return 'IN-PROCESS';
+    return 'NEEDS-ACTION';
+  }
+}
+
+// Project statistics class
+class ProjectStats {
+  final int totalTasks;
+  final int completedTasks;
+  final int inProgressTasks;
+  final int pendingTasks;
+  final int progressPercentage;
+  
+  const ProjectStats({
+    required this.totalTasks,
+    required this.completedTasks,
+    required this.inProgressTasks,
+    required this.pendingTasks,
+    required this.progressPercentage,
+  });
+} 
