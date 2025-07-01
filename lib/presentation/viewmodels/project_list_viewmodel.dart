@@ -470,13 +470,19 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
       state = state.copyWith(error: null);
       
       // Create new project calendar
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final path = '/calendars/project_${timestamp}_${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}/';
+      AppLogger.info('ProjectListViewModel: Creating project with path: $path');
+      
       final newProject = TaskCalendarFactory.createNew(
-        path: '/calendars/${DateTime.now().millisecondsSinceEpoch}/',
+        path: path,
         displayName: name,
         description: description,
         organizer: organizer,
         categories: categories,
       );
+      
+      AppLogger.info('ProjectListViewModel: Created project object with UID: ${newProject.uid}');
       
       final result = await _calendarRepository.save(newProject);
       await result.when(

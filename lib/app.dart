@@ -12,6 +12,7 @@ import 'presentation/screens/archived_projects/archived_projects_screen.dart';
 import 'presentation/screens/project_detail/project_detail_screen.dart';
 import 'presentation/widgets/adaptive_app_layout.dart';
 import 'data/providers/providers.dart';
+import 'core/theme/chart_theme.dart';
 
 class FlowItApp extends ConsumerWidget {
   const FlowItApp({super.key});
@@ -25,7 +26,7 @@ class FlowItApp extends ConsumerWidget {
       title: 'FlowIt',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
+          seedColor: FlowItColors.primary,
           brightness: Brightness.light,
         ),
         useMaterial3: true,
@@ -44,10 +45,16 @@ class FlowItApp extends ConsumerWidget {
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
         ),
+        extensions: <ThemeExtension<dynamic>>[
+          ChartTheme.light(ColorScheme.fromSeed(
+            seedColor: FlowItColors.primary,
+            brightness: Brightness.light,
+          )),
+        ],
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
+          seedColor: FlowItColors.primary,
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
@@ -66,6 +73,12 @@ class FlowItApp extends ConsumerWidget {
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
         ),
+        extensions: <ThemeExtension<dynamic>>[
+          ChartTheme.dark(ColorScheme.fromSeed(
+            seedColor: FlowItColors.primary,
+            brightness: Brightness.dark,
+          )),
+        ],
       ),
       themeMode: ThemeMode.system,
       routerConfig: _createRouter(),

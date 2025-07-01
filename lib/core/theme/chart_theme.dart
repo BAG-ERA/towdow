@@ -1,7 +1,50 @@
 // Chart theme constants and typography for FlowIt application
 // Extends Material Design 3 theme system with chart-specific styling
+// Uses FlowIt brand color palette
 
 import 'package:flutter/material.dart';
+
+/// FlowIt brand color palette
+class FlowItColors {
+  // Water Green family
+  static const Color waterGreen = Color(0xFF6CBD97);
+  static const Color waterGreenLight = Color(0xFFD3E6C7);
+  
+  // Blue family (Primary color family)
+  static const Color blueDark = Color(0xFF192440);
+  static const Color blue = Color(0xFF223A7B);
+  static const Color blueMedium = Color(0xFF0068B3);
+  static const Color blueLight = Color(0xFF85CAED);
+  
+  // Violet family
+  static const Color violetDark = Color(0xFF463077);
+  static const Color violet = Color(0xFF6A5195);
+  static const Color violetLight = Color(0xFF8C89C2);
+  
+  // Green family
+  static const Color greenApple = Color(0xFF96B522);
+  static const Color greenAnis = Color(0xFFC5C741);
+  static const Color greenLight = Color(0xFFD8D596);
+  
+  // Red/Pink family
+  static const Color pink = Color(0xFFE83947);
+  static const Color pinkLight = Color(0xFFEF7E6F);
+  static const Color coral = Color(0xFFF6A66D);
+  
+  // Yellow family
+  static const Color yellowDark = Color(0xFFF59E00);
+  static const Color yellow = Color(0xFFFDC61E);
+  static const Color yellowLight = Color(0xFFFFE37E);
+  
+  // Neutral colors
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color surfaceDark = Color(0xFF121212);
+  static const Color separator = Color(0xFFE0E0E0);
+  static const Color separatorDark = Color(0xFF2C2C2C);
+  
+  // Primary brand color (Medium Blue)
+  static const Color primary = blueMedium;
+}
 
 /// Chart theme extension for consistent chart styling across the app
 /// Integrates with Material Design 3 color system for light/dark mode support
@@ -101,58 +144,58 @@ class ChartColors {
   final List<Color> progressGradient;
   final Map<String, Color> taskStatusColors;
 
-  /// Light theme chart colors
+  /// Light theme chart colors using FlowIt brand palette
   factory ChartColors.light(ColorScheme colorScheme) {
     return ChartColors(
-      primary: colorScheme.primary,
-      secondary: colorScheme.secondary,
-      tertiary: colorScheme.tertiary,
-      quaternary: const Color(0xFF6750A4), // Material purple
-      success: const Color(0xFF4CAF50),
-      warning: const Color(0xFFFF9800),
-      error: colorScheme.error,
-      background: colorScheme.surface,
-      surface: colorScheme.surfaceContainerHighest,
-      outline: colorScheme.outline,
-      onSurface: colorScheme.onSurface,
-      onSurfaceVariant: colorScheme.onSurfaceVariant,
+      primary: FlowItColors.primary,
+      secondary: FlowItColors.waterGreen,
+      tertiary: FlowItColors.violet,
+      quaternary: FlowItColors.greenApple,
+      success: FlowItColors.waterGreen,
+      warning: FlowItColors.yellowDark,
+      error: FlowItColors.pink,
+      background: FlowItColors.surface,
+      surface: FlowItColors.surface,
+      outline: FlowItColors.separator,
+      onSurface: FlowItColors.blueDark,
+      onSurfaceVariant: FlowItColors.blue.withValues(alpha: 0.7),
       progressGradient: [
-        colorScheme.primary,
-        colorScheme.primaryContainer,
+        FlowItColors.primary,
+        FlowItColors.blueLight,
       ],
       taskStatusColors: {
-        'COMPLETED': const Color(0xFF4CAF50),
-        'NEEDS-ACTION': colorScheme.primary,
-        'CANCELLED': colorScheme.error,
-        'IN-PROGRESS': const Color(0xFFFF9800),
+        'COMPLETED': FlowItColors.waterGreen,
+        'NEEDS-ACTION': FlowItColors.primary,
+        'CANCELLED': FlowItColors.pink,
+        'IN-PROGRESS': FlowItColors.yellowDark,
       },
     );
   }
 
-  /// Dark theme chart colors
+  /// Dark theme chart colors using FlowIt brand palette
   factory ChartColors.dark(ColorScheme colorScheme) {
     return ChartColors(
-      primary: colorScheme.primary,
-      secondary: colorScheme.secondary,
-      tertiary: colorScheme.tertiary,
-      quaternary: const Color(0xFFD0BCFF), // Material purple dark
-      success: const Color(0xFF81C784),
-      warning: const Color(0xFFFFB74D),
-      error: colorScheme.error,
-      background: colorScheme.surface,
-      surface: colorScheme.surfaceContainerHighest,
-      outline: colorScheme.outline,
-      onSurface: colorScheme.onSurface,
-      onSurfaceVariant: colorScheme.onSurfaceVariant,
+      primary: FlowItColors.blueLight,
+      secondary: FlowItColors.waterGreenLight,
+      tertiary: FlowItColors.violetLight,
+      quaternary: FlowItColors.greenLight,
+      success: FlowItColors.waterGreenLight,
+      warning: FlowItColors.yellow,
+      error: FlowItColors.pinkLight,
+      background: FlowItColors.surfaceDark,
+      surface: FlowItColors.surfaceDark,
+      outline: FlowItColors.separatorDark,
+      onSurface: FlowItColors.surface,
+      onSurfaceVariant: FlowItColors.blueLight.withValues(alpha: 0.8),
       progressGradient: [
-        colorScheme.primary,
-        colorScheme.primaryContainer,
+        FlowItColors.blueLight,
+        FlowItColors.primary,
       ],
       taskStatusColors: {
-        'COMPLETED': const Color(0xFF81C784),
-        'NEEDS-ACTION': colorScheme.primary,
-        'CANCELLED': colorScheme.error,
-        'IN-PROGRESS': const Color(0xFFFFB74D),
+        'COMPLETED': FlowItColors.waterGreenLight,
+        'NEEDS-ACTION': FlowItColors.blueLight,
+        'CANCELLED': FlowItColors.pinkLight,
+        'IN-PROGRESS': FlowItColors.yellow,
       },
     );
   }
@@ -181,14 +224,16 @@ class ChartColors {
     );
   }
 
-  /// Get a series of colors for multi-line charts
+  /// Get a series of colors for multi-line charts using FlowIt palette
   List<Color> get chartSeries => [
-    primary,
-    secondary,
-    tertiary,
-    quaternary,
-    success,
-    warning,
+    primary,           // Blue Medium
+    secondary,         // Water Green (Light)
+    tertiary,          // Violet (Light)
+    quaternary,        // Green Apple/Light
+    warning,           // Yellow Dark/Yellow
+    error,             // Pink Light
+    FlowItColors.coral, // Additional coral color
+    FlowItColors.greenAnis, // Additional anis green
   ];
 }
 

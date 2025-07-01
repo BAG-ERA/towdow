@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/providers/providers.dart';
+import '../utils/popup/domain_creation_dialog.dart';
+import '../utils/popup/project_creation_dialog.dart';
+import '../utils/popup/task_creation_dialog.dart';
 
 class ToolbarWidget extends ConsumerWidget {
   const ToolbarWidget({super.key});
@@ -19,7 +22,7 @@ class ToolbarWidget extends ConsumerWidget {
           ? _buildToolbarContent(context, currentLocation)
           : const SizedBox.shrink(),
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, stackTrace) => const SizedBox.shrink(),
     );
   }
 
@@ -166,6 +169,15 @@ class ToolbarWidget extends ConsumerWidget {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.domain_rounded),
+              title: const Text('Domain'),
+              subtitle: const Text('Create a new domain'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _showCreateDomainDialog(context);
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.folder_rounded),
               title: const Text('Project'),
               subtitle: const Text('Create a new project'),
@@ -181,142 +193,23 @@ class ToolbarWidget extends ConsumerWidget {
   }
 
   void _showCreateTaskDialog(BuildContext context) {
-    final summaryController = TextEditingController();
-    final descriptionController = TextEditingController();
-    DateTime? selectedDue;
-
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Create Task'),
-          content: SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: summaryController,
-                  decoration: const InputDecoration(
-                    labelText: 'Task summary *',
-                    border: OutlineInputBorder(),
-                  ),
-                  autofocus: true,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_today_rounded),
-                  title: Text(selectedDue == null 
-                    ? 'No due date' 
-                    : 'Due: ${selectedDue!.day}/${selectedDue!.month}/${selectedDue!.year}'
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_ios_rounded),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDue ?? DateTime.now(),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        selectedDue = picked;
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: summaryController.text.trim().isEmpty 
-                  ? null 
-                  : () {
-                      // TODO: Implement task creation logic
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Task creation will be implemented'),
-                        ),
-                      );
-                    },
-              child: const Text('Create'),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) => const TaskCreationDialog(),
+    );
+  }
+
+  void _showCreateDomainDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const DomainCreationDialog(),
     );
   }
 
   void _showCreateProjectDialog(BuildContext context) {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create Project'),
-        content: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Project name *',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description (optional)',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: nameController.text.trim().isEmpty 
-                ? null 
-                : () {
-                    // TODO: Implement project creation logic
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Project creation will be implemented'),
-                      ),
-                    );
-                  },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
+      builder: (context) => const ProjectCreationDialog(),
     );
   }
 
