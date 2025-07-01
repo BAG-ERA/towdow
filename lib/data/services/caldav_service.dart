@@ -495,15 +495,16 @@ class CalDAVService {
     }
   }
 
-  /// Update calendar X-FLOWIT-DOMAIN property on server using PROPPATCH
+  /// Update calendar FlowIt properties (domain, status, etc.) on server using PROPPATCH
   Future<Result<void>> updateCalendarProperties(TaskCalendar calendar) async {
     try {
-      AppLogger.info('CalDAVService: Starting domain PROPPATCH for ${calendar.displayName}');
+      AppLogger.info('CalDAVService: Starting FlowIt properties PROPPATCH for ${calendar.displayName}');
       AppLogger.info('CalDAVService: Calendar path: ${calendar.path}');
       AppLogger.info('CalDAVService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
+      AppLogger.info('CalDAVService: Status value: ${calendar.flowitStatus ?? "(null)"}');
       
-      // Generate PROPPATCH XML for domain property
-      final proppatchXml = _generateDomainPropPatch(calendar);
+      // Generate PROPPATCH XML for FlowIt properties
+      final proppatchXml = _generateFlowItPropertiesPropPatch(calendar);
       AppLogger.info('CalDAVService: Generated PROPPATCH XML:\n$proppatchXml');
       
       // Use PROPPATCH to set WebDAV property on calendar collection
@@ -518,7 +519,7 @@ class CalDAVService {
           AppLogger.info('CalDAVService: Response body: ${response.body}');
           
           if (response.statusCode == 207 || response.statusCode == 200) {
-            AppLogger.info('CalDAVService: X-FLOWIT-DOMAIN property updated successfully');
+            AppLogger.info('CalDAVService: FlowIt properties (domain, status) updated successfully');
             return Result.success(null);
           } else {
             AppLogger.warning('CalDAVService: PROPPATCH returned ${response.statusCode} (non-critical)');
@@ -537,13 +538,14 @@ class CalDAVService {
     }
   }
 
-  /// Generate PROPPATCH XML for setting X-FLOWIT-DOMAIN property
-  String _generateDomainPropPatch(TaskCalendar calendar) {
+  /// Generate PROPPATCH XML for setting FlowIt properties (domain, status, etc.)
+  String _generateFlowItPropertiesPropPatch(TaskCalendar calendar) {
     final xml = StringBuffer();
     
     xml.writeln('<?xml version="1.0" encoding="utf-8"?>');
     xml.writeln('<D:propertyupdate xmlns:D="DAV:" xmlns:FLOWIT="https://flowit.app/ns/">');
     
+    // Handle domain property
     if (calendar.flowitDomain != null && calendar.flowitDomain!.isNotEmpty) {
       // Set the domain property
       xml.writeln('  <D:set>');
@@ -556,6 +558,23 @@ class CalDAVService {
       xml.writeln('  <D:remove>');
       xml.writeln('    <D:prop>');
       xml.writeln('      <FLOWIT:domain/>');
+      xml.writeln('    </D:prop>');
+      xml.writeln('  </D:remove>');
+    }
+    
+    // Handle status property
+    if (calendar.flowitStatus != null && calendar.flowitStatus!.isNotEmpty) {
+      // Set the status property
+      xml.writeln('  <D:set>');
+      xml.writeln('    <D:prop>');
+      xml.writeln('      <FLOWIT:status>${_escapeXmlText(calendar.flowitStatus!)}</FLOWIT:status>');
+      xml.writeln('    </D:prop>');
+      xml.writeln('  </D:set>');
+    } else {
+      // Remove the status property if null/empty (default to ONGOING)
+      xml.writeln('  <D:remove>');
+      xml.writeln('    <D:prop>');
+      xml.writeln('      <FLOWIT:status/>');
       xml.writeln('    </D:prop>');
       xml.writeln('  </D:remove>');
     }
@@ -606,6 +625,10 @@ class CalDAVService {
     
     if (calendar.flowitDomain != null && calendar.flowitDomain!.isNotEmpty) {
       vcalendar.writeln('X-FLOWIT-DOMAIN:${_escapeCalendarText(calendar.flowitDomain!)}');
+    }
+    
+    if (calendar.flowitStatus != null && calendar.flowitStatus!.isNotEmpty) {
+      vcalendar.writeln('X-FLOWIT-STATUS:${_escapeCalendarText(calendar.flowitStatus!)}');
     }
     
     if (calendar.flowitKanban.isNotEmpty && calendar.flowitKanban != '[]') {
@@ -663,6 +686,7 @@ class CalDAVService {
       final flowitType = properties['X-FLOWIT-TYPE'] ?? 'PROJECT';
       final flowitAsFlow = properties['X-FLOWIT-ASFLOW']?.toLowerCase() == 'true';
       final flowitDomain = properties['X-FLOWIT-DOMAIN'];
+      final flowitStatus = properties['X-FLOWIT-STATUS'];
       final flowitKanban = properties['X-FLOWIT-KANBAN'] ?? '[]';
       final flowitOwner = properties['X-FLOWIT-OWNER'];
       final flowitTemplate = properties['X-FLOWIT-TEMPLATE'];
@@ -687,6 +711,7 @@ class CalDAVService {
         flowitType: flowitType,
         flowitAsFlow: flowitAsFlow,
         flowitDomain: flowitDomain,
+        flowitStatus: flowitStatus,
         flowitKanban: flowitKanban,
         flowitOwner: flowitOwner,
         flowitTemplate: flowitTemplate,

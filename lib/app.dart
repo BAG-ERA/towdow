@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/connection/connection_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
+import 'presentation/screens/archived_projects/archived_projects_screen.dart';
 
 import 'presentation/screens/project_detail/project_detail_screen.dart';
 import 'presentation/widgets/adaptive_app_layout.dart';
@@ -84,11 +85,13 @@ class FlowItApp extends ConsumerWidget {
         ShellRoute(
           builder: (context, state, child) {
             // Determine current destination from route
-            AppDestination currentDestination;
+            AppDestination? currentDestination;
             final location = state.uri.path;
             
             if (location.startsWith('/settings')) {
               currentDestination = AppDestination.settings;
+            } else if (location.startsWith('/archived')) {
+              currentDestination = null; // Archived projects have no main navigation active
             } else if (location.startsWith('/project/')) {
               currentDestination = AppDestination.myTasks; // Project details use myTasks navigation
             } else {
@@ -115,6 +118,10 @@ class FlowItApp extends ConsumerWidget {
             GoRoute(
               path: '/settings',
               builder: (context, state) => const SettingsScreen(),
+            ),
+            GoRoute(
+              path: '/archived',
+              builder: (context, state) => const ArchivedProjectsScreen(),
             ),
           ],
         ),

@@ -234,17 +234,88 @@ class ProjectItemWidget extends ConsumerWidget {
     );
   }
 
-  void _handleArchiveProject(BuildContext context, WidgetRef ref) {
-    // TODO: Implement archive functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Archive functionality not yet implemented for ${project.summary}'),
-        action: SnackBarAction(
-          label: 'Dismiss',
-          onPressed: () {},
+  void _handleArchiveProject(BuildContext context, WidgetRef ref) async {
+    try {
+      // Get the status service from providers
+      final statusService = ref.read(statusServiceProvider);
+      
+      // Archive the project
+      final result = await statusService.archiveCalendar(project.uid);
+      
+      result.when(
+        success: (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Project "${project.summary}" archived successfully'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () => _handleUnarchiveProject(context, ref),
+              ),
+            ),
+          );
+        },
+        failure: (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to archive project: ${failure.message}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+              action: SnackBarAction(
+                label: 'Dismiss',
+                onPressed: () {},
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to archive project: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          action: SnackBarAction(
+            label: 'Dismiss',
+            onPressed: () {},
+          ),
         ),
-      ),
-    );
+      );
+    }
+  }
+
+  void _handleUnarchiveProject(BuildContext context, WidgetRef ref) async {
+    try {
+      // Get the status service from providers
+      final statusService = ref.read(statusServiceProvider);
+      
+      // Unarchive the project
+      final result = await statusService.unarchiveCalendar(project.uid);
+      
+      result.when(
+        success: (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Project "${project.summary}" unarchived successfully'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        },
+        failure: (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to unarchive project: ${failure.message}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to unarchive project: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {

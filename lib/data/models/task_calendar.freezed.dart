@@ -80,7 +80,10 @@ mixin _$TaskCalendar {
   List<String> get categories =>
       throw _privateConstructorUsedError; // CATEGORIES
   @HiveField(25)
-  String? get flowitDomain => throw _privateConstructorUsedError;
+  String? get flowitDomain =>
+      throw _privateConstructorUsedError; // X-FLOWIT-DOMAIN - domain for grouping projects
+  @HiveField(26)
+  String? get flowitStatus => throw _privateConstructorUsedError;
 
   /// Serializes this TaskCalendar to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -124,7 +127,8 @@ abstract class $TaskCalendarCopyWith<$Res> {
       @HiveField(21) String? organizer,
       @HiveField(22) List<Attendee> attendees,
       @HiveField(23) List<String> categories,
-      @HiveField(25) String? flowitDomain});
+      @HiveField(25) String? flowitDomain,
+      @HiveField(26) String? flowitStatus});
 }
 
 /// @nodoc
@@ -168,6 +172,7 @@ class _$TaskCalendarCopyWithImpl<$Res, $Val extends TaskCalendar>
     Object? attendees = null,
     Object? categories = null,
     Object? flowitDomain = freezed,
+    Object? flowitStatus = freezed,
   }) {
     return _then(_value.copyWith(
       path: null == path
@@ -274,6 +279,10 @@ class _$TaskCalendarCopyWithImpl<$Res, $Val extends TaskCalendar>
           ? _value.flowitDomain
           : flowitDomain // ignore: cast_nullable_to_non_nullable
               as String?,
+      flowitStatus: freezed == flowitStatus
+          ? _value.flowitStatus
+          : flowitStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -312,7 +321,8 @@ abstract class _$$TaskCalendarImplCopyWith<$Res>
       @HiveField(21) String? organizer,
       @HiveField(22) List<Attendee> attendees,
       @HiveField(23) List<String> categories,
-      @HiveField(25) String? flowitDomain});
+      @HiveField(25) String? flowitDomain,
+      @HiveField(26) String? flowitStatus});
 }
 
 /// @nodoc
@@ -354,6 +364,7 @@ class __$$TaskCalendarImplCopyWithImpl<$Res>
     Object? attendees = null,
     Object? categories = null,
     Object? flowitDomain = freezed,
+    Object? flowitStatus = freezed,
   }) {
     return _then(_$TaskCalendarImpl(
       path: null == path
@@ -460,6 +471,10 @@ class __$$TaskCalendarImplCopyWithImpl<$Res>
           ? _value.flowitDomain
           : flowitDomain // ignore: cast_nullable_to_non_nullable
               as String?,
+      flowitStatus: freezed == flowitStatus
+          ? _value.flowitStatus
+          : flowitStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -493,7 +508,8 @@ class _$TaskCalendarImpl implements _TaskCalendar {
       @HiveField(21) this.organizer,
       @HiveField(22) final List<Attendee> attendees = const [],
       @HiveField(23) final List<String> categories = const [],
-      @HiveField(25) this.flowitDomain})
+      @HiveField(25) this.flowitDomain,
+      @HiveField(26) this.flowitStatus})
       : _attendees = attendees,
         _categories = categories;
 
@@ -614,10 +630,14 @@ class _$TaskCalendarImpl implements _TaskCalendar {
   @override
   @HiveField(25)
   final String? flowitDomain;
+// X-FLOWIT-DOMAIN - domain for grouping projects
+  @override
+  @HiveField(26)
+  final String? flowitStatus;
 
   @override
   String toString() {
-    return 'TaskCalendar(path: $path, displayName: $displayName, description: $description, supportsTodos: $supportsTodos, etag: $etag, color: $color, lastSyncAt: $lastSyncAt, isReadOnly: $isReadOnly, syncToken: $syncToken, uid: $uid, dtstamp: $dtstamp, created: $created, lastModified: $lastModified, summary: $summary, status: $status, percentComplete: $percentComplete, flowitType: $flowitType, flowitAsFlow: $flowitAsFlow, flowitKanban: $flowitKanban, flowitOwner: $flowitOwner, flowitTemplate: $flowitTemplate, calendarOrder: $calendarOrder, organizer: $organizer, attendees: $attendees, categories: $categories, flowitDomain: $flowitDomain)';
+    return 'TaskCalendar(path: $path, displayName: $displayName, description: $description, supportsTodos: $supportsTodos, etag: $etag, color: $color, lastSyncAt: $lastSyncAt, isReadOnly: $isReadOnly, syncToken: $syncToken, uid: $uid, dtstamp: $dtstamp, created: $created, lastModified: $lastModified, summary: $summary, status: $status, percentComplete: $percentComplete, flowitType: $flowitType, flowitAsFlow: $flowitAsFlow, flowitKanban: $flowitKanban, flowitOwner: $flowitOwner, flowitTemplate: $flowitTemplate, calendarOrder: $calendarOrder, organizer: $organizer, attendees: $attendees, categories: $categories, flowitDomain: $flowitDomain, flowitStatus: $flowitStatus)';
   }
 
   @override
@@ -668,7 +688,9 @@ class _$TaskCalendarImpl implements _TaskCalendar {
             const DeepCollectionEquality()
                 .equals(other._categories, _categories) &&
             (identical(other.flowitDomain, flowitDomain) ||
-                other.flowitDomain == flowitDomain));
+                other.flowitDomain == flowitDomain) &&
+            (identical(other.flowitStatus, flowitStatus) ||
+                other.flowitStatus == flowitStatus));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -700,7 +722,8 @@ class _$TaskCalendarImpl implements _TaskCalendar {
         organizer,
         const DeepCollectionEquality().hash(_attendees),
         const DeepCollectionEquality().hash(_categories),
-        flowitDomain
+        flowitDomain,
+        flowitStatus
       ]);
 
   /// Create a copy of TaskCalendar
@@ -746,7 +769,8 @@ abstract class _TaskCalendar implements TaskCalendar {
       @HiveField(21) final String? organizer,
       @HiveField(22) final List<Attendee> attendees,
       @HiveField(23) final List<String> categories,
-      @HiveField(25) final String? flowitDomain}) = _$TaskCalendarImpl;
+      @HiveField(25) final String? flowitDomain,
+      @HiveField(26) final String? flowitStatus}) = _$TaskCalendarImpl;
 
   factory _TaskCalendar.fromJson(Map<String, dynamic> json) =
       _$TaskCalendarImpl.fromJson;
@@ -829,7 +853,10 @@ abstract class _TaskCalendar implements TaskCalendar {
   List<String> get categories; // CATEGORIES
   @override
   @HiveField(25)
-  String? get flowitDomain;
+  String? get flowitDomain; // X-FLOWIT-DOMAIN - domain for grouping projects
+  @override
+  @HiveField(26)
+  String? get flowitStatus;
 
   /// Create a copy of TaskCalendar
   /// with the given fields replaced by the non-null parameter values.

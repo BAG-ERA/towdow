@@ -6,6 +6,7 @@ import '../services/local_storage_service.dart';
 import '../services/sync_service.dart';
 import '../services/background_sync_service.dart';
 import '../services/domain_service.dart';
+import '../services/status_service.dart';
 import '../repositories/task_repository.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
@@ -84,6 +85,14 @@ final domainServiceProvider = Provider<DomainService>((ref) {
   final localStorageService = ref.watch(localStorageServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   return DomainService(calendarRepository, localStorageService, accountRepository);
+});
+
+// Status service provider
+final statusServiceProvider = Provider<StatusService>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final localStorageService = ref.watch(localStorageServiceProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return StatusService(calendarRepository, localStorageService, accountRepository);
 });
 
 // App Lifecycle Manager provider
@@ -191,6 +200,18 @@ final calendarListProvider = StreamProvider<List<TaskCalendar>>((ref) {
   });
 });
 
+// Active calendars provider (excludes archived calendars)
+final activeCalendarListProvider = StreamProvider<List<TaskCalendar>>((ref) {
+  final repository = ref.watch(calendarRepositoryProvider);
+  return repository.watchCalendars().asyncMap((_) async {
+    final result = await repository.getProjectCalendars();
+    return result.when(
+      success: (calendars) => calendars.where((calendar) => !calendar.isArchived).toList(),
+      failure: (failure) => throw Exception(failure.message),
+    );
+  });
+});
+
 // Today's tasks provider (not done with due date < 24h, including overdue)
 final todayTasksProvider = StreamProvider<List<Task>>((ref) {
   final tasksStream = ref.watch(taskListProvider.stream);
@@ -256,8 +277,8 @@ final anytimeTasksProvider = StreamProvider<List<Task>>((ref) {
 // Deprecated: Keep for backward compatibility
 final unregisteredTasksProvider = anytimeTasksProvider;
 
-// Backward compatibility alias
-final projectListProvider = calendarListProvider;
+// Backward compatibility alias - use active calendars for navbar
+final projectListProvider = activeCalendarListProvider;
 
 // Selected project provider  
 final selectedProjectProvider = StateProvider<String?>((ref) => null);

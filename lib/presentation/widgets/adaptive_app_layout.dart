@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'navbar/app_sidebar.dart';
 
 enum AppDestination {
@@ -37,7 +38,7 @@ class AdaptiveAppLayout extends ConsumerWidget {
     required this.child,
   });
 
-  final AppDestination currentDestination;
+  final AppDestination? currentDestination;
   final Widget child;
 
   static const double _desktopBreakpoint = 800.0;
@@ -69,9 +70,18 @@ class AdaptiveAppLayout extends ConsumerWidget {
   }
 
   Widget _buildMobileLayout(BuildContext context) {
+    // Determine title for mobile based on route when no currentDestination
+    String title = currentDestination?.label ?? 'FlowIt';
+    if (currentDestination == null) {
+      final location = GoRouterState.of(context).uri.path;
+      if (location.startsWith('/archived')) {
+        title = 'Archived Projects';
+      }
+    }
+    
     return Scaffold(
       appBar: AppBar(
-        title: Text(currentDestination.label),
+        title: Text(title),
         centerTitle: false,
         leading: Builder(
           builder: (context) => IconButton(
