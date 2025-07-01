@@ -106,7 +106,7 @@ class ProjectsSection extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       children: [
                         // Projects without domain (with drop target)
-                        if (projectsWithoutDomain.isNotEmpty || sortedDomains.isNotEmpty) 
+                        if (projectsWithoutDomain.isNotEmpty) 
                           _NoDomainSection(
                             projects: projectsWithoutDomain,
                             ref: ref,
