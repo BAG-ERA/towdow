@@ -23,6 +23,15 @@ abstract class CalendarRepository {
   Future<Result<void>> renameDomain(String oldDomain, String newDomain);
   Future<Result<Map<String, int>>> getDomainStatistics();
   Future<Result<List<TaskCalendar>>> getCalendarsWithoutDomain();
+  
+  // Status-related methods
+  Future<Result<List<TaskCalendar>>> getCalendarsByStatus(String? status);
+  Future<Result<List<String>>> getUniqueStatuses();
+  Future<Result<void>> changeStatus(String oldStatus, String newStatus);
+  Future<Result<Map<String, int>>> getStatusStatistics();
+  Future<Result<List<TaskCalendar>>> getCalendarsWithoutStatus();
+  Future<Result<List<TaskCalendar>>> getArchivedCalendars();
+  Future<Result<List<TaskCalendar>>> getActiveCalendars();
 }
 
 // Local implementation using Hive
@@ -200,6 +209,130 @@ class LocalCalendarRepository implements CalendarRepository {
         final calendarsWithoutDomain = calendars.where((calendar) => !calendar.hasDomain).toList();
         AppLogger.info('LocalCalendarRepository: Found ${calendarsWithoutDomain.length} calendars without domain');
         return Result.success(calendarsWithoutDomain);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<List<TaskCalendar>>> getCalendarsByStatus(String? status) async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) {
+                 final filteredCalendars = calendars.where((calendar) {
+           if (status == null || status.toLowerCase() == 'no status') {
+             return !calendar.hasStatus;
+           }
+           return calendar.hasProjectStatus(status);
+         }).toList();
+        
+        AppLogger.info('LocalCalendarRepository: Found ${filteredCalendars.length} calendars in status: ${status ?? "No Status"}');
+        return Result.success(filteredCalendars);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<List<String>>> getUniqueStatuses() async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) {
+        final statuses = calendars
+            .where((calendar) => calendar.hasStatus)
+            .map((calendar) => calendar.flowitStatus!)
+            .toSet()
+            .toList();
+        
+        // Sort statuses alphabetically (case-insensitive)
+        statuses.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+        
+        AppLogger.info('LocalCalendarRepository: Found ${statuses.length} unique statuses');
+        return Result.success(statuses);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<void>> changeStatus(String oldStatus, String newStatus) async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) async {
+                 final calendarsToUpdate = calendars
+             .where((calendar) => calendar.hasProjectStatus(oldStatus))
+             .toList();
+        
+        AppLogger.info('LocalCalendarRepository: Changing status from "$oldStatus" to "$newStatus" for ${calendarsToUpdate.length} calendars');
+        
+        for (final calendar in calendarsToUpdate) {
+          final updatedCalendar = calendar.withStatus(newStatus);
+          final saveResult = await save(updatedCalendar);
+          if (saveResult is Error<void>) {
+            AppLogger.error('LocalCalendarRepository: Failed to change status for calendar ${calendar.uid}: ${saveResult.failure.message}');
+            return saveResult;
+          }
+        }
+        
+        return Result.success(null);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<Map<String, int>>> getStatusStatistics() async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) {
+        final statistics = <String, int>{};
+        
+        for (final calendar in calendars) {
+          final status = calendar.statusDisplayName;
+          statistics[status] = (statistics[status] ?? 0) + 1;
+        }
+        
+        AppLogger.info('LocalCalendarRepository: Status statistics calculated for ${statistics.length} statuses');
+        return Result.success(statistics);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<List<TaskCalendar>>> getCalendarsWithoutStatus() async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) {
+        final calendarsWithoutStatus = calendars.where((calendar) => !calendar.hasStatus).toList();
+        AppLogger.info('LocalCalendarRepository: Found ${calendarsWithoutStatus.length} calendars without status');
+        return Result.success(calendarsWithoutStatus);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<List<TaskCalendar>>> getArchivedCalendars() async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) {
+        final archivedCalendars = calendars.where((calendar) => calendar.isArchived).toList();
+        AppLogger.info('LocalCalendarRepository: Found ${archivedCalendars.length} archived calendars');
+        return Result.success(archivedCalendars);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<List<TaskCalendar>>> getActiveCalendars() async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) {
+        final activeCalendars = calendars.where((calendar) => !calendar.isArchived).toList();
+        AppLogger.info('LocalCalendarRepository: Found ${activeCalendars.length} active calendars');
+        return Result.success(activeCalendars);
       },
       failure: (failure) => Result.failure(failure),
     );

@@ -247,6 +247,134 @@ class MockCalendarRepository extends _i1.Mock
           ),
         )),
       ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
+
+  @override
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getCalendarsByStatus(
+          String? status) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getCalendarsByStatus,
+          [status],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
+          this,
+          Invocation.method(
+            #getCalendarsByStatus,
+            [status],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
+
+  @override
+  _i4.Future<_i2.Result<List<String>>> getUniqueStatuses() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getUniqueStatuses,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<String>>>.value(
+            _FakeResult_0<List<String>>(
+          this,
+          Invocation.method(
+            #getUniqueStatuses,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<String>>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> changeStatus(
+    String? oldStatus,
+    String? newStatus,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #changeStatus,
+          [
+            oldStatus,
+            newStatus,
+          ],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #changeStatus,
+            [
+              oldStatus,
+              newStatus,
+            ],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<Map<String, int>>> getStatusStatistics() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getStatusStatistics,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<Map<String, int>>>.value(
+            _FakeResult_0<Map<String, int>>(
+          this,
+          Invocation.method(
+            #getStatusStatistics,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<Map<String, int>>>);
+
+  @override
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getCalendarsWithoutStatus() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getCalendarsWithoutStatus,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
+          this,
+          Invocation.method(
+            #getCalendarsWithoutStatus,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
+
+  @override
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getArchivedCalendars() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getArchivedCalendars,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
+          this,
+          Invocation.method(
+            #getArchivedCalendars,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
+
+  @override
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getActiveCalendars() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getActiveCalendars,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
+          this,
+          Invocation.method(
+            #getActiveCalendars,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
 }
 
 /// A class which mocks [TaskRepository].

@@ -45,6 +45,7 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(22) @Default([]) List<Attendee> attendees, // ATTENDEE
     @HiveField(23) @Default([]) List<String> categories, // CATEGORIES
     @HiveField(25) String? flowitDomain, // X-FLOWIT-DOMAIN - domain for grouping projects
+    @HiveField(26) String? flowitStatus, // X-FLOWIT-STATUS - project status (DRAFT, CANCELED, ONGOING, STOPPED, ARCHIVE, COMPLETED, NEEDACTION, FAILED)
   }) = _TaskCalendar;
 
   factory TaskCalendar.fromJson(Map<String, dynamic> json) => _$TaskCalendarFromJson(json);
@@ -203,5 +204,68 @@ extension TaskCalendarDomain on TaskCalendar {
       flowitDomain: null,
       lastModified: DateTime.now(),
     );
+  }
+}
+
+// Extension for status-related operations
+extension TaskCalendarStatus on TaskCalendar {
+  /// Valid FlowIt project statuses
+  static const List<String> validStatuses = [
+    'DRAFT',
+    'CANCELED', 
+    'ONGOING',
+    'STOPPED',
+    'ARCHIVE',
+    'COMPLETED',
+    'NEEDACTION',
+    'FAILED'
+  ];
+
+  /// Check if this calendar has a status assigned
+  bool get hasStatus => flowitStatus != null && flowitStatus!.isNotEmpty;
+  
+  /// Get the status name, or "ONGOING" if none assigned (default)
+  String get statusDisplayName => flowitStatus?.isNotEmpty == true ? flowitStatus! : 'ONGOING';
+  
+  /// Check if this calendar has a specific status (case-insensitive)
+  bool hasProjectStatus(String status) {
+    return statusDisplayName.toLowerCase() == status.toLowerCase();
+  }
+  
+  /// Check if this calendar is archived
+  bool get isArchived => hasProjectStatus('ARCHIVE');
+  
+  /// Check if this calendar is active (not archived, not canceled, not failed)
+  bool get isActive => !isArchived && !hasProjectStatus('CANCELED') && !hasProjectStatus('FAILED');
+  
+  /// Create a copy with a new status
+  TaskCalendar withStatus(String? newStatus) {
+    // Validate status if provided
+    if (newStatus != null && newStatus.isNotEmpty && !validStatuses.contains(newStatus.toUpperCase())) {
+      throw ArgumentError('Invalid status: $newStatus. Valid statuses are: ${validStatuses.join(', ')}');
+    }
+    
+    return copyWith(
+      flowitStatus: newStatus?.isEmpty == true ? null : newStatus?.toUpperCase(),
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Remove status from this calendar (will default to ONGOING)
+  TaskCalendar withoutStatus() {
+    return copyWith(
+      flowitStatus: null,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Set this calendar as archived
+  TaskCalendar withArchiveStatus() {
+    return withStatus('ARCHIVE');
+  }
+  
+  /// Set this calendar as ongoing
+  TaskCalendar withOngoingStatus() {
+    return withStatus('ONGOING');
   }
 } 

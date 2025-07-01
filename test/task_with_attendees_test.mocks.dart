@@ -320,4 +320,266 @@ class MockLocalStorageService extends _i1.Mock
         returnValue: _i4.Future<void>.value(),
         returnValueForMissingStub: _i4.Future<void>.value(),
       ) as _i4.Future<void>);
+
+  @override
+  _i4.Future<_i2.Result<List<String>>> getAllDomains() => (super.noSuchMethod(
+        Invocation.method(
+          #getAllDomains,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<String>>>.value(
+            _FakeResult_0<List<String>>(
+          this,
+          Invocation.method(
+            #getAllDomains,
+            [],
+          ),
+        )),
+        returnValueForMissingStub: _i4.Future<_i2.Result<List<String>>>.value(
+            _FakeResult_0<List<String>>(
+          this,
+          Invocation.method(
+            #getAllDomains,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<String>>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> addDomain(String? domain) => (super.noSuchMethod(
+        Invocation.method(
+          #addDomain,
+          [domain],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #addDomain,
+            [domain],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #addDomain,
+            [domain],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> removeDomain(String? domain) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #removeDomain,
+          [domain],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #removeDomain,
+            [domain],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #removeDomain,
+            [domain],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<bool>> domainExists(String? domain) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #domainExists,
+          [domain],
+        ),
+        returnValue: _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
+          this,
+          Invocation.method(
+            #domainExists,
+            [domain],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
+          this,
+          Invocation.method(
+            #domainExists,
+            [domain],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<bool>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> renameDomain(
+    String? oldDomain,
+    String? newDomain,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #renameDomain,
+          [
+            oldDomain,
+            newDomain,
+          ],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #renameDomain,
+            [
+              oldDomain,
+              newDomain,
+            ],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #renameDomain,
+            [
+              oldDomain,
+              newDomain,
+            ],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<List<String>>> getAllStatuses() => (super.noSuchMethod(
+        Invocation.method(
+          #getAllStatuses,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<String>>>.value(
+            _FakeResult_0<List<String>>(
+          this,
+          Invocation.method(
+            #getAllStatuses,
+            [],
+          ),
+        )),
+        returnValueForMissingStub: _i4.Future<_i2.Result<List<String>>>.value(
+            _FakeResult_0<List<String>>(
+          this,
+          Invocation.method(
+            #getAllStatuses,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<String>>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> addStatus(String? status) => (super.noSuchMethod(
+        Invocation.method(
+          #addStatus,
+          [status],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #addStatus,
+            [status],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #addStatus,
+            [status],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> removeStatus(String? status) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #removeStatus,
+          [status],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #removeStatus,
+            [status],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #removeStatus,
+            [status],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<bool>> statusExists(String? status) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #statusExists,
+          [status],
+        ),
+        returnValue: _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
+          this,
+          Invocation.method(
+            #statusExists,
+            [status],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
+          this,
+          Invocation.method(
+            #statusExists,
+            [status],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<bool>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> renameStatus(
+    String? oldStatus,
+    String? newStatus,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #renameStatus,
+          [
+            oldStatus,
+            newStatus,
+          ],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #renameStatus,
+            [
+              oldStatus,
+              newStatus,
+            ],
+          ),
+        )),
+        returnValueForMissingStub:
+            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #renameStatus,
+            [
+              oldStatus,
+              newStatus,
+            ],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
 }
