@@ -1,3 +1,7 @@
+appdir_towdow
+appimagetool-x86_64.AppImage
+towdow_app-x86_64.AppImage
+
 # Miscellaneous
 *.class
 *.log

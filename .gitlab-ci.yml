@@ -1,0 +1,50 @@
+stages:
+  - build
+  - release
+
+variables:
+  APPIMAGE_OUTPUT: "build/linux/x64/release/towdow_app.AppImage"
+
+build_appimage:
+  stage: build
+  image: ghcr.io/gmeligio/flutter-android:3.32.5
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  before_script:
+    - apt-get update && apt-get install -y fuse libfuse2 desktop-file-utils
+  script:
+    - bash scripts/linux/build_app_image.sh
+  artifacts:
+    paths:
+      - $APPIMAGE_OUTPUT
+    expire_in: 1 week
+
+build_android:
+  stage: build
+  image: ghcr.io/gmeligio/flutter-android:3.32.5
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  before_script:
+    - flutter pub get
+    - flutter build apk --release
+  artifacts:
+    paths:
+      - $APK_OUTPUT
+    expire_in: 1 week
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs: [build_appimage]
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - echo "Releasing $CI_COMMIT_TAG"
+  release:
+    tag_name: "$CI_COMMIT_TAG"
+    name: "Release $CI_COMMIT_TAG"
+    description: "Automated release for tag $CI_COMMIT_TAG"
+    assets:
+      links:
+        - name: "$APPIMAGE_OUTPUT"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/$APPIMAGE_OUTPUT"
