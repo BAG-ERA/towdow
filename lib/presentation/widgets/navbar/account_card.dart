@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/caldav_account.dart';
 import '../../../data/services/sync_service.dart';
+import '../../../core/theme/chart_theme.dart';
 
 enum SyncIndicatorState {
   offline,     // Hors ligne
@@ -322,7 +323,7 @@ class AccountCard extends ConsumerWidget {
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: Colors.grey,
+            color: context.chartTheme.colors.onSurfaceVariant,
             shape: BoxShape.circle,
           ),
         );
@@ -331,7 +332,7 @@ class AccountCard extends ConsumerWidget {
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: Colors.green,
+            color: context.chartTheme.colors.success,
             shape: BoxShape.circle,
           ),
         );
@@ -341,7 +342,7 @@ class AccountCard extends ConsumerWidget {
           height: 8,
           child: CircularProgressIndicator(
             strokeWidth: 1,
-            color: Colors.blue,
+            color: context.chartTheme.colors.primary,
           ),
         );
       case SyncIndicatorState.error:
@@ -349,7 +350,7 @@ class AccountCard extends ConsumerWidget {
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: Colors.red,
+            color: context.chartTheme.colors.error,
             shape: BoxShape.circle,
           ),
         );

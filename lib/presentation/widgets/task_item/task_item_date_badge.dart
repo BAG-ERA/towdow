@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../../../data/models/task.dart';
+import '../../../core/theme/chart_theme.dart';
 
 class TaskItemDateBadge extends StatelessWidget {
   final Task task;
@@ -51,20 +52,20 @@ class TaskItemDateBadge extends StatelessWidget {
   }
 
   Color _getDueDateColor(BuildContext context) {
-    if (task.due == null) return Theme.of(context).colorScheme.onSurface;
+    if (task.due == null) return context.chartTheme.colors.onSurfaceVariant;
     
     final now = DateTime.now();
     final due = task.due!;
     final daysUntilDue = due.difference(now).inDays;
     
     if (daysUntilDue < 0) {
-      return Colors.red.shade600; // Overdue
+      return context.chartTheme.colors.error; // Overdue - FlowIt Pink
     } else if (daysUntilDue == 0) {
-      return Colors.orange.shade600; // Due today
+      return context.chartTheme.colors.warning; // Due today - FlowIt Yellow Dark
     } else if (daysUntilDue <= 3) {
-      return Colors.amber.shade600; // Due soon
+      return FlowItColors.coral; // Due soon - FlowIt Coral
     } else {
-      return Theme.of(context).colorScheme.primary;
+      return context.chartTheme.colors.primary; // FlowIt Blue Medium
     }
   }
 

@@ -13,6 +13,7 @@ import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../viewmodels/commands/attendee_commands.dart';
+import '../../../core/theme/chart_theme.dart';
 
 // Provider for a specific project/calendar
 final projectProvider = FutureProvider.family<TaskCalendar?, String>((ref, projectUid) async {
@@ -255,11 +256,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   Widget _buildProjectStatusChip(BuildContext context, TaskCalendar project) {
     final status = project.status.toLowerCase();
     final color = switch (status) {
-      'completed' => Colors.green,
-      'needs-action' => Colors.orange,
-      'in-process' => Colors.blue,
-      'cancelled' => Colors.red,
-      _ => Colors.grey,
+             'completed' => context.chartTheme.colors.success, // Water Green
+       'needs-action' => context.chartTheme.colors.primary, // Blue Medium
+       'in-process' => context.chartTheme.colors.warning, // Yellow Dark
+       'cancelled' => context.chartTheme.colors.error, // Pink
+       _ => context.chartTheme.colors.onSurfaceVariant,
     };
 
     return Container(
@@ -272,7 +273,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       child: Text(
         status.toUpperCase(),
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: color.shade700,
+          color: color,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -458,7 +459,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 children: [
                   // Overdue tasks section
                   if (overdueTasks.isNotEmpty) ...[
-                    _buildSectionHeader(context, 'Overdue', overdueTasks.length, Colors.red),
+                    _buildSectionHeader(context, 'Overdue', overdueTasks.length, context.chartTheme.colors.error),
                     const SizedBox(height: 8),
                     ...overdueTasks.map((task) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -479,7 +480,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   
                   // Pending tasks section
                   if (pendingTasks.isNotEmpty) ...[
-                    _buildSectionHeader(context, 'To Be Done', pendingTasks.length, Colors.orange),
+                    _buildSectionHeader(context, 'To Be Done', pendingTasks.length, context.chartTheme.colors.warning),
                     const SizedBox(height: 8),
                     ...pendingTasks.map((task) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -500,7 +501,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   
                   // Completed tasks section with separator
                   if (completedTasks.isNotEmpty) ...[
-                    _buildSectionHeader(context, 'Done', completedTasks.length, Colors.green),
+                    _buildSectionHeader(context, 'Done', completedTasks.length, context.chartTheme.colors.success),
                     const SizedBox(height: 8),
                     ...completedTasks.map((task) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -613,7 +614,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: 'Overdue',
         subtitle: '${overdueTasks.length} tasks',
         tasks: overdueTasks,
-        color: Colors.red,
+                 color: context.chartTheme.colors.error,
         icon: Icons.warning_rounded,
       ),
       KanbanColumn(
@@ -621,7 +622,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: 'Today',
         subtitle: _formatDate(today),
         tasks: todayTasks,
-        color: Colors.green,
+                 color: context.chartTheme.colors.success,
         icon: Icons.today_rounded,
       ),
       KanbanColumn(
@@ -629,7 +630,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: 'Soon',
         subtitle: 'Next 2 days',
         tasks: soonTasks,
-        color: Colors.orange,
+                 color: context.chartTheme.colors.warning,
         icon: Icons.schedule_rounded,
       ),
       KanbanColumn(
@@ -637,7 +638,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: 'Next Week',
         subtitle: '${nextWeekTasks.length} tasks',
         tasks: nextWeekTasks,
-        color: Colors.blue,
+                 color: context.chartTheme.colors.primary,
         icon: Icons.date_range_rounded,
       ),
       KanbanColumn(
@@ -645,7 +646,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: 'Later',
         subtitle: '${laterTasks.length} tasks',
         tasks: laterTasks,
-        color: Colors.purple,
+                 color: context.chartTheme.colors.tertiary,
         icon: Icons.event_rounded,
       ),
       KanbanColumn(

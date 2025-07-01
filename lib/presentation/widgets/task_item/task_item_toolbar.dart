@@ -127,8 +127,8 @@ class TaskItemToolbar extends StatelessWidget {
             const PopupMenuItem(
               value: 'delete',
               child: ListTile(
-                leading: Icon(Icons.delete_rounded, color: Colors.red),
-                title: Text('Delete', style: TextStyle(color: Colors.red)),
+                              leading: const Icon(Icons.delete_rounded, color: Colors.red),
+              title: const Text('Delete', style: TextStyle(color: Colors.red)),
                 contentPadding: EdgeInsets.zero,
               ),
             ),
@@ -528,7 +528,7 @@ class TaskItemToolbar extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error updating due date: $e'),
-            backgroundColor: Colors.red,
+                          backgroundColor: Theme.of(context).colorScheme.error,
             duration: const Duration(seconds: 3),
           ),
         );
