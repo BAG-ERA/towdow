@@ -75,42 +75,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           loading: () => const Text('Loading...'),
           error: (_, _) => const Text('Error'),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.sync_rounded),
-            onPressed: () => _syncProject(context, ref),
-            tooltip: 'Sync Project',
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) => _handleMenuAction(context, ref, value),
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'kanban',
-                child: ListTile(
-                  leading: Icon(Icons.view_kanban_rounded),
-                  title: Text('Kanban View'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'list',
-                child: ListTile(
-                  leading: Icon(Icons.view_list_rounded),
-                  title: Text('List View'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'edit',
-                child: ListTile(
-                  leading: Icon(Icons.edit_rounded),
-                  title: Text('Edit Project'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -216,7 +180,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       _buildProjectStat(context, 'Tasks', '${stats.completedTasks}/${stats.totalTasks}'),
                       const SizedBox(width: 16),
                       if (project.lastSyncAt != null)
-                        _buildProjectStat(context, 'Last Sync', _formatLastSync(project.lastSyncAt!)),
+                        _buildProjectStat(context, 'Last Update', _formatLastSync(project.lastSyncAt!)),
                     ],
                   );
                 },
@@ -227,7 +191,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     _buildProjectStat(context, 'Tasks', '...'),
                     const SizedBox(width: 16),
                     if (project.lastSyncAt != null)
-                      _buildProjectStat(context, 'Last Sync', _formatLastSync(project.lastSyncAt!)),
+                      _buildProjectStat(context, 'Last Update', _formatLastSync(project.lastSyncAt!)),
                   ],
                 ),
                 error: (_, _) => Row(
@@ -237,7 +201,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     _buildProjectStat(context, 'Status', project.status),
                     const SizedBox(width: 16),
                     if (project.lastSyncAt != null)
-                      _buildProjectStat(context, 'Last Sync', _formatLastSync(project.lastSyncAt!)),
+                      _buildProjectStat(context, 'Last Update', _formatLastSync(project.lastSyncAt!)),
                   ],
                 ),
               ),
@@ -1133,57 +1097,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
   }
 
-  Future<void> _syncProject(BuildContext context, WidgetRef ref) async {
-    final syncService = ref.read(syncServiceProvider);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🔄 Syncing project...')),
-    );
-    
-    final result = await syncService.syncNow();
-    
-    if (context.mounted) {
-      result.when(
-        success: (syncResult) {
-          ref.invalidate(projectProvider(widget.projectUid));
-          ref.invalidate(projectTasksProvider(widget.projectUid));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ Synced ${syncResult.syncedItems} items'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-        failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ Sync failed: ${failure.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        },
-      );
-    }
-  }
 
-  void _handleMenuAction(BuildContext context, WidgetRef ref, String action) {
-    switch (action) {
-      case 'kanban':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('🚧 Kanban view coming soon')),
-        );
-        break;
-      case 'list':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('📋 Already in list view')),
-        );
-        break;
-      case 'edit':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✏️ Edit project coming soon')),
-        );
-        break;
-    }
-  }
 
   Future<void> _addTask(BuildContext context, WidgetRef ref) async {
     // Simple dialog to add a task to this project
