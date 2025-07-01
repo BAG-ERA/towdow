@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
-import '../../../data/services/caldav_service.dart';
 import '../../../data/services/sync_service.dart';
 import '../../providers/home_providers.dart';
 import '../../widgets/styled_tab_bar.dart';
@@ -110,7 +109,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               StyledTabItem(
                 label: 'Anytime (${ref.watch(anytimeTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                icon: Icons.layers_rounded
+                icon: Icons.inbox_rounded
               ),
             ],
             selectedIndex: selectedTabIndex,
@@ -370,20 +369,6 @@ class _TaskListTab extends ConsumerWidget {
           },
           child: Column(
             children: [
-              // Test CalDAV Sync Button (development)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: ElevatedButton.icon(
-                  onPressed: () => _testCalDAVSync(context, ref),
-                  icon: const Icon(Icons.sync_rounded),
-                  label: const Text('Test CalDAV Sync'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-              
               Expanded(
                 child: tasks.isEmpty
                     ? const Center(
@@ -419,78 +404,6 @@ class _TaskListTab extends ConsumerWidget {
     );
   }
 
-  Future<void> _testCalDAVSync(BuildContext context, WidgetRef ref) async {
-    try {
-      // Get active CalDAV account
-      final activeAccount = ref.read(activeAccountProvider);
-      activeAccount.when(
-        data: (account) async {
-          if (account == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No active CalDAV account found')),
-            );
-            return;
-          }
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Creating test task and syncing with CalDAV server...')),
-          );
-
-          // Create a test task
-          final testTask = Task(
-            uid: 'test-task-${DateTime.now().millisecondsSinceEpoch}',
-            summary: 'Test CalDAV Task',
-            description: 'This is a test task created from FlowIt to verify CalDAV synchronization',
-            status: 'NEEDS-ACTION',
-            lastModified: DateTime.now(),
-            created: DateTime.now(),
-            dtstamp: DateTime.now(), // Required by iCalendar specification
-            due: DateTime.now().add(const Duration(days: 7)),
-            categories: ['test', 'caldav'],
-          );
-
-          // Save locally first
-          final taskViewModel = ref.read(taskViewModelProvider.notifier);
-          await taskViewModel.createTask(
-            summary: testTask.summary,
-            description: testTask.description,
-            due: testTask.due,
-          );
-
-          // Sync with CalDAV server
-          final caldavService = CalDAVService(account: account);
-          final syncResult = await caldavService.createTask(testTask);
-          
-          syncResult.when(
-            success: (taskUrl) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('✅ Task synced successfully!\nURL: $taskUrl'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-              ref.invalidate(taskListProvider);
-            },
-            failure: (failure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('❌ CalDAV sync failed: ${failure.message}')),
-              );
-            },
-          );
-        },
-        loading: () => ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Loading account...')),
-        ),
-        error: (error, _) => ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting account: $error')),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error during CalDAV sync test: $e')),
-      );
-    }
-  }
 
 
 }
