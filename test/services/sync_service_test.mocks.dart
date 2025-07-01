@@ -420,6 +420,100 @@ class MockCalendarRepository extends _i1.Mock
           ),
         )),
       ) as _i5.Future<_i2.Result<List<_i9.TaskCalendar>>>);
+
+  @override
+  _i5.Future<_i2.Result<List<_i9.TaskCalendar>>> getCalendarsByDomain(
+          String? domain) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getCalendarsByDomain,
+          [domain],
+        ),
+        returnValue: _i5.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i9.TaskCalendar>>(
+          this,
+          Invocation.method(
+            #getCalendarsByDomain,
+            [domain],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<List<_i9.TaskCalendar>>>);
+
+  @override
+  _i5.Future<_i2.Result<List<String>>> getUniqueDomains() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getUniqueDomains,
+          [],
+        ),
+        returnValue: _i5.Future<_i2.Result<List<String>>>.value(
+            _FakeResult_0<List<String>>(
+          this,
+          Invocation.method(
+            #getUniqueDomains,
+            [],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<List<String>>>);
+
+  @override
+  _i5.Future<_i2.Result<void>> renameDomain(
+    String? oldDomain,
+    String? newDomain,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #renameDomain,
+          [
+            oldDomain,
+            newDomain,
+          ],
+        ),
+        returnValue: _i5.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #renameDomain,
+            [
+              oldDomain,
+              newDomain,
+            ],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<void>>);
+
+  @override
+  _i5.Future<_i2.Result<Map<String, int>>> getDomainStatistics() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getDomainStatistics,
+          [],
+        ),
+        returnValue: _i5.Future<_i2.Result<Map<String, int>>>.value(
+            _FakeResult_0<Map<String, int>>(
+          this,
+          Invocation.method(
+            #getDomainStatistics,
+            [],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<Map<String, int>>>);
+
+  @override
+  _i5.Future<_i2.Result<List<_i9.TaskCalendar>>> getCalendarsWithoutDomain() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getCalendarsWithoutDomain,
+          [],
+        ),
+        returnValue: _i5.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i9.TaskCalendar>>(
+          this,
+          Invocation.method(
+            #getCalendarsWithoutDomain,
+            [],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<List<_i9.TaskCalendar>>>);
 }
 
 /// A class which mocks [LocalStorageService].
@@ -629,6 +723,94 @@ class MockLocalStorageService extends _i1.Mock
         returnValue: _i5.Future<void>.value(),
         returnValueForMissingStub: _i5.Future<void>.value(),
       ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<_i2.Result<List<String>>> getAllDomains() => (super.noSuchMethod(
+        Invocation.method(
+          #getAllDomains,
+          [],
+        ),
+        returnValue: _i5.Future<_i2.Result<List<String>>>.value(
+            _FakeResult_0<List<String>>(
+          this,
+          Invocation.method(
+            #getAllDomains,
+            [],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<List<String>>>);
+
+  @override
+  _i5.Future<_i2.Result<void>> addDomain(String? domain) => (super.noSuchMethod(
+        Invocation.method(
+          #addDomain,
+          [domain],
+        ),
+        returnValue: _i5.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #addDomain,
+            [domain],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<void>>);
+
+  @override
+  _i5.Future<_i2.Result<void>> removeDomain(String? domain) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #removeDomain,
+          [domain],
+        ),
+        returnValue: _i5.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #removeDomain,
+            [domain],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<void>>);
+
+  @override
+  _i5.Future<_i2.Result<bool>> domainExists(String? domain) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #domainExists,
+          [domain],
+        ),
+        returnValue: _i5.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
+          this,
+          Invocation.method(
+            #domainExists,
+            [domain],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<bool>>);
+
+  @override
+  _i5.Future<_i2.Result<void>> renameDomain(
+    String? oldDomain,
+    String? newDomain,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #renameDomain,
+          [
+            oldDomain,
+            newDomain,
+          ],
+        ),
+        returnValue: _i5.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #renameDomain,
+            [
+              oldDomain,
+              newDomain,
+            ],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<void>>);
 }
 
 /// A class which mocks [CalDAVService].
@@ -801,4 +983,21 @@ class MockCalDAVService extends _i1.Mock implements _i12.CalDAVService {
           ),
         )),
       ) as _i5.Future<_i2.Result<_i9.TaskCalendar>>);
+
+  @override
+  _i5.Future<_i2.Result<void>> updateCalendarProperties(
+          _i9.TaskCalendar? calendar) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateCalendarProperties,
+          [calendar],
+        ),
+        returnValue: _i5.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #updateCalendarProperties,
+            [calendar],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<void>>);
 }

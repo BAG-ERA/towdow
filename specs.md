@@ -281,6 +281,7 @@ Required Properties (VCALENDAR)
 - X-FLOWIT-ASFLOW: FALSE – indicates the calendar is not a "flow" container
 - X-FLOWIT-KANBAN – JSON array of kanban states (may be empty)
 - X-FLOWIT-OWNER – identifier or email of the owner (if ORGANIZER not used)
+- X-FLOWIT-DOMAIN – domain name for grouping projects (WebDAV property on calendar collections, acts as folder organization)
 - GETETAG – server-managed ETag, preserved for caching & sync
 - CALENDAR-ORDER – integer used for UX ordering
 - ORGANIZER – CalDAV/email address of the responsible person
@@ -292,6 +293,90 @@ Optional Properties
 - X-FLOWIT-TEMPLATE – UID if the project is based on a template
 
 All other FlowIt-specific extensions (validator, requirement, automate…) remain VTODO-level only.
+
+7.2 Domain Organization (X-FLOWIT-DOMAIN)
+
+Domains provide a hierarchical organization system for projects, acting as folders to group related calendars/projects together.
+
+**Purpose:**
+- Group related projects under a common domain name
+- Provide visual organization in the UI (folder-like structure)
+- Enable bulk operations on projects within the same domain
+- Support hierarchical project navigation
+
+**Technical Implementation:**
+- **Protocol**: WebDAV property on calendar collections (RFC 4918 PROPPATCH/PROPFIND)
+- **Namespace**: `http://flowit.app/ns/` (usually aliased as `FLOWIT:` or dynamic like `ns3:`)
+- **Location**: Calendar collection level (not VCALENDAR or VTODO objects)
+- **Cardinality**: 0..1 per calendar (optional, maximum one domain per project)
+- **Format**: String value representing the domain name
+- **Case Sensitivity**: Case-insensitive for display purposes, case-preserving for storage
+- **Validation**: Must be a non-empty string if provided, no special character restrictions
+
+**CalDAV Operations:**
+- **Discovery**: Retrieved via PROPFIND requests on calendar collections
+- **Updates**: Modified via PROPPATCH requests to set/remove the domain property
+- **Server Response**: Returns in multistatus XML as `<ns:domain>value</ns:domain>`
+
+**Behavior:**
+- If X-FLOWIT-DOMAIN is missing or empty, the project appears in the "No Domain" section
+- Projects with the same domain value are grouped together in the UI
+- Domain names are user-defined and can be created dynamically when assigning projects
+- Domains have no hierarchical nesting (flat structure only)
+- Changing a project's domain immediately triggers a PROPPATCH request to update the server
+
+**UI Implications:**
+- Projects are visually grouped by domain in navigation sidebars
+- Domain folders can be collapsed/expanded to show/hide contained projects
+- Domain creation happens through project editing or during project creation
+- Bulk domain assignment operations are available for multiple projects
+
+**Migration Considerations:**
+- Existing projects without X-FLOWIT-DOMAIN are treated as having no domain
+- No data migration is required - the feature is additive
+- Legacy CalDAV clients ignore custom WebDAV properties automatically
+
+**PROPPATCH Example:**
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<D:propertyupdate xmlns:D="DAV:" xmlns:FLOWIT="http://flowit.app/ns/">
+  <D:set>
+    <D:prop>
+      <FLOWIT:domain>Marketing Campaigns</FLOWIT:domain>
+    </D:prop>
+  </D:set>
+</D:propertyupdate>
+```
+
+**PROPFIND Response Example:**
+```xml
+<D:multistatus xmlns:D="DAV:" xmlns:ns3="http://flowit.app/ns/">
+  <D:response>
+    <D:href>/calendars/user/project-calendar/</D:href>
+    <D:propstat>
+      <D:prop>
+        <D:displayname>Marketing Campaign Q1</D:displayname>
+        <ns3:domain>Marketing Campaigns</ns3:domain>
+      </D:prop>
+      <D:status>HTTP/1.1 200 OK</D:status>
+    </D:propstat>
+  </D:response>
+</D:multistatus>
+```
+
+7.3 Domain Management
+
+**Domain Lifecycle:**
+- Domains are created implicitly when first assigned to a project
+- Domains persist as WebDAV properties on calendar collections
+- Domain names can be renamed by updating the WebDAV property via PROPPATCH
+- Domain removal is achieved by sending a PROPPATCH request to remove the property
+
+**Synchronization:**
+- Domain information is discovered during calendar collection PROPFIND operations
+- Changes to domain assignments trigger immediate PROPPATCH requests to update the server
+- Domain properties are included in standard CalDAV discovery and sync workflows
+- No separate sync mechanism is required - domains sync as part of calendar metadata
 
 7.4 Task (x-flowit-type: task)
 
@@ -383,6 +468,8 @@ GETETAG:"12345-67890"
 CALENDAR-ORDER:1
 ATTENDEE:mailto:collaborator@example.com
 END:VCALENDAR
+
+Note: X-FLOWIT-DOMAIN is NOT stored in VCALENDAR objects but as a WebDAV property on the calendar collection itself. The domain for this project would be discoverable via PROPFIND on the calendar collection containing this VCALENDAR.
 
 Task Example:
 BEGIN:VTODO
@@ -766,7 +853,7 @@ This section defines Material Design icon mappings used throughout FlowIt for ac
 | Set validator | `fact_check` | `colorScheme.onSurface.withOpacity(0.6)` | Configure task validator |
 | Add attendee | `person_add_rounded` | `colorScheme.onSurface.withOpacity(0.6)` | Assign an attendee |
 | Add category | `label_rounded` | `colorScheme.onSurface.withOpacity(0.6)` | Assign a category |
-| Move task | `drive_file_move_rounded` | `colorScheme.onSurface.withOpacity(0.6)` | Change project/portfolio |
+| Move task | `drive_file_move_rounded` | `colorScheme.onSurface.withOpacity(0.6)` | Change project |
 | Delete task | `delete_rounded` | `colorScheme.error` | Permanently delete |
 | Archive task | `archive` | `colorScheme.onSurface.withOpacity(0.6)` | Permanently delete |
 | Add GPS coordinate | `pin_drop` | `colorScheme.onSurface.withOpacity(0.6)` | Permanently delete |
@@ -777,7 +864,7 @@ This section defines Material Design icon mappings used throughout FlowIt for ac
 | Element | Material Icon | Color | Usage |
 |---------|---------------|-------|-------|
 | Expand/Collapse | `expand_more_rounded` / `expand_less_rounded` | `colorScheme.onSurface.withOpacity(0.6)` | Toggle task detail view |
-| Portfolio expand | `expand_more_rounded` / `expand_less_rounded` | `colorScheme.onSurface.withOpacity(0.5)` | Toggle portfolio details |
+| Project expand | `expand_more_rounded` / `expand_less_rounded` | `colorScheme.onSurface.withOpacity(0.5)` | Toggle project details |
 
 11.1.5 Tab Bar Icons
 

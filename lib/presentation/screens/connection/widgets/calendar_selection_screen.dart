@@ -1,5 +1,5 @@
-﻿// Project Portfolio selection screen after successful CalDAV connection
-// Allows users to choose which project portfolios to sync or create new ones
+﻿// Project selection screen after successful CalDAV connection
+// Allows users to choose which projects to sync or create new ones
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

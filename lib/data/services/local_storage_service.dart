@@ -13,6 +13,7 @@ class LocalStorageService {
   static const String automatedTasksBoxName = 'automated_tasks';
   static const String accountsBoxName = 'accounts';
   static const String syncQueueBoxName = 'sync_queue';
+  static const String domainsBoxName = 'domains'; // For storing domain names
 
   // Box references
   late Box _tasksBox;
@@ -21,6 +22,7 @@ class LocalStorageService {
   late Box _automatedTasksBox;
   late Box _accountsBox;
   late Box _syncQueueBox;
+  late Box _domainsBox;
 
   // Initialize all Hive boxes
   Future<Result<void>> initialize() async {
@@ -34,6 +36,7 @@ class LocalStorageService {
       await _initializeBoxSafely(automatedTasksBoxName, 'automated_tasks');
       await _initializeBoxSafely(accountsBoxName, 'accounts');
       await _initializeBoxSafely(syncQueueBoxName, 'sync_queue');
+      await _initializeBoxSafely(domainsBoxName, 'domains');
 
       // Assign the boxes after successful initialization
       _tasksBox = Hive.box(tasksBoxName);
@@ -42,6 +45,7 @@ class LocalStorageService {
       _automatedTasksBox = Hive.box(automatedTasksBoxName);
       _accountsBox = Hive.box(accountsBoxName);
       _syncQueueBox = Hive.box(syncQueueBoxName);
+      _domainsBox = Hive.box(domainsBoxName);
 
       // AppLogger.info('LocalStorageService: All boxes initialized successfully');
       return const Result.success(null);
@@ -264,6 +268,7 @@ class LocalStorageService {
       await clear(automatedTasksBoxName);
       await clear(accountsBoxName);
       await clear(syncQueueBoxName);
+      await clear(domainsBoxName);
       
       // AppLogger.info('LocalStorageService: Successfully cleared ALL data');
       return const Result.success(null);
@@ -289,6 +294,7 @@ class LocalStorageService {
         automatedTasksBoxName,
         accountsBoxName,
         syncQueueBoxName,
+        domainsBoxName,
       ];
       
       // Close all boxes first
@@ -345,6 +351,8 @@ class LocalStorageService {
         return _accountsBox;
       case syncQueueBoxName:
         return _syncQueueBox;
+      case domainsBoxName:
+        return _domainsBox;
       default:
         throw ArgumentError('Unknown box name: $boxName');
     }
@@ -360,6 +368,7 @@ class LocalStorageService {
       _automatedTasksBox.close(),
       _accountsBox.close(),
       _syncQueueBox.close(),
+      _domainsBox.close(),
     ]);
   }
 
@@ -454,5 +463,48 @@ class LocalStorageService {
     }
 
     // AppLogger.info('=== END DEBUG ===');
+  }
+
+  // Domain-specific methods
+  
+  /// Get all domains
+  Future<Result<List<String>>> getAllDomains() async {
+    AppLogger.info('LocalStorageService: Getting all domains');
+    return await getAll<String>(domainsBoxName);
+  }
+
+  /// Add a domain
+  Future<Result<void>> addDomain(String domain) async {
+    AppLogger.info('LocalStorageService: Adding domain: $domain');
+    return await put<String>(domainsBoxName, domain.toLowerCase(), domain);
+  }
+
+  /// Remove a domain
+  Future<Result<void>> removeDomain(String domain) async {
+    AppLogger.info('LocalStorageService: Removing domain: $domain');
+    return await delete(domainsBoxName, domain.toLowerCase());
+  }
+
+  /// Check if domain exists
+  Future<Result<bool>> domainExists(String domain) async {
+    final result = await get<String>(domainsBoxName, domain.toLowerCase());
+    return result.when(
+      success: (domainValue) => Result.success(domainValue != null),
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  /// Rename a domain
+  Future<Result<void>> renameDomain(String oldDomain, String newDomain) async {
+    AppLogger.info('LocalStorageService: Renaming domain from "$oldDomain" to "$newDomain"');
+    
+    // Remove old domain
+    final removeResult = await removeDomain(oldDomain);
+    if (removeResult is Error<void>) {
+      return removeResult;
+    }
+    
+    // Add new domain
+    return await addDomain(newDomain);
   }
 } 

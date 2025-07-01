@@ -257,4 +257,98 @@ class MockCalendarRepository extends _i1.Mock
           ),
         )),
       ) as _i4.Future<_i2.Result<List<_i7.TaskCalendar>>>);
+
+  @override
+  _i4.Future<_i2.Result<List<_i7.TaskCalendar>>> getCalendarsByDomain(
+          String? domain) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getCalendarsByDomain,
+          [domain],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<_i7.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i7.TaskCalendar>>(
+          this,
+          Invocation.method(
+            #getCalendarsByDomain,
+            [domain],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<_i7.TaskCalendar>>>);
+
+  @override
+  _i4.Future<_i2.Result<List<String>>> getUniqueDomains() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getUniqueDomains,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<String>>>.value(
+            _FakeResult_0<List<String>>(
+          this,
+          Invocation.method(
+            #getUniqueDomains,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<String>>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> renameDomain(
+    String? oldDomain,
+    String? newDomain,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #renameDomain,
+          [
+            oldDomain,
+            newDomain,
+          ],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #renameDomain,
+            [
+              oldDomain,
+              newDomain,
+            ],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<Map<String, int>>> getDomainStatistics() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getDomainStatistics,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<Map<String, int>>>.value(
+            _FakeResult_0<Map<String, int>>(
+          this,
+          Invocation.method(
+            #getDomainStatistics,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<Map<String, int>>>);
+
+  @override
+  _i4.Future<_i2.Result<List<_i7.TaskCalendar>>> getCalendarsWithoutDomain() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getCalendarsWithoutDomain,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<_i7.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i7.TaskCalendar>>(
+          this,
+          Invocation.method(
+            #getCalendarsWithoutDomain,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<_i7.TaskCalendar>>>);
 }

@@ -16,6 +16,13 @@ abstract class CalendarRepository {
   Future<Result<void>> delete(String uid);
   Stream<List<TaskCalendar>> watchCalendars();
   Future<Result<List<TaskCalendar>>> getProjectCalendars();
+  
+  // Domain-related methods
+  Future<Result<List<TaskCalendar>>> getCalendarsByDomain(String? domain);
+  Future<Result<List<String>>> getUniqueDomains();
+  Future<Result<void>> renameDomain(String oldDomain, String newDomain);
+  Future<Result<Map<String, int>>> getDomainStatistics();
+  Future<Result<List<TaskCalendar>>> getCalendarsWithoutDomain();
 }
 
 // Local implementation using Hive
@@ -95,6 +102,104 @@ class LocalCalendarRepository implements CalendarRepository {
         final projects = calendars.where((c) => c.supportsTodos).toList();
         // AppLogger.info('LocalCalendarRepository: Found ${projects.length} project calendars (all synchronized VTODO calendars)');
         return Result.success(projects);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<List<TaskCalendar>>> getCalendarsByDomain(String? domain) async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) {
+        final filteredCalendars = calendars.where((calendar) {
+          if (domain == null || domain.toLowerCase() == 'no domain') {
+            return !calendar.hasDomain;
+          }
+          return calendar.belongsToDomain(domain);
+        }).toList();
+        
+        AppLogger.info('LocalCalendarRepository: Found ${filteredCalendars.length} calendars in domain: ${domain ?? "No Domain"}');
+        return Result.success(filteredCalendars);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<List<String>>> getUniqueDomains() async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) {
+        final domains = calendars
+            .where((calendar) => calendar.hasDomain)
+            .map((calendar) => calendar.flowitDomain!)
+            .toSet()
+            .toList();
+        
+        // Sort domains alphabetically (case-insensitive)
+        domains.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+        
+        AppLogger.info('LocalCalendarRepository: Found ${domains.length} unique domains');
+        return Result.success(domains);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<void>> renameDomain(String oldDomain, String newDomain) async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) async {
+        final calendarsToUpdate = calendars
+            .where((calendar) => calendar.belongsToDomain(oldDomain))
+            .toList();
+        
+        AppLogger.info('LocalCalendarRepository: Renaming domain "$oldDomain" to "$newDomain" for ${calendarsToUpdate.length} calendars');
+        
+        for (final calendar in calendarsToUpdate) {
+          final updatedCalendar = calendar.withDomain(newDomain);
+          final saveResult = await save(updatedCalendar);
+          if (saveResult is Error<void>) {
+            AppLogger.error('LocalCalendarRepository: Failed to rename domain for calendar ${calendar.uid}: ${saveResult.failure.message}');
+            return saveResult;
+          }
+        }
+        
+        return Result.success(null);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<Map<String, int>>> getDomainStatistics() async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) {
+        final statistics = <String, int>{};
+        
+        for (final calendar in calendars) {
+          final domain = calendar.domainDisplayName;
+          statistics[domain] = (statistics[domain] ?? 0) + 1;
+        }
+        
+        AppLogger.info('LocalCalendarRepository: Domain statistics calculated for ${statistics.length} domains');
+        return Result.success(statistics);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<List<TaskCalendar>>> getCalendarsWithoutDomain() async {
+    final result = await getAll();
+    return result.when(
+      success: (calendars) {
+        final calendarsWithoutDomain = calendars.where((calendar) => !calendar.hasDomain).toList();
+        AppLogger.info('LocalCalendarRepository: Found ${calendarsWithoutDomain.length} calendars without domain');
+        return Result.success(calendarsWithoutDomain);
       },
       failure: (failure) => Result.failure(failure),
     );

@@ -6,6 +6,7 @@ import '../../data/models/task_calendar.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/services/sync_service.dart';
+import '../../data/services/domain_service.dart';
 import '../../core/logger.dart';
 
 // Project with associated statistics
@@ -41,15 +42,77 @@ class ProjectWithStats {
   }
 }
 
+// Domain with projects
+class DomainGroup {
+  final String domain;
+  final List<ProjectWithStats> projects;
+  final bool isExpanded;
+
+  const DomainGroup({
+    required this.domain,
+    required this.projects,
+    this.isExpanded = true,
+  });
+
+  DomainGroup copyWith({
+    String? domain,
+    List<ProjectWithStats>? projects,
+    bool? isExpanded,
+  }) {
+    return DomainGroup(
+      domain: domain ?? this.domain,
+      projects: projects ?? this.projects,
+      isExpanded: isExpanded ?? this.isExpanded,
+    );
+  }
+
+  /// Get domain statistics
+  DomainStats get stats {
+    final totalProjects = projects.length;
+    final completedProjects = projects.where((p) => p.stats.progressPercentage == 100).length;
+    final totalTasks = projects.fold(0, (sum, p) => sum + p.stats.totalTasks);
+    final completedTasks = projects.fold(0, (sum, p) => sum + p.stats.completedTasks);
+    
+    return DomainStats(
+      projectCount: totalProjects,
+      completedProjects: completedProjects,
+      totalTasks: totalTasks,
+      completedTasks: completedTasks,
+      progressPercentage: totalTasks > 0 ? (completedTasks * 100 / totalTasks).round() : 0,
+    );
+  }
+}
+
+// Domain statistics
+class DomainStats {
+  final int projectCount;
+  final int completedProjects;
+  final int totalTasks;
+  final int completedTasks;
+  final int progressPercentage;
+
+  const DomainStats({
+    required this.projectCount,
+    required this.completedProjects,
+    required this.totalTasks,
+    required this.completedTasks,
+    required this.progressPercentage,
+  });
+}
+
 // Project List ViewModel State
 class ProjectListState {
   final bool isLoading;
   final bool isRefreshing;
   final String? error;
   final List<ProjectWithStats> projects;
+  final List<DomainGroup> domainGroups;
   final ProjectFilter filter;
   final ProjectSort sortBy;
   final String searchQuery;
+  final String? selectedDomain;
+  final bool isDomainGroupingEnabled;
+  final Map<String, bool> domainExpandedState;
   final int totalProjects;
   final int completedProjects;
   final int activeProjects;
@@ -59,9 +122,13 @@ class ProjectListState {
     this.isRefreshing = false,
     this.error,
     this.projects = const [],
+    this.domainGroups = const [],
     this.filter = ProjectFilter.all,
     this.sortBy = ProjectSort.name,
     this.searchQuery = '',
+    this.selectedDomain,
+    this.isDomainGroupingEnabled = true,
+    this.domainExpandedState = const {},
     this.totalProjects = 0,
     this.completedProjects = 0,
     this.activeProjects = 0,
@@ -72,9 +139,13 @@ class ProjectListState {
     bool? isRefreshing,
     String? error,
     List<ProjectWithStats>? projects,
+    List<DomainGroup>? domainGroups,
     ProjectFilter? filter,
     ProjectSort? sortBy,
     String? searchQuery,
+    String? selectedDomain,
+    bool? isDomainGroupingEnabled,
+    Map<String, bool>? domainExpandedState,
     int? totalProjects,
     int? completedProjects,
     int? activeProjects,
@@ -84,9 +155,13 @@ class ProjectListState {
       isRefreshing: isRefreshing ?? this.isRefreshing,
       error: error,
       projects: projects ?? this.projects,
+      domainGroups: domainGroups ?? this.domainGroups,
       filter: filter ?? this.filter,
       sortBy: sortBy ?? this.sortBy,
       searchQuery: searchQuery ?? this.searchQuery,
+      selectedDomain: selectedDomain,
+      isDomainGroupingEnabled: isDomainGroupingEnabled ?? this.isDomainGroupingEnabled,
+      domainExpandedState: domainExpandedState ?? this.domainExpandedState,
       totalProjects: totalProjects ?? this.totalProjects,
       completedProjects: completedProjects ?? this.completedProjects,
       activeProjects: activeProjects ?? this.activeProjects,
@@ -99,11 +174,19 @@ class ProjectListState {
       final project = projectWithStats.project;
       final stats = projectWithStats.stats;
       
+      // Apply domain filter
+      if (selectedDomain != null) {
+        if (!project.belongsToDomain(selectedDomain!)) {
+          return false;
+        }
+      }
+      
       // Apply search filter
       if (searchQuery.isNotEmpty) {
         final searchLower = searchQuery.toLowerCase();
         if (!project.displayName.toLowerCase().contains(searchLower) &&
-            !project.description.toLowerCase().contains(searchLower)) {
+            !project.description.toLowerCase().contains(searchLower) &&
+            !(project.flowitDomain?.toLowerCase().contains(searchLower) ?? false)) {
           return false;
         }
       }
@@ -140,9 +223,35 @@ class ProjectListState {
       case ProjectSort.taskCount:
         filtered.sort((a, b) => b.stats.totalTasks.compareTo(a.stats.totalTasks));
         break;
+      case ProjectSort.domain:
+        filtered.sort((a, b) {
+          final domainA = a.project.domainDisplayName;
+          final domainB = b.project.domainDisplayName;
+          final domainCompare = domainA.compareTo(domainB);
+          if (domainCompare != 0) return domainCompare;
+          return a.project.displayName.compareTo(b.project.displayName);
+        });
+        break;
     }
     
     return filtered;
+  }
+
+  /// Get available domains
+  List<String> get availableDomains {
+    final domains = projects
+        .map((p) => p.project.domainDisplayName)
+        .toSet()
+        .toList();
+    
+    // Sort domains alphabetically, but put "No Domain" last
+    domains.sort((a, b) {
+      if (a == 'No Domain') return 1;
+      if (b == 'No Domain') return -1;
+      return a.toLowerCase().compareTo(b.toLowerCase());
+    });
+    
+    return domains;
   }
 }
 
@@ -160,6 +269,7 @@ enum ProjectSort {
   created,
   lastModified,
   taskCount,
+  domain,
 }
 
 // Project List ViewModel
@@ -167,11 +277,13 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   final CalendarRepository _calendarRepository;
   final TaskRepository _taskRepository;
   final SyncService _syncService;
+  final DomainService _domainService;
 
   ProjectListViewModel(
     this._calendarRepository,
     this._taskRepository,
     this._syncService,
+    this._domainService,
   ) : super(const ProjectListState());
 
   /// Initialize the view model
@@ -254,8 +366,12 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           final completedProjects = projectsWithStats.where((p) => p.stats.progressPercentage == 100).length;
           final activeProjects = totalProjects - completedProjects;
           
+          // Build domain groups
+          final domainGroups = _buildDomainGroups(projectsWithStats);
+          
           state = state.copyWith(
             projects: projectsWithStats,
+            domainGroups: domainGroups,
             totalProjects: totalProjects,
             completedProjects: completedProjects,
             activeProjects: activeProjects,
@@ -451,6 +567,96 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         return 'Modified';
       case ProjectSort.taskCount:
         return 'Task Count';
+      case ProjectSort.domain:
+        return 'Domain';
     }
+  }
+
+  /// Set domain filter
+  void setDomainFilter(String? domain) {
+    // AppLogger.info('ProjectListViewModel: Setting domain filter: ${domain ?? "All"}');
+    state = state.copyWith(selectedDomain: domain);
+  }
+
+  /// Toggle domain grouping
+  void toggleDomainGrouping() {
+    // AppLogger.info('ProjectListViewModel: Toggling domain grouping');
+    state = state.copyWith(isDomainGroupingEnabled: !state.isDomainGroupingEnabled);
+  }
+
+  /// Toggle domain expansion state
+  void toggleDomainExpansion(String domain) {
+    final newExpandedState = Map<String, bool>.from(state.domainExpandedState);
+    newExpandedState[domain] = !(newExpandedState[domain] ?? true);
+    state = state.copyWith(domainExpandedState: newExpandedState);
+  }
+
+  /// Get domain expansion state
+  bool isDomainExpanded(String domain) {
+    return state.domainExpandedState[domain] ?? true;
+  }
+
+  /// Assign domain to project
+  Future<void> assignDomainToProject(String projectUid, String? domain) async {
+    // AppLogger.info('ProjectListViewModel: Assigning domain "$domain" to project $projectUid');
+    
+    try {
+      state = state.copyWith(error: null);
+      
+      final result = await _domainService.assignDomainToCalendar(projectUid, domain);
+      await result.when(
+        success: (_) async {
+          // AppLogger.info('ProjectListViewModel: Domain assigned successfully');
+          // Reload projects to reflect the change
+          await loadProjects();
+        },
+        failure: (failure) async {
+          AppLogger.error('ProjectListViewModel: Failed to assign domain', failure.exception, failure.stackTrace);
+          state = state.copyWith(error: 'Failed to assign domain: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectListViewModel: Exception assigning domain', e, stackTrace);
+      state = state.copyWith(error: 'Failed to assign domain: $e');
+    }
+  }
+
+  /// Build domain groups from projects
+  List<DomainGroup> _buildDomainGroups(List<ProjectWithStats> projects) {
+    if (!state.isDomainGroupingEnabled) return [];
+    
+    final groupedProjects = <String, List<ProjectWithStats>>{};
+    
+    // Group projects by domain
+    for (final project in projects) {
+      final domain = project.project.domainDisplayName;
+      groupedProjects.putIfAbsent(domain, () => []).add(project);
+    }
+    
+    // Create domain groups
+    final domainGroups = <DomainGroup>[];
+    final sortedDomains = groupedProjects.keys.toList();
+    
+    // Sort domains alphabetically, but put "No Domain" last
+    sortedDomains.sort((a, b) {
+      if (a == 'No Domain') return 1;
+      if (b == 'No Domain') return -1;
+      return a.toLowerCase().compareTo(b.toLowerCase());
+    });
+    
+    for (final domain in sortedDomains) {
+      final domainProjects = groupedProjects[domain]!;
+      
+      // Sort projects within domain
+      domainProjects.sort((a, b) => a.project.displayName.compareTo(b.project.displayName));
+      
+      domainGroups.add(DomainGroup(
+        domain: domain,
+        projects: domainProjects,
+        isExpanded: isDomainExpanded(domain),
+      ));
+    }
+    
+    return domainGroups;
   }
 } 

@@ -44,6 +44,7 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(21) String? organizer, // ORGANIZER
     @HiveField(22) @Default([]) List<Attendee> attendees, // ATTENDEE
     @HiveField(23) @Default([]) List<String> categories, // CATEGORIES
+    @HiveField(25) String? flowitDomain, // X-FLOWIT-DOMAIN - domain for grouping projects
   }) = _TaskCalendar;
 
   factory TaskCalendar.fromJson(Map<String, dynamic> json) => _$TaskCalendarFromJson(json);
@@ -58,6 +59,7 @@ extension TaskCalendarFactory on TaskCalendar {
     String? organizer,
     List<String> categories = const [],
     List<Attendee> attendees = const [],
+    String? domain,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -74,6 +76,7 @@ extension TaskCalendarFactory on TaskCalendar {
       attendees: attendees,
       categories: categories,
       flowitOwner: organizer,
+      flowitDomain: domain,
     );
   }
   
@@ -84,6 +87,11 @@ extension TaskCalendarFactory on TaskCalendar {
     String? etag,
     String? color,
     bool isReadOnly = false,
+    String? domain,
+    String? flowitType,
+    bool? flowitAsFlow,
+    String? flowitOwner,
+    String? flowitTemplate,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -99,6 +107,11 @@ extension TaskCalendarFactory on TaskCalendar {
       lastModified: now,
       summary: displayName,
       status: 'NEEDS-ACTION',
+      flowitDomain: domain,
+      flowitType: flowitType ?? 'PROJECT',
+      flowitAsFlow: flowitAsFlow ?? false,
+      flowitOwner: flowitOwner,
+      flowitTemplate: flowitTemplate,
     );
   }
 }
@@ -160,4 +173,35 @@ class ProjectStats {
     required this.pendingTasks,
     required this.progressPercentage,
   });
+}
+
+// Extension for domain-related operations
+extension TaskCalendarDomain on TaskCalendar {
+  /// Check if this calendar has a domain assigned
+  bool get hasDomain => flowitDomain != null && flowitDomain!.isNotEmpty;
+  
+  /// Get the domain name, or "No Domain" if none assigned
+  String get domainDisplayName => flowitDomain?.isNotEmpty == true ? flowitDomain! : 'No Domain';
+  
+  /// Check if this calendar belongs to a specific domain (case-insensitive)
+  bool belongsToDomain(String domain) {
+    if (!hasDomain) return domain.toLowerCase() == 'no domain';
+    return flowitDomain!.toLowerCase() == domain.toLowerCase();
+  }
+  
+  /// Create a copy with a new domain
+  TaskCalendar withDomain(String? newDomain) {
+    return copyWith(
+      flowitDomain: newDomain?.isEmpty == true ? null : newDomain,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Remove domain from this calendar
+  TaskCalendar withoutDomain() {
+    return copyWith(
+      flowitDomain: null,
+      lastModified: DateTime.now(),
+    );
+  }
 } 

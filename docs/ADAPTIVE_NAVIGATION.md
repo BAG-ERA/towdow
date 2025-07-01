@@ -57,7 +57,6 @@ ShellRoute(
   builder: (context, state, child) => AdaptiveAppLayout(...),
   routes: [
     GoRoute(path: '/', builder: (context, state) => HomeScreen()),
-    GoRoute(path: '/projects', builder: (context, state) => ProjectsScreen()),
     GoRoute(path: '/settings', builder: (context, state) => SettingsScreen()),
   ],
 )
@@ -74,15 +73,9 @@ ShellRoute(
 
 #### Navigation Section
 - **Titre** : "Navigation"
-- **Items** : My Tasks, Projects, Settings
+- **Items** : My Tasks, Settings
 - **États** : Normal, Selected, Hover
 - **Icônes** : Material Rounded
-
-#### Project Portfolios Section
-- **Titre** : "Project Portfolios" 
-- **Action** : Bouton "+" pour créer un nouveau portefeuille
-- **Liste** : Portefeuilles existants (à implémenter)
-- **Empty state** : "No portfolios yet"
 
 #### User Profile (Desktop seulement)
 - **Avatar** : Première lettre du nom d'utilisateur
@@ -114,7 +107,7 @@ ShellRoute(
 | Route | Destination | Écran | Description |
 |-------|-------------|-------|-------------|
 | `/` | MyTasks | HomeScreen | Tâches groupées par Today/Soon/Unregistered |
-| `/projects` | Projects | ProjectsScreen | Liste des portefeuilles projet |
+
 | `/settings` | Settings | SettingsScreen | Configuration de l'app |
 | `/connect` | - | ConnectionScreen | Connexion CalDAV (hors shell) |
 | `/project/:uid` | - | ProjectDetailScreen | Détail d'un projet (hors shell) |
