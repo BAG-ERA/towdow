@@ -89,7 +89,7 @@ class FlowItApp extends ConsumerWidget {
             final location = state.uri.path;
             
             if (location.startsWith('/settings')) {
-              currentDestination = AppDestination.settings;
+              currentDestination = null; // Settings handled by toolbar
             } else if (location.startsWith('/archived')) {
               currentDestination = null; // Archived projects have no main navigation active
             } else if (location.startsWith('/project/')) {

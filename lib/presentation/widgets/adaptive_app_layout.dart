@@ -12,12 +12,6 @@ enum AppDestination {
     label: 'My Tasks',
     icon: Icons.checklist_rounded,
     route: '/',
-  ),
-
-  settings(
-    label: 'Settings',
-    icon: Icons.settings_rounded,
-    route: '/settings',
   );
 
   const AppDestination({
@@ -76,6 +70,8 @@ class AdaptiveAppLayout extends ConsumerWidget {
       final location = GoRouterState.of(context).uri.path;
       if (location.startsWith('/archived')) {
         title = 'Archived Projects';
+      } else if (location.startsWith('/settings')) {
+        title = 'Settings';
       }
     }
     
