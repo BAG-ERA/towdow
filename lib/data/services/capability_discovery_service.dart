@@ -291,15 +291,20 @@ class CapabilityDiscoveryService {
 
   /// Discover available calendars that support VTODO
   Future<Result<List<TaskCalendar>>> _discoverCalendars(String calendarHome) async {
-    // AppLogger.debug('CapabilityDiscovery: Discovering calendars in: $calendarHome');
+    AppLogger.debug('CapabilityDiscovery: Discovering calendars in: $calendarHome');
     
     const propfindQuery = '''<?xml version="1.0" encoding="utf-8"?>
-<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:FLOWIT="https://flowit.app/ns/">
   <D:prop>
     <D:resourcetype/>
     <D:displayname/>
     <C:supported-calendar-component-set/>
     <C:calendar-description/>
+    <FLOWIT:domain/>
+    <FLOWIT:type/>
+    <FLOWIT:asflow/>
+    <FLOWIT:owner/>
+    <FLOWIT:template/>
   </D:prop>
 </D:propfind>''';
 
@@ -314,7 +319,8 @@ class CapabilityDiscoveryService {
         }
 
         final calendars = _parseCalendarsFromResponse(response.body, calendarHome);
-        // AppLogger.info('CapabilityDiscovery: Found ${calendars.length} available calendars');
+        AppLogger.info('CapabilityDiscovery: PROPFIND response: ${response.body}');
+        AppLogger.info('CapabilityDiscovery: Found ${calendars.length} available calendars');
         
         return Result.success(calendars);
       },
@@ -375,6 +381,10 @@ class CapabilityDiscoveryService {
     final calendars = <TaskCalendar>[];
     
     try {
+      // Extract FlowIt namespace prefixes from the FULL XML response (namespace declarations are at root level)
+      final globalFlowItPrefixes = _findFlowItNamespacePrefixes(xmlResponse);
+      AppLogger.debug('CapabilityDiscovery: Found global FlowIt prefixes: $globalFlowItPrefixes');
+      
       // Extract individual responses
       final responsePattern = RegExp(r'<(?:D:)?response[^>]*>(.*?)</(?:D:)?response>', 
         dotAll: true, caseSensitive: false);
@@ -415,12 +425,28 @@ class CapabilityDiscoveryService {
         final descriptionMatch = descriptionPattern.firstMatch(responseContent);
         final description = descriptionMatch?.group(1)?.trim();
         
+        // Extract FlowIt properties using global namespace prefixes
+        AppLogger.debug('CapabilityDiscovery: Extracting FlowIt properties from response content for $href');
+        AppLogger.debug('CapabilityDiscovery: Response content snippet: ${responseContent.substring(0, responseContent.length > 500 ? 500 : responseContent.length)}...');
+        final domain = _extractFlowItPropertyWithPrefixes(responseContent, 'domain', globalFlowItPrefixes);
+        AppLogger.debug('CapabilityDiscovery: Domain extraction result: $domain');
+        final flowitType = _extractFlowItPropertyWithPrefixes(responseContent, 'type', globalFlowItPrefixes);
+        final flowitAsFlowStr = _extractFlowItPropertyWithPrefixes(responseContent, 'asflow', globalFlowItPrefixes);
+        final flowitAsFlow = flowitAsFlowStr?.toLowerCase() == 'true';
+        final flowitOwner = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
+        final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
+        
         if (supportsTodos) {
-          // AppLogger.debug('CapabilityDiscovery: Found VTODO calendar: $displayName at $href');
+          AppLogger.debug('CapabilityDiscovery: Found VTODO calendar: $displayName at $href with domain: $domain');
           calendars.add(TaskCalendarFactory.fromCalDAVDiscovery(
             path: href,
             displayName: displayName,
             description: description ?? 'Supports tasks (VTODO)',
+            domain: domain,
+            flowitType: flowitType,
+            flowitAsFlow: flowitAsFlow,
+            flowitOwner: flowitOwner,
+            flowitTemplate: flowitTemplate,
           ));
         }
       }
@@ -430,6 +456,156 @@ class CapabilityDiscoveryService {
     }
     
     return calendars;
+  }
+
+  /// Extract FlowIt property using known namespace prefixes
+  /// This version takes the prefixes as a parameter to avoid re-parsing namespaces for each property
+  String? _extractFlowItPropertyWithPrefixes(String xmlContent, String propertyName, List<String> knownPrefixes) {
+    try {
+      AppLogger.debug('CapabilityDiscovery: Extracting $propertyName with known prefixes: $knownPrefixes');
+      
+      // Try to extract property using each known FlowIt namespace prefix
+      for (final prefix in knownPrefixes) {
+        final openTag = '<$prefix:$propertyName';
+        final closeTag = '</$prefix:$propertyName>';
+        
+        final startIndex = xmlContent.indexOf(openTag);
+        if (startIndex != -1) {
+          final contentStart = xmlContent.indexOf('>', startIndex) + 1;
+          final contentEnd = xmlContent.indexOf(closeTag, contentStart);
+          
+          if (contentStart > 0 && contentEnd > contentStart) {
+            final value = xmlContent.substring(contentStart, contentEnd).trim();
+            if (value.isNotEmpty) {
+              AppLogger.debug('CapabilityDiscovery: Found FlowIt property $propertyName=$value using prefix $prefix');
+              return value;
+            }
+          }
+        }
+      }
+      
+      // Fallback to legacy parsing if no prefixes worked
+      return _extractFlowItPropertyLegacy(xmlContent, propertyName);
+    } catch (e) {
+      AppLogger.debug('CapabilityDiscovery: Error extracting FlowIt property $propertyName: $e');
+      return null;
+    }
+  }
+
+  /// Extract FlowIt property from XML response, supporting dynamic namespaces
+  /// Handles server responses where FlowIt namespace is declared with dynamic prefixes
+  /// Example: xmlns:ns1="https://flowit.app/ns/" and properties like `<ns1:domain>`
+  String? _extractFlowItProperty(String xmlContent, String propertyName) {
+    try {
+      // First, find which namespace prefix(es) map to FlowIt namespace URI
+      final flowItPrefixes = _findFlowItNamespacePrefixes(xmlContent);
+      
+      // Try to extract property using each FlowIt namespace prefix
+      for (final prefix in flowItPrefixes) {
+        final openTag = '<$prefix:$propertyName';
+        final closeTag = '</$prefix:$propertyName>';
+        
+        final startIndex = xmlContent.indexOf(openTag);
+        if (startIndex != -1) {
+          final contentStart = xmlContent.indexOf('>', startIndex) + 1;
+          final contentEnd = xmlContent.indexOf(closeTag, contentStart);
+          
+          if (contentStart > 0 && contentEnd > contentStart) {
+            final value = xmlContent.substring(contentStart, contentEnd).trim();
+            if (value.isNotEmpty) {
+              AppLogger.debug('CapabilityDiscovery: Found FlowIt property $propertyName=$value using prefix $prefix');
+              return value;
+            }
+          }
+        }
+      }
+      
+      // Fallback to legacy parsing for backward compatibility
+      return _extractFlowItPropertyLegacy(xmlContent, propertyName);
+    } catch (e) {
+      AppLogger.debug('CapabilityDiscovery: Error extracting FlowIt property $propertyName: $e');
+      return null;
+    }
+  }
+  
+  /// Find namespace prefixes that map to FlowIt namespace URI
+  /// Supports both http:// and https:// versions of the FlowIt namespace
+  List<String> _findFlowItNamespacePrefixes(String xmlContent) {
+    final prefixes = <String>[];
+    
+    try {
+      // Look for FlowIt namespace declarations (both http and https)
+      final httpPattern = 'http://flowit.app/ns/';
+      final httpsPattern = 'https://flowit.app/ns/';
+      
+      // Find all xmlns declarations
+      final xmlnsMatches = RegExp(r'xmlns:([^=\s]+)=["\x27]([^"\x27]+)["\x27]').allMatches(xmlContent);
+      
+      for (final match in xmlnsMatches) {
+        final prefix = match.group(1);
+        final uri = match.group(2);
+        
+        if (prefix != null && uri != null) {
+          if (uri == httpPattern || uri == httpsPattern) {
+            if (!prefixes.contains(prefix)) {
+              prefixes.add(prefix);
+              AppLogger.debug('CapabilityDiscovery: Found FlowIt namespace prefix: $prefix for URI: $uri');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.debug('CapabilityDiscovery: Error finding FlowIt namespace prefixes: $e');
+    }
+    
+    return prefixes;
+  }
+  
+  /// Legacy FlowIt property extraction for backward compatibility
+  /// Handles formats like: `<FLOWIT:domain>`, or `<domain>` (no namespace)
+  String? _extractFlowItPropertyLegacy(String xmlContent, String propertyName) {
+    try {
+      // Try FLOWIT namespace format
+      final flowitOpenTag = '<FLOWIT:$propertyName';
+      final flowitCloseTag = '</FLOWIT:$propertyName>';
+      
+      var startIndex = xmlContent.indexOf(flowitOpenTag);
+      if (startIndex != -1) {
+        final contentStart = xmlContent.indexOf('>', startIndex) + 1;
+        final contentEnd = xmlContent.indexOf(flowitCloseTag, contentStart);
+        
+        if (contentStart > 0 && contentEnd > contentStart) {
+          final value = xmlContent.substring(contentStart, contentEnd).trim();
+          if (value.isNotEmpty) {
+            AppLogger.debug('CapabilityDiscovery: Found FlowIt property $propertyName=$value using FLOWIT namespace');
+            return value;
+          }
+        }
+      }
+      
+      // Try no namespace format
+      final openTag = '<$propertyName';
+      final closeTag = '</$propertyName>';
+      
+      startIndex = xmlContent.indexOf(openTag);
+      if (startIndex != -1) {
+        final contentStart = xmlContent.indexOf('>', startIndex) + 1;
+        final contentEnd = xmlContent.indexOf(closeTag, contentStart);
+        
+        if (contentStart > 0 && contentEnd > contentStart) {
+          final value = xmlContent.substring(contentStart, contentEnd).trim();
+          if (value.isNotEmpty) {
+            AppLogger.debug('CapabilityDiscovery: Found FlowIt property $propertyName=$value using no namespace');
+            return value;
+          }
+        }
+      }
+
+      return null;
+    } catch (e) {
+      AppLogger.debug('CapabilityDiscovery: Error in legacy FlowIt property extraction for $propertyName: $e');
+      return null;
+    }
   }
 }
 

@@ -139,10 +139,6 @@ class CalDAVService {
     }
   }
 
-
-
-
-
   /// Delete a task from the server
   Future<Result<void>> deleteTask(String taskUrl, {String? etag}) async {
     try {
@@ -225,8 +221,6 @@ class CalDAVService {
       ));
     }
   }
-
-
 
   /// Discover calendar capabilities and available calendars
   Future<Result<CalDAVCapabilities>> discoverCapabilities() async {
@@ -377,9 +371,17 @@ class CalDAVService {
   Future<Result<List<TaskCalendar>>> _listCalendars(String calendarHome) async {
     // AppLogger.debug('CalDAVService: Listing calendars in: $calendarHome');
     
-    final propfindQuery = '''<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+    final propfindQuery = '''<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:FLOWIT="https://flowit.app/ns/">
   <D:prop>
+    <D:resourcetype/>
     <D:displayname/>
+    <C:supported-calendar-component-set/>
+    <C:calendar-description/>
+    <FLOWIT:domain/>
+    <FLOWIT:type/>
+    <FLOWIT:asflow/>
+    <FLOWIT:owner/>
+    <FLOWIT:template/>
   </D:prop>
 </D:propfind>''';
 
@@ -491,6 +493,256 @@ class CalDAVService {
         stackTrace: stackTrace,
       ));
     }
+  }
+
+  /// Update calendar X-FLOWIT-DOMAIN property on server using PROPPATCH
+  Future<Result<void>> updateCalendarProperties(TaskCalendar calendar) async {
+    try {
+      AppLogger.info('CalDAVService: Starting domain PROPPATCH for ${calendar.displayName}');
+      AppLogger.info('CalDAVService: Calendar path: ${calendar.path}');
+      AppLogger.info('CalDAVService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
+      
+      // Generate PROPPATCH XML for domain property
+      final proppatchXml = _generateDomainPropPatch(calendar);
+      AppLogger.info('CalDAVService: Generated PROPPATCH XML:\n$proppatchXml');
+      
+      // Use PROPPATCH to set WebDAV property on calendar collection
+      AppLogger.info('CalDAVService: Sending PROPPATCH request to: ${calendar.path}');
+      
+      final proppatchResult = await _client.proppatch(calendar.path, proppatchXml);
+      
+      return await proppatchResult.when(
+        success: (response) async {
+          AppLogger.info('CalDAVService: PROPPATCH completed with status: ${response.statusCode}');
+          AppLogger.info('CalDAVService: Response headers: ${response.headers}');
+          AppLogger.info('CalDAVService: Response body: ${response.body}');
+          
+          if (response.statusCode == 207 || response.statusCode == 200) {
+            AppLogger.info('CalDAVService: X-FLOWIT-DOMAIN property updated successfully');
+            return Result.success(null);
+          } else {
+            AppLogger.warning('CalDAVService: PROPPATCH returned ${response.statusCode} (non-critical)');
+            return Result.success(null);
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: PROPPATCH failed: ${failure.message}');
+          AppLogger.error('CalDAVService: Failure code: ${failure.code}');
+          return Result.success(null);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Exception during PROPPATCH', e, stackTrace);
+      return Result.success(null);
+    }
+  }
+
+  /// Generate PROPPATCH XML for setting X-FLOWIT-DOMAIN property
+  String _generateDomainPropPatch(TaskCalendar calendar) {
+    final xml = StringBuffer();
+    
+    xml.writeln('<?xml version="1.0" encoding="utf-8"?>');
+    xml.writeln('<D:propertyupdate xmlns:D="DAV:" xmlns:FLOWIT="https://flowit.app/ns/">');
+    
+    if (calendar.flowitDomain != null && calendar.flowitDomain!.isNotEmpty) {
+      // Set the domain property
+      xml.writeln('  <D:set>');
+      xml.writeln('    <D:prop>');
+      xml.writeln('      <FLOWIT:domain>${_escapeXmlText(calendar.flowitDomain!)}</FLOWIT:domain>');
+      xml.writeln('    </D:prop>');
+      xml.writeln('  </D:set>');
+    } else {
+      // Remove the domain property if null/empty
+      xml.writeln('  <D:remove>');
+      xml.writeln('    <D:prop>');
+      xml.writeln('      <FLOWIT:domain/>');
+      xml.writeln('    </D:prop>');
+      xml.writeln('  </D:remove>');
+    }
+    
+    xml.writeln('</D:propertyupdate>');
+    return xml.toString();
+  }
+
+  /// Escape XML text to prevent injection
+  String _escapeXmlText(String text) {
+    return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+  }
+
+  /// Serialize calendar properties to VCALENDAR format
+  String _serializeCalendarProperties(TaskCalendar calendar) {
+    final vcalendar = StringBuffer();
+    
+    // Start VCALENDAR
+    vcalendar.writeln('BEGIN:VCALENDAR');
+    vcalendar.writeln('VERSION:2.0');
+    vcalendar.writeln('PRODID:-//FlowIt//FlowIt v1.0//EN');
+    
+    // Standard calendar properties
+    vcalendar.writeln('UID:${calendar.uid}');
+    vcalendar.writeln('DTSTAMP:${_formatDateTime(calendar.dtstamp)}');
+    vcalendar.writeln('CREATED:${_formatDateTime(calendar.created)}');
+    vcalendar.writeln('LAST-MODIFIED:${_formatDateTime(calendar.lastModified)}');
+    vcalendar.writeln('SUMMARY:${_escapeCalendarText(calendar.summary)}');
+    vcalendar.writeln('STATUS:${calendar.status}');
+    vcalendar.writeln('PERCENT-COMPLETE:${calendar.percentComplete}');
+    
+    if (calendar.description.isNotEmpty) {
+      vcalendar.writeln('DESCRIPTION:${_escapeCalendarText(calendar.description)}');
+    }
+    
+    if (calendar.organizer != null) {
+      vcalendar.writeln('ORGANIZER:${calendar.organizer}');
+    }
+    
+    // FlowIt-specific properties
+    vcalendar.writeln('X-FLOWIT-TYPE:${calendar.flowitType}');
+    vcalendar.writeln('X-FLOWIT-ASFLOW:${calendar.flowitAsFlow.toString().toUpperCase()}');
+    
+    if (calendar.flowitDomain != null && calendar.flowitDomain!.isNotEmpty) {
+      vcalendar.writeln('X-FLOWIT-DOMAIN:${_escapeCalendarText(calendar.flowitDomain!)}');
+    }
+    
+    if (calendar.flowitKanban.isNotEmpty && calendar.flowitKanban != '[]') {
+      vcalendar.writeln('X-FLOWIT-KANBAN:${_escapeCalendarText(calendar.flowitKanban)}');
+    }
+    
+    if (calendar.flowitOwner != null) {
+      vcalendar.writeln('X-FLOWIT-OWNER:${_escapeCalendarText(calendar.flowitOwner!)}');
+    }
+    
+    if (calendar.flowitTemplate != null) {
+      vcalendar.writeln('X-FLOWIT-TEMPLATE:${calendar.flowitTemplate}');
+    }
+    
+    vcalendar.writeln('CALENDAR-ORDER:${calendar.calendarOrder}');
+    
+    // Categories
+    if (calendar.categories.isNotEmpty) {
+      vcalendar.writeln('CATEGORIES:${calendar.categories.map(_escapeCalendarText).join(',')}');
+    }
+    
+    // End VCALENDAR
+    vcalendar.writeln('END:VCALENDAR');
+    
+    return vcalendar.toString();
+  }
+
+  /// Parse calendar properties from VCALENDAR response
+  TaskCalendar? _parseCalendarProperties(String vcalendarContent, String path, String displayName) {
+    try {
+      final lines = vcalendarContent.split('\n').map((line) => line.trim()).toList();
+      final properties = <String, String>{};
+      
+      for (final line in lines) {
+        if (line.contains(':') && !line.startsWith('BEGIN:') && !line.startsWith('END:')) {
+          final colonIndex = line.indexOf(':');
+          final key = line.substring(0, colonIndex).trim();
+          final value = line.substring(colonIndex + 1).trim();
+          properties[key] = _unescapeCalendarText(value);
+        }
+      }
+      
+      // Extract standard properties
+      final uid = properties['UID'] ?? 'generated-${DateTime.now().millisecondsSinceEpoch}';
+      final dtstamp = _parseDateTime(properties['DTSTAMP']) ?? DateTime.now();
+      final created = _parseDateTime(properties['CREATED']) ?? DateTime.now();
+      final lastModified = _parseDateTime(properties['LAST-MODIFIED']) ?? DateTime.now();
+      final summary = properties['SUMMARY'] ?? displayName;
+      final status = properties['STATUS'] ?? 'NEEDS-ACTION';
+      final percentComplete = int.tryParse(properties['PERCENT-COMPLETE'] ?? '0') ?? 0;
+      final description = properties['DESCRIPTION'] ?? '';
+      final organizer = properties['ORGANIZER'];
+      
+      // Extract FlowIt-specific properties
+      final flowitType = properties['X-FLOWIT-TYPE'] ?? 'PROJECT';
+      final flowitAsFlow = properties['X-FLOWIT-ASFLOW']?.toLowerCase() == 'true';
+      final flowitDomain = properties['X-FLOWIT-DOMAIN'];
+      final flowitKanban = properties['X-FLOWIT-KANBAN'] ?? '[]';
+      final flowitOwner = properties['X-FLOWIT-OWNER'];
+      final flowitTemplate = properties['X-FLOWIT-TEMPLATE'];
+      final calendarOrder = int.tryParse(properties['CALENDAR-ORDER'] ?? '1') ?? 1;
+      
+      // Parse categories
+      final categoriesStr = properties['CATEGORIES'];
+      final categories = categoriesStr?.split(',').map((c) => c.trim()).toList() ?? <String>[];
+      
+      return TaskCalendar(
+        path: path,
+        displayName: displayName,
+        description: description,
+        uid: uid,
+        dtstamp: dtstamp,
+        created: created,
+        lastModified: lastModified,
+        summary: summary,
+        status: status,
+        percentComplete: percentComplete,
+        organizer: organizer,
+        flowitType: flowitType,
+        flowitAsFlow: flowitAsFlow,
+        flowitDomain: flowitDomain,
+        flowitKanban: flowitKanban,
+        flowitOwner: flowitOwner,
+        flowitTemplate: flowitTemplate,
+        calendarOrder: calendarOrder,
+        categories: categories,
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Failed to parse calendar properties', e, stackTrace);
+      return null;
+    }
+  }
+
+  /// Helper method to format DateTime for iCalendar
+  String _formatDateTime(DateTime dateTime) {
+    return dateTime.toUtc().toIso8601String().replaceAll(RegExp(r'[:\-]'), '').replaceAll('.000Z', 'Z');
+  }
+  
+  /// Helper method to parse DateTime from iCalendar format
+  DateTime? _parseDateTime(String? dateTimeStr) {
+    if (dateTimeStr == null) return null;
+    try {
+      // Handle iCalendar format: 20250101T090000Z
+      if (dateTimeStr.endsWith('Z')) {
+        final cleaned = dateTimeStr.substring(0, dateTimeStr.length - 1);
+        final year = int.parse(cleaned.substring(0, 4));
+        final month = int.parse(cleaned.substring(4, 6));
+        final day = int.parse(cleaned.substring(6, 8));
+        final hour = int.parse(cleaned.substring(9, 11));
+        final minute = int.parse(cleaned.substring(11, 13));
+        final second = int.parse(cleaned.substring(13, 15));
+        return DateTime.utc(year, month, day, hour, minute, second);
+      }
+    } catch (e) {
+      AppLogger.warning('CalDAVService: Failed to parse datetime: $dateTimeStr');
+    }
+    return null;
+  }
+  
+  /// Helper method to escape calendar text
+  String _escapeCalendarText(String text) {
+    return text
+        .replaceAll('\\', '\\\\')
+        .replaceAll('\n', '\\n')
+        .replaceAll('\r', '\\r')
+        .replaceAll(',', '\\,')
+        .replaceAll(';', '\\;');
+  }
+  
+  /// Helper method to unescape calendar text
+  String _unescapeCalendarText(String text) {
+    return text
+        .replaceAll('\\n', '\n')
+        .replaceAll('\\r', '\r')
+        .replaceAll('\\,', ',')
+        .replaceAll('\\;', ';')
+        .replaceAll('\\\\', '\\');
   }
 }
 

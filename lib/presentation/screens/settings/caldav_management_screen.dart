@@ -153,7 +153,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
     return _selectedCalendars.any((c) => c.path == calendar.path);
   }
 
-  /// Clear existing calendars and save selected calendars as local projects/portfolios
+  /// Clear existing calendars and save selected calendars as local projects
   Future<void> _createProjectsForSelectedCalendars() async {
     // AppLogger.info('CalDAVManagement: Starting to update projects for selected calendars');
     // AppLogger.info('CalDAVManagement: Selected calendars count: ${_selectedCalendars.length}');
@@ -218,7 +218,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
           // Invalidate providers to refresh the app state
           ref.invalidate(activeAccountProvider);
           
-          // Create projects/portfolios for selected calendars
+          // Create projects for selected calendars
           await _createProjectsForSelectedCalendars();
           
           setState(() {
@@ -229,7 +229,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('✅ Saved ${_selectedCalendars.length} calendar selections and created portfolios'),
+                content: Text('✅ Saved ${_selectedCalendars.length} calendar selections and created projects'),
                 backgroundColor: Colors.green,
               ),
             );

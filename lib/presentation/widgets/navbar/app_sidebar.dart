@@ -1,11 +1,13 @@
 ﻿// Main application sidebar component
-// Displays navigation sections, project portfolios, and user account info using modular widgets
+// Displays navigation sections, projects, and user account info using modular widgets
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'account_card.dart';
 import 'main_navigation.dart';
-import 'portfolio_section.dart';
+import 'projects_section.dart';
+import 'create_button.dart';
+
 import '../../../data/providers/providers.dart';
 import '../adaptive_app_layout.dart';
 
@@ -39,9 +41,18 @@ class AppSidebar extends ConsumerWidget {
           
           const Divider(height: 1),
           
-          // Project Portfolios section
+          // Projects section
           const Expanded(
-            child: PortfolioSection(),
+            child: ProjectsSection(),
+          ),
+          
+          // Create button
+          hasAccount.when(
+            data: (hasActiveAccount) => hasActiveAccount 
+                ? const CreateButton()
+                : const SizedBox.shrink(),
+            loading: () => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
           ),
           
           const Divider(height: 1),

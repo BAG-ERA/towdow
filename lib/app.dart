@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/connection/connection_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
-import 'presentation/screens/projects/projects_screen.dart';
+
 import 'presentation/screens/project_detail/project_detail_screen.dart';
 import 'presentation/widgets/adaptive_app_layout.dart';
 import 'data/providers/providers.dart';
@@ -87,10 +87,10 @@ class FlowItApp extends ConsumerWidget {
             AppDestination currentDestination;
             final location = state.uri.path;
             
-            if (location.startsWith('/projects') || location.startsWith('/project/')) {
-              currentDestination = AppDestination.projects;
-            } else if (location.startsWith('/settings')) {
+            if (location.startsWith('/settings')) {
               currentDestination = AppDestination.settings;
+            } else if (location.startsWith('/project/')) {
+              currentDestination = AppDestination.myTasks; // Project details use myTasks navigation
             } else {
               currentDestination = AppDestination.myTasks;
             }
@@ -105,10 +105,7 @@ class FlowItApp extends ConsumerWidget {
               path: '/',
               builder: (context, state) => const _AppShell(),
             ),
-            GoRoute(
-              path: '/projects',
-              builder: (context, state) => const ProjectsScreen(),
-            ),
+
             GoRoute(
               path: '/project/:uid',
               builder: (context, state) => ProjectDetailScreen(

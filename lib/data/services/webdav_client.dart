@@ -170,9 +170,12 @@ class WebDAVClient {
   /// Used to create/update calendar objects
   Future<Result<WebDAVResponse>> put(String path, String body, {String? etag}) async {
     try {
-      // AppLogger.debug('WebDAVClient: PUT $path');
+      AppLogger.info('WebDAVClient: PUT $path');
+      AppLogger.debug('WebDAVClient: PUT body: $body');
       
       final uri = _buildUri(path);
+      AppLogger.info('WebDAVClient: PUT URI: $uri');
+      
       final headers = {
         ..._commonHeaders,
         'Content-Type': 'text/calendar; charset=utf-8',
@@ -183,6 +186,8 @@ class WebDAVClient {
         headers['If-Match'] = etag;
       }
 
+      AppLogger.debug('WebDAVClient: PUT headers: $headers');
+
       final response = await http.put(uri, headers: headers, body: body)
           .timeout(timeout);
 
@@ -192,7 +197,8 @@ class WebDAVClient {
         body: response.body,
       );
 
-      // AppLogger.debug('WebDAVClient: PUT response ${response.statusCode}');
+      AppLogger.info('WebDAVClient: PUT response ${response.statusCode}');
+      AppLogger.debug('WebDAVClient: PUT response body: ${response.body}');
       return Result.success(result);
     } catch (e, stackTrace) {
       AppLogger.error('WebDAVClient: PUT failed', e, stackTrace);
@@ -308,9 +314,52 @@ class WebDAVClient {
     }
   }
 
+  /// PROPPATCH method - RFC 4918 Section 9.2
+  /// Used to update/set WebDAV properties on collections
+  Future<Result<WebDAVResponse>> proppatch(String path, String body) async {
+    try {
+      AppLogger.info('WebDAVClient: PROPPATCH $path');
+      AppLogger.debug('WebDAVClient: PROPPATCH body: $body');
+      
+      final uri = _buildUri(path);
+      AppLogger.info('WebDAVClient: PROPPATCH URI: $uri');
+      
+      final headers = {
+        ..._commonHeaders,
+        'Content-Type': 'application/xml; charset=utf-8',
+      };
+      
+      AppLogger.debug('WebDAVClient: PROPPATCH headers: $headers');
+      
+      final request = http.Request('PROPPATCH', uri)
+        ..headers.addAll(headers)
+        ..body = body;
+
+      final streamedResponse = await request.send().timeout(timeout);
+      final responseBody = await streamedResponse.stream.bytesToString();
+      
+      final result = WebDAVResponse(
+        statusCode: streamedResponse.statusCode,
+        headers: streamedResponse.headers,
+        body: responseBody,
+      );
+
+      AppLogger.info('WebDAVClient: PROPPATCH response ${streamedResponse.statusCode}');
+      AppLogger.debug('WebDAVClient: PROPPATCH response body: $responseBody');
+      return Result.success(result);
+    } catch (e, stackTrace) {
+      AppLogger.error('WebDAVClient: PROPPATCH failed', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'PROPPATCH request failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
   /// Default PROPFIND body for basic resource discovery
   static const String _defaultPropfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
-<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:FLOWIT="https://flowit.app/ns/">
   <D:prop>
     <D:resourcetype />
     <D:displayname />
@@ -318,6 +367,11 @@ class WebDAVClient {
     <C:calendar-description />
     <C:calendar-timezone />
     <D:current-user-privilege-set />
+    <FLOWIT:domain/>
+    <FLOWIT:type/>
+    <FLOWIT:asflow/>
+    <FLOWIT:owner/>
+    <FLOWIT:template/>
   </D:prop>
 </D:propfind>''';
 } 

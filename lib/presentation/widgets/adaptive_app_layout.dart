@@ -12,11 +12,7 @@ enum AppDestination {
     icon: Icons.checklist_rounded,
     route: '/',
   ),
-  projects(
-    label: 'Projects',
-    icon: Icons.folder_rounded,
-    route: '/projects',
-  ),
+
   settings(
     label: 'Settings',
     icon: Icons.settings_rounded,

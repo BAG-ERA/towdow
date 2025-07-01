@@ -88,6 +88,10 @@ class XMLResponseParser {
     try {
       AppLogger.debug('XMLResponseParser: Parsing calendars from XML response');
       
+      // Extract FlowIt namespace prefixes from the FULL XML response (namespace declarations are at root level)
+      final globalFlowItPrefixes = _findFlowItNamespacePrefixes(xmlResponse);
+      AppLogger.debug('XMLResponseParser: Found global FlowIt prefixes: $globalFlowItPrefixes');
+      
       // Extract individual calendar responses using regex (simple approach)
       final responsePattern = RegExp(r'<(?:d:)?response[^>]*>(.*?)</(?:d:)?response>', dotAll: true, caseSensitive: false);
       final responses = responsePattern.allMatches(xmlResponse);
@@ -111,25 +115,49 @@ class XMLResponseParser {
         // Skip the calendar home itself
         if (href == calendarHome || href == '$calendarHome/') continue;
         
+        // Check if it's a calendar collection (when resourcetype is requested)
+        final isCalendar = responseContent.contains('<C:calendar/>') || 
+                          responseContent.contains('<calendar/>') ||
+                          responseContent.contains('calendar'); // Fallback for basic checks
+        
         // Extract display name
         final displayNamePattern = RegExp(r'<(?:d:)?displayname[^>]*>(.*?)</(?:d:)?displayname>', dotAll: true, caseSensitive: false);
         final displayNameMatch = displayNamePattern.firstMatch(responseContent);
         final displayName = displayNameMatch?.group(1)?.trim() ?? 'Unnamed Calendar';
         
-        // For basic discovery, assume all responses with displayname are calendars
-        // We'll check VTODO support in a separate call if needed
-        final isCalendar = displayName.isNotEmpty && displayName != 'Unnamed Calendar';
+        // Check VTODO support (when supported-calendar-component-set is requested)
+        final supportsTodos = responseContent.contains('VTODO') || 
+                             responseContent.contains('vtodo') ||
+                             displayName.isNotEmpty; // Fallback assume support
         
-        // For now, assume all calendars can support VTODO (we'll verify later)
-        // This is a reasonable assumption for modern CalDAV servers
-        final supportsTodos = true;
+        // Extract description
+        final descriptionPattern = RegExp(r'<(?:C:)?calendar-description[^>]*>(.*?)</(?:C:)?calendar-description>', 
+          dotAll: true, caseSensitive: false);
+        final descriptionMatch = descriptionPattern.firstMatch(responseContent);
+        final description = descriptionMatch?.group(1)?.trim();
         
-        if (isCalendar) {
-          AppLogger.debug('XMLResponseParser: Found calendar: $displayName at $href (VTODO: $supportsTodos)');
+        // Extract FlowIt properties using the global namespace prefixes
+        AppLogger.debug('XMLResponseParser: Extracting FlowIt properties from response content for $href');
+        AppLogger.debug('XMLResponseParser: Response content snippet: ${responseContent.substring(0, responseContent.length > 500 ? 500 : responseContent.length)}...');
+        final domain = _extractFlowItPropertyWithPrefixes(responseContent, 'domain', globalFlowItPrefixes);
+        AppLogger.debug('XMLResponseParser: Domain extraction result: $domain');
+        final flowitType = _extractFlowItPropertyWithPrefixes(responseContent, 'type', globalFlowItPrefixes);
+        final flowitAsFlowStr = _extractFlowItPropertyWithPrefixes(responseContent, 'asflow', globalFlowItPrefixes);
+        final flowitAsFlow = flowitAsFlowStr?.toLowerCase() == 'true';
+        final flowitOwner = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
+        final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
+        
+        if (isCalendar && supportsTodos) {
+          AppLogger.debug('XMLResponseParser: Found VTODO calendar: $displayName at $href with domain: $domain');
           calendars.add(TaskCalendarFactory.fromCalDAVDiscovery(
             path: href,
             displayName: displayName,
-            //description: supportsTodos ? 'Supports tasks (VTODO)' : 'Calendar collection',
+            description: description ?? (supportsTodos ? 'Supports tasks (VTODO)' : 'Calendar collection'),
+            domain: domain,
+            flowitType: flowitType,
+            flowitAsFlow: flowitAsFlow,
+            flowitOwner: flowitOwner,
+            flowitTemplate: flowitTemplate,
           ));
         }
       }
@@ -218,6 +246,139 @@ class XMLResponseParser {
       'changes': changes,
       'syncToken': newSyncToken,
     };
+  }
+
+  /// Extract FlowIt property using known namespace prefixes
+  /// This version takes the prefixes as a parameter to avoid re-parsing namespaces for each property
+  static String? _extractFlowItPropertyWithPrefixes(String xmlContent, String propertyName, List<String> knownPrefixes) {
+    try {
+      AppLogger.debug('XMLResponseParser: Extracting $propertyName with known prefixes: $knownPrefixes');
+      
+      // Try to extract property using each known FlowIt namespace prefix
+      for (final prefix in knownPrefixes) {
+        final pattern = RegExp('<$prefix:$propertyName[^>]*>(.*?)</$prefix:$propertyName>', 
+          dotAll: true, caseSensitive: false);
+        
+        final match = pattern.firstMatch(xmlContent);
+        if (match != null) {
+          final value = match.group(1)?.trim();
+          if (value != null && value.isNotEmpty) {
+            AppLogger.debug('XMLResponseParser: Found FlowIt property $propertyName=$value using prefix $prefix');
+            return value;
+          }
+        }
+      }
+      
+      // Fallback to legacy parsing if no prefixes worked
+      return _extractFlowItPropertyLegacy(xmlContent, propertyName);
+    } catch (e) {
+      AppLogger.debug('XMLResponseParser: Error extracting FlowIt property $propertyName: $e');
+      return null;
+    }
+  }
+
+  /// Extract FlowIt property from XML response, supporting dynamic namespaces
+  /// Handles server responses where FlowIt namespace is declared with dynamic prefixes
+  /// Example: xmlns:ns1="https://flowit.app/ns/" and properties like `<ns1:domain>`
+  static String? _extractFlowItProperty(String xmlContent, String propertyName) {
+    try {
+      // First, find which namespace prefix(es) map to FlowIt namespace URI
+      final flowItPrefixes = _findFlowItNamespacePrefixes(xmlContent);
+      
+      if (flowItPrefixes.isEmpty) {
+        // Fallback to old parsing for backward compatibility
+        return _extractFlowItPropertyLegacy(xmlContent, propertyName);
+      }
+      
+      // Try to extract property using each FlowIt namespace prefix
+      for (final prefix in flowItPrefixes) {
+        final pattern = RegExp('<$prefix:$propertyName[^>]*>(.*?)</$prefix:$propertyName>', 
+          dotAll: true, caseSensitive: false);
+        
+        final match = pattern.firstMatch(xmlContent);
+        if (match != null) {
+          final value = match.group(1)?.trim();
+          if (value != null && value.isNotEmpty) {
+            AppLogger.debug('XMLResponseParser: Found FlowIt property $propertyName=$value using prefix $prefix');
+            return value;
+          }
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      AppLogger.debug('XMLResponseParser: Error extracting FlowIt property $propertyName: $e');
+      return null;
+    }
+  }
+
+  /// Find namespace prefixes that map to FlowIt namespace URI
+  static List<String> _findFlowItNamespacePrefixes(String xmlContent) {
+    final prefixes = <String>[];
+    
+    try {
+      // FlowIt namespace URIs (support both http and https)
+      const flowItNamespaces = [
+        'https://flowit.app/ns/',
+        'http://flowit.app/ns/',
+      ];
+      
+      AppLogger.debug('XMLResponseParser: Looking for FlowIt namespaces in content length: ${xmlContent.length}');
+      
+      // Find all xmlns declarations
+      final xmlnsMatches = RegExp(r'xmlns:([^=\s]+)=["\x27]([^"\x27]+)["\x27]').allMatches(xmlContent);
+      
+      AppLogger.debug('XMLResponseParser: Found ${xmlnsMatches.length} xmlns declarations');
+      
+      for (final match in xmlnsMatches) {
+        final prefix = match.group(1);
+        final uri = match.group(2);
+        
+        AppLogger.debug('XMLResponseParser: Found namespace: $prefix -> $uri');
+        
+        if (prefix != null && uri != null && flowItNamespaces.contains(uri)) {
+          prefixes.add(prefix);
+          AppLogger.debug('XMLResponseParser: Found FlowIt namespace prefix: $prefix -> $uri');
+        }
+      }
+      
+      AppLogger.debug('XMLResponseParser: Total FlowIt prefixes found: ${prefixes.length}');
+    } catch (e) {
+      AppLogger.debug('XMLResponseParser: Error finding FlowIt namespace prefixes: $e');
+    }
+    
+    return prefixes;
+  }
+
+  /// Legacy FlowIt property extraction for backward compatibility
+  /// Handles formats like: `<FLOWIT:domain>`, or `<domain>` (no namespace)
+  static String? _extractFlowItPropertyLegacy(String xmlContent, String propertyName) {
+    try {
+      final patterns = [
+        // FLOWIT namespace (like FLOWIT:domain)
+        RegExp('<(?:FLOWIT:)?$propertyName[^>]*>(.*?)</(?:FLOWIT:)?$propertyName>', 
+          dotAll: true, caseSensitive: false),
+        // No namespace (like <domain>)
+        RegExp('<$propertyName[^>]*>(.*?)</$propertyName>', 
+          dotAll: true, caseSensitive: false),
+      ];
+      
+      for (final pattern in patterns) {
+        final match = pattern.firstMatch(xmlContent);
+        if (match != null) {
+          final value = match.group(1)?.trim();
+          if (value != null && value.isNotEmpty) {
+            AppLogger.debug('XMLResponseParser: Found FlowIt property $propertyName=$value (legacy)');
+            return value;
+          }
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      AppLogger.debug('XMLResponseParser: Error in legacy FlowIt property extraction: $e');
+      return null;
+    }
   }
 }
 

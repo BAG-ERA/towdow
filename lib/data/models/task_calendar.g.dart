@@ -42,13 +42,14 @@ class TaskCalendarAdapter extends TypeAdapter<TaskCalendar> {
       organizer: fields[21] as String?,
       attendees: (fields[22] as List).cast<Attendee>(),
       categories: (fields[23] as List).cast<String>(),
+      flowitDomain: fields[25] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, TaskCalendar obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(26)
       ..writeByte(0)
       ..write(obj.path)
       ..writeByte(1)
@@ -98,7 +99,9 @@ class TaskCalendarAdapter extends TypeAdapter<TaskCalendar> {
       ..writeByte(22)
       ..write(obj.attendees)
       ..writeByte(23)
-      ..write(obj.categories);
+      ..write(obj.categories)
+      ..writeByte(25)
+      ..write(obj.flowitDomain);
   }
 
   @override
@@ -151,6 +154,7 @@ _$TaskCalendarImpl _$$TaskCalendarImplFromJson(Map<String, dynamic> json) =>
               ?.map((e) => e as String)
               .toList() ??
           const [],
+      flowitDomain: json['flowitDomain'] as String?,
     );
 
 Map<String, dynamic> _$$TaskCalendarImplToJson(_$TaskCalendarImpl instance) =>
@@ -180,4 +184,5 @@ Map<String, dynamic> _$$TaskCalendarImplToJson(_$TaskCalendarImpl instance) =>
       'organizer': instance.organizer,
       'attendees': instance.attendees,
       'categories': instance.categories,
+      'flowitDomain': instance.flowitDomain,
     };
