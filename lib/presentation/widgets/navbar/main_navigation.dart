@@ -11,7 +11,7 @@ class MainNavigation extends StatelessWidget {
     required this.currentDestination,
   });
 
-  final AppDestination currentDestination;
+  final AppDestination? currentDestination;
 
   @override
   Widget build(BuildContext context) {

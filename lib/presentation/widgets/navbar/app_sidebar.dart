@@ -18,7 +18,7 @@ class AppSidebar extends ConsumerWidget {
     required this.currentDestination,
   });
 
-  final AppDestination currentDestination;
+  final AppDestination? currentDestination;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

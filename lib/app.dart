@@ -85,13 +85,13 @@ class FlowItApp extends ConsumerWidget {
         ShellRoute(
           builder: (context, state, child) {
             // Determine current destination from route
-            AppDestination currentDestination;
+            AppDestination? currentDestination;
             final location = state.uri.path;
             
             if (location.startsWith('/settings')) {
               currentDestination = AppDestination.settings;
             } else if (location.startsWith('/archived')) {
-              currentDestination = AppDestination.settings; // Archived uses settings navigation context
+              currentDestination = null; // Archived projects have no main navigation active
             } else if (location.startsWith('/project/')) {
               currentDestination = AppDestination.myTasks; // Project details use myTasks navigation
             } else {
