@@ -1,7 +1,9 @@
 ﻿// Styled tab bar widget with rounded tabs and background colors for selected state
 // Features width that fits content and improved padding
+// Uses FlowIt primary color system for consistent theming
 
 import 'package:flutter/material.dart';
+import '../../../core/theme/chart_theme.dart';
 
 class StyledTabItem {
   final String label;
@@ -41,6 +43,7 @@ class StyledTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final chartTheme = context.chartTheme; // Access FlowIt chart theme for enhanced color consistency
 
     return Padding(
       padding: padding,
@@ -75,6 +78,7 @@ class StyledTabBar extends StatelessWidget {
                               index,
                               shouldUseCompactMode,
                               colorScheme,
+                              chartTheme,
                             );
                           }),
                         ),
@@ -91,6 +95,7 @@ class StyledTabBar extends StatelessWidget {
                           index,
                           false, // Never use compact mode when responsive is disabled
                           colorScheme,
+                          chartTheme,
                         );
                       }),
                     ),
@@ -146,11 +151,13 @@ class StyledTabBar extends StatelessWidget {
   }
 
   /// Builds an individual tab with responsive behavior
+      /// Uses exact FlowIt primary color (#192440) for selected state
   Widget _buildTab(
     BuildContext context,
     int index,
     bool useCompactMode,
     ColorScheme colorScheme,
+    ChartTheme chartTheme,
   ) {
     final item = items[index];
     final isSelected = index == selectedIndex;
@@ -164,14 +171,16 @@ class StyledTabBar extends StatelessWidget {
         right: index < items.length - 1 ? tabSpacing : 0,
       ),
       decoration: BoxDecoration(
+        // Use exact FlowIt primary color instead of generated colorScheme.primary
         color: isSelected
-            ? colorScheme.primary
+            ? FlowItColors.primary // Directly use FlowIt blue dark (#192440)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(8.0),
         boxShadow: isSelected
             ? [
                 BoxShadow(
-                  color: colorScheme.primary.withValues(alpha: 0.3),
+                  // Use exact FlowIt primary color for shadow
+                  color: FlowItColors.primary.withValues(alpha: 0.3),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -201,8 +210,9 @@ class StyledTabBar extends StatelessWidget {
                       item.icon,
                       key: ValueKey('$index-$isSelected-$showText'),
                       size: 18,
+                      // Use white for good contrast against FlowIt primary blue
                       color: isSelected
-                          ? colorScheme.onPrimary
+                          ? Colors.white
                           : isDisabled
                               ? colorScheme.onSurface.withValues(alpha: 0.38)
                               : colorScheme.onSurface.withValues(alpha: 0.8),
@@ -217,8 +227,9 @@ class StyledTabBar extends StatelessWidget {
                       item.label,
                       key: ValueKey('text-$index-$isSelected'),
                       style: TextStyle(
+                        // Use white for good contrast against FlowIt primary blue
                         color: isSelected
-                            ? colorScheme.onPrimary
+                            ? Colors.white
                             : isDisabled
                                 ? colorScheme.onSurface.withValues(alpha: 0.38)
                                 : colorScheme.onSurface.withValues(alpha: 0.8),

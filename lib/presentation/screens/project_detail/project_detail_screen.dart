@@ -9,11 +9,13 @@ import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/utils/buttons/create_task_button.dart';
 import '../../widgets/kanban_board.dart';
 import '../../widgets/agenda_calendar.dart';
+import '../../widgets/utils/tasklist_toolbar.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../viewmodels/commands/attendee_commands.dart';
+import '../../viewmodels/project_task_search_viewmodel.dart';
 import '../../../core/theme/chart_theme.dart';
 
 // Provider for a specific project/calendar
@@ -93,23 +95,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           Expanded(
             child: _buildTabContent(context, ref, tasksAsync),
           ),
-        ],
-      ),
-      floatingActionButton: CreateTaskButton.prominent(
-        projectCalendarUid: widget.projectUid,
-        isFullWidth: false,
-        onTaskCreated: (taskSummary) {
-          // Refresh the project tasks
-          ref.invalidate(projectTasksProvider(widget.projectUid));
           
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Task "$taskSummary" added to project'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-          );
-        },
+          // Bottom toolbar with search and create task button
+          TaskListToolbar(
+            projectUid: widget.projectUid,
+            projectName: projectAsync.asData?.value?.displayName,
+          ),
+        ],
       ),
     );
   }
@@ -380,27 +372,33 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   Widget _buildListView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
     return tasksAsync.when(
-      data: (tasks) {
-        if (tasks.isEmpty) {
+      data: (allTasks) {
+        // Use filtered and sorted tasks instead of all tasks
+        final filteredTasks = ref.watch(filteredProjectTasksProvider(widget.projectUid));
+        final searchState = ref.watch(projectTaskSearchProvider(widget.projectUid));
+        
+        if (filteredTasks.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.task_alt_rounded,
+                  searchState.isSearchActive ? Icons.search_off : Icons.task_alt_rounded,
                   size: 64,
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No Tasks Yet',
+                  searchState.isSearchActive ? 'No Matching Tasks' : 'No Tasks Yet',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Add your first task to get started',
+                  searchState.isSearchActive 
+                    ? 'Try adjusting your search or filters'
+                    : 'Add your first task to get started',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
@@ -410,7 +408,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           );
         }
 
-        // Organize tasks by priority: overdue → to be done → done
+        // Tasks are already filtered and sorted by the provider
+        final tasks = filteredTasks;
+        
+        // Organize tasks by priority: overdue → to be done → done (if not using custom filter)
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
         
@@ -451,7 +452,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Tasks (${tasks.length})',
+                    'Tasks (${tasks.length} of ${allTasks.length})',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
