@@ -130,25 +130,41 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
     
     return Row(
       children: [
-        Expanded(
-          child: Text(
-            widget.projectName ?? 'Tasks',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        
-        // Actions
-        IconButton(
-          icon: const Icon(Icons.search),
-          onPressed: () {
+        // Search button with icon and text stacked left
+        InkWell(
+          onTap: () {
             setState(() {
               _isSearchExpanded = true;
             });
             _searchFocusNode.requestFocus();
           },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.search,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Search',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
+        
+        // Spacer to push create task button to the right
+        const Spacer(),
+        
+        // Create task button
         CreateTaskButton.compact(
           projectCalendarUid: widget.projectUid,
         ),
