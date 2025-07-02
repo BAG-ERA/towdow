@@ -47,7 +47,7 @@ build_appimage:
   artifacts:
     paths:
       - $APPIMAGE_OUTPUT
-    expire_in: 1 hour
+    expire_in: 1 week
 
 build_android:
   stage: build
@@ -61,12 +61,28 @@ build_android:
   artifacts:
     paths:
       - $APK_OUTPUT
-    expire_in: 1 hour
+    expire_in: 1 week
+
+build_windows:
+  stage: build
+  image: $WINDOWS_CUSTOM_IMAGE_NAME:$WINDOWS_CUSTOM_IMAGE_TAG
+  tags:
+    - windows
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - CI_COMMIT_TAG_CLEAN=$(echo $CI_COMMIT_TAG | sed 's/^v//')
+    - flutter pub get
+    - flutter build windows --release --build-name=$CI_COMMIT_TAG_CLEAN --build-number=$CI_PIPELINE_IID
+  artifacts:
+    paths:
+      - build/windows/runner/Release/
+    expire_in: 1 week
 
 release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
-  needs: [build_appimage, build_android]
+  needs: [build_appimage, build_android, build_windows]
   rules:
     - if: '$CI_COMMIT_TAG'
   script:
@@ -78,6 +94,6 @@ release:
     assets:
       links:
         - name: "Towdow AppImage"
-          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/$APPIMAGE_OUTPUT"
+          filepath: "$APPIMAGE_OUTPUT"
         - name: "Towdow Android APK"
-          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/$APK_OUTPUT"
+          filepath: "$APK_OUTPUT"
