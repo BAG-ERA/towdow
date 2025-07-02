@@ -3,6 +3,7 @@
 // Projects are represented by TaskCalendar objects (CalDAV calendars)
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/task_item/task_item.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
@@ -82,6 +83,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           loading: () => const Text('Loading...'),
           error: (_, _) => const Text('Error'),
         ),
+        scrolledUnderElevation: 0,
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
       ) : null,
       body: Column(
         children: [
@@ -1162,15 +1167,54 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             maxWidth: 420,
             minWidth: 300,
           ),
-          child: TaskItem(
-            task: task,
-            onTap: () => _viewTask(context, task),
-            onToggleComplete: () => _toggleTaskComplete(context, ref, task),
-            onTaskUpdated: (updatedTask) async {
-              await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-              _refreshProjectTasks(ref);
+          child: Draggable<Task>(
+            data: task,
+            feedback: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 300,
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: TaskItem(
+                  task: task,
+                  onTap: null, // Disable interactions during drag
+                  onToggleComplete: null,
+                  onTaskUpdated: null,
+                  onTaskDeleted: null,
+                ),
+              ),
+            ),
+            childWhenDragging: Opacity(
+              opacity: 0.5,
+              child: TaskItem(
+                task: task,
+                onTap: () => _viewTask(context, task),
+                onToggleComplete: () => _toggleTaskComplete(context, ref, task),
+                onTaskUpdated: (updatedTask) async {
+                  await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
+                  _refreshProjectTasks(ref);
+                },
+                onTaskDeleted: () => _deleteTask(context, ref, task),
+              ),
+            ),
+            onDragStarted: () {
+              AppLogger.info('ProjectDetail: Started dragging task ${task.summary}');
+              // Provide haptic feedback
+              HapticFeedback.lightImpact();
             },
-            onTaskDeleted: () => _deleteTask(context, ref, task),
+            onDragEnd: (details) {
+              AppLogger.info('ProjectDetail: Ended dragging task ${task.summary}');
+            },
+            child: TaskItem(
+              task: task,
+              onTap: () => _viewTask(context, task),
+              onToggleComplete: () => _toggleTaskComplete(context, ref, task),
+              onTaskUpdated: (updatedTask) async {
+                await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
+                _refreshProjectTasks(ref);
+              },
+              onTaskDeleted: () => _deleteTask(context, ref, task),
+            ),
           ),
         );
       }).toList(),

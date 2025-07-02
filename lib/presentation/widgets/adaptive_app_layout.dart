@@ -130,6 +130,10 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout> {
       appBar: isDetailScreen ? AppBar(
         title: Text(title),
         centerTitle: false,
+        scrolledUnderElevation: 0,
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
