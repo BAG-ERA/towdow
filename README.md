@@ -1,16 +1,16 @@
-# flowit_app
+# TowDow_app
 
-A new Flutter project.
 
-## Getting Started
 
-This project is a starting point for a Flutter application.
+## configuring CI
 
-A few resources to get you started if this is your first Flutter project:
+The CI is used to build and release the app.
+It uses custom docker images to build configured to build for Linux and Android.
+These images will be created / updated automatically when a change is pushed to the default branch.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+If you want to manually build the image you can do this:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```shell
+docker login registry.gitlab.com/towdow/towdow-flutter
+docker build --build-arg FLUTTER_VERSION=3.32.5  --build-arg ANDROID_TOOL_VERSION_X=34 --build-arg ANDROID_TOOL_VERSION=34.0.0 -t registry.gitlab.com/towdow/towdow-flutter/flutter-build-env:3.32.5 .
+```
