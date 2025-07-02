@@ -24,7 +24,7 @@ build_base_image:
       --build-arg FLUTTER_VERSION=$FLUTTER_VERSION
       --build-arg ANDROID_TOOL_VERSION_X=$ANDROID_TOOL_VERSION_X
       --build-arg ANDROID_TOOL_VERSION=$ANDROID_TOOL_VERSION
-      -t $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG .
+      -t $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG -f CI_scripts/linux/Dockerfile .
     - docker push $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
   rules:
     - if: '$CI_COMMIT_TAG'
