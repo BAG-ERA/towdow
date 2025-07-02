@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/task_repository.dart';
+import '../../data/repositories/account_repository.dart';
 import '../../data/services/sync_service.dart';
 import '../../data/services/domain_service.dart';
+import '../../data/services/caldav_service.dart';
 import '../../core/logger.dart';
 
 // Project with associated statistics
@@ -278,12 +280,14 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   final TaskRepository _taskRepository;
   final SyncService _syncService;
   final DomainService _domainService;
+  final AccountRepository _accountRepository;
 
   ProjectListViewModel(
     this._calendarRepository,
     this._taskRepository,
     this._syncService,
     this._domainService,
+    this._accountRepository,
   ) : super(const ProjectListState());
 
   /// Initialize the view model
@@ -504,21 +508,65 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
 
   /// Delete a project
   Future<void> deleteProject(String projectUid) async {
-    // AppLogger.info('ProjectListViewModel: Deleting project: $projectUid');
+    AppLogger.info('ProjectListViewModel: Deleting project: $projectUid');
     
     try {
       state = state.copyWith(error: null);
       
-      final result = await _calendarRepository.delete(projectUid);
-      await result.when(
-        success: (_) async {
-          // AppLogger.info('ProjectListViewModel: Project deleted successfully: $projectUid');
-          // Remove from local state
-          final updatedProjects = state.projects.where((p) => p.project.uid != projectUid).toList();
-          state = state.copyWith(projects: updatedProjects);
+      // First get the project to obtain its path for server deletion
+      final calendarResult = await _calendarRepository.getById(projectUid);
+      await calendarResult.when(
+        success: (calendar) async {
+          if (calendar == null) {
+            AppLogger.warning('ProjectListViewModel: Project $projectUid not found for deletion');
+            return; // Already deleted
+          }
+
+          // Delete from server first (if we have an active account)
+          try {
+            final accountResult = await _accountRepository.getActiveAccount();
+            await accountResult.when(
+              success: (account) async {
+                if (account != null) {
+                  final caldavService = CalDAVService(account: account);
+                  final serverDeleteResult = await caldavService.deleteCalendar(calendar.path);
+                  
+                  serverDeleteResult.when(
+                    success: (_) {
+                      AppLogger.info('ProjectListViewModel: Project deleted from server successfully');
+                    },
+                    failure: (failure) {
+                      AppLogger.warning('ProjectListViewModel: Failed to delete project from server: ${failure.message}');
+                      // Continue with local deletion even if server deletion fails
+                    },
+                  );
+                }
+              },
+              failure: (failure) {
+                AppLogger.warning('ProjectListViewModel: No active account, skipping server deletion');
+              },
+            );
+          } catch (e) {
+            AppLogger.warning('ProjectListViewModel: Server deletion failed, continuing with local deletion: $e');
+          }
+
+          // Delete locally
+          final result = await _calendarRepository.delete(projectUid);
+          await result.when(
+            success: (_) async {
+              AppLogger.info('ProjectListViewModel: Project deleted successfully: $projectUid');
+              // Remove from local state
+              final updatedProjects = state.projects.where((p) => p.project.uid != projectUid).toList();
+              state = state.copyWith(projects: updatedProjects);
+            },
+            failure: (failure) async {
+              AppLogger.error('ProjectListViewModel: Failed to delete project locally', failure.exception, failure.stackTrace);
+              state = state.copyWith(error: 'Failed to delete project: ${failure.message}');
+            },
+          );
         },
         failure: (failure) async {
-          AppLogger.error('ProjectListViewModel: Failed to delete project', failure.exception, failure.stackTrace);
+          AppLogger.error('ProjectListViewModel: Failed to get project for deletion', failure.exception, failure.stackTrace);
           state = state.copyWith(error: 'Failed to delete project: ${failure.message}');
         },
       );

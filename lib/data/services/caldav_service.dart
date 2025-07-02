@@ -406,6 +406,62 @@ class CalDAVService {
     );
   }
 
+  /// Delete a calendar collection from the server using DELETE
+  Future<Result<void>> deleteCalendar(String calendarPath) async {
+    try {
+      // Normalize calendar path to ensure it ends with /
+      final normalizedPath = calendarPath.endsWith('/') ? calendarPath : '$calendarPath/';
+      AppLogger.info('CalDAVService: Deleting calendar collection at $normalizedPath');
+      
+      // Send DELETE request to remove the calendar collection
+      final response = await _client.delete(normalizedPath);
+      return await response.when(
+        success: (webDavResponse) async {
+          AppLogger.debug('CalDAVService: DELETE response status: ${webDavResponse.statusCode}');
+          AppLogger.debug('CalDAVService: DELETE response body: ${webDavResponse.body}');
+          
+          // According to RFC 4918, successful collection deletion should return 204 No Content
+          // Some servers might return 200 OK or 202 Accepted
+          if (webDavResponse.statusCode == 204 || 
+              webDavResponse.statusCode == 200 || 
+              webDavResponse.statusCode == 202) {
+            AppLogger.info('CalDAVService: Calendar collection deleted successfully with status ${webDavResponse.statusCode}');
+            return Result.success(null);
+          } else if (webDavResponse.statusCode == 404) {
+            // 404 Not Found - calendar doesn't exist (consider this success)
+            AppLogger.warning('CalDAVService: Calendar not found at $normalizedPath (already deleted?)');
+            return Result.success(null);
+          } else if (webDavResponse.statusCode == 403) {
+            // 403 Forbidden - no permission to delete calendar
+            AppLogger.warning('CalDAVService: No permission to delete calendar at $normalizedPath');
+            return Result.failure(Failure(
+              message: 'Permission denied - cannot delete calendar at this location',
+              exception: Exception('HTTP 403 Forbidden'),
+            ));
+          } else {
+            AppLogger.error('CalDAVService: Failed to delete calendar with status ${webDavResponse.statusCode}');
+            return Result.failure(Failure(
+              message: 'Failed to delete calendar: HTTP ${webDavResponse.statusCode}\nResponse: ${webDavResponse.body}',
+              exception: Exception('Server returned ${webDavResponse.statusCode}'),
+            ));
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: DELETE request failed', failure.exception, failure.stackTrace);
+          return Result.failure(failure);
+        },
+      );
+
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Failed to delete calendar', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to delete calendar: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
   /// Create a new calendar on the server using MKCALENDAR
   Future<Result<TaskCalendar>> createCalendar({
     required String calendarPath,

@@ -154,7 +154,8 @@ final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel,
   final taskRepository = ref.watch(taskRepositoryProvider);
   final syncService = ref.watch(syncServiceProvider);
   final domainService = ref.watch(domainServiceProvider);
-  return ProjectListViewModel(calendarRepository, taskRepository, syncService, domainService);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return ProjectListViewModel(calendarRepository, taskRepository, syncService, domainService, accountRepository);
 });
 
 final validatorViewModelProvider = StateNotifierProvider<ValidatorViewModel, ValidatorViewModelState>((ref) {
