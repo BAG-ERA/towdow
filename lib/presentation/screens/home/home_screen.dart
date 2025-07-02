@@ -104,6 +104,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 icon: Icons.schedule_rounded
               ),
               StyledTabItem(
+                label: 'Next Week (${ref.watch(nextWeekTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                icon: Icons.date_range_rounded
+              ),
+              StyledTabItem(
                 label: 'Later (${ref.watch(laterTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                 icon: Icons.event_rounded
               ),
@@ -124,6 +128,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         children: const [
           _TaskListTab(type: TaskListType.today),
           _TaskListTab(type: TaskListType.soon),
+          _TaskListTab(type: TaskListType.nextWeek),
           _TaskListTab(type: TaskListType.later),
           _TaskListTab(type: TaskListType.anytime),
         ],
@@ -248,6 +253,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ref.invalidate(taskListProvider);
                       ref.invalidate(todayTasksProvider);
                       ref.invalidate(soonTasksProvider);
+                      ref.invalidate(nextWeekTasksProvider);
                       ref.invalidate(laterTasksProvider);
                       ref.invalidate(anytimeTasksProvider);
                     } catch (e) {
@@ -287,7 +293,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
 }
 
-enum TaskListType { today, soon, later, anytime }
+enum TaskListType { today, soon, nextWeek, later, anytime }
 
 class _TaskListTab extends ConsumerWidget {
   final TaskListType type;
@@ -305,19 +311,25 @@ class _TaskListTab extends ConsumerWidget {
       case TaskListType.today:
         tasksAsync = ref.watch(todayTasksProvider);
         title = 'Today\'s Tasks';
-        subtitle = 'Overdue and tasks due within 24 hours';
+        subtitle = 'Overdue and tasks due before midnight';
         icon = Icons.today_rounded;
         break;
       case TaskListType.soon:
         tasksAsync = ref.watch(soonTasksProvider);
         title = 'Soon Tasks';
-        subtitle = 'Tasks due between 24h and 7 days';
+        subtitle = 'Tasks due from tomorrow until next Monday';
         icon = Icons.schedule_rounded;
+        break;
+      case TaskListType.nextWeek:
+        tasksAsync = ref.watch(nextWeekTasksProvider);
+        title = 'Next Week Tasks';
+        subtitle = 'Tasks due from next Monday to the following Monday';
+        icon = Icons.date_range_rounded;
         break;
       case TaskListType.later:
         tasksAsync = ref.watch(laterTasksProvider);
         title = 'Later Tasks';
-        subtitle = 'Tasks due in more than 7 days';
+        subtitle = 'Tasks due after next week';
         icon = Icons.event_rounded;
         break;
       case TaskListType.anytime:
@@ -431,6 +443,7 @@ class _TaskListTile extends ConsumerWidget {
         ref.invalidate(taskListProvider);
         ref.invalidate(todayTasksProvider);
         ref.invalidate(soonTasksProvider);
+        ref.invalidate(nextWeekTasksProvider);
         ref.invalidate(laterTasksProvider);
         ref.invalidate(anytimeTasksProvider);
       },
@@ -442,6 +455,7 @@ class _TaskListTile extends ConsumerWidget {
         ref.invalidate(taskListProvider);
         ref.invalidate(todayTasksProvider);
         ref.invalidate(soonTasksProvider);
+        ref.invalidate(nextWeekTasksProvider);
         ref.invalidate(laterTasksProvider);
         ref.invalidate(anytimeTasksProvider);
       },
@@ -453,6 +467,7 @@ class _TaskListTile extends ConsumerWidget {
         ref.invalidate(taskListProvider);
         ref.invalidate(todayTasksProvider);
         ref.invalidate(soonTasksProvider);
+        ref.invalidate(nextWeekTasksProvider);
         ref.invalidate(laterTasksProvider);
         ref.invalidate(anytimeTasksProvider);
         

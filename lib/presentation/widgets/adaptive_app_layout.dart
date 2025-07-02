@@ -8,10 +8,20 @@ import 'package:go_router/go_router.dart';
 import 'navbar/app_sidebar.dart';
 
 enum AppDestination {
-  myTasks(
-    label: 'My Tasks',
-    icon: Icons.checklist_rounded,
-    route: '/',
+  today(
+    label: 'Today',
+    icon: Icons.today_rounded,
+    route: '/today',
+  ),
+  soon(
+    label: 'Soon',
+    icon: Icons.schedule_rounded,
+    route: '/soon',
+  ),
+  anytime(
+    label: 'Anytime',
+    icon: Icons.inbox_rounded,
+    route: '/anytime',
   );
 
   const AppDestination({
@@ -64,15 +74,18 @@ class AdaptiveAppLayout extends ConsumerWidget {
   }
 
   Widget _buildMobileLayout(BuildContext context) {
-    // Determine title for mobile based on route when no currentDestination
-    String title = currentDestination?.label ?? 'FlowIt';
-    if (currentDestination == null) {
-      final location = GoRouterState.of(context).uri.path;
-      if (location.startsWith('/archived')) {
-        title = 'Archived Projects';
-      } else if (location.startsWith('/settings')) {
-        title = 'Settings';
-      }
+    // Determine title for mobile based on route
+    String title = 'FlowIt';
+    final location = GoRouterState.of(context).uri.path;
+    
+    if (location.startsWith('/archived')) {
+      title = 'Archived Projects';
+    } else if (location.startsWith('/settings')) {
+      title = 'Settings';
+    } else if (location.startsWith('/project/')) {
+      title = 'Project Details';
+    } else if (currentDestination != null) {
+      title = currentDestination!.label;
     }
     
     return Scaffold(

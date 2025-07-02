@@ -212,51 +212,93 @@ final activeCalendarListProvider = StreamProvider<List<TaskCalendar>>((ref) {
   });
 });
 
-// Today's tasks provider (not done with due date < 24h, including overdue)
+// Helper function to find next Monday at 12AM
+DateTime _getNextMondayMidnight(DateTime from) {
+  final currentWeekday = from.weekday; // 1 = Monday, 7 = Sunday
+  int daysUntilNextMonday;
+  
+  if (currentWeekday == DateTime.monday) {
+    // If today is Monday, next Monday is 7 days away
+    daysUntilNextMonday = 7;
+  } else {
+    // Calculate days until next Monday
+    daysUntilNextMonday = (DateTime.monday + 7 - currentWeekday) % 7;
+  }
+  
+  final nextMonday = from.add(Duration(days: daysUntilNextMonday));
+  // Set to midnight (12AM)
+  return DateTime(nextMonday.year, nextMonday.month, nextMonday.day);
+}
+
+// Helper function to get midnight of current day
+DateTime _getTodayMidnight(DateTime from) {
+  return DateTime(from.year, from.month, from.day);
+}
+
+// Today's tasks provider (not done with due date before 12AM of current day - overdue and due today)
 final todayTasksProvider = StreamProvider<List<Task>>((ref) {
   final tasksStream = ref.watch(taskListProvider.stream);
   return tasksStream.map((tasks) {
     final now = DateTime.now();
-    final in24Hours = now.add(const Duration(hours: 24));
+    final todayMidnight = _getTodayMidnight(now);
+    final tomorrowMidnight = todayMidnight.add(const Duration(days: 1));
     
     final todayTasks = tasks.where((task) {
       if (task.status == 'COMPLETED') return false;
       if (task.due == null) return false;
-      // Include overdue tasks (due date in the past) and tasks due within 24h
-      return task.due!.isBefore(in24Hours);
+      // Include overdue tasks (before today midnight) and tasks due today (before tomorrow midnight)
+      return task.due!.isBefore(tomorrowMidnight);
     }).toList();
     return todayTasks;
   });
 });
 
-// Soon tasks provider (not done with due date > 24h and < 7 days)
+// Soon tasks provider (not done with due date between 12AM today and next Monday 12AM)
 final soonTasksProvider = StreamProvider<List<Task>>((ref) {
   final tasksStream = ref.watch(taskListProvider.stream);
   return tasksStream.map((tasks) {
     final now = DateTime.now();
-    final in24Hours = now.add(const Duration(hours: 24));
-    final in7Days = now.add(const Duration(days: 7));
+    final tomorrowMidnight = _getTodayMidnight(now).add(const Duration(days: 1));
+    final nextMondayMidnight = _getNextMondayMidnight(now);
     
     final soonTasks = tasks.where((task) {
       if (task.status == 'COMPLETED') return false;
       if (task.due == null) return false;
-      return task.due!.isAfter(in24Hours) && task.due!.isBefore(in7Days);
+      return !task.due!.isBefore(tomorrowMidnight) && task.due!.isBefore(nextMondayMidnight);
     }).toList();
     return soonTasks;
   });
 });
 
-// Later tasks provider (not done with due date > 7 days)
+// Next week tasks provider (not done with due date between next Monday 12AM and Monday after 12AM)
+final nextWeekTasksProvider = StreamProvider<List<Task>>((ref) {
+  final tasksStream = ref.watch(taskListProvider.stream);
+  return tasksStream.map((tasks) {
+    final now = DateTime.now();
+    final nextMondayMidnight = _getNextMondayMidnight(now);
+    final mondayAfterNextMidnight = nextMondayMidnight.add(const Duration(days: 7));
+    
+    final nextWeekTasks = tasks.where((task) {
+      if (task.status == 'COMPLETED') return false;
+      if (task.due == null) return false;
+      return !task.due!.isBefore(nextMondayMidnight) && task.due!.isBefore(mondayAfterNextMidnight);
+    }).toList();
+    return nextWeekTasks;
+  });
+});
+
+// Later tasks provider (not done with due date after Monday after next Monday 12AM)
 final laterTasksProvider = StreamProvider<List<Task>>((ref) {
   final tasksStream = ref.watch(taskListProvider.stream);
   return tasksStream.map((tasks) {
     final now = DateTime.now();
-    final in7Days = now.add(const Duration(days: 7));
+    final nextMondayMidnight = _getNextMondayMidnight(now);
+    final mondayAfterNextMidnight = nextMondayMidnight.add(const Duration(days: 7));
     
     final laterTasks = tasks.where((task) {
       if (task.status == 'COMPLETED') return false;
       if (task.due == null) return false;
-      return task.due!.isAfter(in7Days);
+      return !task.due!.isBefore(mondayAfterNextMidnight);
     }).toList();
     return laterTasks;
   });
