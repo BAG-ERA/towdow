@@ -19,28 +19,33 @@ class AppSidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
+    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
     return Container(
       width: 280,
       decoration: BoxDecoration(
-        //of(context).colorScheme.surface,//ContainerHighest.withValues(alpha: 1),
-        border: Border(
+        borderRadius: isDesktop ? null : BorderRadius.zero, // Remove rounded corners on mobile
+        border: isDesktop ? Border(
           right: BorderSide(
             color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
             width: 1,
           ),
-        ),
+        ) : null, // Remove right border on mobile since drawer is full-screen
       ),
       child: Column(
         children: [
           // Main navigation
-          MainNavigation(currentDestination: currentDestination),
+          MainNavigation(
+            currentDestination: currentDestination,
+            isDesktop: isDesktop,
+          ),
           
           const Divider(height: 1),
           
           // Projects section
-          const Expanded(
-            child: ProjectsSection(),
+          Expanded(
+            child: ProjectsSection(isDesktop: isDesktop),
           ),
           
           const Divider(height: 1),

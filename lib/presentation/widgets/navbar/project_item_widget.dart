@@ -24,11 +24,13 @@ class ProjectDragData {
 class ProjectItemWidget extends ConsumerStatefulWidget {
   final TaskCalendar project;
   final bool enableDragDrop;
+  final bool isDesktop;
 
   const ProjectItemWidget({
     super.key,
     required this.project,
     this.enableDragDrop = true,
+    this.isDesktop = true,
   });
 
   @override
@@ -63,12 +65,16 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
             color: isSelected 
                 ? Theme.of(context).colorScheme.primaryContainer
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: widget.isDesktop ? BorderRadius.circular(8) : BorderRadius.zero,
             child: InkWell(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: widget.isDesktop ? BorderRadius.circular(8) : BorderRadius.zero,
               onTap: () {
                 AppLogger.info('ProjectItem: Navigating to project ${widget.project.uid} (${widget.project.summary})');
                 context.go('/project/${widget.project.uid}');
+                // Close drawer on mobile
+                if (Scaffold.of(context).hasDrawer) {
+                  Navigator.of(context).pop();
+                }
               },
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

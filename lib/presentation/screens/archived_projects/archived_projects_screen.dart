@@ -15,11 +15,14 @@ class ArchivedProjectsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statusService = ref.watch(statusServiceProvider);
     
+    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
+    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
+    
     return Scaffold(
-      appBar: AppBar(
+      appBar: isDesktop ? AppBar(
         title: const Text('Archived Projects'),
         automaticallyImplyLeading: false,
-      ),
+      ) : null,
       body: FutureBuilder(
         future: statusService.getArchivedCalendars(),
         builder: (context, snapshot) {

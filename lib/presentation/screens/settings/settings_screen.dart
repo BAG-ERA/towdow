@@ -12,11 +12,14 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
+    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
+    
     return Scaffold(
-      appBar: AppBar(
+      appBar: isDesktop ? AppBar(
         title: const Text('Settings'),
         automaticallyImplyLeading: false,
-      ),
+      ) : null,
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [

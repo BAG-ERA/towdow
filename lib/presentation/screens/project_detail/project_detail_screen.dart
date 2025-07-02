@@ -69,14 +69,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final projectAsync = ref.watch(projectProvider(widget.projectUid));
     final tasksAsync = ref.watch(projectTasksProvider(widget.projectUid));
 
+    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
+    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
+
     return Scaffold(
-      appBar: AppBar(
+      appBar: isDesktop ? AppBar(
         title: projectAsync.when(
           data: (project) => Text(project?.displayName ?? 'Unknown Project'),
           loading: () => const Text('Loading...'),
           error: (_, _) => const Text('Error'),
         ),
-      ),
+      ) : null,
       body: Column(
         children: [
           // Project Info Card
@@ -452,72 +455,39 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               ),
             ),
             
-            // Tasks list with sections
+            // Tasks list with sections - Responsive layout
             Expanded(
-              child: ListView(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                children: [
-                  // Overdue tasks section
-                  if (overdueTasks.isNotEmpty) ...[
-                    _buildSectionHeader(context, 'Overdue', overdueTasks.length, context.chartTheme.colors.error),
-                    const SizedBox(height: 8),
-                    ...overdueTasks.map((task) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: TaskItem(
-                        task: task,
-                        onTap: () => _viewTask(context, task),
-                        onToggleComplete: () => _toggleTaskComplete(context, ref, task),
-                        onTaskUpdated: (updatedTask) async {
-                          await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                          _refreshProjectTasks(ref);
-                        },
-                        onTaskDeleted: () => _deleteTask(context, ref, task),
-                      ),
-                    )),
-                    if (pendingTasks.isNotEmpty || completedTasks.isNotEmpty)
-                      const SizedBox(height: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Overdue tasks section
+                    if (overdueTasks.isNotEmpty) ...[
+                      _buildSectionHeader(context, 'Overdue', overdueTasks.length, context.chartTheme.colors.error),
+                      const SizedBox(height: 8),
+                      _buildResponsiveTaskGrid(context, ref, overdueTasks),
+                      if (pendingTasks.isNotEmpty || completedTasks.isNotEmpty)
+                        const SizedBox(height: 24),
+                    ],
+                    
+                    // Pending tasks section
+                    if (pendingTasks.isNotEmpty) ...[
+                      _buildSectionHeader(context, 'To Be Done', pendingTasks.length, context.chartTheme.colors.warning),
+                      const SizedBox(height: 8),
+                      _buildResponsiveTaskGrid(context, ref, pendingTasks),
+                      if (completedTasks.isNotEmpty)
+                        const SizedBox(height: 24),
+                    ],
+                    
+                    // Completed tasks section
+                    if (completedTasks.isNotEmpty) ...[
+                      _buildSectionHeader(context, 'Done', completedTasks.length, context.chartTheme.colors.success),
+                      const SizedBox(height: 8),
+                      _buildResponsiveTaskGrid(context, ref, completedTasks),
+                    ],
                   ],
-                  
-                  // Pending tasks section
-                  if (pendingTasks.isNotEmpty) ...[
-                    _buildSectionHeader(context, 'To Be Done', pendingTasks.length, context.chartTheme.colors.warning),
-                    const SizedBox(height: 8),
-                    ...pendingTasks.map((task) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: TaskItem(
-                        task: task,
-                        onTap: () => _viewTask(context, task),
-                        onToggleComplete: () => _toggleTaskComplete(context, ref, task),
-                        onTaskUpdated: (updatedTask) async {
-                          await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                          _refreshProjectTasks(ref);
-                        },
-                        onTaskDeleted: () => _deleteTask(context, ref, task),
-                      ),
-                    )),
-                    if (completedTasks.isNotEmpty)
-                      const SizedBox(height: 16),
-                  ],
-                  
-                  // Completed tasks section with separator
-                  if (completedTasks.isNotEmpty) ...[
-                    _buildSectionHeader(context, 'Done', completedTasks.length, context.chartTheme.colors.success),
-                    const SizedBox(height: 8),
-                    ...completedTasks.map((task) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: TaskItem(
-                        task: task,
-                        onTap: () => _viewTask(context, task),
-                        onToggleComplete: () => _toggleTaskComplete(context, ref, task),
-                        onTaskUpdated: (updatedTask) async {
-                          await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                          _refreshProjectTasks(ref);
-                        },
-                        onTaskDeleted: () => _deleteTask(context, ref, task),
-                      ),
-                    )),
-                  ],
-                ],
+                ),
               ),
             ),
           ],
@@ -1098,8 +1068,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
   }
 
-
-
   Future<void> _addTask(BuildContext context, WidgetRef ref) async {
     // Simple dialog to add a task to this project
     final textController = TextEditingController();
@@ -1176,6 +1144,34 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   void _refreshProjectTasks(WidgetRef ref) {
     // Refresh the project tasks list
     ref.invalidate(projectTasksProvider(widget.projectUid));
+  }
+
+  /// Builds a responsive grid layout for tasks that wraps to new rows when needed
+  Widget _buildResponsiveTaskGrid(BuildContext context, WidgetRef ref, List<Task> tasks) {
+    return Wrap(
+      spacing: 12.0, // Horizontal spacing between tasks
+      runSpacing: 12.0, // Vertical spacing between rows
+      alignment: WrapAlignment.start,
+      runAlignment: WrapAlignment.start,
+      children: tasks.map((task) {
+        return ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 420,
+            minWidth: 300,
+          ),
+          child: TaskItem(
+            task: task,
+            onTap: () => _viewTask(context, task),
+            onToggleComplete: () => _toggleTaskComplete(context, ref, task),
+            onTaskUpdated: (updatedTask) async {
+              await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
+              _refreshProjectTasks(ref);
+            },
+            onTaskDeleted: () => _deleteTask(context, ref, task),
+          ),
+        );
+      }).toList(),
+    );
   }
 
   Future<void> _deleteTask(BuildContext context, WidgetRef ref, Task task) async {

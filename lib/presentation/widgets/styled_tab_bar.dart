@@ -23,6 +23,7 @@ class StyledTabBar extends StatelessWidget {
   final double tabSpacing;
   final Duration animationDuration;
   final EdgeInsets tabPadding;
+  final bool enableResponsiveMode;
 
   const StyledTabBar({
     super.key,
@@ -33,6 +34,7 @@ class StyledTabBar extends StatelessWidget {
     this.tabSpacing = 8.0,
     this.animationDuration = const Duration(milliseconds: 200),
     this.tabPadding = const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+    this.enableResponsiveMode = true,
   });
 
   @override
@@ -57,85 +59,177 @@ class StyledTabBar extends StatelessWidget {
           ),
           child: Padding(
             padding: const EdgeInsets.all(4.0),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(items.length, (index) {
-                  final item = items[index];
-                  final isSelected = index == selectedIndex;
-                  final isDisabled = item.isDisabled;
-
-                  return AnimatedContainer(
-                    duration: animationDuration,
-                    curve: Curves.easeInOut,
-                    margin: EdgeInsets.only(
-                      right: index < items.length - 1 ? tabSpacing : 0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? colorScheme.primary
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8.0),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: colorScheme.primary.withValues(alpha: 0.3),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: isDisabled ? null : () => onTabSelected(index),
-                        borderRadius: BorderRadius.circular(8.0),
-                        child: Padding(
-                          padding: tabPadding,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (item.icon != null) ...[
-                                AnimatedSwitcher(
-                                  duration: animationDuration,
-                                  child: Icon(
-                                    item.icon,
-                                    key: ValueKey('$index-$isSelected'),
-                                    size: 18,
-                                    color: isSelected
-                                        ? colorScheme.onPrimary
-                                        : isDisabled
-                                            ? colorScheme.onSurface.withValues(alpha: 0.38)
-                                            : colorScheme.onSurface.withValues(alpha: 0.8),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                              Text(
-                                item.label,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? colorScheme.onPrimary
-                                      : isDisabled
-                                          ? colorScheme.onSurface.withValues(alpha: 0.38)
-                                          : colorScheme.onSurface.withValues(alpha: 0.8),
-                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                                  fontSize: 14,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
+            child: enableResponsiveMode
+                ? LayoutBuilder(
+                    builder: (context, constraints) {
+                      final availableWidth = constraints.maxWidth - 8.0; // Account for container padding
+                      final shouldUseCompactMode = _shouldUseCompactMode(context, availableWidth);
+                      
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(items.length, (index) {
+                            return _buildTab(
+                              context,
+                              index,
+                              shouldUseCompactMode,
+                              colorScheme,
+                            );
+                          }),
                         ),
-                      ),
+                      );
+                    },
+                  )
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(items.length, (index) {
+                        return _buildTab(
+                          context,
+                          index,
+                          false, // Never use compact mode when responsive is disabled
+                          colorScheme,
+                        );
+                      }),
                     ),
-                  );
-                                }),
-              ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Determines if compact mode should be used based on available width
+  bool _shouldUseCompactMode(BuildContext context, double availableWidth) {
+    if (!enableResponsiveMode) return false;
+    
+    // Estimate the width needed for all tabs with full text
+    double estimatedFullWidth = 0;
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      
+      // Estimate text width (rough calculation)
+      final textWidth = _estimateTextWidth(context, item.label);
+      
+      // Add icon width if present
+      final iconWidth = item.icon != null ? 18.0 + 8.0 : 0; // icon + spacing
+      
+      // Add padding
+      final totalTabWidth = tabPadding.horizontal + iconWidth + textWidth;
+      
+      estimatedFullWidth += totalTabWidth;
+      
+      // Add spacing between tabs
+      if (i < items.length - 1) {
+        estimatedFullWidth += tabSpacing;
+      }
+    }
+    
+    // Use compact mode if estimated width exceeds available width
+    return estimatedFullWidth > availableWidth;
+  }
+
+  /// Estimates text width for a given string
+  double _estimateTextWidth(BuildContext context, String text) {
+    final TextPainter textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+      ),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    return textPainter.size.width;
+  }
+
+  /// Builds an individual tab with responsive behavior
+  Widget _buildTab(
+    BuildContext context,
+    int index,
+    bool useCompactMode,
+    ColorScheme colorScheme,
+  ) {
+    final item = items[index];
+    final isSelected = index == selectedIndex;
+    final isDisabled = item.isDisabled;
+    final showText = isSelected || !useCompactMode;
+
+    return AnimatedContainer(
+      duration: animationDuration,
+      curve: Curves.easeInOut,
+      margin: EdgeInsets.only(
+        right: index < items.length - 1 ? tabSpacing : 0,
+      ),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? colorScheme.primary
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(8.0),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: colorScheme.primary.withValues(alpha: 0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isDisabled ? null : () => onTabSelected(index),
+          borderRadius: BorderRadius.circular(8.0),
+          child: Padding(
+            padding: showText
+                ? tabPadding
+                : EdgeInsets.symmetric(
+                    horizontal: tabPadding.horizontal * 0.6, // Reduced padding for icon-only
+                    vertical: tabPadding.vertical,
+                  ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (item.icon != null) ...[
+                  AnimatedSwitcher(
+                    duration: animationDuration,
+                    child: Icon(
+                      item.icon,
+                      key: ValueKey('$index-$isSelected-$showText'),
+                      size: 18,
+                      color: isSelected
+                          ? colorScheme.onPrimary
+                          : isDisabled
+                              ? colorScheme.onSurface.withValues(alpha: 0.38)
+                              : colorScheme.onSurface.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  if (showText) const SizedBox(width: 8),
+                ],
+                if (showText)
+                  AnimatedSwitcher(
+                    duration: animationDuration,
+                    child: Text(
+                      item.label,
+                      key: ValueKey('text-$index-$isSelected'),
+                      style: TextStyle(
+                        color: isSelected
+                            ? colorScheme.onPrimary
+                            : isDisabled
+                                ? colorScheme.onSurface.withValues(alpha: 0.38)
+                                : colorScheme.onSurface.withValues(alpha: 0.8),
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),

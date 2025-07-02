@@ -76,38 +76,46 @@ class AdaptiveAppLayout extends ConsumerWidget {
   Widget _buildMobileLayout(BuildContext context) {
     // Determine title for mobile based on route
     String title = 'FlowIt';
-    final location = GoRouterState.of(context).uri.path;
+    bool isDetailScreen = false;
+      final location = GoRouterState.of(context).uri.path;
     
-    if (location.startsWith('/archived')) {
-      title = 'Archived Projects';
+      if (location.startsWith('/archived')) {
+        title = 'Archived Projects';
+      isDetailScreen = true;
     } else if (location.startsWith('/settings')) {
       title = 'Settings';
+      isDetailScreen = true;
     } else if (location.startsWith('/project/')) {
       title = 'Project Details';
+      isDetailScreen = true;
     } else if (currentDestination != null) {
       title = currentDestination!.label;
     }
     
     return Scaffold(
-      appBar: AppBar(
+      appBar: isDetailScreen ? AppBar(
         title: Text(title),
         centerTitle: false,
         leading: Builder(
           builder: (context) => IconButton(
-          icon: const Icon(Icons.menu_rounded),
+            icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () => Scaffold.of(context).openDrawer(),
-            tooltip: 'Menu',
+            tooltip: 'Back to navigation',
           ),
                   ),
-                ),
+      ) : null,
       drawer: _buildMobileDrawer(context),
       body: child,
     );
   }
 
   Widget _buildMobileDrawer(BuildContext context) {
-    return Drawer(
+    return SizedBox(
+      width: double.infinity,
+      child: Drawer(
+        shape: const RoundedRectangleBorder(), // Remove rounded corners
       child: AppSidebar(currentDestination: currentDestination),
+      ),
           );
   }
 

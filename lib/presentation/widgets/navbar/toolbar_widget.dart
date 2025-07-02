@@ -159,15 +159,15 @@ class ToolbarWidget extends ConsumerWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.checklist_rounded),
-              title: const Text('Task'),
-              subtitle: const Text('Create a new task'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _showCreateTaskDialog(context);
-              },
-            ),
+            //ListTile(
+            //  leading: const Icon(Icons.checklist_rounded),
+            //  title: const Text('Task'),
+            //  subtitle: const Text('Create a new task'),
+            //  onTap: () {
+            //    Navigator.of(context).pop();
+            //    _showCreateTaskDialog(context);
+            //  },
+            //),
             ListTile(
               leading: const Icon(Icons.domain_rounded),
               title: const Text('Domain'),

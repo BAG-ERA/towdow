@@ -272,30 +272,35 @@ class _AgendaCalendarState extends ConsumerState<AgendaCalendar> {
                       ),
                     ),
                   )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: tasksForDate.length,
-                    itemBuilder: (context, index) {
-                      final task = tasksForDate[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: TaskItem(
-                          task: task,
-                          onTap: widget.onTaskTap != null ? () => widget.onTaskTap!(task) : null,
-                          onToggleComplete: widget.onTaskToggle != null ? () => widget.onTaskToggle!(task) : null,
-                          onTaskUpdated: widget.onTaskUpdated != null ? (updatedTask) => widget.onTaskUpdated!(updatedTask) : null,
-                          onTaskDeleted: widget.onTaskDeleted != null ? () => widget.onTaskDeleted!(task) : null,
-                        ),
-                      );
-                    },
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Wrap(
+                      spacing: 12.0, // Horizontal spacing between tasks
+                      runSpacing: 12.0, // Vertical spacing between rows
+                      alignment: WrapAlignment.start,
+                      runAlignment: WrapAlignment.start,
+                      children: tasksForDate.map((task) {
+                        return ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: 420,
+                            minWidth: 300,
+                          ),
+                          child: TaskItem(
+                            task: task,
+                            onTap: widget.onTaskTap != null ? () => widget.onTaskTap!(task) : null,
+                            onToggleComplete: widget.onTaskToggle != null ? () => widget.onTaskToggle!(task) : null,
+                            onTaskUpdated: widget.onTaskUpdated != null ? (updatedTask) => widget.onTaskUpdated!(updatedTask) : null,
+                            onTaskDeleted: widget.onTaskDeleted != null ? () => widget.onTaskDeleted!(task) : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
           ),
         ],
       ),
     );
   }
-
-
 
   List<Task> _getTasksForDate(DateTime date) {
     return widget.tasks.where((task) {

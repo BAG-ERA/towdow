@@ -9,15 +9,18 @@ class MainNavigation extends StatelessWidget {
   const MainNavigation({
     super.key,
     required this.currentDestination,
+    required this.isDesktop,
   });
 
   final AppDestination? currentDestination;
+  final bool isDesktop;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: AppDestination.values.map((destination) {
         final isSelected = destination == currentDestination;
+        final borderRadius = isDesktop ? BorderRadius.circular(12) : BorderRadius.zero;
         
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
@@ -25,7 +28,7 @@ class MainNavigation extends StatelessWidget {
             color: isSelected 
                 ? Theme.of(context).colorScheme.secondaryContainer
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: borderRadius,
             child: ListTile(
               leading: Icon(
                 destination.icon,
@@ -51,7 +54,7 @@ class MainNavigation extends StatelessWidget {
               },
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: borderRadius,
               ),
             ),
           ),

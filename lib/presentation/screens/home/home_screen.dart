@@ -3,12 +3,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../widgets/task_item/task_item.dart';
+import '../../widgets/styled_tab_bar.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
 import '../../../data/services/sync_service.dart';
 import '../../providers/home_providers.dart';
-import '../../widgets/styled_tab_bar.dart';
-import '../../widgets/task_item/task_item.dart';
+import '../../viewmodels/task_viewmodel.dart';
+import '../../../core/logger.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -39,10 +41,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final selectedTabIndex = ref.watch(selectedTabIndexProvider);
     
+    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
+    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
+    
     return Scaffold(
-      appBar: AppBar(
+      appBar: isDesktop ? AppBar(
         title: const Text('My Tasks'),
-        automaticallyImplyLeading: false,
         actions: [
           // Sync status indicator
           Consumer(
@@ -122,15 +126,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             },
           ),
         ),
-      ),
-      body: IndexedStack(
-        index: selectedTabIndex,
-        children: const [
-          _TaskListTab(type: TaskListType.today),
-          _TaskListTab(type: TaskListType.soon),
-          _TaskListTab(type: TaskListType.nextWeek),
-          _TaskListTab(type: TaskListType.later),
-          _TaskListTab(type: TaskListType.anytime),
+      ) : null,
+      body: Column(
+        children: [
+          // Mobile tabs - only show when no AppBar (mobile mode)
+          if (!isDesktop)
+            StyledTabBar(
+              items: [
+                StyledTabItem(
+                  label: 'Today (${ref.watch(todayTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                  icon: Icons.today_rounded
+                ),
+                StyledTabItem(
+                  label: 'Soon (${ref.watch(soonTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                  icon: Icons.schedule_rounded
+                ),
+                StyledTabItem(
+                  label: 'Next Week (${ref.watch(nextWeekTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                  icon: Icons.date_range_rounded
+                ),
+                StyledTabItem(
+                  label: 'Later (${ref.watch(laterTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                  icon: Icons.event_rounded
+                ),
+                StyledTabItem(
+                  label: 'Anytime (${ref.watch(anytimeTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                  icon: Icons.inbox_rounded
+                ),
+              ],
+              selectedIndex: selectedTabIndex,
+              onTabSelected: (index) {
+                ref.read(selectedTabIndexProvider.notifier).state = index;
+              },
+            ),
+          
+          Expanded(
+            child: IndexedStack(
+              index: selectedTabIndex,
+              children: const [
+                _TaskListTab(type: TaskListType.today),
+                _TaskListTab(type: TaskListType.soon),
+                _TaskListTab(type: TaskListType.nextWeek),
+                _TaskListTab(type: TaskListType.later),
+                _TaskListTab(type: TaskListType.anytime),
+              ],
+            ),
+          ),
         ],
       ),
       floatingActionButton: Consumer(
@@ -401,12 +442,82 @@ class _TaskListTab extends ConsumerWidget {
                           ],
                         ),
                       )
-                    : ListView.builder(
-                        itemCount: tasks.length,
-                        itemBuilder: (context, index) {
-                          final task = tasks[index];
-                          return _TaskListTile(task: task);
-                        },
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Wrap(
+                          spacing: 12.0, // Horizontal spacing between tasks
+                          runSpacing: 12.0, // Vertical spacing between rows
+                          alignment: WrapAlignment.start,
+                          runAlignment: WrapAlignment.start,
+                          children: tasks.map((task) {
+                            return ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth: 420,
+                                minWidth: 300,
+                              ),
+                              child: TaskItem(
+                                task: task,
+                                onTap: () {
+                                  // Navigate to task detail
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Navigate to task ${task.uid}')),
+                                  );
+                                },
+                                onToggleComplete: () async {
+                                  // Toggle task completion
+                                  await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
+                                  
+                                  // Refresh the task lists
+                                  ref.invalidate(taskListProvider);
+                                  ref.invalidate(todayTasksProvider);
+                                  ref.invalidate(soonTasksProvider);
+                                  ref.invalidate(nextWeekTasksProvider);
+                                  ref.invalidate(laterTasksProvider);
+                                  ref.invalidate(anytimeTasksProvider);
+                                },
+                                onTaskUpdated: (updatedTask) async {
+                                  // Handle task updates - save to repository and sync
+                                  await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
+                                  
+                                  // Refresh the task lists
+                                  ref.invalidate(taskListProvider);
+                                  ref.invalidate(todayTasksProvider);
+                                  ref.invalidate(soonTasksProvider);
+                                  ref.invalidate(nextWeekTasksProvider);
+                                  ref.invalidate(laterTasksProvider);
+                                  ref.invalidate(anytimeTasksProvider);
+                                },
+                                onTaskDeleted: () async {
+                                  // Handle task deletion
+                                  await ref.read(taskViewModelProvider.notifier).deleteTask(task.uid);
+                                  
+                                  // Refresh the task lists
+                                  ref.invalidate(taskListProvider);
+                                  ref.invalidate(todayTasksProvider);
+                                  ref.invalidate(soonTasksProvider);
+                                  ref.invalidate(nextWeekTasksProvider);
+                                  ref.invalidate(laterTasksProvider);
+                                  ref.invalidate(anytimeTasksProvider);
+                                  
+                                  // Show confirmation
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Task "${task.summary}" deleted'),
+                                        action: SnackBarAction(
+                                          label: 'Undo',
+                                          onPressed: () {
+                                            // TODO: Implement undo functionality
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
               ),
             ],
@@ -415,77 +526,6 @@ class _TaskListTab extends ConsumerWidget {
       },
     );
   }
-
-
-
 }
 
-class _TaskListTile extends ConsumerWidget {
-  final Task task;
-
-  const _TaskListTile({required this.task});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-            return TaskItem(
-      task: task,
-      onTap: () {
-        // Navigate to task detail
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Navigate to task ${task.uid}')),
-        );
-      },
-      onToggleComplete: () async {
-        // Toggle task completion
-        await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
-        
-        // Refresh the task lists
-        ref.invalidate(taskListProvider);
-        ref.invalidate(todayTasksProvider);
-        ref.invalidate(soonTasksProvider);
-        ref.invalidate(nextWeekTasksProvider);
-        ref.invalidate(laterTasksProvider);
-        ref.invalidate(anytimeTasksProvider);
-      },
-      onTaskUpdated: (updatedTask) async {
-        // Handle task updates - save to repository and sync
-        await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-        
-        // Refresh the task lists
-        ref.invalidate(taskListProvider);
-        ref.invalidate(todayTasksProvider);
-        ref.invalidate(soonTasksProvider);
-        ref.invalidate(nextWeekTasksProvider);
-        ref.invalidate(laterTasksProvider);
-        ref.invalidate(anytimeTasksProvider);
-      },
-      onTaskDeleted: () async {
-        // Handle task deletion
-        await ref.read(taskViewModelProvider.notifier).deleteTask(task.uid);
-        
-        // Refresh the task lists
-        ref.invalidate(taskListProvider);
-        ref.invalidate(todayTasksProvider);
-        ref.invalidate(soonTasksProvider);
-        ref.invalidate(nextWeekTasksProvider);
-        ref.invalidate(laterTasksProvider);
-        ref.invalidate(anytimeTasksProvider);
-        
-        // Show confirmation
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Task "${task.summary}" deleted'),
-              action: SnackBarAction(
-                label: 'Undo',
-                onPressed: () {
-                  // TODO: Implement undo functionality
-                },
-              ),
-            ),
-          );
-        }
-      },
-    );
-  }
-} 
+ 

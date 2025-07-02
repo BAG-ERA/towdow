@@ -10,7 +10,12 @@ import '../../../data/models/task_calendar.dart';
 import 'project_item_widget.dart';
 
 class ProjectsSection extends ConsumerWidget {
-  const ProjectsSection({super.key});
+  const ProjectsSection({
+    super.key,
+    this.isDesktop = true,
+  });
+
+  final bool isDesktop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -111,6 +116,7 @@ class ProjectsSection extends ConsumerWidget {
                             projects: projectsWithoutDomain,
                             ref: ref,
                             showSeparator: sortedDomains.isNotEmpty,
+                            isDesktop: isDesktop,
                           ),
                         
                         // Domain sections (including empty ones)
@@ -119,6 +125,7 @@ class ProjectsSection extends ConsumerWidget {
                             domain: domain,
                             projects: domainGroups[domain]!,
                             ref: ref,
+                            isDesktop: isDesktop,
                           )
                         ),
                       ],
@@ -229,11 +236,13 @@ class _DomainSection extends ConsumerStatefulWidget {
   final String domain;
   final List<TaskCalendar> projects;
   final WidgetRef ref;
+  final bool isDesktop;
 
   const _DomainSection({
     required this.domain,
     required this.projects,
     required this.ref,
+    required this.isDesktop,
   });
 
   @override
@@ -536,7 +545,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                         children: widget.projects.map((project) => 
                           Padding(
                             padding: const EdgeInsets.only(left: 16),
-                            child: ProjectItemWidget(project: project),
+                            child: ProjectItemWidget(project: project, isDesktop: widget.isDesktop),
                           )
                         ).toList(),
                       ),
@@ -556,11 +565,13 @@ class _NoDomainSection extends ConsumerWidget {
   final List<TaskCalendar> projects;
   final WidgetRef ref;
   final bool showSeparator;
+  final bool isDesktop;
 
   const _NoDomainSection({
     required this.projects,
     required this.ref,
     this.showSeparator = false,
+    required this.isDesktop,
   });
 
   @override
@@ -573,10 +584,10 @@ class _NoDomainSection extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Projects without domain
-            if (projects.isNotEmpty) ...[
-              ...projects.map((project) => ProjectItemWidget(project: project)),
-            ],
+                          // Projects without domain
+              if (projects.isNotEmpty) ...[
+                ...projects.map((project) => ProjectItemWidget(project: project, isDesktop: this.isDesktop)),
+              ],
             
             // Drop zone for removing projects from domains
             if (isHovering || projects.isEmpty) 

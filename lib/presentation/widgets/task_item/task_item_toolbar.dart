@@ -23,28 +23,11 @@ class TaskItemToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Simple calculation: 3 primary buttons + menu = about 180px
-        // All buttons = about 400px
-        final availableWidth = constraints.maxWidth;
-        
-        // Use compact mode if less than 240px available
-        if (availableWidth < 240) {
-          return _buildCompactActions(context);
-        } else {
-          return _buildFullActions(context);
-        }
-      },
-    );
-  }
-
-  Widget _buildCompactActions(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        // Essential actions only
-        _buildCompactIconButton(
+        // Primary actions - always visible
+        _buildPrimaryAction(
           context: context,
           icon: Icons.calendar_today_rounded,
           tooltip: 'Set Due Date',
@@ -58,7 +41,7 @@ class TaskItemToolbar extends StatelessWidget {
           const SizedBox(width: 4),
         ],
         
-        _buildCompactIconButton(
+        _buildPrimaryAction(
           context: context,
           icon: Icons.person_add_rounded,
           tooltip: 'Add Attendee',
@@ -66,180 +49,18 @@ class TaskItemToolbar extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         
-        // More menu
-        PopupMenuButton<String>(
-          icon: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              Icons.more_vert_rounded,
-              size: 20,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-          tooltip: 'More Actions',
-          onSelected: (action) => _handleMenuAction(context, action),
-          itemBuilder: (context) => [
-            if (task.due == null)
-              const PopupMenuItem(
-                value: 'due_date',
-                child: ListTile(
-                  leading: Icon(Icons.calendar_today_rounded),
-                  title: Text('Set Due Date'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            const PopupMenuItem(
-              value: 'category',
-              child: ListTile(
-                leading: Icon(Icons.label_rounded),
-                title: Text('Add Category'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'move',
-              child: ListTile(
-                leading: Icon(Icons.drive_file_move_rounded),
-                title: Text('Move Task'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'archive',
-              child: ListTile(
-                leading: Icon(Icons.archive),
-                title: Text('Archive Task'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'gps',
-              child: ListTile(
-                leading: Icon(Icons.pin_drop),
-                title: Text('Add GPS'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: ListTile(
-                              leading: const Icon(Icons.delete_rounded, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            if (kDebugMode)
-              const PopupMenuItem(
-                value: 'debug',
-                child: ListTile(
-                  leading: Icon(Icons.info_rounded),
-                  title: Text('Show UID'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-          ],
-        ),
+        // Secondary actions menu
+        _buildSecondaryActionsMenu(context),
       ],
     );
   }
 
-  Widget _buildFullActions(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        // Set due date
-        _buildCompactIconButton(
-          context: context,
-          icon: Icons.calendar_today_rounded,
-          tooltip: 'Set Due Date',
-          onPressed: () => _showDueDatePicker(context),
-        ),
-        const SizedBox(width: 4),
-        
-        // Validator button (organizer only)
-        if (_isOrganizer()) ...[
-          _buildValidatorPopupButton(context),
-          const SizedBox(width: 4),
-        ],
-        
-        // Set attendee
-        _buildCompactIconButton(
-          context: context,
-          icon: Icons.person_add_rounded,
-          tooltip: 'Add Attendee',
-          onPressed: () => _showAttendeeDialog(context),
-        ),
-        const SizedBox(width: 4),
-        
-        // Set category
-        _buildCompactIconButton(
-          context: context,
-          icon: Icons.label_rounded,
-          tooltip: 'Add Category',
-          onPressed: () => _showCategoryDialog(context),
-        ),
-        const SizedBox(width: 4),
-        
-        // Move task
-        _buildCompactIconButton(
-          context: context,
-          icon: Icons.drive_file_move_rounded,
-          tooltip: 'Move Task',
-          onPressed: () => _showMoveDialog(context),
-        ),
-        const SizedBox(width: 4),
-        
-        // Archive task
-        _buildCompactIconButton(
-          context: context,
-          icon: Icons.archive,
-          tooltip: 'Archive Task',
-          onPressed: () => _showArchiveDialog(context),
-        ),
-        const SizedBox(width: 4),
-        
-        // Add GPS coordinate
-        _buildCompactIconButton(
-          context: context,
-          icon: Icons.pin_drop,
-          tooltip: 'Add GPS Coordinate',
-          onPressed: () => _showGpsDialog(context),
-        ),
-        const SizedBox(width: 4),
-        
-        // Delete task
-        _buildCompactIconButton(
-          context: context,
-          icon: Icons.delete_rounded,
-          tooltip: 'Delete Task',
-          onPressed: () => _showDeleteDialog(context),
-          isDestructive: true,
-        ),
-        
-        // Debug: Show UID
-        if (kDebugMode) ...[
-          const SizedBox(width: 4),
-          _buildCompactIconButton(
-            context: context,
-            icon: Icons.info_rounded,
-            tooltip: 'Show UID',
-            onPressed: () => _showUidDialog(context),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildCompactIconButton({
+  /// Builds a primary action button (always visible)
+  Widget _buildPrimaryAction({
     required BuildContext context,
     required IconData icon,
     required String tooltip,
     required VoidCallback onPressed,
-    bool isDestructive = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     
@@ -258,14 +79,87 @@ class TaskItemToolbar extends StatelessWidget {
           child: Icon(
             icon,
             size: 20,
-            color: isDestructive 
-                ? colorScheme.error 
-                : colorScheme.onSurface.withValues(alpha: 0.6),
+            color: colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
       ),
     );
   }
+
+  /// Builds the secondary actions menu with vertical 3-dot icon
+  Widget _buildSecondaryActionsMenu(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          Icons.more_vert_rounded,
+          size: 20,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+      ),
+      tooltip: 'More Actions',
+      onSelected: (action) => _handleMenuAction(context, action),
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'category',
+          child: ListTile(
+            leading: Icon(Icons.label_rounded),
+            title: Text('Add Category'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'move',
+          child: ListTile(
+            leading: Icon(Icons.drive_file_move_rounded),
+            title: Text('Move Task'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'archive',
+          child: ListTile(
+            leading: Icon(Icons.archive),
+            title: Text('Archive Task'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'gps',
+          child: ListTile(
+            leading: Icon(Icons.pin_drop),
+            title: Text('Add GPS Location'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'delete',
+          child: ListTile(
+            leading: Icon(Icons.delete_rounded, color: Colors.red),
+            title: Text('Delete Task', style: TextStyle(color: Colors.red)),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        if (kDebugMode)
+          const PopupMenuItem(
+            value: 'debug',
+            child: ListTile(
+              leading: Icon(Icons.info_rounded),
+              title: Text('Show UID'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+      ],
+    );
+  }
+
+
+
+
 
   Widget _buildValidatorPopupButton(BuildContext context) {
     return PopupMenuButton<String>(
@@ -318,9 +212,6 @@ class TaskItemToolbar extends StatelessWidget {
 
   void _handleMenuAction(BuildContext context, String action) {
     switch (action) {
-      case 'due_date':
-        _showDueDatePicker(context);
-        break;
       case 'category':
         _showCategoryDialog(context);
         break;
