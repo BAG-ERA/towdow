@@ -47,7 +47,7 @@ release:
     description: "Automated release for tag $CI_COMMIT_TAG"
     assets:
       links:
-        - name: "$APPIMAGE_OUTPUT"
+        - name: "Towdow AppImage"
           url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/$APPIMAGE_OUTPUT"
-        - name: "APK_OUTPUT"
-          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/APK_OUTPUT"
+        - name: "Towdow Android APK"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/$APK_OUTPUT"
