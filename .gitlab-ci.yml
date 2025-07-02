@@ -6,6 +6,8 @@ variables:
   APPIMAGE_OUTPUT: "build/linux/x64/release/towdow_app.AppImage"
   APK_OUTPUT: "build/app/outputs/flutter-apk/app-release.apk"
   FLUTTER_VERSION: "3.32.5"
+  ANDROID_TOOL_VERISON_X: "34"
+  ANDROID_TOOL_VERISON: "${ANDROID_TOOL_VERISON_X}.0.0"
 
 build_appimage:
   stage: build
@@ -28,10 +30,11 @@ build_appimage:
 
 build_android:
   stage: build
-  image: ubuntu:latest
+  image: ubuntu:24.04
   rules:
     - if: '$CI_COMMIT_TAG'
   before_script:
+    - export DEBIAN_FRONTEND=noninteractive
     - apt-get update && apt-get install -y git curl unzip openjdk-17-jdk
     - git clone https://github.com/flutter/flutter.git -b ${FLUTTER_VERSION} /usr/local/flutter
     - export PATH="$PATH:/usr/local/flutter/bin"
@@ -43,7 +46,7 @@ build_android:
     - mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
     - export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
     - yes | sdkmanager --licenses
-    - sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+    - sdkmanager "platform-tools" "build-tools;${ANDROID_TOOL_VERISON}" "platforms;android-${ANDROID_TOOL_VERISON_X}"
     - CI_COMMIT_TAG_CLEAN=$(echo $CI_COMMIT_TAG | sed 's/^v//')
     - flutter pub get
   script:
