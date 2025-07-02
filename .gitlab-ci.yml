@@ -36,6 +36,31 @@ build_base_image:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: manual
 
+build_windows_base_image:
+  stage: prepare
+  image: docker:latest
+  tags:
+    - windows
+  services:
+    - docker:dind
+  variables:
+    WINDOWS_CUSTOM_IMAGE_NAME: "$CI_REGISTRY_IMAGE/flutter-windows-build-env"
+    WINDOWS_CUSTOM_IMAGE_TAG: "$FLUTTER_VERSION"
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $WINDOWS_CUSTOM_IMAGE_NAME:$WINDOWS_CUSTOM_IMAGE_TAG -f CI_scripts/windows/Dockerfile .
+    - docker push $WINDOWS_CUSTOM_IMAGE_NAME:$WINDOWS_CUSTOM_IMAGE_TAG
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      changes:
+        - .gitlab-ci.yml
+        - CI_scripts/windows/Dockerfile
+      when: always
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+
 build_appimage:
   stage: build
   image: $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
@@ -65,24 +90,26 @@ build_android:
 
 build_windows:
   stage: build
-  image: $WINDOWS_CUSTOM_IMAGE_NAME:$WINDOWS_CUSTOM_IMAGE_TAG
-  tags:
-    - windows
-  rules:
-    - if: '$CI_COMMIT_TAG'
   script:
-    - CI_COMMIT_TAG_CLEAN=$(echo $CI_COMMIT_TAG | sed 's/^v//')
-    - flutter pub get
-    - flutter build windows --release --build-name=$CI_COMMIT_TAG_CLEAN --build-number=$CI_PIPELINE_IID
-  artifacts:
-    paths:
-      - build/windows/runner/Release/
-    expire_in: 1 week
+    - echo "No windows build yet"
+#  image: $WINDOWS_CUSTOM_IMAGE_NAME:$WINDOWS_CUSTOM_IMAGE_TAG
+#  tags:
+#    - windows
+#  rules:
+#    - if: '$CI_COMMIT_TAG'
+#  script:
+#    - CI_COMMIT_TAG_CLEAN=$(echo $CI_COMMIT_TAG | sed 's/^v//')
+#    - flutter pub get
+#    - flutter build windows --release --build-name=$CI_COMMIT_TAG_CLEAN --build-number=$CI_PIPELINE_IID
+#  artifacts:
+#    paths:
+#      - build/windows/runner/Release/
+#    expire_in: 1 week
 
 release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
-  needs: [build_appimage, build_android, build_windows]
+  needs: [ build_appimage, build_android, build_windows ]
   rules:
     - if: '$CI_COMMIT_TAG'
   script:
@@ -97,3 +124,5 @@ release:
           filepath: "$APPIMAGE_OUTPUT"
         - name: "Towdow Android APK"
           filepath: "$APK_OUTPUT"
+#        - name: "Towdow Windows Executable"
+#          filepath: "build/windows/runner/Release/towdow.exe"
