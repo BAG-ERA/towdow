@@ -9,7 +9,8 @@ variables:
   FLUTTER_VERSION: "3.32.5"
   CUSTOM_IMAGE_NAME: "$CI_REGISTRY_IMAGE/flutter-build-env"
   CUSTOM_IMAGE_TAG: "$FLUTTER_VERSION"
-
+  ANDROID_TOOL_VERISON_X: "34"
+  ANDROID_TOOL_VERISON: "${ANDROID_TOOL_VERISON_X}.0.0"
 
 build_base_image:
   stage: prepare
@@ -20,8 +21,8 @@ build_base_image:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker build 
         --build-arg FLUTTER_VERSION=$FLUTTER_VERSION 
-        --build-arg ANDROID_TOOL_VERISON_X=34 
-        --build-arg ANDROID_TOOL_VERISON=34.0.0 
+        --build-arg ANDROID_TOOL_VERISON_X=${ANDROID_TOOL_VERISON_X}
+        --build-arg ANDROID_TOOL_VERISON=${ANDROID_TOOL_VERISON}
         -t $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG .
     - docker push $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
   rules:
