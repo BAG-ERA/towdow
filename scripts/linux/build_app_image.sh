@@ -12,7 +12,7 @@ chmod +x ${APP_IMAGE_TOOL}
 
 echo "building app"
 flutter pub get
-flutter build linux --release
+flutter build linux --release --build-name=$1 --build-number=$2
 
 echo "preparing AppDir ${APP_DIR}"
 cp -r build/linux/x64/release/bundle/* ${APP_DIR}/

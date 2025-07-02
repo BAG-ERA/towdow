@@ -13,8 +13,9 @@ build_appimage:
     - if: '$CI_COMMIT_TAG'
   before_script:
     - apt-get update && apt-get install -y fuse libfuse2 desktop-file-utils
+    - CI_COMMIT_TAG_CLEAN=$(echo $CI_COMMIT_TAG | sed 's/^v//')
   script:
-    - bash scripts/linux/build_app_image.sh
+    - bash scripts/linux/build_app_image.sh $CI_COMMIT_TAG_CLEAN $CI_PIPELINE_IID
   artifacts:
     paths:
       - $APPIMAGE_OUTPUT
@@ -25,9 +26,11 @@ build_android:
   image: ghcr.io/gmeligio/flutter-android:3.32.5
   rules:
     - if: '$CI_COMMIT_TAG'
-  script:
+  before_script:
+    - CI_COMMIT_TAG_CLEAN=$(echo $CI_COMMIT_TAG | sed 's/^v//')
     - flutter pub get
-    - flutter build apk --release
+  script:
+    - flutter build apk --release --build-name=$CI_COMMIT_TAG_CLEAN --build-number=$CI_PIPELINE_IID
   artifacts:
     paths:
       - $APK_OUTPUT
