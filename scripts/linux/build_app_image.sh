@@ -11,6 +11,7 @@ curl -L -o ${APP_IMAGE_TOOL} "https://github.com/AppImage/AppImageKit/releases/d
 chmod +x ${APP_IMAGE_TOOL}
 
 echo "building app"
+flutter pub get
 flutter build linux --release
 
 echo "preparing AppDir ${APP_DIR}"
