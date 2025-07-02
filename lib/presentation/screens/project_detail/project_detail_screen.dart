@@ -5,7 +5,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/task_item/task_item.dart';
-import '../../widgets/styled_tab_bar.dart';
+import '../../widgets/utils/styled_tab_bar.dart';
+import '../../widgets/utils/buttons/create_task_button.dart';
 import '../../widgets/kanban_board.dart';
 import '../../widgets/agenda_calendar.dart';
 import '../../../data/models/task_calendar.dart';
@@ -94,10 +95,21 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addTask(context, ref),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Task'),
+      floatingActionButton: CreateTaskButton.prominent(
+        projectCalendarUid: widget.projectUid,
+        isFullWidth: false,
+        onTaskCreated: (taskSummary) {
+          // Refresh the project tasks
+          ref.invalidate(projectTasksProvider(widget.projectUid));
+          
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Task "$taskSummary" added to project'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        },
       ),
     );
   }
@@ -1066,52 +1078,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('Error loading tasks: $error')),
     );
-  }
-
-  Future<void> _addTask(BuildContext context, WidgetRef ref) async {
-    // Simple dialog to add a task to this project
-    final textController = TextEditingController();
-    
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Task'),
-        content: TextField(
-          controller: textController,
-          decoration: const InputDecoration(
-            hintText: 'Enter task summary',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(textController.text.trim()),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-    
-    if (result != null && result.isNotEmpty) {
-      final taskViewModel = ref.read(taskViewModelProvider.notifier);
-      await taskViewModel.createTask(
-        summary: result,
-        sourceCalendarUid: widget.projectUid,
-      );
-      
-      // Refresh the tasks list
-      ref.invalidate(projectTasksProvider(widget.projectUid));
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Task "$result" added to project')),
-        );
-      }
-    }
   }
 
   void _viewTask(BuildContext context, Task task) {

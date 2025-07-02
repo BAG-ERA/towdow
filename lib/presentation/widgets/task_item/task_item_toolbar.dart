@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../../../data/models/task.dart';
 import '../../../data/services/validator_service.dart';
-import '../attendee_dialog.dart';
-import '../move_task_dialog.dart';
+import '../utils/popup/attendee_dialog.dart';
+import '../utils/popup/move_task_dialog.dart';
 
 class TaskItemToolbar extends StatelessWidget {
   final Task task;

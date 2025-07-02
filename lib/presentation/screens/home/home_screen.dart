@@ -4,13 +4,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/task_item/task_item.dart';
-import '../../widgets/styled_tab_bar.dart';
+import '../../widgets/utils/styled_tab_bar.dart';
+import '../../widgets/utils/buttons/create_task_button.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
 import '../../../data/services/sync_service.dart';
 import '../../providers/home_providers.dart';
-import '../../viewmodels/task_viewmodel.dart';
-import '../../../core/logger.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -174,162 +173,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: Consumer(
-        builder: (context, ref, child) {
-          final isCommandExecuting = ref.watch(isAnyCommandExecutingProvider);
+      floatingActionButton: CreateTaskButton.prominent(
+        isFullWidth: false,
+        onTaskCreated: (taskSummary) {
+          // Refresh all task providers
+          ref.invalidate(taskListProvider);
+          ref.invalidate(todayTasksProvider);
+          ref.invalidate(soonTasksProvider);
+          ref.invalidate(nextWeekTasksProvider);
+          ref.invalidate(laterTasksProvider);
+          ref.invalidate(anytimeTasksProvider);
           
-          return FloatingActionButton(
-            onPressed: isCommandExecuting ? null : () {
-              _showCreateTaskDialog(context);
-            },
-            child: isCommandExecuting 
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.add_rounded),
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Task "$taskSummary" created successfully!'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
           );
         },
       ),
     );
   }
 
-  void _showCreateTaskDialog(BuildContext context) {
-    final summaryController = TextEditingController();
-    final descriptionController = TextEditingController();
-    DateTime? selectedDue;
 
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Create Task'),
-          content: SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: summaryController,
-                  decoration: const InputDecoration(
-                    labelText: 'Task summary *',
-                    border: OutlineInputBorder(),
-                  ),
-                  autofocus: true,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.calendar_today_rounded),
-                  title: Text(selectedDue == null 
-                    ? 'No due date' 
-                    : 'Due: ${selectedDue!.day}/${selectedDue!.month}/${selectedDue!.year}'
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_ios_rounded),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDue ?? DateTime.now(),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        selectedDue = picked;
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            Consumer(
-              builder: (context, ref, child) {
-                final isCommandExecuting = ref.watch(isAnyCommandExecutingProvider);
-                
-                return ElevatedButton(
-                  onPressed: isCommandExecuting ? null : () async {
-                    if (summaryController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please enter a task summary')),
-                      );
-                      return;
-                    }
 
-                    try {
-                      // Use TaskViewModel to create the task so it includes organizer by default
-                      final taskViewModel = ref.read(taskViewModelProvider.notifier);
-                      await taskViewModel.createTask(
-                        summary: summaryController.text.trim(),
-                        description: descriptionController.text.trim().isEmpty 
-                          ? '' 
-                          : descriptionController.text.trim(),
-                        due: selectedDue,
-                        categories: const [],
-                      );
 
-                      // Close dialog and show success
-                      if (!mounted) return;
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Task created successfully!')),
-                      );
-                      
-                      // Refresh task providers
-                      ref.invalidate(taskListProvider);
-                      ref.invalidate(todayTasksProvider);
-                      ref.invalidate(soonTasksProvider);
-                      ref.invalidate(nextWeekTasksProvider);
-                      ref.invalidate(laterTasksProvider);
-                      ref.invalidate(anytimeTasksProvider);
-                    } catch (e) {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')),
-                      );
-                    }
-                  },
-                  child: isCommandExecuting 
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Create'),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showMessage(String message, {bool isSuccess = false}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isSuccess ? Colors.green : null,
-        duration: Duration(seconds: isSuccess ? 4 : 3),
-      ),
-    );
-  }
 
 
 }

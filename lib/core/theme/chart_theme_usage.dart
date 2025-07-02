@@ -1,5 +1,6 @@
 // Practical usage examples and patterns for ChartTheme
 // Common patterns for using chart constants throughout FlowIt
+// Includes typography helpers for Roboto Flex system
 
 import 'package:flutter/material.dart';
 import 'chart_theme.dart';
@@ -14,6 +15,76 @@ class ChartThemeUsage {
            chartTheme.colors.onSurfaceVariant;
   }
   
+  /// Primary button text with automatic capitalization
+  /// Use this for Create, Add Task, and other primary action buttons
+  static Widget buildPrimaryButtonText(
+    BuildContext context, 
+    String text, {
+    Color? textColor,
+  }) {
+    final chartTheme = context.chartTheme;
+    return Text(
+      text.toUpperCase(), // Automatic capitalization as requested
+      style: chartTheme.typography.primaryButton.copyWith(
+        color: textColor ?? chartTheme.typography.primaryButton.color,
+      ),
+    );
+  }
+  
+  /// Domain name text with Roboto Serif thin styling
+  static Widget buildDomainNameText(
+    BuildContext context, 
+    String domainName, {
+    Color? textColor,
+  }) {
+    final chartTheme = context.chartTheme;
+    return Text(
+      domainName,
+      style: chartTheme.typography.domainName.copyWith(
+        color: textColor ?? chartTheme.typography.domainName.color,
+      ),
+    );
+  }
+  
+  /// Primary action button with FlowIt styling
+  static Widget buildPrimaryButton(
+    BuildContext context, {
+    required String text,
+    required VoidCallback onPressed,
+    bool isLoading = false,
+    Widget? icon,
+  }) {
+    final chartTheme = context.chartTheme;
+    
+    return ElevatedButton.icon(
+      onPressed: isLoading ? null : onPressed,
+      icon: isLoading 
+        ? SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                chartTheme.typography.primaryButton.color!,
+              ),
+            ),
+          )
+        : (icon ?? const SizedBox.shrink()),
+      label: buildPrimaryButtonText(context, text),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: chartTheme.colors.primary,
+        foregroundColor: chartTheme.typography.primaryButton.color,
+        padding: EdgeInsets.symmetric(
+          horizontal: chartTheme.dimensions.paddingLarge,
+          vertical: chartTheme.dimensions.paddingMedium,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(chartTheme.dimensions.cornerRadius),
+        ),
+      ),
+    );
+  }
+
   /// Progress bar with theme colors
   static Widget buildProgressBar(
     BuildContext context, {
@@ -193,4 +264,18 @@ extension QuickChartAccess on BuildContext {
   /// Get task status color quickly
   Color taskStatusColor(String status) =>
       ChartThemeUsage.getTaskStatusColor(this, status);
+      
+  /// Quick access to primary button text style
+  TextStyle get primaryButtonStyle => chartTheme.typography.primaryButton;
+  
+  /// Quick access to domain name text style
+  TextStyle get domainNameStyle => chartTheme.typography.domainName;
+  
+  /// Create primary button text widget with automatic capitalization
+  Widget primaryButtonText(String text, {Color? color}) =>
+      ChartThemeUsage.buildPrimaryButtonText(this, text, textColor: color);
+      
+  /// Create domain name text widget with Roboto Serif styling
+  Widget domainNameText(String text, {Color? color}) =>
+      ChartThemeUsage.buildDomainNameText(this, text, textColor: color);
 } 

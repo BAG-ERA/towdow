@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/logger.dart';
+import '../../../core/theme/chart_theme_usage.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task_calendar.dart';
 import 'project_item_widget.dart';
@@ -436,7 +437,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
             children: [
               // Domain header
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 0),
                 child: Material(
                   color: Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
@@ -444,7 +445,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                     borderRadius: BorderRadius.circular(8),
                     onTap: _toggleExpanded,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
                       child: Row(
                         children: [
                           AnimatedRotation(
@@ -459,9 +460,8 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              widget.domain.toUpperCase(),
-                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
+                              widget.domain,
+                              style: context.domainNameStyle.copyWith(
                                 color: isHovering 
                                     ? Theme.of(context).colorScheme.primary
                                     : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),

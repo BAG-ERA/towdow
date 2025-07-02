@@ -3,10 +3,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/models/task.dart';
-import '../../data/models/task_calendar.dart';
-import '../../data/providers/providers.dart';
-import '../../core/logger.dart';
+import '../../../../data/models/task.dart';
+import '../../../../data/models/task_calendar.dart';
+import '../../../../data/providers/providers.dart';
+import '../../../../core/logger.dart';
 
 /// Dialog for selecting target calendar when moving a task
 class MoveTaskDialog extends ConsumerWidget {

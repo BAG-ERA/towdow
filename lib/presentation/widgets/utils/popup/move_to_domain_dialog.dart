@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
+import '../../../../core/theme/chart_theme_usage.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../data/models/task_calendar.dart';
 import 'domain_creation_dialog.dart';
@@ -99,7 +100,10 @@ class _MoveToDomainDialogState extends ConsumerState<MoveToDomainDialog> {
             
             // Existing domains
             ...availableDomains.map((domain) => RadioListTile<String?>(
-              title: Text(domain),
+              title: Text(
+                domain,
+                style: context.domainNameStyle,
+              ),
               value: domain,
               groupValue: selectedDomain,
               onChanged: (value) => setState(() => selectedDomain = value),

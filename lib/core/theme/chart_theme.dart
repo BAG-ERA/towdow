@@ -1,8 +1,9 @@
 // Chart theme constants and typography for FlowIt application
 // Extends Material Design 3 theme system with chart-specific styling
-// Uses FlowIt brand color palette
+// Uses FlowIt brand color palette with Roboto Flex typography system
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// FlowIt brand color palette
 class FlowItColors {
@@ -46,6 +47,30 @@ class FlowItColors {
   static const Color primary = blueMedium;
 }
 
+/// FlowIt typography constants
+class FlowItTypography {
+  // Font family fallbacks following design system requirements
+  static const List<String> primaryFontFamily = [
+    'Roboto Flex',
+    'Roboto', 
+    'Noto Sans',
+    'system-ui',
+    'sans-serif'
+  ];
+  
+  static const List<String> domainFontFamily = [
+    'Roboto Serif',
+    'Roboto',
+    'Noto Serif',
+    'serif'
+  ];
+  
+  static const List<String> monospaceFontFamily = [
+    'Roboto Mono',
+    'monospace'
+  ];
+}
+
 /// Chart theme extension for consistent chart styling across the app
 /// Integrates with Material Design 3 color system for light/dark mode support
 @immutable
@@ -64,7 +89,7 @@ class ChartTheme extends ThemeExtension<ChartTheme> {
   factory ChartTheme.light(ColorScheme colorScheme) {
     return ChartTheme(
       colors: ChartColors.light(colorScheme),
-      typography: const ChartTypography.light(),
+      typography: ChartTypography.light(),
       dimensions: const ChartDimensions(),
     );
   }
@@ -73,7 +98,7 @@ class ChartTheme extends ThemeExtension<ChartTheme> {
   factory ChartTheme.dark(ColorScheme colorScheme) {
     return ChartTheme(
       colors: ChartColors.dark(colorScheme),
-      typography: const ChartTypography.dark(),
+      typography: ChartTypography.dark(),
       dimensions: const ChartDimensions(),
     );
   }
@@ -237,7 +262,7 @@ class ChartColors {
   ];
 }
 
-/// Chart typography following Material Design 3 type scale
+/// Chart typography following Material Design 3 type scale with FlowIt brand fonts
 @immutable
 class ChartTypography {
   const ChartTypography({
@@ -249,6 +274,8 @@ class ChartTypography {
     required this.labelSmall,
     required this.bodyMedium,
     required this.bodySmall,
+    required this.primaryButton,
+    required this.domainName,
   });
 
   // Chart titles and headers
@@ -264,110 +291,144 @@ class ChartTypography {
   // Chart content
   final TextStyle bodyMedium;   // General text
   final TextStyle bodySmall;    // Secondary text
+  
+  // Special styles
+  final TextStyle primaryButton; // Primary buttons like "Create", "Add Task" - capitalized
+  final TextStyle domainName;    // Domain names with Roboto Serif thin
 
   /// Light theme typography
-  const ChartTypography.light() : this(
-    titleLarge: const TextStyle(
-      fontSize: 22,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0,
-      color: Color(0xFF1C1B1F),
-    ),
-    titleMedium: const TextStyle(
-      fontSize: 16,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.15,
-      color: Color(0xFF1C1B1F),
-    ),
-    titleSmall: const TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.1,
-      color: Color(0xFF1C1B1F),
-    ),
-    labelLarge: const TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w500,
-      letterSpacing: 0.1,
-      color: Color(0xFF49454F),
-    ),
-    labelMedium: const TextStyle(
-      fontSize: 12,
-      fontWeight: FontWeight.w500,
-      letterSpacing: 0.5,
-      color: Color(0xFF49454F),
-    ),
-    labelSmall: const TextStyle(
-      fontSize: 11,
-      fontWeight: FontWeight.w500,
-      letterSpacing: 0.5,
-      color: Color(0xFF49454F),
-    ),
-    bodyMedium: const TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w400,
-      letterSpacing: 0.25,
-      color: Color(0xFF1C1B1F),
-    ),
-    bodySmall: const TextStyle(
-      fontSize: 12,
-      fontWeight: FontWeight.w400,
-      letterSpacing: 0.4,
-      color: Color(0xFF49454F),
-    ),
-  );
+  factory ChartTypography.light() {
+    return ChartTypography(
+      titleLarge: GoogleFonts.robotoFlex(
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
+        color: const Color(0xFF1C1B1F),
+      ),
+      titleMedium: GoogleFonts.robotoFlex(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.15,
+        color: const Color(0xFF1C1B1F),
+      ),
+      titleSmall: GoogleFonts.robotoFlex(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.1,
+        color: const Color(0xFF1C1B1F),
+      ),
+      labelLarge: GoogleFonts.robotoFlex(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.1,
+        color: const Color(0xFF49454F),
+      ),
+      labelMedium: GoogleFonts.robotoFlex(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.5,
+        color: const Color(0xFF49454F),
+      ),
+      labelSmall: GoogleFonts.robotoFlex(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.5,
+        color: const Color(0xFF49454F),
+      ),
+      bodyMedium: GoogleFonts.robotoFlex(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0.25,
+        color: const Color(0xFF1C1B1F),
+      ),
+      bodySmall: GoogleFonts.robotoFlex(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0.4,
+        color: const Color(0xFF49454F),
+      ),
+      primaryButton: GoogleFonts.robotoFlex(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.25, // Increased for capitalized text
+        color: const Color(0xFFFFFFFF),
+        textBaseline: TextBaseline.alphabetic,
+      ),
+      domainName: GoogleFonts.robotoSerif(
+        fontSize: 14,
+        fontWeight: FontWeight.w400, 
+        letterSpacing: 0.15,
+        color: const Color(0xFF1C1B1F),
+      ),
+    );
+  }
 
   /// Dark theme typography
-  const ChartTypography.dark() : this(
-    titleLarge: const TextStyle(
-      fontSize: 22,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0,
-      color: Color(0xFFE6E1E5),
-    ),
-    titleMedium: const TextStyle(
-      fontSize: 16,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.15,
-      color: Color(0xFFE6E1E5),
-    ),
-    titleSmall: const TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.1,
-      color: Color(0xFFE6E1E5),
-    ),
-    labelLarge: const TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w500,
-      letterSpacing: 0.1,
-      color: Color(0xFFCAC4D0),
-    ),
-    labelMedium: const TextStyle(
-      fontSize: 12,
-      fontWeight: FontWeight.w500,
-      letterSpacing: 0.5,
-      color: Color(0xFFCAC4D0),
-    ),
-    labelSmall: const TextStyle(
-      fontSize: 11,
-      fontWeight: FontWeight.w500,
-      letterSpacing: 0.5,
-      color: Color(0xFFCAC4D0),
-    ),
-    bodyMedium: const TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w400,
-      letterSpacing: 0.25,
-      color: Color(0xFFE6E1E5),
-    ),
-    bodySmall: const TextStyle(
-      fontSize: 12,
-      fontWeight: FontWeight.w400,
-      letterSpacing: 0.4,
-      color: Color(0xFFCAC4D0),
-    ),
-  );
+  factory ChartTypography.dark() {
+    return ChartTypography(
+      titleLarge: GoogleFonts.robotoFlex(
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
+        color: const Color(0xFFE6E1E5),
+      ),
+      titleMedium: GoogleFonts.robotoFlex(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.15,
+        color: const Color(0xFFE6E1E5),
+      ),
+      titleSmall: GoogleFonts.robotoFlex(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.1,
+        color: const Color(0xFFE6E1E5),
+      ),
+      labelLarge: GoogleFonts.robotoFlex(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.1,
+        color: const Color(0xFFCAC4D0),
+      ),
+      labelMedium: GoogleFonts.robotoFlex(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.5,
+        color: const Color(0xFFCAC4D0),
+      ),
+      labelSmall: GoogleFonts.robotoFlex(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.5,
+        color: const Color(0xFFCAC4D0),
+      ),
+      bodyMedium: GoogleFonts.robotoFlex(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0.25,
+        color: const Color(0xFFE6E1E5),
+      ),
+      bodySmall: GoogleFonts.robotoFlex(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0.4,
+        color: const Color(0xFFCAC4D0),
+      ),
+      primaryButton: GoogleFonts.robotoFlex(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.25, // Increased for capitalized text
+        color: const Color(0xFF1C1B1F), // Dark text on light button in dark mode
+        textBaseline: TextBaseline.alphabetic,
+      ),
+      domainName: GoogleFonts.robotoSerif(
+        fontSize: 14,
+        fontWeight: FontWeight.w400, 
+        letterSpacing: 0.15,
+        color: const Color(0xFFE6E1E5),
+      ),
+    );
+  }
 
   /// Interpolate between two ChartTypography
   ChartTypography lerp(ChartTypography other, double t) {
@@ -380,6 +441,8 @@ class ChartTypography {
       labelSmall: TextStyle.lerp(labelSmall, other.labelSmall, t)!,
       bodyMedium: TextStyle.lerp(bodyMedium, other.bodyMedium, t)!,
       bodySmall: TextStyle.lerp(bodySmall, other.bodySmall, t)!,
+      primaryButton: TextStyle.lerp(primaryButton, other.primaryButton, t)!,
+      domainName: TextStyle.lerp(domainName, other.domainName, t)!,
     );
   }
 }
