@@ -1,7 +1,11 @@
+
 APP_DIR=appdir_towdow
 APP_NAME=towdow_app
 ARCH=x86_64
 APP_IMAGE_TOOL=appimagetool-${ARCH}.AppImage
+APPIMAGE_OUTPUT=${3-build/linux/x64/release/${APP_NAME}.AppImage}
+
+
 rm -rf ${APP_DIR}
 mkdir -p ${APP_DIR}
 
@@ -29,6 +33,6 @@ Categories=Utility
 cp assets/icons/logo/Flow-it_Default.png ${APP_DIR}/icon.png
 
 echo "create app image"
-./${APP_IMAGE_TOOL} ${APP_DIR} build/linux/x64/release/${APP_NAME}.AppImage
+./${APP_IMAGE_TOOL} ${APP_DIR} ${APPIMAGE_OUTPUT}
 
 echo "done"

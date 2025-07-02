@@ -4,7 +4,7 @@ stages:
   - release
 
 variables:
-  APPIMAGE_OUTPUT: "build/linux/x64/release/towdow_app.AppImage"
+  APPIMAGE_OUTPUT: "towdow_app.AppImage"
   APK_OUTPUT: "build/app/outputs/flutter-apk/app-release.apk"
   FLUTTER_VERSION: "3.32.5"
   CUSTOM_IMAGE_NAME: "$CI_REGISTRY_IMAGE/flutter-build-env"
@@ -69,7 +69,7 @@ build_appimage:
   script:
     - echo "APPIMAGE_JOB_ID=$CI_JOB_ID" > build.env
     - CI_COMMIT_TAG_CLEAN=$(echo $CI_COMMIT_TAG | sed 's/^v//')
-    - bash CI_scripts/linux/build_app_image.sh $CI_COMMIT_TAG_CLEAN $CI_PIPELINE_IID
+    - bash CI_scripts/linux/build_app_image.sh $CI_COMMIT_TAG_CLEAN $CI_PIPELINE_IID $APPIMAGE_OUTPUT
   artifacts:
     paths:
       - $APPIMAGE_OUTPUT
