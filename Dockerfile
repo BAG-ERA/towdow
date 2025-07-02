@@ -1,6 +1,6 @@
 ARG FLUTTER_VERSION
-ARG ANDROID_TOOL_VERISON_X
-ARG ANDROID_TOOL_VERISON
+ARG ANDROID_TOOL_VERSION_X
+ARG ANDROID_TOOL_VERSION
 
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
@@ -23,7 +23,7 @@ RUN curl -o /tmp/commandlinetools.zip https://dl.google.com/android/repository/c
     mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
 ENV PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
 RUN yes | sdkmanager --licenses
-RUN sdkmanager "platform-tools" "build-tools;${ANDROID_TOOL_VERISON}" "platforms;android-${ANDROID_TOOL_VERISON_X}"
+RUN sdkmanager "platform-tools" "build-tools;${ANDROID_TOOL_VERSION}" "platforms;android-${ANDROID_TOOL_VERSION_X}"
 
 # Clean up apt cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
