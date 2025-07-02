@@ -35,6 +35,9 @@ class AppSidebar extends ConsumerWidget {
       ),
       child: Column(
         children: [
+          // Add top padding on mobile for status bar
+          if (!isDesktop) const SizedBox(height: 8),
+          
           // Main navigation
           MainNavigation(
             currentDestination: currentDestination,
@@ -50,6 +53,10 @@ class AppSidebar extends ConsumerWidget {
           
           // Bottom toolbar with Create, Archive, and Settings
           const ToolbarWidget(),
+          
+          // Add bottom padding on mobile for home indicator
+          if (!isDesktop) 
+            SizedBox(height: MediaQuery.of(context).padding.bottom > 0 ? 8 : 0),
         ],
       ),
     );

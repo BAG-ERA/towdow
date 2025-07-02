@@ -129,11 +129,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ) : null,
-      body: Column(
-        children: [
-          // Mobile tabs - only show when no AppBar (mobile mode)
-          if (!isDesktop)
-            StyledTabBar(
+             body: SafeArea(
+        child: Column(
+          children: [
+            // Mobile tabs - only show when no AppBar (mobile mode)
+            if (!isDesktop)
+              StyledTabBar(
               items: [
                 StyledTabItem(
                   label: 'Today (${ref.watch(todayTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
@@ -175,6 +176,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

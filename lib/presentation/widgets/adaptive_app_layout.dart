@@ -7,6 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'navbar/app_sidebar.dart';
 
+// Provider for dynamic mobile title (used by detail screens)
+final mobileTitleProvider = StateProvider<String?>((ref) => null);
+
+// Provider for drawer control - allows navigation components to close drawer
+final drawerControllerProvider = StateProvider<VoidCallback?>((ref) => null);
+
 enum AppDestination {
   today(
     label: 'Today',
@@ -54,9 +60,34 @@ class AdaptiveAppLayout extends ConsumerStatefulWidget {
   ConsumerState<AdaptiveAppLayout> createState() => _AdaptiveAppLayoutState();
 }
 
-class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout> {
+class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout> 
+    with TickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _hasOpenedDrawerOnStart = false;
+  late AnimationController _slideAnimationController;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _slideAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0.3, 0), // Start slightly from the right
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideAnimationController,
+      curve: Curves.easeOutCubic,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _slideAnimationController.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -72,6 +103,7 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout> {
       // Use addPostFrameCallback to ensure the widget is built before opening drawer
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _scaffoldKey.currentState != null) {
+          _slideAnimationController.reset();
           _scaffoldKey.currentState!.openDrawer();
           // Mark that we've completed the first mobile load
           ref.read(_firstMobileLoadProvider.notifier).state = false;
@@ -84,11 +116,48 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout> {
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width >= AdaptiveAppLayout._desktopBreakpoint;
 
-    if (isDesktop) {
-      return _buildDesktopLayout(context);
-    } else {
-      return _buildMobileLayout(context);
+    // Provide drawer closing function to navigation components
+    if (!isDesktop) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(drawerControllerProvider.notifier).state = () {
+          if (_scaffoldKey.currentState?.isDrawerOpen == true) {
+            _scaffoldKey.currentState!.closeDrawer();
+            // Trigger slide-in animation after drawer starts closing
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (mounted) {
+                _slideAnimationController.reset();
+                _slideAnimationController.forward();
+              }
+            });
+          }
+        };
+      });
     }
+
+    return PopScope(
+      canPop: false, // Never allow back button to close the app
+      onPopInvoked: (didPop) {
+        // On mobile, toggle drawer state instead of closing app
+        if (!isDesktop && _scaffoldKey.currentState != null) {
+          final scaffoldState = _scaffoldKey.currentState!;
+          if (scaffoldState.isDrawerOpen) {
+            // Drawer is open, close it
+            Navigator.of(context).pop();
+            // Trigger slide-in animation
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (mounted) {
+                _slideAnimationController.forward();
+              }
+            });
+          } else {
+            // Drawer is closed, open it - reset animation
+            _slideAnimationController.reset();
+            scaffoldState.openDrawer();
+          }
+        }
+      },
+      child: isDesktop ? _buildDesktopLayout(context) : _buildMobileLayout(context),
+    );
   }
 
   Widget _buildDesktopLayout(BuildContext context) {
@@ -119,12 +188,9 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout> {
       title = 'Settings';
       isDetailScreen = true;
     } else if (location.startsWith('/project/')) {
-      title = 'Project Details';
+      title = ref.watch(mobileTitleProvider) ?? 'Project Details';
       isDetailScreen = true;
-    } else if (widget.currentDestination != null) {
-      title = widget.currentDestination!.label;
-    }
-    
+    }    
     return Scaffold(
       key: _scaffoldKey,
       appBar: isDetailScreen ? AppBar(
@@ -143,7 +209,12 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout> {
                   ),
       ) : null,
       drawer: _buildMobileDrawer(context),
-      body: widget.child,
+      body: SafeArea(
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: widget.child,
+        ),
+      ),
     );
   }
 
@@ -152,8 +223,10 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout> {
       width: double.infinity,
       child: Drawer(
         shape: const RoundedRectangleBorder(), // Remove rounded corners
-      child: AppSidebar(currentDestination: widget.currentDestination),
+        child: SafeArea(
+          child: AppSidebar(currentDestination: widget.currentDestination),
+        ),
       ),
-          );
+    );
   }
 } 

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/logger.dart';
 import '../../../data/providers/providers.dart';
+import '../adaptive_app_layout.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../utils/popup/move_to_domain_dialog.dart';
@@ -43,7 +44,8 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final isSelected = GoRouterState.of(context).uri.path == '/project/${widget.project.uid}';
+    // Only show selected state on desktop, not on mobile
+    final isSelected = widget.isDesktop && GoRouterState.of(context).uri.path == '/project/${widget.project.uid}';
     
     // Count remaining tasks for this project
     final taskListAsync = ref.watch(taskListProvider);
@@ -72,9 +74,10 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
               onTap: () {
                 AppLogger.info('ProjectItem: Navigating to project ${widget.project.uid} (${widget.project.summary})');
                 context.go('/project/${widget.project.uid}');
-                // Close drawer on mobile
-                if (Scaffold.of(context).hasDrawer) {
-                  Navigator.of(context).pop();
+                // Close drawer on mobile using provided controller
+                if (!widget.isDesktop) {
+                  final closeDrawer = ref.read(drawerControllerProvider);
+                  closeDrawer?.call();
                 }
               },
               child: Padding(

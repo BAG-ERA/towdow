@@ -18,6 +18,7 @@ import '../../../core/logger.dart';
 import '../../viewmodels/commands/attendee_commands.dart';
 import '../../viewmodels/project_task_search_viewmodel.dart';
 import '../../../core/theme/chart_theme.dart';
+import '../../widgets/adaptive_app_layout.dart';
 
 // Provider for a specific project/calendar
 final projectProvider = FutureProvider.family<TaskCalendar?, String>((ref, projectUid) async {
@@ -68,6 +69,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   int _selectedTabIndex = 0;
 
   @override
+  void dispose() {
+    // Clear mobile title when leaving the screen
+    ref.read(mobileTitleProvider.notifier).state = null;
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // AppLogger.info('ProjectDetailScreen: Building screen for project UID: ${widget.projectUid}');
     final projectAsync = ref.watch(projectProvider(widget.projectUid));
@@ -75,6 +83,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
+
+    // Update mobile title when project data is available
+    projectAsync.whenData((project) {
+      if (project != null && !isDesktop) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(mobileTitleProvider.notifier).state = project.displayName;
+        });
+      }
+    });
 
     return Scaffold(
       appBar: isDesktop ? AppBar(
@@ -152,26 +169,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.folder_rounded,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      project.displayName,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                  ),
-                  _buildProjectStatusChip(context, project),
-                ],
-              ),
               if (project.description.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
@@ -1175,15 +1172,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             onDragEnd: () {
               AppLogger.info('ProjectDetail: Ended dragging task ${task.summary}');
             },
-            child: TaskItem(
-              task: task,
-              onTap: () => _viewTask(context, task),
-              onToggleComplete: () => _toggleTaskComplete(context, ref, task),
-              onTaskUpdated: (updatedTask) async {
-                await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                _refreshProjectTasks(ref);
-              },
-              onTaskDeleted: () => _deleteTask(context, ref, task),
+          child: TaskItem(
+            task: task,
+            onTap: () => _viewTask(context, task),
+            onToggleComplete: () => _toggleTaskComplete(context, ref, task),
+            onTaskUpdated: (updatedTask) async {
+              await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
+              _refreshProjectTasks(ref);
+            },
+            onTaskDeleted: () => _deleteTask(context, ref, task),
             ),
           ),
         );

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/providers/providers.dart';
 import '../utils/buttons/create_project_or_domain_button.dart';
+import '../adaptive_app_layout.dart';
 
 class ToolbarWidget extends ConsumerWidget {
   const ToolbarWidget({super.key});
@@ -17,16 +18,17 @@ class ToolbarWidget extends ConsumerWidget {
     
     return hasAccount.when(
       data: (hasActiveAccount) => hasActiveAccount 
-          ? _buildToolbarContent(context, currentLocation)
+          ? _buildToolbarContent(context, currentLocation, ref)
           : const SizedBox.shrink(),
       loading: () => const SizedBox.shrink(),
       error: (_, stackTrace) => const SizedBox.shrink(),
     );
   }
 
-  Widget _buildToolbarContent(BuildContext context, String currentLocation) {
+  Widget _buildToolbarContent(BuildContext context, String currentLocation, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
     
     return Container(
       height: 56,
@@ -56,10 +58,10 @@ class ToolbarWidget extends ConsumerWidget {
             context: context,
             icon: Icons.archive_rounded,
             tooltip: 'Archived Projects',
-            isSelected: currentLocation == '/archived',
+            isSelected: isDesktop && currentLocation == '/archived',
             onPressed: () {
               context.go('/archived');
-              _closeDrawerIfMobile(context);
+              _closeDrawerIfMobile(context, ref);
             },
           ),
           
@@ -70,10 +72,10 @@ class ToolbarWidget extends ConsumerWidget {
             context: context,
             icon: Icons.settings_rounded,
             tooltip: 'Settings',
-            isSelected: currentLocation == '/settings',
+            isSelected: isDesktop && currentLocation == '/settings',
             onPressed: () {
               context.go('/settings');
-              _closeDrawerIfMobile(context);
+              _closeDrawerIfMobile(context, ref);
             },
           ),
         ],
@@ -120,9 +122,12 @@ class ToolbarWidget extends ConsumerWidget {
 
 
 
-  void _closeDrawerIfMobile(BuildContext context) {
-    if (Scaffold.of(context).hasDrawer) {
-      Navigator.of(context).pop();
+  void _closeDrawerIfMobile(BuildContext context, WidgetRef ref) {
+    // More reliable drawer closing - only on mobile screens
+    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
+    if (!isDesktop) {
+      final closeDrawer = ref.read(drawerControllerProvider);
+      closeDrawer?.call();
     }
   }
 } 

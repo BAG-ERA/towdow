@@ -2,10 +2,11 @@
 // Displays primary navigation destinations with proper highlighting
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../adaptive_app_layout.dart';
 
-class MainNavigation extends StatelessWidget {
+class MainNavigation extends ConsumerWidget {
   const MainNavigation({
     super.key,
     required this.currentDestination,
@@ -16,10 +17,11 @@ class MainNavigation extends StatelessWidget {
   final bool isDesktop;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       children: AppDestination.values.map((destination) {
-        final isSelected = destination == currentDestination;
+        // Only show selected state on desktop, not on mobile
+        final isSelected = isDesktop && destination == currentDestination;
         final borderRadius = isDesktop ? BorderRadius.circular(12) : BorderRadius.zero;
         
         return Padding(
@@ -47,9 +49,10 @@ class MainNavigation extends StatelessWidget {
               ),
               onTap: () {
                 context.go(destination.route);
-                // Close drawer on mobile
-                if (Scaffold.of(context).hasDrawer) {
-                  Navigator.of(context).pop();
+                // Close drawer on mobile using provided controller
+                if (!isDesktop) {
+                  final closeDrawer = ref.read(drawerControllerProvider);
+                  closeDrawer?.call();
                 }
               },
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
