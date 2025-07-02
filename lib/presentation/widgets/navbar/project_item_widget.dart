@@ -391,18 +391,44 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
     );
   }
 
-  void _deleteProject(BuildContext context) {
-    // TODO: Implement delete functionality through ProjectListViewModel
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Delete functionality not yet implemented for ${widget.project.summary}'),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        action: SnackBarAction(
-          label: 'Dismiss',
-          onPressed: () {},
+  void _deleteProject(BuildContext context) async {
+    try {
+      AppLogger.info('ProjectItem: Deleting project ${widget.project.uid} (${widget.project.summary})');
+      
+      final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+      await projectListViewModel.deleteProject(widget.project.uid);
+      
+      // Navigate away from project if currently viewing it
+      final currentRoute = GoRouterState.of(context).uri.path;
+      if (currentRoute == '/project/${widget.project.uid}') {
+        AppLogger.info('ProjectItem: Navigating away from deleted project');
+        context.go('/');
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Project "${widget.project.summary}" deleted successfully'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          duration: const Duration(seconds: 3),
         ),
-      ),
-    );
+      );
+      
+      AppLogger.info('ProjectItem: Successfully deleted project ${widget.project.uid}');
+    } catch (e) {
+      AppLogger.error('ProjectItem: Failed to delete project ${widget.project.uid}: $e');
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete project: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            onPressed: () {},
+          ),
+        ),
+      );
+    }
   }
 
   /// Build drag feedback widget that follows the cursor during drag

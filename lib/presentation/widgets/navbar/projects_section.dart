@@ -31,6 +31,20 @@ class ProjectsSection extends ConsumerWidget {
   }
 
   Widget _buildProjectsSection(BuildContext context, WidgetRef ref, List<TaskCalendar> projects, dynamic projectListState) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).colorScheme.outline.withAlpha(25),
+            width: 1,
+          ),
+        ),
+      ),
+      child: _buildProjectsContent(context, ref, projects, projectListState),
+    );
+  }
+
+  Widget _buildProjectsContent(BuildContext context, WidgetRef ref, List<TaskCalendar> projects, dynamic projectListState) {
     // Group projects by domain
     final projectsWithoutDomain = projects.where((project) => !project.hasDomain).toList();
     final domainGroups = <String, List<TaskCalendar>>{};
@@ -65,44 +79,6 @@ class ProjectsSection extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.folder_rounded,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Projects',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  if (projects.isNotEmpty) ...[
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${projects.length}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
             
             // Projects list
             Expanded(
@@ -112,13 +88,13 @@ class ProjectsSection extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       children: [
                         // Projects without domain (with drop target)
-                        if (projectsWithoutDomain.isNotEmpty) 
-                          _NoDomainSection(
-                            projects: projectsWithoutDomain,
-                            ref: ref,
-                            showSeparator: sortedDomains.isNotEmpty,
-                            isDesktop: isDesktop,
-                          ),
+                        // Always show this section to provide a drop target for removing projects from domains
+                        _NoDomainSection(
+                          projects: projectsWithoutDomain,
+                          ref: ref,
+                          showSeparator: sortedDomains.isNotEmpty,
+                          isDesktop: isDesktop,
+                        ),
                         
                         // Domain sections (including empty ones)
                         ...sortedDomains.map((domain) => 
@@ -584,57 +560,45 @@ class _NoDomainSection extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-                          // Projects without domain
-              if (projects.isNotEmpty) ...[
-                ...projects.map((project) => ProjectItemWidget(project: project, isDesktop: this.isDesktop)),
-              ],
+            // Projects without domain
+            if (projects.isNotEmpty) ...[
+              ...projects.map((project) => 
+                Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: ProjectItemWidget(project: project, isDesktop: this.isDesktop),
+                )
+              ),
+            ],
             
-            // Drop zone for removing projects from domains
-            if (isHovering || projects.isEmpty) 
+            // Drop zone for removing projects from domains - only show when dragging
+            if (isHovering) 
               AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 decoration: BoxDecoration(
-                  color: isHovering 
-                      ? Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.4)
-                      : Colors.transparent,
+                  color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(8),
-                  border: isHovering 
-                      ? Border.all(
-                          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.6),
-                          width: 2,
-                          style: BorderStyle.solid,
-                        )
-                      : Border.all(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-                          width: 1,
-                          style: BorderStyle.solid,
-                        ),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.6),
+                    width: 2,
+                    style: BorderStyle.solid,
+                  ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      isHovering ? Icons.remove_circle_outline : Icons.folder_outlined,
+                      Icons.remove_circle_outline,
                       size: 16,
-                      color: isHovering
-                          ? Theme.of(context).colorScheme.secondary
-                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: Theme.of(context).colorScheme.secondary,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        isHovering 
-                            ? 'Drop here to remove from domain'
-                            : projects.isEmpty 
-                                ? 'No projects without domain'
-                                : 'Projects without domain',
+                        'Drop here to remove from domain',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isHovering
-                              ? Theme.of(context).colorScheme.secondary
-                              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                          fontStyle: projects.isEmpty ? FontStyle.italic : null,
-                          fontWeight: isHovering ? FontWeight.w500 : FontWeight.normal,
+                          color: Theme.of(context).colorScheme.secondary,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),

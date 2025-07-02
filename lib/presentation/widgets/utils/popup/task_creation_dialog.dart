@@ -23,6 +23,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
   final TextEditingController descriptionController = TextEditingController();
   DateTime? selectedDue;
   bool isLoading = false;
+  bool keepDialogOpen = false; // New checkbox state
 
   @override
   void dispose() {
@@ -98,6 +99,29 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                 }
               },
             ),
+            
+            const SizedBox(height: 16),
+            
+            // Keep dialog open checkbox
+            Row(
+              children: [
+                Checkbox(
+                  value: keepDialogOpen,
+                  onChanged: (value) {
+                    setState(() {
+                      keepDialogOpen = value ?? false;
+                    });
+                  },
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Keep dialog open for creating multiple tasks',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -122,6 +146,12 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
 
   bool _canCreate() {
     return summaryController.text.trim().isNotEmpty;
+  }
+
+  void _clearForm() {
+    summaryController.clear();
+    descriptionController.clear();
+    selectedDue = null;
   }
 
   void _createTask() async {
@@ -161,8 +191,6 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         );
       } else {
         // Task creation succeeded
-        Navigator.of(context).pop(taskSummary);
-        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Task "$taskSummary" created successfully'),
@@ -176,6 +204,16 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         ref.invalidate(soonTasksProvider);
         ref.invalidate(laterTasksProvider);
         ref.invalidate(anytimeTasksProvider);
+        
+        // Handle dialog behavior based on checkbox
+        if (keepDialogOpen) {
+          // Clear form for next task but keep dialog open
+          _clearForm();
+          setState(() {}); // Refresh UI to show cleared form
+        } else {
+          // Close dialog as before
+          Navigator.of(context).pop(taskSummary);
+        }
       }
     } catch (e) {
       AppLogger.error('TaskCreation: Exception creating task: $e');
@@ -187,9 +225,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+      setState(() => isLoading = false);
     }
   }
 } 

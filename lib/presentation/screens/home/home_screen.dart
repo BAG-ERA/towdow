@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/task_item/task_item.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
-import '../../widgets/utils/buttons/create_task_button.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
 import '../../../data/services/sync_service.dart';
@@ -172,26 +171,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: CreateTaskButton.prominent(
-        isFullWidth: false,
-        onTaskCreated: (taskSummary) {
-          // Refresh all task providers
-          ref.invalidate(taskListProvider);
-          ref.invalidate(todayTasksProvider);
-          ref.invalidate(soonTasksProvider);
-          ref.invalidate(nextWeekTasksProvider);
-          ref.invalidate(laterTasksProvider);
-          ref.invalidate(anytimeTasksProvider);
-          
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Task "$taskSummary" created successfully!'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-          );
-        },
       ),
     );
   }

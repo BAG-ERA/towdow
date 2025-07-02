@@ -458,12 +458,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
-                    onPressed: () => ref.invalidate(projectTasksProvider(widget.projectUid)),
-                    icon: const Icon(Icons.refresh_rounded),
-                    iconSize: 20,
-                    tooltip: 'Refresh Tasks',
-                  ),
                 ],
               ),
             ),

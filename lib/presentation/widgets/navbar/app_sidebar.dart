@@ -41,16 +41,12 @@ class AppSidebar extends ConsumerWidget {
             isDesktop: isDesktop,
           ),
           
-          const Divider(height: 1),
+          const Divider(height: 24, color: Colors.transparent),
           
           // Projects section
           Expanded(
             child: ProjectsSection(isDesktop: isDesktop),
           ),
-          
-          const Divider(height: 1),
-          
-          // Account info section removed
           
           // Bottom toolbar with Create, Archive, and Settings
           const ToolbarWidget(),

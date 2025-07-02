@@ -1,6 +1,7 @@
 ﻿// Styled tab bar widget with rounded tabs and background colors for selected state
 // Features width that fits content and improved padding
 // Uses FlowIt primary color system for consistent theming
+// Responsive padding reduces vertical space on mobile while preserving icon-only inactive tabs
 
 import 'package:flutter/material.dart';
 import '../../../core/theme/chart_theme.dart';
@@ -21,10 +22,10 @@ class StyledTabBar extends StatelessWidget {
   final List<StyledTabItem> items;
   final int selectedIndex;
   final ValueChanged<int> onTabSelected;
-  final EdgeInsets padding;
+  final EdgeInsets? padding; // Made nullable to enable responsive padding
   final double tabSpacing;
   final Duration animationDuration;
-  final EdgeInsets tabPadding;
+  final EdgeInsets? tabPadding; // Made nullable to enable responsive padding
   final bool enableResponsiveMode;
 
   const StyledTabBar({
@@ -32,21 +33,48 @@ class StyledTabBar extends StatelessWidget {
     required this.items,
     required this.selectedIndex,
     required this.onTabSelected,
-    this.padding = const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+    this.padding, // No default value - will be calculated responsively
     this.tabSpacing = 8.0,
     this.animationDuration = const Duration(milliseconds: 200),
-    this.tabPadding = const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+    this.tabPadding, // No default value - will be calculated responsively
     this.enableResponsiveMode = true,
   });
+
+  /// Gets responsive padding based on screen size
+  EdgeInsets _getResponsivePadding(BuildContext context) {
+    if (padding != null) return padding!;
+    
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600; // Mobile breakpoint
+    
+    return EdgeInsets.symmetric(
+      horizontal: 16.0,
+      vertical: isMobile ? 6.0 : 12.0, // Reduced vertical padding on mobile
+    );
+  }
+
+  /// Gets responsive tab padding based on screen size
+  EdgeInsets _getResponsiveTabPadding(BuildContext context) {
+    if (tabPadding != null) return tabPadding!;
+    
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600; // Mobile breakpoint
+    
+    return EdgeInsets.symmetric(
+      horizontal: 16.0,
+      vertical: isMobile ? 6.0 : 10.0, // Reduced vertical padding on mobile
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final chartTheme = context.chartTheme; // Access FlowIt chart theme for enhanced color consistency
+    final responsivePadding = _getResponsivePadding(context);
 
     return Padding(
-      padding: padding,
+      padding: responsivePadding,
       child: Center(
         child: Container(
           decoration: BoxDecoration(
@@ -110,6 +138,8 @@ class StyledTabBar extends StatelessWidget {
   bool _shouldUseCompactMode(BuildContext context, double availableWidth) {
     if (!enableResponsiveMode) return false;
     
+    final responsiveTabPadding = _getResponsiveTabPadding(context);
+    
     // Estimate the width needed for all tabs with full text
     double estimatedFullWidth = 0;
     for (int i = 0; i < items.length; i++) {
@@ -122,7 +152,7 @@ class StyledTabBar extends StatelessWidget {
       final iconWidth = item.icon != null ? 18.0 + 8.0 : 0; // icon + spacing
       
       // Add padding
-      final totalTabWidth = tabPadding.horizontal + iconWidth + textWidth;
+      final totalTabWidth = responsiveTabPadding.horizontal + iconWidth + textWidth;
       
       estimatedFullWidth += totalTabWidth;
       
@@ -151,7 +181,7 @@ class StyledTabBar extends StatelessWidget {
   }
 
   /// Builds an individual tab with responsive behavior
-      /// Uses exact FlowIt primary color (#192440) for selected state
+  /// Uses exact FlowIt primary color (#192440) for selected state
   Widget _buildTab(
     BuildContext context,
     int index,
@@ -163,6 +193,7 @@ class StyledTabBar extends StatelessWidget {
     final isSelected = index == selectedIndex;
     final isDisabled = item.isDisabled;
     final showText = isSelected || !useCompactMode;
+    final responsiveTabPadding = _getResponsiveTabPadding(context);
 
     return AnimatedContainer(
       duration: animationDuration,
@@ -194,10 +225,10 @@ class StyledTabBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(8.0),
           child: Padding(
             padding: showText
-                ? tabPadding
+                ? responsiveTabPadding
                 : EdgeInsets.symmetric(
-                    horizontal: tabPadding.horizontal * 0.6, // Reduced padding for icon-only
-                    vertical: tabPadding.vertical,
+                    horizontal: responsiveTabPadding.horizontal * 0.6, // Reduced padding for icon-only
+                    vertical: responsiveTabPadding.vertical,
                   ),
             child: Row(
               mainAxisSize: MainAxisSize.min,

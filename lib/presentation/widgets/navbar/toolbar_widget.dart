@@ -5,9 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/providers/providers.dart';
-import '../utils/popup/domain_creation_dialog.dart';
-import '../utils/popup/project_creation_dialog.dart';
-import '../utils/popup/task_creation_dialog.dart';
+import '../utils/buttons/create_project_or_domain_button.dart';
 
 class ToolbarWidget extends ConsumerWidget {
   const ToolbarWidget({super.key});
@@ -31,12 +29,13 @@ class ToolbarWidget extends ConsumerWidget {
     final colorScheme = theme.colorScheme;
     
     return Container(
-      padding: const EdgeInsets.all(12),
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         border: Border(
           top: BorderSide(
-            color: colorScheme.outline.withValues(alpha: 0.2),
+            color: theme.colorScheme.outline.withAlpha(25),
             width: 1,
           ),
         ),
@@ -45,7 +44,9 @@ class ToolbarWidget extends ConsumerWidget {
         children: [
           // Create button (left side)
           Expanded(
-            child: _buildCreateButton(context),
+            child: CreateProjectOrDomainButton.compact(
+              isFullWidth: true,
+            ),
           ),
           
           const SizedBox(width: 8),
@@ -80,41 +81,7 @@ class ToolbarWidget extends ConsumerWidget {
     );
   }
 
-  Widget _buildCreateButton(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    return Material(
-      color: colorScheme.primary,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () => _showCreateDialog(context),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.add_rounded,
-                color: colorScheme.onPrimary,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Create',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: colorScheme.onPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildIconButton({
     required BuildContext context,
@@ -151,67 +118,7 @@ class ToolbarWidget extends ConsumerWidget {
     );
   }
 
-  void _showCreateDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create New'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            //ListTile(
-            //  leading: const Icon(Icons.checklist_rounded),
-            //  title: const Text('Task'),
-            //  subtitle: const Text('Create a new task'),
-            //  onTap: () {
-            //    Navigator.of(context).pop();
-            //    _showCreateTaskDialog(context);
-            //  },
-            //),
-            ListTile(
-              leading: const Icon(Icons.domain_rounded),
-              title: const Text('Domain'),
-              subtitle: const Text('Create a new domain'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _showCreateDomainDialog(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.folder_rounded),
-              title: const Text('Project'),
-              subtitle: const Text('Create a new project'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _showCreateProjectDialog(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  void _showCreateTaskDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const TaskCreationDialog(),
-    );
-  }
-
-  void _showCreateDomainDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const DomainCreationDialog(),
-    );
-  }
-
-  void _showCreateProjectDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const ProjectCreationDialog(),
-    );
-  }
 
   void _closeDrawerIfMobile(BuildContext context) {
     if (Scaffold.of(context).hasDrawer) {
