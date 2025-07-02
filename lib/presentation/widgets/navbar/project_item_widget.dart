@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/logger.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task_calendar.dart';
+import '../../../data/models/task.dart';
 import '../utils/popup/move_to_domain_dialog.dart';
 
 /// Data class for drag and drop operations
@@ -167,25 +168,48 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       return projectWidget;
     }
 
-    return Draggable<ProjectDragData>(
-      data: ProjectDragData(
-        project: widget.project,
-        currentDomain: widget.project.flowitDomain,
-      ),
-      feedback: _buildDragFeedback(context),
-      childWhenDragging: Opacity(
-        opacity: 0.5,
-        child: projectWidget,
-      ),
-      onDragStarted: () {
-        AppLogger.info('ProjectItem: Started dragging project ${widget.project.summary}');
-        // Provide haptic feedback
-        HapticFeedback.lightImpact();
+    // Wrap with DragTarget to accept tasks, then Draggable for project drag
+    return DragTarget<Task>(
+      onAcceptWithDetails: (details) => _handleTaskDrop(context, details.data),
+      builder: (context, candidateData, rejectedData) {
+        final isHoveringWithTask = candidateData.isNotEmpty;
+        
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: isHoveringWithTask 
+                ? Border.all(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                    width: 2,
+                  )
+                : null,
+            color: isHoveringWithTask 
+                ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                : Colors.transparent,
+          ),
+          child: Draggable<ProjectDragData>(
+            data: ProjectDragData(
+              project: widget.project,
+              currentDomain: widget.project.flowitDomain,
+            ),
+            feedback: _buildDragFeedback(context),
+            childWhenDragging: Opacity(
+              opacity: 0.5,
+              child: projectWidget,
+            ),
+            onDragStarted: () {
+              AppLogger.info('ProjectItem: Started dragging project ${widget.project.summary}');
+              // Provide haptic feedback
+              HapticFeedback.lightImpact();
+            },
+            onDragEnd: (details) {
+              AppLogger.info('ProjectItem: Ended dragging project ${widget.project.summary}');
+            },
+            child: projectWidget,
+          ),
+        );
       },
-      onDragEnd: (details) {
-        AppLogger.info('ProjectItem: Ended dragging project ${widget.project.summary}');
-      },
-      child: projectWidget,
     );
   }
 
@@ -432,6 +456,55 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
   }
 
   /// Build drag feedback widget that follows the cursor during drag
+  /// Handle dropping a task onto this project to move it
+  void _handleTaskDrop(BuildContext context, Task task) async {
+    // Don't move if task is already in this project
+    if (task.sourceCalendarUid == widget.project.uid) {
+      AppLogger.info('ProjectItem: Task ${task.summary} is already in project ${widget.project.summary}');
+      return;
+    }
+
+    try {
+      AppLogger.info('ProjectItem: Moving task ${task.summary} to project ${widget.project.summary}');
+      
+      // Use the existing TaskViewModel moveTask functionality
+      final taskViewModel = ref.read(taskViewModelProvider.notifier);
+      await taskViewModel.moveTask(task, widget.project.uid);
+      
+      // Show success feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Moved "${task.summary}" to "${widget.project.summary}"'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          duration: const Duration(seconds: 2),
+          action: SnackBarAction(
+            label: 'View Project',
+            onPressed: () {
+              context.go('/project/${widget.project.uid}');
+            },
+          ),
+        ),
+      );
+      
+      AppLogger.info('ProjectItem: Successfully moved task ${task.summary} to project ${widget.project.summary}');
+    } catch (e) {
+      AppLogger.error('ProjectItem: Failed to move task ${task.summary} to project ${widget.project.summary}: $e');
+      
+      // Show error feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to move task: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            onPressed: () {},
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildDragFeedback(BuildContext context) {
     return Material(
       elevation: 8,
