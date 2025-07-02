@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 # Install Flutter SDK
 RUN echo "--- Build Arguments ---" && \
     echo "FLUTTER_VERSION: ${FLUTTER_VERSION}" && \
-    echo "ANDROID_TOOL_VERSION_X: ${ANDROID_TOOL_VERSION_X}" && 
+    echo "ANDROID_TOOL_VERSION_X: ${ANDROID_TOOL_VERSION_X}" && \
     echo "ANDROID_TOOL_VERSION: ${ANDROID_TOOL_VERSION}" && \
     echo "-----------------------"
 RUN git clone https://github.com/flutter/flutter.git -b ${FLUTTER_VERSION} /usr/local/flutter
