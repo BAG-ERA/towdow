@@ -1,8 +1,5 @@
-ARG FLUTTER_VERSION
-ARG ANDROID_TOOL_VERSION_X
-ARG ANDROID_TOOL_VERSION
-
 FROM ubuntu:24.04
+
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     git curl unzip openjdk-17-jdk \
@@ -11,6 +8,9 @@ RUN apt-get update && apt-get install -y \
     libgtk-3-dev libsecret-1-dev
 
 # Install Flutter SDK
+ARG FLUTTER_VERSION
+ARG ANDROID_TOOL_VERSION_X
+ARG ANDROID_TOOL_VERSION
 RUN echo "--- Build Arguments ---" && \
     echo "FLUTTER_VERSION: ${FLUTTER_VERSION}" && \
     echo "ANDROID_TOOL_VERSION_X: ${ANDROID_TOOL_VERSION_X}" && \
