@@ -35,7 +35,10 @@ enum AppDestination {
   final String route;
 }
 
-class AdaptiveAppLayout extends ConsumerWidget {
+// Provider to track if this is the first time opening the app on mobile
+final _firstMobileLoadProvider = StateProvider<bool>((ref) => true);
+
+class AdaptiveAppLayout extends ConsumerStatefulWidget {
   const AdaptiveAppLayout({
     super.key,
     required this.currentDestination,
@@ -48,8 +51,38 @@ class AdaptiveAppLayout extends ConsumerWidget {
   static const double _desktopBreakpoint = 800.0;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isDesktop = MediaQuery.of(context).size.width >= _desktopBreakpoint;
+  ConsumerState<AdaptiveAppLayout> createState() => _AdaptiveAppLayoutState();
+}
+
+class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _hasOpenedDrawerOnStart = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    final isDesktop = MediaQuery.of(context).size.width >= AdaptiveAppLayout._desktopBreakpoint;
+    final isFirstMobileLoad = ref.read(_firstMobileLoadProvider);
+    
+    // Open drawer on start for mobile devices on first load
+    if (!isDesktop && isFirstMobileLoad && !_hasOpenedDrawerOnStart) {
+      _hasOpenedDrawerOnStart = true;
+      
+      // Use addPostFrameCallback to ensure the widget is built before opening drawer
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scaffoldKey.currentState != null) {
+          _scaffoldKey.currentState!.openDrawer();
+          // Mark that we've completed the first mobile load
+          ref.read(_firstMobileLoadProvider.notifier).state = false;
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width >= AdaptiveAppLayout._desktopBreakpoint;
 
     if (isDesktop) {
       return _buildDesktopLayout(context);
@@ -63,10 +96,10 @@ class AdaptiveAppLayout extends ConsumerWidget {
       body: Row(
         children: [
           // Fixed sidebar
-          AppSidebar(currentDestination: currentDestination),
+          AppSidebar(currentDestination: widget.currentDestination),
           // Main content area
           Expanded(
-            child: child,
+            child: widget.child,
           ),
         ],
       ),
@@ -88,11 +121,12 @@ class AdaptiveAppLayout extends ConsumerWidget {
     } else if (location.startsWith('/project/')) {
       title = 'Project Details';
       isDetailScreen = true;
-    } else if (currentDestination != null) {
-      title = currentDestination!.label;
+    } else if (widget.currentDestination != null) {
+      title = widget.currentDestination!.label;
     }
     
     return Scaffold(
+      key: _scaffoldKey,
       appBar: isDetailScreen ? AppBar(
         title: Text(title),
         centerTitle: false,
@@ -105,7 +139,7 @@ class AdaptiveAppLayout extends ConsumerWidget {
                   ),
       ) : null,
       drawer: _buildMobileDrawer(context),
-      body: child,
+      body: widget.child,
     );
   }
 
@@ -114,10 +148,8 @@ class AdaptiveAppLayout extends ConsumerWidget {
       width: double.infinity,
       child: Drawer(
         shape: const RoundedRectangleBorder(), // Remove rounded corners
-      child: AppSidebar(currentDestination: currentDestination),
+      child: AppSidebar(currentDestination: widget.currentDestination),
       ),
           );
   }
-
-
 } 
