@@ -585,6 +585,14 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     
     final anytimeTasks = tasks.where((task) => task.due == null).toList();
 
+    // Sort all task lists by status (completed tasks last)
+    _sortTasksByStatus(overdueTasks);
+    _sortTasksByStatus(todayTasks);
+    _sortTasksByStatus(soonTasks);
+    _sortTasksByStatus(nextWeekTasks);
+    _sortTasksByStatus(laterTasks);
+    _sortTasksByStatus(anytimeTasks);
+
     final columns = [
       KanbanColumn(
         id: 'overdue',
@@ -770,8 +778,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     final attendeesList = allAttendees.toList()..sort();
     
-    // Tasks without attendees
+    // Tasks without attendees - sorted by status (done tasks last)
     final unassignedTasks = tasks.where((task) => task.attendees.isEmpty).toList();
+    _sortTasksByStatus(unassignedTasks);
     
     final columns = <KanbanColumn>[];
     
@@ -791,6 +800,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     // Add columns for each attendee
     for (final attendee in attendeesList) {
       final attendeeTasks = _getTasksForAttendee(tasks, attendee);
+      _sortTasksByStatus(attendeeTasks);
       final completedTasks = attendeeTasks.where((task) => task.status == 'COMPLETED').length;
       final progressPercentage = attendeeTasks.isNotEmpty 
           ? (completedTasks * 100 / attendeeTasks.length).round() 
@@ -958,8 +968,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     
     final categoriesList = allCategories.toList()..sort();
     
-    // Tasks without categories
+    // Tasks without categories - sorted by status (done tasks last)
     final uncategorizedTasks = tasks.where((task) => task.categories.isEmpty).toList();
+    _sortTasksByStatus(uncategorizedTasks);
     
     final columns = <KanbanColumn>[];
     
@@ -979,6 +990,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     // Add columns for each category
     for (final category in categoriesList) {
       final categoryTasks = tasks.where((task) => task.categories.contains(category)).toList();
+      _sortTasksByStatus(categoryTasks);
       
       columns.add(
         KanbanColumn(
@@ -1005,6 +1017,36 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final hash = category.hashCode;
     final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.teal, Colors.pink, Colors.indigo, Colors.red];
     return colors[hash.abs() % colors.length];
+  }
+
+  /// Sort tasks by status with completed tasks appearing last
+  void _sortTasksByStatus(List<Task> tasks) {
+    tasks.sort((a, b) {
+      // First, sort by completion status (incomplete tasks first)
+      if (a.status == 'COMPLETED' && b.status != 'COMPLETED') {
+        return 1; // a (completed) comes after b (incomplete)
+      }
+      if (a.status != 'COMPLETED' && b.status == 'COMPLETED') {
+        return -1; // a (incomplete) comes before b (completed)
+      }
+      
+      // If both have the same completion status, sort by priority/due date
+      // Tasks with due dates come before tasks without due dates
+      if (a.due != null && b.due == null) {
+        return -1; // a (has due date) comes before b (no due date)
+      }
+      if (a.due == null && b.due != null) {
+        return 1; // a (no due date) comes after b (has due date)
+      }
+      
+      // If both have due dates, sort by due date (earliest first)
+      if (a.due != null && b.due != null) {
+        return a.due!.compareTo(b.due!);
+      }
+      
+      // If neither has due dates, sort alphabetically by summary
+      return a.summary.toLowerCase().compareTo(b.summary.toLowerCase());
+    });
   }
 
   Future<void> _addTaskToCategory(BuildContext context, WidgetRef ref, String? category) async {
