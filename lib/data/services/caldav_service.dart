@@ -467,6 +467,7 @@ class CalDAVService {
     required String calendarPath,
     required String displayName,
     String? description,
+    String? uid,
   }) async {
     try {
       // Normalize calendar path to ensure it ends with /
@@ -512,6 +513,7 @@ class CalDAVService {
                path: normalizedPath,
                displayName: displayName,
                description: description ?? 'Created by FlowIt',
+               uid: uid,
              ));
                      } else if (webDavResponse.statusCode == 409) {
              // 409 Conflict - calendar already exists
@@ -844,5 +846,5 @@ class CalDAVCapabilities {
     required this.taskCalendars,
     required this.serverInfo,
   });
-  }
+}
    

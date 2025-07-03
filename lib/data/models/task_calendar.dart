@@ -93,6 +93,7 @@ extension TaskCalendarFactory on TaskCalendar {
     bool? flowitAsFlow,
     String? flowitOwner,
     String? flowitTemplate,
+    String? uid,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -102,7 +103,7 @@ extension TaskCalendarFactory on TaskCalendar {
       etag: etag,
       color: color,
       isReadOnly: isReadOnly,
-      uid: 'discovered-${path.hashCode}',
+      uid: uid ?? 'discovered-${path.hashCode}',
       dtstamp: now,
       created: now,
       lastModified: now,
