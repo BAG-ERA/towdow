@@ -3,6 +3,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import 'dart:convert';
 import '../../../data/models/task.dart';
 import '../../../data/services/validator_service.dart';
@@ -252,7 +253,7 @@ class TaskItemToolbar extends StatelessWidget {
   }
 
   String _generateId() {
-    return DateTime.now().millisecondsSinceEpoch.toString();
+    return const Uuid().v4();
   }
 
   void _addValidator(BuildContext context, String validatorType) {

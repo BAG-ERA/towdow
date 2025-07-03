@@ -49,17 +49,17 @@ class DueDateDialog extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.today_rounded),
             title: const Text('Today'),
-            onTap: () => _selectDate(context, DateTime.now()),
+            onTap: () => _selectDate(context, _getToday()),
           ),
           ListTile(
             leading: const Icon(Icons.event_rounded),
             title: const Text('Tomorrow'),
-            onTap: () => _selectDate(context, DateTime.now().add(const Duration(days: 1))),
+            onTap: () => _selectDate(context, _getTomorrow()),
           ),
           ListTile(
             leading: const Icon(Icons.calendar_view_week_rounded),
             title: const Text('In 7 days'),
-            onTap: () => _selectDate(context, DateTime.now().add(const Duration(days: 7))),
+            onTap: () => _selectDate(context, _getInDays(7)),
           ),
           const Divider(),
           ListTile(
@@ -93,6 +93,22 @@ class DueDateDialog extends StatelessWidget {
   void _selectDate(BuildContext context, DateTime? selectedDate) {
     Navigator.of(context).pop();
     _updateTaskDueDate(context, selectedDate);
+  }
+
+  /// Helper methods for getting proper calendar dates
+  DateTime _getToday() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  DateTime _getTomorrow() {
+    final today = _getToday();
+    return today.add(const Duration(days: 1));
+  }
+
+  DateTime _getInDays(int days) {
+    final today = _getToday();
+    return today.add(Duration(days: days));
   }
 
   /// Updates the task with the new due date
