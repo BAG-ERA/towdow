@@ -129,12 +129,79 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ) : null,
-             body: SafeArea(
-        child: Column(
-          children: [
-            // Mobile tabs - only show when no AppBar (mobile mode)
-            if (!isDesktop)
-              StyledTabBar(
+      body: Column(
+        children: [
+          // Mobile header with hamburger menu
+          if (!isDesktop)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Builder(
+                    builder: (context) => IconButton(
+                      icon: const Icon(Icons.menu_rounded),
+                      onPressed: () {
+                        Scaffold.of(context).openDrawer();
+                      },
+                      tooltip: 'Open navigation',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'My Tasks',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Mobile sync status
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final syncStatus = ref.watch(currentSyncStatusProvider);
+                      switch (syncStatus) {
+                        case SyncStatus.syncing:
+                          return const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          );
+                        case SyncStatus.error:
+                          return IconButton(
+                            icon: const Icon(Icons.sync_problem_rounded, color: Colors.red),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Sync error occurred')),
+                              );
+                            },
+                          );
+                        case SyncStatus.offline:
+                          return IconButton(
+                            icon: const Icon(Icons.cloud_off_rounded, color: Colors.orange),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Offline - no account configured')),
+                              );
+                            },
+                          );
+                        case SyncStatus.idle:
+                          return IconButton(
+                            icon: const Icon(Icons.sync_rounded),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Go to Settings > Debug > Sync Now')),
+                              );
+                            },
+                          );
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          
+          // Mobile tabs - only show when no AppBar (mobile mode)
+          if (!isDesktop)
+            StyledTabBar(
               items: [
                 StyledTabItem(
                   label: 'Today (${ref.watch(todayTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
@@ -176,7 +243,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         ],
-      ),
       ),
     );
   }

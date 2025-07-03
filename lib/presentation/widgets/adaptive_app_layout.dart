@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'navbar/app_sidebar.dart';
 import '../../data/models/task_calendar.dart';
-import 'utils/enhanced_text_field.dart';
 
 // Provider for dynamic mobile title (used by detail screens)
 final mobileTitleProvider = StateProvider<String?>((ref) => null);
@@ -83,12 +82,15 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
       vsync: this,
     );
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.3, 0), // Start slightly from the right
+      begin: const Offset(0.2, 0), // Start slightly from the right when drawer closes
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _slideAnimationController,
       curve: Curves.easeOutCubic,
     ));
+    
+    // Start in completed state - animation will be triggered when drawer closes
+    _slideAnimationController.value = 1.0;
   }
 
   @override
@@ -104,18 +106,20 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     final isDesktop = MediaQuery.of(context).size.width >= AdaptiveAppLayout._desktopBreakpoint;
     final isFirstMobileLoad = ref.read(_firstMobileLoadProvider);
     
-    // Open drawer on start for mobile devices on first load
+    // Open drawer on mobile startup, but with proper timing to avoid layout issues
     if (!isDesktop && isFirstMobileLoad && !_hasOpenedDrawerOnStart) {
       _hasOpenedDrawerOnStart = true;
       
-      // Use addPostFrameCallback to ensure the widget is built before opening drawer
+      // Use a longer delay to ensure the layout is fully established
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _scaffoldKey.currentState != null) {
-          _slideAnimationController.reset();
-          _scaffoldKey.currentState!.openDrawer();
-          // Mark that we've completed the first mobile load
-          ref.read(_firstMobileLoadProvider.notifier).state = false;
-        }
+        // Add an additional delay to ensure everything is rendered
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted && _scaffoldKey.currentState != null) {
+            _scaffoldKey.currentState!.openDrawer();
+            // Mark that we've completed the first mobile load
+            ref.read(_firstMobileLoadProvider.notifier).state = false;
+          }
+        });
       });
     }
   }
@@ -144,7 +148,7 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
 
     return PopScope(
       canPop: false, // Never allow back button to close the app
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         // On mobile, toggle drawer state instead of closing app
         if (!isDesktop && _scaffoldKey.currentState != null) {
           final scaffoldState = _scaffoldKey.currentState!;
@@ -310,7 +314,7 @@ class _MobileEditableProjectTitleState extends State<_MobileEditableProjectTitle
     if (_isEditing) {
       return SizedBox(
         width: double.infinity,
-        child: EnhancedTextField(
+        child: TextField(
           controller: _controller,
           focusNode: _focusNode,
           decoration: InputDecoration(
