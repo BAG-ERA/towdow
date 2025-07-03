@@ -7,7 +7,6 @@ import 'dart:convert';
 import '../../../data/models/task.dart';
 import '../../../data/services/validator_service.dart';
 import '../utils/popup/attendee_dialog.dart';
-import '../utils/popup/category_dialog.dart';
 import '../utils/popup/due_date_dialog.dart';
 import '../utils/popup/move_task_dialog.dart';
 
@@ -34,7 +33,7 @@ class TaskItemToolbar extends StatelessWidget {
           icon: Icons.calendar_today_rounded,
           tooltip: 'Set Due Date',
           onPressed: () => DueDateDialog.show(
-            context: context,
+            context,
             task: task,
             onTaskUpdated: onTaskUpdated,
           ),
@@ -311,7 +310,6 @@ class TaskItemToolbar extends StatelessWidget {
   }
 
   // Dialog methods
-
   void _showAttendeeDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -327,17 +325,12 @@ class TaskItemToolbar extends StatelessWidget {
   }
 
   void _showCategoryDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => CategoryDialog(
-        task: task,
-        onTaskUpdated: (updatedTask) {
-          if (onTaskUpdated != null) {
-            onTaskUpdated!(updatedTask);
-          }
-        },
-      ),
-    );
+    // TODO: Implement category dialog
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Category dialog not implemented yet')),
+      );
+    }
   }
 
   void _showMoveDialog(BuildContext context) {
