@@ -7,6 +7,8 @@ import 'dart:convert';
 import '../../../data/models/task.dart';
 import '../../../data/services/validator_service.dart';
 import '../utils/popup/attendee_dialog.dart';
+import '../utils/popup/category_dialog.dart';
+import '../utils/popup/due_date_dialog.dart';
 import '../utils/popup/move_task_dialog.dart';
 
 class TaskItemToolbar extends StatelessWidget {
@@ -31,7 +33,11 @@ class TaskItemToolbar extends StatelessWidget {
           context: context,
           icon: Icons.calendar_today_rounded,
           tooltip: 'Set Due Date',
-          onPressed: () => _showDueDatePicker(context),
+          onPressed: () => DueDateDialog.show(
+            context: context,
+            task: task,
+            onTaskUpdated: onTaskUpdated,
+          ),
         ),
         const SizedBox(width: 4),
         
@@ -305,127 +311,6 @@ class TaskItemToolbar extends StatelessWidget {
   }
 
   // Dialog methods
-  void _showDueDatePicker(BuildContext context) async {
-    final currentDue = task.due;
-    
-    // Show a dialog with date picker options
-    final result = await showDialog<DateTime?>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Due Date'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (currentDue != null) ...[
-              ListTile(
-                leading: const Icon(Icons.clear_rounded),
-                title: const Text('Remove due date'),
-                onTap: () => Navigator.of(context).pop(DateTime(1970)), // Special marker for removal
-              ),
-              const Divider(),
-            ],
-            ListTile(
-              leading: const Icon(Icons.today_rounded),
-              title: const Text('Today'),
-              onTap: () => Navigator.of(context).pop(DateTime.now()),
-            ),
-            ListTile(
-              leading: const Icon(Icons.event_rounded),
-              title: const Text('Tomorrow'),
-              onTap: () => Navigator.of(context).pop(DateTime.now().add(const Duration(days: 1))),
-            ),
-            ListTile(
-              leading: const Icon(Icons.weekend_rounded),
-              title: const Text('This Weekend'),
-              onTap: () {
-                final now = DateTime.now();
-                final daysUntilSaturday = 6 - now.weekday; // Saturday = 6
-                final saturday = now.add(Duration(days: daysUntilSaturday));
-                Navigator.of(context).pop(saturday);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.schedule_rounded),
-              title: const Text('Next Week'),
-              onTap: () => Navigator.of(context).pop(DateTime.now().add(const Duration(days: 7))),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.calendar_today_rounded),
-              title: const Text('Pick a date...'),
-              onTap: () async {
-                Navigator.of(context).pop(); // Close current dialog
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: currentDue ?? DateTime.now(),
-                  firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                  lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
-                );
-                if (picked != null) {
-                  _updateTaskDueDate(context, picked);
-                }
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null) {
-      if (result.year == 1970) {
-        // Special marker for removal
-        _updateTaskDueDate(context, null);
-      } else {
-        _updateTaskDueDate(context, result);
-      }
-    }
-  }
-
-  Future<void> _updateTaskDueDate(BuildContext context, DateTime? newDue) async {
-    try {
-      // Create updated task
-      final updatedTask = task.copyWith(
-        due: newDue,
-        lastModified: DateTime.now(),
-      );
-
-      // Notify parent widget
-      if (onTaskUpdated != null) {
-        onTaskUpdated!(updatedTask);
-      }
-
-      // Show feedback
-      if (context.mounted) {
-        final message = newDue == null 
-            ? 'Due date removed' 
-            : 'Due date set to ${newDue.day}/${newDue.month}/${newDue.year}';
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating due date: $e'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
 
   void _showAttendeeDialog(BuildContext context) {
     showDialog(
@@ -442,9 +327,16 @@ class TaskItemToolbar extends StatelessWidget {
   }
 
   void _showCategoryDialog(BuildContext context) {
-    // TODO: Implement category dialog
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Category dialog not implemented yet')),
+    showDialog(
+      context: context,
+      builder: (context) => CategoryDialog(
+        task: task,
+        onTaskUpdated: (updatedTask) {
+          if (onTaskUpdated != null) {
+            onTaskUpdated!(updatedTask);
+          }
+        },
+      ),
     );
   }
 
@@ -454,16 +346,20 @@ class TaskItemToolbar extends StatelessWidget {
 
   void _showArchiveDialog(BuildContext context) {
     // TODO: Implement archive dialog
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Archive dialog not implemented yet')),
-    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Archive dialog not implemented yet')),
+      );
+    }
   }
 
   void _showGpsDialog(BuildContext context) {
     // TODO: Implement GPS coordinate dialog
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('GPS dialog not implemented yet')),
-    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('GPS dialog not implemented yet')),
+      );
+    }
   }
 
   void _showDeleteDialog(BuildContext context) {
