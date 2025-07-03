@@ -48,14 +48,20 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
     // Only show selected state on desktop, not on mobile
     final isSelected = widget.isDesktop && GoRouterState.of(context).uri.path == '/project/${widget.project.uid}';
     
-    // Count remaining tasks for this project
+    // Calculate percentage completed for this project
     final taskListAsync = ref.watch(taskListProvider);
-    final taskCount = taskListAsync.when(
-      data: (tasks) => tasks.where((task) {
-        return task.status != 'COMPLETED' && task.sourceCalendarUid == widget.project.uid;
-      }).length,
-      loading: () => 0,
-      error: (_, _) => 0,
+    final completionData = taskListAsync.when(
+      data: (tasks) {
+        final projectTasks = tasks.where((task) {
+          return task.sourceCalendarUid == widget.project.uid;
+        });
+        final totalTasks = projectTasks.length;
+        final completedTasks = projectTasks.where((task) => task.status == 'COMPLETED').length;
+        final percentage = totalTasks > 0 ? (completedTasks / totalTasks * 100).round() : 0;
+        return {'total': totalTasks, 'percentage': percentage};
+      },
+      loading: () => {'total': 0, 'percentage': 0},
+      error: (_, _) => {'total': 0, 'percentage': 0},
     );
     
     final projectWidget = MouseRegion(
@@ -112,8 +118,8 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
                 
                     const SizedBox(width: 8),
                     
-                    // Task count badge
-                    if (taskCount > 0) 
+                    // Completion percentage badge
+                    if (completionData['total']! > 0) 
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
@@ -123,7 +129,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          '$taskCount',
+                          '${completionData['percentage']}%',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: isSelected
                                 ? Theme.of(context).colorScheme.onPrimaryContainer

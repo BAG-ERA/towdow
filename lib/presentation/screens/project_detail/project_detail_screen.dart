@@ -1074,26 +1074,30 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   Future<void> _updateProject(TaskCalendar updatedProject) async {
     try {
+      AppLogger.info('ProjectDetail: _updateProject called for project: ${updatedProject.displayName}');
+      
       final calendarRepository = ref.read(calendarRepositoryProvider);
       
       // Save locally first
+      AppLogger.info('ProjectDetail: Saving project locally...');
       final result = await calendarRepository.save(updatedProject);
       
-      result.when(
-        success: (_) async {
-          // Refresh the project data
+      await result.when(
+        success: (data) async {
+          // Refresh the project data immediately
           ref.invalidate(projectProvider(widget.projectUid));
           
-          // Sync changes to CalDAV server
-          await _syncProjectToServer(updatedProject);
-          
+          // Show success message
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('✅ Project updated successfully')),
             );
           }
+          
+          // Sync changes to CalDAV server (don't wait for this)
+          _syncProjectToServer(updatedProject);
         },
-        failure: (failure) {
+        failure: (failure) async {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('❌ Failed to update project: ${failure.message}')),
@@ -1113,6 +1117,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   /// Sync project metadata changes to CalDAV server
   Future<void> _syncProjectToServer(TaskCalendar project) async {
     try {
+      AppLogger.info('ProjectDetail: Starting server sync for project: ${project.displayName}');
+      
       // Get active account
       final accountRepository = ref.read(accountRepositoryProvider);
       final accountResult = await accountRepository.getActiveAccount();
@@ -1120,21 +1126,23 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       await accountResult.when(
         success: (account) async {
           if (account == null) {
-            // No active account, skip server sync (local save already succeeded)
+            AppLogger.warning('ProjectDetail: No active account found, skipping server sync');
             return;
           }
           
+          AppLogger.info('ProjectDetail: Found active account: ${account.username}@${account.serverUrl}');
+          
           // Create CalDAV service and sync to server
           final caldavService = CalDAVService(account: account);
+          AppLogger.info('ProjectDetail: Calling CalDAV updateCalendarProperties...');
           final syncResult = await caldavService.updateCalendarProperties(project);
           
           await syncResult.when(
             success: (_) {
-              // Server sync successful - no additional action needed
+              AppLogger.info('ProjectDetail: Successfully synced project metadata to server');
             },
             failure: (failure) {
-              // Log the error but don't show user error since local save succeeded
-              AppLogger.warning('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');
+              AppLogger.error('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');
             },
           );
         },
@@ -1328,10 +1336,15 @@ class _EditableProjectTitleState extends State<_EditableProjectTitle> {
 
   void _saveTitle() {
     if (_controller.text.trim().isNotEmpty) {
+      final newTitle = _controller.text.trim();
+      AppLogger.info('ProjectDetail: Saving new title: "$newTitle" (was: "${widget.project.displayName}")');
+      
       final updatedProject = widget.project.copyWith(
-        summary: _controller.text.trim(),
+        displayName: newTitle,
         lastModified: DateTime.now(),
       );
+      
+      AppLogger.info('ProjectDetail: Calling onProjectUpdated callback...');
       widget.onProjectUpdated(updatedProject);
     }
     
