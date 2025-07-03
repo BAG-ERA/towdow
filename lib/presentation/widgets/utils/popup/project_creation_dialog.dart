@@ -2,6 +2,7 @@
 // Used across the app for creating new projects
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
 import '../../../../core/theme/chart_theme_usage.dart';
@@ -21,8 +22,9 @@ class ProjectCreationDialog extends ConsumerStatefulWidget {
 class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
+  final FocusNode nameFocusNode = FocusNode();
+  final FocusNode descriptionFocusNode = FocusNode();
   String? selectedDomain;
-  bool isDomainSectionExpanded = false;
   bool isLoading = false;
   int _domainRefreshKey = 0;
 
@@ -32,7 +34,6 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
     // Initialize with provided domain if available
     if (widget.initialDomain != null) {
       selectedDomain = widget.initialDomain;
-      isDomainSectionExpanded = true; // Expand domain section when pre-selected
     }
   }
 
@@ -40,6 +41,8 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
   void dispose() {
     nameController.dispose();
     descriptionController.dispose();
+    nameFocusNode.dispose();
+    descriptionFocusNode.dispose();
     super.dispose();
   }
 
@@ -61,62 +64,74 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
             ),
             const SizedBox(height: 16),
             
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Project name *',
-                hintText: 'e.g., Website Redesign, Marketing Campaign',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => _canCreate() ? _createProject() : null,
-            ),
-            
-            const SizedBox(height: 16),
-            
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                hintText: 'Describe the project goals and objectives',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              onChanged: (_) => setState(() {}),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Domain selection section
-            ExpansionTile(
-              title: Row(
-                children: [
-                  const Icon(Icons.folder_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Domain (optional)',
-                    style: Theme.of(context).textTheme.titleSmall,
+            // Project name TextField with keyboard handling
+            KeyboardListener(
+              focusNode: FocusNode(),
+              onKeyEvent: (KeyEvent event) {
+                _handleKeyboardEvent(event, nameController, nameFocusNode);
+              },
+              child: Focus(
+                child: TextField(
+                  controller: nameController,
+                  focusNode: nameFocusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Project name *',
+                    hintText: 'e.g., Website Redesign, Marketing Campaign',
+                    border: OutlineInputBorder(),
                   ),
-                ],
-              ),
-              subtitle: selectedDomain != null 
-                  ? Text(
-                      'Selected: $selectedDomain',
-                      style: context.domainNameStyle?.copyWith(
-                        fontSize: 12,
-                      ),
-                    )
-                  : const Text('No domain selected'),
-              initiallyExpanded: isDomainSectionExpanded,
-              onExpansionChanged: (expanded) => setState(() => isDomainSectionExpanded = expanded),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: _buildDomainSelection(),
+                  autofocus: true,
+                  enableInteractiveSelection: true,
+                  textInputAction: TextInputAction.next,
+                  keyboardType: TextInputType.text,
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => descriptionFocusNode.requestFocus(),
+                  onTap: () {
+                    // Ensure all keyboard shortcuts work by maintaining proper focus
+                    if (!nameFocusNode.hasFocus) {
+                      nameFocusNode.requestFocus();
+                    }
+                  },
                 ),
-              ],
+              ),
             ),
+            
+            const SizedBox(height: 16),
+            
+            // Description TextField with keyboard handling
+            KeyboardListener(
+              focusNode: FocusNode(),
+              onKeyEvent: (KeyEvent event) {
+                _handleKeyboardEvent(event, descriptionController, descriptionFocusNode);
+              },
+              child: Focus(
+                child: TextField(
+                  controller: descriptionController,
+                  focusNode: descriptionFocusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (optional)',
+                    hintText: 'Describe the project goals and objectives',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  enableInteractiveSelection: true,
+                  textInputAction: TextInputAction.done,
+                  keyboardType: TextInputType.multiline,
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _canCreate() ? _createProject() : null,
+                  onTap: () {
+                    // Ensure all keyboard shortcuts work by maintaining proper focus
+                    if (!descriptionFocusNode.hasFocus) {
+                      descriptionFocusNode.requestFocus();
+                    }
+                  },
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Domain selection dropdown
+            _buildDomainSelection(),
           ],
         ),
       ),
@@ -139,6 +154,26 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
     );
   }
 
+  void _handleKeyboardEvent(KeyEvent event, TextEditingController controller, FocusNode focusNode) {
+    // Handle Ctrl+A for select all
+    if (event is KeyDownEvent && 
+        event.logicalKey == LogicalKeyboardKey.keyA && 
+        (HardwareKeyboard.instance.isControlPressed)) {
+      if (controller.text.isNotEmpty) {
+        controller.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: controller.text.length,
+        );
+      }
+    }
+    // Handle Escape to close dialog
+    else if (event is KeyDownEvent && 
+             event.logicalKey == LogicalKeyboardKey.escape && 
+             !isLoading) {
+      Navigator.of(context).pop();
+    }
+  }
+
   Widget _buildDomainSelection() {
     return FutureBuilder<List<String>>(
       key: ValueKey(_domainRefreshKey),
@@ -156,38 +191,36 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Select a domain for this project:',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            // Domain dropdown field
+            DropdownButtonFormField<String?>(
+              value: selectedDomain,
+              decoration: const InputDecoration(
+                labelText: 'Domain (optional)',
+                hintText: 'Select a domain for this project',
+                border: OutlineInputBorder(),
               ),
+              items: [
+                // No domain option
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('No domain'),
+                ),
+                // Existing domains
+                ...availableDomains.map((domain) => DropdownMenuItem<String?>(
+                  value: domain,
+                  child: Text(
+                    domain,
+                    style: context.domainNameStyle,
+                  ),
+                )),
+              ],
+              onChanged: (value) => setState(() => selectedDomain = value),
+              isExpanded: true,
             ),
+            
             const SizedBox(height: 8),
             
-            // No domain option
-            RadioListTile<String?>(
-              title: const Text('No domain'),
-              value: null,
-              groupValue: selectedDomain,
-              onChanged: (value) => setState(() => selectedDomain = value),
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-            ),
-            
-            // Existing domains
-            ...availableDomains.map((domain) => RadioListTile<String?>(
-              title: Text(
-                domain,
-                style: context.domainNameStyle,
-              ),
-              value: domain,
-              groupValue: selectedDomain,
-              onChanged: (value) => setState(() => selectedDomain = value),
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-            )),
-            
-            const SizedBox(height: 8),
+            // Create new domain button
             Row(
               children: [
                 TextButton.icon(
