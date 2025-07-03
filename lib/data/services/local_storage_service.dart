@@ -15,6 +15,7 @@ class LocalStorageService {
   static const String syncQueueBoxName = 'sync_queue';
   static const String domainsBoxName = 'domains'; // For storing domain names
   static const String statusesBoxName = 'statuses'; // For storing status names
+  static const String userPreferencesBoxName = 'user_preferences'; // For storing user preferences
 
   // Box references
   late Box _tasksBox;
@@ -25,6 +26,7 @@ class LocalStorageService {
   late Box _syncQueueBox;
   late Box _domainsBox;
   late Box _statusesBox;
+  late Box _userPreferencesBox;
 
   // Initialize all Hive boxes
   Future<Result<void>> initialize() async {
@@ -40,6 +42,7 @@ class LocalStorageService {
       await _initializeBoxSafely(syncQueueBoxName, 'sync_queue');
       await _initializeBoxSafely(domainsBoxName, 'domains');
       await _initializeBoxSafely(statusesBoxName, 'statuses');
+      await _initializeBoxSafely(userPreferencesBoxName, 'user_preferences');
 
       // Assign the boxes after successful initialization
       _tasksBox = Hive.box(tasksBoxName);
@@ -50,6 +53,7 @@ class LocalStorageService {
       _syncQueueBox = Hive.box(syncQueueBoxName);
       _domainsBox = Hive.box(domainsBoxName);
       _statusesBox = Hive.box(statusesBoxName);
+      _userPreferencesBox = Hive.box(userPreferencesBoxName);
 
       // AppLogger.info('LocalStorageService: All boxes initialized successfully');
       return const Result.success(null);
@@ -361,6 +365,8 @@ class LocalStorageService {
         return _domainsBox;
       case statusesBoxName:
         return _statusesBox;
+      case userPreferencesBoxName:
+        return _userPreferencesBox;
       default:
         throw ArgumentError('Unknown box name: $boxName');
     }
@@ -378,6 +384,7 @@ class LocalStorageService {
       _syncQueueBox.close(),
       _domainsBox.close(),
       _statusesBox.close(),
+      _userPreferencesBox.close(),
     ]);
   }
 

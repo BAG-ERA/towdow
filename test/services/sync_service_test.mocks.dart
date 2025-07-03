@@ -1170,6 +1170,22 @@ class MockCalDAVService extends _i1.Mock implements _i12.CalDAVService {
       ) as _i5.Future<_i2.Result<_i12.CalDAVCapabilities>>);
 
   @override
+  _i5.Future<_i2.Result<void>> deleteCalendar(String? calendarPath) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #deleteCalendar,
+          [calendarPath],
+        ),
+        returnValue: _i5.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #deleteCalendar,
+            [calendarPath],
+          ),
+        )),
+      ) as _i5.Future<_i2.Result<void>>);
+
+  @override
   _i5.Future<_i2.Result<_i9.TaskCalendar>> createCalendar({
     required String? calendarPath,
     required String? displayName,
