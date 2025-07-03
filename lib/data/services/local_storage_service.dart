@@ -2,6 +2,8 @@
 // Provides generic CRUD operations for all FlowIt models
 
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/caldav_account.dart';
@@ -30,6 +32,10 @@ class LocalStorageService {
   Future<Result<void>> initialize() async {
     try {
       // AppLogger.info('LocalStorageService: Initializing Hive boxes');
+
+      // Initialize Hive with a platform-specific path
+      final appDocumentDir = await getApplicationDocumentsDirectory();
+      Hive.init(appDocumentDir.path);
       
       // Try to open boxes, but handle corrupted data gracefully
       await _initializeBoxSafely(tasksBoxName, 'tasks');

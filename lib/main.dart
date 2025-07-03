@@ -19,8 +19,7 @@ import 'data/providers/providers.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Hive
-  await Hive.initFlutter();
+  
   
   // Register Hive adapters for all models
   Hive.registerAdapter(TaskAdapter());
