@@ -200,6 +200,11 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
+        
+        // Even on error, respect the keepDialogOpen setting
+        if (!keepDialogOpen) {
+          Navigator.of(context).pop();
+        }
       } else {
         // Task creation succeeded
         ScaffoldMessenger.of(context).showSnackBar(
@@ -235,6 +240,11 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
+      
+      // Even on exception, respect the keepDialogOpen setting
+      if (!keepDialogOpen) {
+        Navigator.of(context).pop();
+      }
     } finally {
       setState(() => isLoading = false);
     }
