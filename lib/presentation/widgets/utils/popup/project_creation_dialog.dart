@@ -10,7 +10,9 @@ import '../../../../data/services/caldav_service.dart';
 import 'domain_creation_dialog.dart';
 
 class ProjectCreationDialog extends ConsumerStatefulWidget {
-  const ProjectCreationDialog({super.key});
+  final String? initialDomain;
+  
+  const ProjectCreationDialog({super.key, this.initialDomain});
 
   @override
   ConsumerState<ProjectCreationDialog> createState() => _ProjectCreationDialogState();
@@ -23,6 +25,16 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
   bool isDomainSectionExpanded = false;
   bool isLoading = false;
   int _domainRefreshKey = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with provided domain if available
+    if (widget.initialDomain != null) {
+      selectedDomain = widget.initialDomain;
+      isDomainSectionExpanded = true; // Expand domain section when pre-selected
+    }
+  }
 
   @override
   void dispose() {

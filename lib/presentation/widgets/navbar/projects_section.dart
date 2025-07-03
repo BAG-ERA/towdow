@@ -11,6 +11,7 @@ import '../../../data/models/task_calendar.dart';
 import '../../../data/repositories/user_repository.dart';
 import '../../viewmodels/project_list_viewmodel.dart';
 import '../utils/popup/domain_rename_dialog.dart';
+import '../utils/popup/project_creation_dialog.dart';
 import 'project_item_widget.dart';
 import 'reorder_drop_zone.dart';
 
@@ -353,6 +354,20 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     }
   }
 
+  void _createProjectInDomain() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => ProjectCreationDialog(
+        initialDomain: widget.domain,
+      ),
+    );
+
+    if (result != null) {
+      // Project creation dialog already handles the creation and UI feedback
+      // No additional logic needed here
+    }
+  }
+
   void _renameDomain() async {
     final newDomainName = await showDialog<String>(
       context: context,
@@ -625,13 +640,35 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                             ),
                             padding: EdgeInsets.zero,
                             onSelected: (value) {
-                              if (value == 'rename') {
+                              if (value == 'create_project') {
+                                _createProjectInDomain();
+                              } else if (value == 'rename') {
                                 _renameDomain();
                               } else if (value == 'delete') {
                                 _deleteDomain();
                               }
                             },
                             itemBuilder: (context) => [
+                              PopupMenuItem<String>(
+                                value: 'create_project',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.add,
+                                      size: 16,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Create project',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuDivider(),
                               PopupMenuItem<String>(
                                 value: 'rename',
                                 child: Row(
