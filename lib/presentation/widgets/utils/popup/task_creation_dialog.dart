@@ -4,7 +4,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
+import '../../../../data/models/task.dart';
 import '../../../../data/providers/providers.dart';
+import 'due_date_dialog.dart';
 
 class TaskCreationDialog extends ConsumerStatefulWidget {
   final String? sourceCalendarUid; // Optional project to assign the task to
@@ -85,19 +87,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                 : 'Due: ${selectedDue!.day}/${selectedDue!.month}/${selectedDue!.year}'
               ),
               trailing: const Icon(Icons.arrow_forward_ios_rounded),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: selectedDue ?? DateTime.now(),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-                if (picked != null) {
-                  setState(() {
-                    selectedDue = picked;
-                  });
-                }
-              },
+              onTap: () => _showDueDateDialog(),
             ),
             
             const SizedBox(height: 16),
@@ -152,6 +142,27 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
     summaryController.clear();
     descriptionController.clear();
     selectedDue = null;
+  }
+
+  void _showDueDateDialog() {
+    // Create a temporary task to pass to the DueDateDialog
+    final tempTask = TaskFactory.createNew(
+      summary: 'Temporary Task',
+      description: '',
+      due: selectedDue,
+      categories: const [],
+      sourceCalendarUid: widget.sourceCalendarUid,
+    );
+
+    DueDateDialog.show(
+      context,
+      task: tempTask,
+      onTaskUpdated: (updatedTask) {
+        setState(() {
+          selectedDue = updatedTask.due;
+        });
+      },
+    );
   }
 
   void _createTask() async {
