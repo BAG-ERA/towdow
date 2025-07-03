@@ -20,6 +20,7 @@ import '../../viewmodels/project_task_search_viewmodel.dart';
 import '../../../core/theme/chart_theme.dart';
 import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_info_card.dart';
+import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../../data/services/caldav_service.dart';
 
 // Provider for a specific project/calendar
@@ -223,188 +224,24 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   Widget _buildTabContent(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
     return switch (_selectedTabIndex) {
-      0 => _buildListView(context, ref, tasksAsync),
+      0 => ProjectTaskListView(
+        projectUid: widget.projectUid,
+        tasksAsync: tasksAsync,
+        onTasksRefresh: () => _refreshProjectTasks(ref),
+      ),
       1 => _buildTimingView(context, ref, tasksAsync),
       2 => _buildAttendeeView(context, ref, tasksAsync),
       3 => _buildKanbanView(context, ref, tasksAsync),
       4 => _buildAgendaView(context, ref, tasksAsync),
-      _ => _buildListView(context, ref, tasksAsync),
+      _ => ProjectTaskListView(
+        projectUid: widget.projectUid,
+        tasksAsync: tasksAsync,
+        onTasksRefresh: () => _refreshProjectTasks(ref),
+      ),
     };
   }
 
-  Widget _buildListView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
-    return tasksAsync.when(
-      data: (allTasks) {
-        // Use filtered and sorted tasks instead of all tasks
-        final filteredTasks = ref.watch(filteredProjectTasksProvider(widget.projectUid));
-        final searchState = ref.watch(projectTaskSearchProvider(widget.projectUid));
-        
-        if (filteredTasks.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  searchState.isSearchActive ? Icons.search_off : Icons.task_alt_rounded,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  searchState.isSearchActive ? 'No Matching Tasks' : 'No Tasks Yet',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  searchState.isSearchActive 
-                    ? 'Try adjusting your search or filters'
-                    : 'Add your first task to get started',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
 
-        // Tasks are already filtered and sorted by the provider
-        final tasks = filteredTasks;
-        
-        // Organize tasks by priority: overdue → to be done → done (if not using custom filter)
-        final now = DateTime.now();
-        final today = DateTime(now.year, now.month, now.day);
-        
-        final overdueTasks = tasks.where((task) => 
-          task.status != 'COMPLETED' && 
-          task.due != null && 
-          DateTime(task.due!.year, task.due!.month, task.due!.day).isBefore(today)
-        ).toList();
-        
-        final pendingTasks = tasks.where((task) => 
-          task.status != 'COMPLETED' && 
-          (task.due == null || !DateTime(task.due!.year, task.due!.month, task.due!.day).isBefore(today))
-        ).toList();
-        
-        final completedTasks = tasks.where((task) => 
-          task.status == 'COMPLETED'
-        ).toList();
-
-        return Column(
-          children: [
-            // Header with task count
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                border: Border(
-                  bottom: BorderSide(
-                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.checklist_rounded,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Tasks (${tasks.length} of ${allTasks.length})',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                ],
-              ),
-            ),
-            
-            // Tasks list with sections - Responsive layout
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Overdue tasks section
-                    if (overdueTasks.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'Overdue', overdueTasks.length, context.chartTheme.colors.error),
-                      const SizedBox(height: 8),
-                      _buildResponsiveTaskGrid(context, ref, overdueTasks),
-                      if (pendingTasks.isNotEmpty || completedTasks.isNotEmpty)
-                        const SizedBox(height: 24),
-                    ],
-                    
-                    // Pending tasks section
-                    if (pendingTasks.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'To Be Done', pendingTasks.length, context.chartTheme.colors.warning),
-                      const SizedBox(height: 8),
-                      _buildResponsiveTaskGrid(context, ref, pendingTasks),
-                      if (completedTasks.isNotEmpty)
-                        const SizedBox(height: 24),
-                    ],
-                    
-                    // Completed tasks section
-                    if (completedTasks.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'Done', completedTasks.length, context.chartTheme.colors.success),
-                      const SizedBox(height: 8),
-                      _buildResponsiveTaskGrid(context, ref, completedTasks),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-      loading: () => const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading tasks...'),
-          ],
-        ),
-      ),
-      error: (error, _) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_rounded,
-              size: 64,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load tasks',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error.toString(),
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => ref.invalidate(projectTasksProvider(widget.projectUid)),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   // Timing View - Kanban organized by time periods
   Widget _buildTimingView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
@@ -508,13 +345,58 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     return KanbanBoard(
       columns: columns,
-      onTaskTap: (task) => _viewTask(context, task),
-      onTaskToggle: (task) => _toggleTaskComplete(context, ref, task),
+      onTaskTap: (task) {
+        // Navigate to task detail
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('👁️ View task: ${task.summary}')),
+        );
+      },
+      onTaskToggle: (task) async {
+        final taskViewModel = ref.read(taskViewModelProvider.notifier);
+        await taskViewModel.toggleTaskCompletion(task);
+        
+        // Refresh the tasks list
+        _refreshProjectTasks(ref);
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                task.status == 'COMPLETED' 
+                    ? '✅ Task marked as incomplete' 
+                    : '✅ Task completed!',
+              ),
+            ),
+          );
+        }
+      },
       onTaskUpdated: (task) async {
         await ref.read(taskViewModelProvider.notifier).updateTask(task);
         _refreshProjectTasks(ref);
       },
-      onTaskDeleted: (task) => _deleteTask(context, ref, task),
+      onTaskDeleted: (task) async {
+        // Handle task deletion
+        final taskViewModel = ref.read(taskViewModelProvider.notifier);
+        await taskViewModel.deleteTask(task.uid);
+        
+        // Refresh the tasks list
+        _refreshProjectTasks(ref);
+        
+        // Show confirmation
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Task "${task.summary}" deleted'),
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  // TODO: Implement undo functionality
+                },
+              ),
+            ),
+          );
+        }
+      },
     );
   }
 
@@ -576,28 +458,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     }
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, int count, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 20,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          '$title ($count)',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
+
 
   // Attendee View - Kanban organized by attendees
   Widget _buildAttendeeView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
@@ -683,8 +544,31 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     return KanbanBoard(
       columns: columns,
-      onTaskTap: (task) => _viewTask(context, task),
-      onTaskToggle: (task) => _toggleTaskComplete(context, ref, task),
+      onTaskTap: (task) {
+        // Navigate to task detail
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('👁️ View task: ${task.summary}')),
+        );
+      },
+      onTaskToggle: (task) async {
+        final taskViewModel = ref.read(taskViewModelProvider.notifier);
+        await taskViewModel.toggleTaskCompletion(task);
+        
+        // Refresh the tasks list
+        _refreshProjectTasks(ref);
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                task.status == 'COMPLETED' 
+                    ? '✅ Task marked as incomplete' 
+                    : '✅ Task completed!',
+              ),
+            ),
+          );
+        }
+      },
       onTaskMoved: (task, columnId) => _handleAttendeeTaskMove(context, ref, task, columnId),
     );
   }
@@ -869,8 +753,31 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     return KanbanBoard(
       columns: columns,
-      onTaskTap: (task) => _viewTask(context, task),
-      onTaskToggle: (task) => _toggleTaskComplete(context, ref, task),
+      onTaskTap: (task) {
+        // Navigate to task detail
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('👁️ View task: ${task.summary}')),
+        );
+      },
+      onTaskToggle: (task) async {
+        final taskViewModel = ref.read(taskViewModelProvider.notifier);
+        await taskViewModel.toggleTaskCompletion(task);
+        
+        // Refresh the tasks list
+        _refreshProjectTasks(ref);
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                task.status == 'COMPLETED' 
+                    ? '✅ Task marked as incomplete' 
+                    : '✅ Task completed!',
+              ),
+            ),
+          );
+        }
+      },
     );
   }
 
@@ -966,111 +873,74 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     return tasksAsync.when(
       data: (tasks) => AgendaCalendar(
         tasks: tasks,
-        onTaskTap: (task) => _viewTask(context, task),
-        onTaskToggle: (task) => _toggleTaskComplete(context, ref, task),
+        onTaskTap: (task) {
+          // Navigate to task detail
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('👁️ View task: ${task.summary}')),
+          );
+        },
+        onTaskToggle: (task) async {
+          final taskViewModel = ref.read(taskViewModelProvider.notifier);
+          await taskViewModel.toggleTaskCompletion(task);
+          
+          // Refresh the tasks list
+          _refreshProjectTasks(ref);
+          
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  task.status == 'COMPLETED' 
+                      ? '✅ Task marked as incomplete' 
+                      : '✅ Task completed!',
+                ),
+              ),
+            );
+          }
+        },
         onTaskUpdated: (task) async {
           await ref.read(taskViewModelProvider.notifier).updateTask(task);
           _refreshProjectTasks(ref);
         },
-        onTaskDeleted: (task) => _deleteTask(context, ref, task),
+        onTaskDeleted: (task) async {
+          // Handle task deletion
+          final taskViewModel = ref.read(taskViewModelProvider.notifier);
+          await taskViewModel.deleteTask(task.uid);
+          
+          // Refresh the tasks list
+          _refreshProjectTasks(ref);
+          
+          // Show confirmation
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Task "${task.summary}" deleted'),
+                action: SnackBarAction(
+                  label: 'Undo',
+                  onPressed: () {
+                    // TODO: Implement undo functionality
+                  },
+                ),
+              ),
+            );
+          }
+        },
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('Error loading tasks: $error')),
     );
   }
 
-  void _viewTask(BuildContext context, Task task) {
-    // Navigate to task detail
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('👁️ View task: ${task.summary}')),
-    );
-  }
 
-  Future<void> _toggleTaskComplete(BuildContext context, WidgetRef ref, Task task) async {
-    final taskViewModel = ref.read(taskViewModelProvider.notifier);
-    await taskViewModel.toggleTaskCompletion(task);
-    
-    // Refresh the tasks list
-    ref.invalidate(projectTasksProvider(widget.projectUid));
-    
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            task.status == 'COMPLETED' 
-                ? '✅ Task marked as incomplete' 
-                : '✅ Task completed!',
-          ),
-        ),
-      );
-    }
-  }
 
   void _refreshProjectTasks(WidgetRef ref) {
     // Refresh the project tasks list
     ref.invalidate(projectTasksProvider(widget.projectUid));
   }
 
-  /// Builds a responsive grid layout for tasks that wraps to new rows when needed
-  Widget _buildResponsiveTaskGrid(BuildContext context, WidgetRef ref, List<Task> tasks) {
-    return Wrap(
-      spacing: 12.0, // Horizontal spacing between tasks
-      runSpacing: 12.0, // Vertical spacing between rows
-      alignment: WrapAlignment.start,
-      runAlignment: WrapAlignment.start,
-      children: tasks.map((task) {
-        return ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 420,
-            minWidth: 300,
-          ),
-          child: OverlayDraggableTask(
-            task: task,
-            onDragStarted: () {
-              AppLogger.info('ProjectDetail: Started dragging task ${task.summary}');
-            },
-            onDragEnd: () {
-              AppLogger.info('ProjectDetail: Ended dragging task ${task.summary}');
-            },
-          child: TaskItem(
-            task: task,
-            onTap: () => _viewTask(context, task),
-            onToggleComplete: () => _toggleTaskComplete(context, ref, task),
-            onTaskUpdated: (updatedTask) async {
-              await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-              _refreshProjectTasks(ref);
-            },
-            onTaskDeleted: () => _deleteTask(context, ref, task),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
 
-  Future<void> _deleteTask(BuildContext context, WidgetRef ref, Task task) async {
-    // Handle task deletion
-    final taskViewModel = ref.read(taskViewModelProvider.notifier);
-    await taskViewModel.deleteTask(task.uid);
-    
-    // Refresh the tasks list
-    ref.invalidate(projectTasksProvider(widget.projectUid));
-    
-    // Show confirmation
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Task "${task.summary}" deleted'),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () {
-              // TODO: Implement undo functionality
-            },
-          ),
-        ),
-      );
-    }
-  }
+
+
 
   Future<void> _updateProject(TaskCalendar updatedProject) async {
     try {
