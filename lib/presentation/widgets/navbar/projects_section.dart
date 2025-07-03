@@ -10,6 +10,7 @@ import '../../../data/providers/providers.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/repositories/user_repository.dart';
 import '../../viewmodels/project_list_viewmodel.dart';
+import '../utils/popup/domain_rename_dialog.dart';
 import 'project_item_widget.dart';
 import 'reorder_drop_zone.dart';
 
@@ -352,6 +353,20 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     }
   }
 
+  void _renameDomain() async {
+    final newDomainName = await showDialog<String>(
+      context: context,
+      builder: (context) => DomainRenameDialog(
+        currentDomainName: widget.domain,
+      ),
+    );
+
+    if (newDomainName != null && newDomainName != widget.domain) {
+      // The dialog already handles the rename operation and UI feedback
+      // No additional logic needed here since it's all handled in the dialog
+    }
+  }
+
   /// Build project list for this domain with custom ordering support
   Widget _buildReorderableProjectList() {
     // Get projects in custom order, but always show all projects
@@ -610,11 +625,32 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                             ),
                             padding: EdgeInsets.zero,
                             onSelected: (value) {
-                              if (value == 'delete') {
+                              if (value == 'rename') {
+                                _renameDomain();
+                              } else if (value == 'delete') {
                                 _deleteDomain();
                               }
                             },
                             itemBuilder: (context) => [
+                              PopupMenuItem<String>(
+                                value: 'rename',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.edit_outlined,
+                                      size: 16,
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Rename domain',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                               PopupMenuItem<String>(
                                 value: 'delete',
                                 child: Row(
