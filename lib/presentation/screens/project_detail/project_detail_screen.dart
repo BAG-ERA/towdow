@@ -972,7 +972,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           }
           
           // Sync changes to CalDAV server (don't wait for this)
+          AppLogger.info('ProjectDetail: About to call _syncProjectToServer...');
           _syncProjectToServer(updatedProject);
+          AppLogger.info('ProjectDetail: _syncProjectToServer call initiated (running in background)');
         },
         failure: (failure) async {
           if (mounted) {
@@ -993,17 +995,29 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   /// Sync project metadata changes to CalDAV server
   Future<void> _syncProjectToServer(TaskCalendar project) async {
+    AppLogger.info('ProjectDetail: _syncProjectToServer method entered for project: ${project.displayName}');
+    
     try {
       AppLogger.info('ProjectDetail: Starting server sync for project: ${project.displayName}');
       
       // Get active account
       final accountRepository = ref.read(accountRepositoryProvider);
+      AppLogger.info('ProjectDetail: Getting active account from repository...');
       final accountResult = await accountRepository.getActiveAccount();
+      AppLogger.info('ProjectDetail: Account result obtained, processing...');
       
       await accountResult.when(
         success: (account) async {
           if (account == null) {
             AppLogger.warning('ProjectDetail: No active account found, skipping server sync');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('⚠️ No CalDAV account found - changes saved locally only'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
             return;
           }
           
@@ -1017,18 +1031,58 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           await syncResult.when(
             success: (_) {
               AppLogger.info('ProjectDetail: Successfully synced project metadata to server');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('☁️ Project synced to server'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             },
             failure: (failure) {
               AppLogger.error('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('❌ Server sync failed: ${failure.message}'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 5),
+                    action: SnackBarAction(
+                      label: 'Retry',
+                      textColor: Colors.white,
+                      onPressed: () => _syncProjectToServer(project),
+                    ),
+                  ),
+                );
+              }
             },
           );
         },
         failure: (failure) {
           AppLogger.warning('ProjectDetail: No active account found, skipping server sync: ${failure.message}');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('⚠️ Account error: ${failure.message}'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
         },
       );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectDetail: Exception during server sync', e, stackTrace);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Sync error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 }

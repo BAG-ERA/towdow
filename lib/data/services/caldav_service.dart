@@ -560,42 +560,125 @@ class CalDAVService {
     try {
       AppLogger.info('CalDAVService: Starting calendar properties PROPPATCH for ${calendar.displayName}');
       AppLogger.info('CalDAVService: Calendar path: ${calendar.path}');
+      AppLogger.info('CalDAVService: Calendar UID: ${calendar.uid}');
       AppLogger.info('CalDAVService: Description: ${calendar.description.isNotEmpty ? calendar.description.substring(0, math.min(50, calendar.description.length)) + "..." : "(empty)"}');
       AppLogger.info('CalDAVService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
       AppLogger.info('CalDAVService: Status value: ${calendar.flowitStatus ?? "(null)"}');
       
-      // Generate PROPPATCH XML for both standard and FlowIt properties
+      // First update WebDAV properties with PROPPATCH
       final proppatchXml = _generateFlowItPropertiesPropPatch(calendar);
       AppLogger.info('CalDAVService: Generated PROPPATCH XML:\n$proppatchXml');
       
-      // Use PROPPATCH to set WebDAV property on calendar collection
       AppLogger.info('CalDAVService: Sending PROPPATCH request to: ${calendar.path}');
       
       final proppatchResult = await _client.proppatch(calendar.path, proppatchXml);
       
-      return await proppatchResult.when(
+      final proppatchSuccess = await proppatchResult.when(
         success: (response) async {
           AppLogger.info('CalDAVService: PROPPATCH completed with status: ${response.statusCode}');
           AppLogger.info('CalDAVService: Response headers: ${response.headers}');
-          AppLogger.info('CalDAVService: Response body: ${response.body}');
+          
+          // Log response body only if it's not too long
+          final responseBody = response.body;
+          if (responseBody.length > 500) {
+            AppLogger.info('CalDAVService: Response body (truncated): ${responseBody.substring(0, 500)}...');
+          } else {
+            AppLogger.info('CalDAVService: Response body: $responseBody');
+          }
           
           if (response.statusCode == 207 || response.statusCode == 200) {
-            AppLogger.info('CalDAVService: Calendar properties (displayName, description, domain, status) updated successfully');
-            return Result.success(null);
+            AppLogger.info('CalDAVService: Calendar WebDAV properties updated successfully');
+            return true;
           } else {
-            AppLogger.warning('CalDAVService: PROPPATCH returned ${response.statusCode} (non-critical)');
-            return Result.success(null);
+            final errorMsg = 'PROPPATCH returned ${response.statusCode}: ${responseBody.isNotEmpty ? responseBody : "No error details"}';
+            AppLogger.warning('CalDAVService: $errorMsg');
+            return false;
           }
         },
         failure: (failure) async {
           AppLogger.error('CalDAVService: PROPPATCH failed: ${failure.message}');
-          AppLogger.error('CalDAVService: Failure code: ${failure.code}');
-          return Result.success(null);
+          return false;
+        },
+      );
+      
+      // Also update the calendar content (VCALENDAR) with PUT
+      final contentUpdateResult = await updateCalendarContent(calendar);
+      final contentSuccess = await contentUpdateResult.when(
+        success: (_) async {
+          AppLogger.info('CalDAVService: Calendar content updated successfully');
+          return true;
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: Calendar content update failed: ${failure.message}');
+          return false;
+        },
+      );
+      
+      // Return success if at least one update succeeded
+      if (proppatchSuccess || contentSuccess) {
+        AppLogger.info('CalDAVService: Calendar update completed (properties: $proppatchSuccess, content: $contentSuccess)');
+        return Result.success(null);
+      } else {
+        return Result.failure(Failure(
+          message: 'Both property and content updates failed',
+          code: 'UPDATE_FAILED',
+        ));
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Exception during calendar update', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Exception during calendar update: $e',
+        code: 'EXCEPTION',
+      ));
+    }
+  }
+
+  /// Update calendar content (VCALENDAR) on server using PUT
+  Future<Result<void>> updateCalendarContent(TaskCalendar calendar) async {
+    try {
+      AppLogger.info('CalDAVService: Starting calendar content update for ${calendar.displayName}');
+      
+      // Generate VCALENDAR content
+      final vcalendarContent = _serializeCalendarProperties(calendar);
+      AppLogger.info('CalDAVService: Generated VCALENDAR content (${vcalendarContent.length} chars)');
+      
+      // Construct calendar URL (path + .ics)
+      final calendarUrl = '${calendar.path}.ics';
+      AppLogger.info('CalDAVService: Updating calendar content at: $calendarUrl');
+      
+      // PUT calendar content to server
+      final result = await _client.put(
+        calendarUrl,
+        vcalendarContent,
+      );
+      
+      return await result.when(
+        success: (response) async {
+          AppLogger.info('CalDAVService: PUT calendar content completed with status: ${response.statusCode}');
+          
+          if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+            AppLogger.info('CalDAVService: Calendar content updated successfully');
+            return Result.success(null);
+          } else {
+            final errorMsg = 'PUT calendar content returned ${response.statusCode}: ${response.body}';
+            AppLogger.warning('CalDAVService: $errorMsg');
+            return Result.failure(Failure(
+              message: errorMsg,
+              code: response.statusCode.toString(),
+            ));
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: PUT calendar content failed: ${failure.message}');
+          return Result.failure(failure);
         },
       );
     } catch (e, stackTrace) {
-      AppLogger.error('CalDAVService: Exception during PROPPATCH', e, stackTrace);
-      return Result.success(null);
+      AppLogger.error('CalDAVService: Exception during calendar content update', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Exception during calendar content update: $e',
+        code: 'EXCEPTION',
+      ));
     }
   }
 
