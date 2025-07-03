@@ -24,9 +24,15 @@ class TaskItemToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
+    // Prevent toolbar clicks from bubbling up to parent task item widgets
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        // Absorb tap events to prevent them from reaching parent widgets
+      },
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
         // Primary actions - always visible
         _buildPrimaryAction(
           context: context,
@@ -56,7 +62,8 @@ class TaskItemToolbar extends StatelessWidget {
         
         // Secondary actions menu
         _buildSecondaryActionsMenu(context),
-      ],
+        ],
+      ),
     );
   }
 
