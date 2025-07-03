@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y \
     git curl unzip openjdk-17-jdk \
     fuse libfuse2 desktop-file-utils \
     ninja-build build-essential cmake clang pkg-config \
-    libgtk-3-dev libsecret-1-dev
+    libgtk-3-dev libsecret-1-dev file
 
 # Install Flutter SDK
 ARG FLUTTER_VERSION
