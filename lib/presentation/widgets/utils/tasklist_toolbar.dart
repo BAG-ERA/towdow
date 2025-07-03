@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../viewmodels/project_task_search_viewmodel.dart';
 import 'buttons/create_task_button.dart';
+import 'enhanced_text_field.dart';
 
 class TaskListToolbar extends ConsumerStatefulWidget {
   final String projectUid;
@@ -217,7 +218,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
         color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: TextField(
+      child: EnhancedTextField(
         controller: _searchController,
         focusNode: _searchFocusNode,
         style: theme.textTheme.bodyMedium,

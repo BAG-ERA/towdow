@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/task.dart';
 import '../../../../data/models/attendee.dart';
 import '../../../../core/logger.dart';
+import '../enhanced_text_field.dart';
 
 /// Dialog for managing task attendees
 class AttendeeDialog extends ConsumerStatefulWidget {
@@ -248,7 +249,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
       child: Column(
         children: [
           // Email field
-          TextFormField(
+          EnhancedTextFormField(
             controller: _emailController,
             decoration: InputDecoration(
               labelText: 'Email Address',
@@ -306,7 +307,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
           const SizedBox(height: 16),
           
           // Display name field
-          TextFormField(
+          EnhancedTextFormField(
             controller: _displayNameController,
             decoration: const InputDecoration(
               labelText: 'Display Name (Optional)',

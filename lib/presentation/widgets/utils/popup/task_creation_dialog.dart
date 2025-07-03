@@ -7,6 +7,7 @@ import '../../../../core/logger.dart';
 import '../../../../data/models/task.dart';
 import '../../../../data/providers/providers.dart';
 import 'due_date_dialog.dart';
+import '../enhanced_text_field.dart';
 
 class TaskCreationDialog extends ConsumerStatefulWidget {
   final String? sourceCalendarUid; // Optional project to assign the task to
@@ -52,7 +53,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
             ),
             const SizedBox(height: 16),
             
-            TextField(
+            EnhancedTextField(
               controller: summaryController,
               decoration: const InputDecoration(
                 labelText: 'Task summary *',
@@ -66,7 +67,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
             
             const SizedBox(height: 16),
             
-            TextField(
+            EnhancedTextField(
               controller: descriptionController,
               decoration: const InputDecoration(
                 labelText: 'Description (optional)',

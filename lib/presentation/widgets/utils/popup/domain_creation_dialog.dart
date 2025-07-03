@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
 import '../../../../data/providers/providers.dart';
+import '../enhanced_text_field.dart';
 
 class DomainCreationDialog extends ConsumerStatefulWidget {
   const DomainCreationDialog({super.key});
@@ -41,7 +42,7 @@ class _DomainCreationDialogState extends ConsumerState<DomainCreationDialog> {
             ),
             const SizedBox(height: 16),
             
-            TextField(
+            EnhancedTextField(
               controller: domainController,
               decoration: const InputDecoration(
                 labelText: 'Domain name *',

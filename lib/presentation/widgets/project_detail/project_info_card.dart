@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../../../core/theme/chart_theme.dart';
+import '../utils/enhanced_text_field.dart';
 
 class ProjectInfoCard extends ConsumerWidget {
   final TaskCalendar? project;
@@ -198,7 +199,7 @@ class _EditableProjectDescriptionState extends State<_EditableProjectDescription
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
+            EnhancedTextField(
               controller: _controller,
               focusNode: _focusNode,
               maxLines: null,

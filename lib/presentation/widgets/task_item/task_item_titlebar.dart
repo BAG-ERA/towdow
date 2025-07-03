@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../data/models/task.dart';
 import '../../../data/services/validator_service.dart';
 import 'task_item_date_badge.dart';
+import '../utils/enhanced_text_field.dart';
 
 class TaskItemTitlebar extends StatefulWidget {
   final Task task;
@@ -126,7 +127,7 @@ class _TaskItemTitlebarState extends State<TaskItemTitlebar> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
+            EnhancedTextField(
               controller: _controller,
               focusNode: _focusNode,
               decoration: const InputDecoration(

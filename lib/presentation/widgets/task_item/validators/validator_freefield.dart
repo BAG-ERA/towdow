@@ -2,6 +2,7 @@
 // Displays text input field with change detection
 
 import 'package:flutter/material.dart';
+import '../../utils/enhanced_text_field.dart';
 
 class ValidatorFreeField extends StatelessWidget {
   final Map<String, dynamic> validator;
@@ -18,7 +19,7 @@ class ValidatorFreeField extends StatelessWidget {
     final value = validator['value'] as String? ?? '';
     final validatorId = validator['id'] as String;
     
-    return TextField(
+    return EnhancedTextField(
       controller: TextEditingController(text: value),
       onChanged: (newValue) => onValueChanged(validatorId, newValue),
       decoration: InputDecoration(

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../data/models/task.dart';
 import 'chips/attendee_chip.dart';
 import 'chips/category_chip.dart';
+import '../utils/enhanced_text_field.dart';
 
 class TaskItemDescription extends StatefulWidget {
   final Task task;
@@ -79,7 +80,7 @@ class _TaskItemDescriptionState extends State<TaskItemDescription> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
+            EnhancedTextField(
               controller: _controller,
               focusNode: _focusNode,
               maxLines: null,
