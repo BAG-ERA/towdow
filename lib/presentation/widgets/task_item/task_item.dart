@@ -73,7 +73,10 @@ class _TaskItemState extends State<TaskItem> {
               const SizedBox(height: 12),
               
               // Description, attendees, and categories
-              TaskItemDescription(task: widget.task),
+              TaskItemDescription(
+                task: widget.task,
+                onTaskUpdated: widget.onTaskUpdated,
+              ),
               
               // Validators
               const SizedBox(height: 8),
