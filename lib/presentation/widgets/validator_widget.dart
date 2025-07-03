@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../data/models/task.dart';
 import '../../data/providers/providers.dart';
 import '../../data/services/validator_service.dart';
@@ -393,7 +394,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
   }
 
   String _generateId() {
-    return DateTime.now().millisecondsSinceEpoch.toString();
+    return const Uuid().v4();
   }
 
   // State update methods
