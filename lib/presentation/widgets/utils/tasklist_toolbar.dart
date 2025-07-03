@@ -2,6 +2,7 @@
 // Provides search functionality and task creation button
 // Responsive design adapts to mobile and desktop layouts
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../viewmodels/project_task_search_viewmodel.dart';
@@ -25,6 +26,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   bool _isSearchExpanded = false;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -32,9 +34,12 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
     
     // Listen to search controller changes for debounced search
     _searchController.addListener(() {
-      // Simple debounce implementation
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted && _searchController.text == _searchController.text) {
+      // Cancel previous timer
+      _debounceTimer?.cancel();
+      
+      // Create new timer for debounced search
+      _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+        if (mounted) {
           ref.read(projectTaskSearchProvider(widget.projectUid).notifier)
               .setSearchQuery(_searchController.text);
         }
@@ -43,7 +48,25 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
   }
 
   @override
+  void didUpdateWidget(TaskListToolbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // If project changed, sync controller with new project's search state
+    if (oldWidget.projectUid != widget.projectUid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          final searchState = ref.read(projectTaskSearchProvider(widget.projectUid));
+          if (_searchController.text != searchState.searchQuery) {
+            _searchController.text = searchState.searchQuery;
+          }
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -54,6 +77,15 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
     final theme = Theme.of(context);
     final searchState = ref.watch(projectTaskSearchProvider(widget.projectUid));
     final searchViewModel = ref.read(projectTaskSearchProvider(widget.projectUid).notifier);
+    
+    // Sync search controller with search state
+    if (_searchController.text != searchState.searchQuery) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _searchController.text = searchState.searchQuery;
+        }
+      });
+    }
     
     return Container(
       height: 56,

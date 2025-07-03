@@ -23,9 +23,11 @@ class ProjectTaskSearchViewModel extends StateNotifier<ProjectTaskSearchState> {
 
   /// Set search query
   void setSearchQuery(String query) {
+    final trimmedQuery = query.trim();
+    print('🔍 ProjectTaskSearchViewModel.setSearchQuery: "${trimmedQuery}" (was: "${state.searchQuery}")');
     state = state.copyWith(
-      searchQuery: query.trim(),
-      isSearchActive: query.trim().isNotEmpty,
+      searchQuery: trimmedQuery,
+      isSearchActive: trimmedQuery.isNotEmpty,
     );
   }
 
@@ -39,21 +41,32 @@ class ProjectTaskSearchViewModel extends StateNotifier<ProjectTaskSearchState> {
 
   /// Filter tasks based on search query
   List<Task> filterTasks(List<Task> allTasks) {
+    print('🔍 ProjectTaskSearchViewModel.filterTasks: searchQuery="${state.searchQuery}", allTasks.length=${allTasks.length}');
+    
     if (state.searchQuery.isEmpty) {
+      print('🔍 Empty search query, returning all ${allTasks.length} tasks');
       return allTasks;
     }
 
     final searchLower = state.searchQuery.toLowerCase();
     
-    return allTasks.where((task) {
+    final filteredTasks = allTasks.where((task) {
       final summaryMatch = task.summary.toLowerCase().contains(searchLower);
       final descriptionMatch = task.description != null && task.description!.toLowerCase().contains(searchLower);
       final categoriesMatch = task.categories.any(
         (category) => category.toLowerCase().contains(searchLower),
       );
       
-      return summaryMatch || descriptionMatch || categoriesMatch;
+      final matches = summaryMatch || descriptionMatch || categoriesMatch;
+      if (matches) {
+        print('🔍 Task matches: "${task.summary}"');
+      }
+      
+      return matches;
     }).toList();
+    
+    print('🔍 Filtered ${filteredTasks.length} tasks from ${allTasks.length} total tasks');
+    return filteredTasks;
   }
 }
 
@@ -68,7 +81,10 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   // Import from existing project detail screen providers
   final projectTasksAsync = ref.watch(projectTasksProvider(projectUid));
   final allTasks = projectTasksAsync.asData?.value ?? [];
+  final searchState = ref.watch(projectTaskSearchProvider(projectUid));
   final searchViewModel = ref.read(projectTaskSearchProvider(projectUid).notifier);
+  
+  print('🔍 filteredProjectTasksProvider called for project $projectUid with ${allTasks.length} tasks, searchQuery="${searchState.searchQuery}"');
   
   return searchViewModel.filterTasks(allTasks);
 }); 
