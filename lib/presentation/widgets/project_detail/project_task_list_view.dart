@@ -13,7 +13,7 @@ import '../../../core/logger.dart';
 import '../../../core/theme/chart_theme.dart';
 import '../../viewmodels/task_viewmodel.dart';
 
-class ProjectTaskListView extends ConsumerWidget {
+class ProjectTaskListView extends ConsumerStatefulWidget {
   final String projectUid;
   final AsyncValue<List<Task>> tasksAsync;
   final VoidCallback? onTasksRefresh;
@@ -26,12 +26,20 @@ class ProjectTaskListView extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return tasksAsync.when(
+  ConsumerState<ProjectTaskListView> createState() => _ProjectTaskListViewState();
+}
+
+class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
+  final Map<String, Map<String, TaskItemController>> _sectionControllers = {};
+  final Map<String, bool> _sectionExpandedStates = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.tasksAsync.when(
       data: (allTasks) {
         // Use filtered and sorted tasks instead of all tasks
-        final filteredTasks = ref.watch(filteredProjectTasksProvider(projectUid));
-        final searchState = ref.watch(projectTaskSearchProvider(projectUid));
+        final filteredTasks = ref.watch(filteredProjectTasksProvider(widget.projectUid));
+        final searchState = ref.watch(projectTaskSearchProvider(widget.projectUid));
         
         if (filteredTasks.isEmpty) {
           return Center(
@@ -86,6 +94,11 @@ class ProjectTaskListView extends ConsumerWidget {
           task.status == 'COMPLETED'
         ).toList();
 
+        // Initialize controllers for each section
+        _initializeControllers('overdue', overdueTasks);
+        _initializeControllers('pending', pendingTasks);
+        _initializeControllers('completed', completedTasks);
+
         return Column(
           children: [
             
@@ -98,27 +111,27 @@ class ProjectTaskListView extends ConsumerWidget {
                   children: [
                     // Overdue tasks section
                     if (overdueTasks.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'Overdue', overdueTasks.length, context.chartTheme.colors.error),
+                      _buildSectionHeader(context, 'Overdue', 'overdue', overdueTasks.length, context.chartTheme.colors.error),
                       const SizedBox(height: 8),
-                      _buildResponsiveTaskGrid(context, ref, overdueTasks),
+                      _buildResponsiveTaskGrid(context, 'overdue', overdueTasks),
                       if (pendingTasks.isNotEmpty || completedTasks.isNotEmpty)
                         const SizedBox(height: 24),
                     ],
                     
                     // Pending tasks section
                     if (pendingTasks.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'To Be Done', pendingTasks.length, context.chartTheme.colors.warning),
+                      _buildSectionHeader(context, 'To Be Done', 'pending', pendingTasks.length, context.chartTheme.colors.warning),
                       const SizedBox(height: 8),
-                      _buildResponsiveTaskGrid(context, ref, pendingTasks),
+                      _buildResponsiveTaskGrid(context, 'pending', pendingTasks),
                       if (completedTasks.isNotEmpty)
                         const SizedBox(height: 24),
                     ],
                     
                     // Completed tasks section
                     if (completedTasks.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'Done', completedTasks.length, context.chartTheme.colors.success),
+                      _buildSectionHeader(context, 'Done', 'completed', completedTasks.length, context.chartTheme.colors.success),
                       const SizedBox(height: 8),
-                      _buildResponsiveTaskGrid(context, ref, completedTasks),
+                      _buildResponsiveTaskGrid(context, 'completed', completedTasks),
                     ],
                   ],
                 ),
@@ -161,7 +174,7 @@ class ProjectTaskListView extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: onTasksRefresh,
+              onPressed: widget.onTasksRefresh,
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Retry'),
             ),
@@ -171,7 +184,24 @@ class ProjectTaskListView extends ConsumerWidget {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, int count, Color color) {
+  void _initializeControllers(String sectionKey, List<Task> tasks) {
+    if (!_sectionControllers.containsKey(sectionKey)) {
+      _sectionControllers[sectionKey] = {};
+    }
+    
+    final currentControllers = _sectionControllers[sectionKey]!;
+    final newControllers = <String, TaskItemController>{};
+    
+    for (final task in tasks) {
+      newControllers[task.uid] = currentControllers[task.uid] ?? TaskItemController();
+    }
+    
+    _sectionControllers[sectionKey] = newControllers;
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title, String sectionKey, int count, Color color) {
+    final isExpanded = _sectionExpandedStates[sectionKey] ?? false;
+    
     return Row(
       children: [
         Container(
@@ -190,18 +220,66 @@ class ProjectTaskListView extends ConsumerWidget {
             color: color,
           ),
         ),
+        const SizedBox(width: 16),
+        TextButton(
+          onPressed: () => _expandAllInSection(sectionKey),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.grey.shade600,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: const Text('Expand All', style: TextStyle(fontSize: 12)),
+        ),
+        const SizedBox(width: 8),
+        TextButton(
+          onPressed: () => _collapseAllInSection(sectionKey),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.grey.shade600,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: const Text('Collapse All', style: TextStyle(fontSize: 12)),
+        ),
       ],
     );
   }
 
+  void _expandAllInSection(String sectionKey) {
+    final controllers = _sectionControllers[sectionKey];
+    if (controllers != null) {
+      for (final controller in controllers.values) {
+        controller.expand();
+      }
+      setState(() {
+        _sectionExpandedStates[sectionKey] = true;
+      });
+    }
+  }
+
+  void _collapseAllInSection(String sectionKey) {
+    final controllers = _sectionControllers[sectionKey];
+    if (controllers != null) {
+      for (final controller in controllers.values) {
+        controller.collapse();
+      }
+      setState(() {
+        _sectionExpandedStates[sectionKey] = false;
+      });
+    }
+  }
+
   /// Builds a responsive grid layout for tasks that wraps to new rows when needed
-  Widget _buildResponsiveTaskGrid(BuildContext context, WidgetRef ref, List<Task> tasks) {
+  Widget _buildResponsiveTaskGrid(BuildContext context, String sectionKey, List<Task> tasks) {
     return Wrap(
       spacing: 12.0, // Horizontal spacing between tasks
       runSpacing: 12.0, // Vertical spacing between rows
       alignment: WrapAlignment.start,
       runAlignment: WrapAlignment.start,
       children: tasks.map((task) {
+        final controller = _sectionControllers[sectionKey]?[task.uid];
+        
         return ConstrainedBox(
           constraints: const BoxConstraints(
             maxWidth: 420,
@@ -217,11 +295,12 @@ class ProjectTaskListView extends ConsumerWidget {
             },
             child: TaskItem(
               task: task,
+              controller: controller,
               onTap: () => _viewTask(context, task),
               onToggleComplete: () => _toggleTaskComplete(context, ref, task),
               onTaskUpdated: (updatedTask) async {
                 await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                onTasksRefresh?.call();
+                widget.onTasksRefresh?.call();
               },
               onTaskDeleted: () => _deleteTask(context, ref, task),
             ),
@@ -243,7 +322,7 @@ class ProjectTaskListView extends ConsumerWidget {
     await taskViewModel.toggleTaskCompletion(task);
     
     // Refresh the tasks list
-    onTasksRefresh?.call();
+    widget.onTasksRefresh?.call();
     
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -264,7 +343,7 @@ class ProjectTaskListView extends ConsumerWidget {
     await taskViewModel.deleteTask(task.uid);
     
     // Refresh the tasks list
-    onTasksRefresh?.call();
+    widget.onTasksRefresh?.call();
     
     // Show confirmation
     if (context.mounted) {
