@@ -89,14 +89,14 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "app.flowit" "\0"
-            VALUE "FileDescription", "flowit_app" "\0"
-            VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "flowit_app" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 app.flowit. All rights reserved." "\0"
-            VALUE "OriginalFilename", "flowit_app.exe" "\0"
-            VALUE "ProductName", "flowit_app" "\0"
-            VALUE "ProductVersion", VERSION_AS_STRING "\0"
+            VALUE "CompanyName", "app.towdow" "\0"
+VALUE "FileDescription", "towdow_app" "\0"
+VALUE "FileVersion", VERSION_AS_STRING
+VALUE "InternalName", "towdow_app" "\0"
+VALUE "LegalCopyright", "Copyright (C) 2025 app.towdow. All rights reserved." "\0"
+VALUE "OriginalFilename", "towdow_app.exe" "\0"
+VALUE "ProductName", "towdow_app" "\0"
+VALUE "ProductVersion", VERSION_AS_STRING
         END
     END
     BLOCK "VarFileInfo"

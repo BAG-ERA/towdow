@@ -1,4 +1,4 @@
-package app.flowit.flowit_app
+package app.towdow.towdow_app
 
 import io.flutter.embedding.android.FlutterActivity
 
