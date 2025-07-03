@@ -11,6 +11,7 @@ import '../adaptive_app_layout.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../utils/popup/move_to_domain_dialog.dart';
+import 'drag_state_provider.dart';
 
 /// Data class for drag and drop operations
 class ProjectDragData {
@@ -203,11 +204,15 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
             ),
             onDragStarted: () {
               AppLogger.info('ProjectItem: Started dragging project ${widget.project.summary}');
+              // Notify global drag state
+              ref.read(dragStateProvider.notifier).startDragging(widget.project.flowitDomain);
               // Provide haptic feedback
               HapticFeedback.lightImpact();
             },
             onDragEnd: (details) {
               AppLogger.info('ProjectItem: Ended dragging project ${widget.project.summary}');
+              // Stop global drag state
+              ref.read(dragStateProvider.notifier).stopDragging();
             },
             child: projectWidget,
           ),

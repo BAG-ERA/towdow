@@ -8,7 +8,10 @@ import '../../../core/logger.dart';
 import '../../../core/theme/chart_theme_usage.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task_calendar.dart';
+import '../../../data/repositories/user_repository.dart';
+import '../../viewmodels/project_list_viewmodel.dart';
 import 'project_item_widget.dart';
+import 'reorder_drop_zone.dart';
 
 class ProjectsSection extends ConsumerWidget {
   const ProjectsSection({
@@ -349,6 +352,142 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     }
   }
 
+  /// Build project list for this domain with custom ordering support
+  Widget _buildReorderableProjectList() {
+    // Get projects in custom order, but always show all projects
+    return FutureBuilder<List<TaskCalendar>>(
+      future: _getCustomOrderedProjectsForDomain(),
+      builder: (context, snapshot) {
+        final orderedProjects = snapshot.data ?? widget.projects;
+        
+        return Column(
+          children: _buildProjectListWithDropZones(orderedProjects),
+        );
+      },
+    );
+  }
+
+  /// Build project list with reorder drop zones between projects
+  List<Widget> _buildProjectListWithDropZones(List<TaskCalendar> projects) {
+    final widgets = <Widget>[];
+    
+    // Add drop zone at the beginning for inserting at index 0
+    widgets.add(ReorderDropZone(
+      targetDomain: widget.domain,
+      insertIndex: 0,
+      onProjectReorder: _handleProjectReorder,
+    ));
+    
+    // Add projects with drop zones between them
+    for (int i = 0; i < projects.length; i++) {
+      // Add project item
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: ProjectItemWidget(
+            project: projects[i], 
+            isDesktop: widget.isDesktop,
+          ),
+        ),
+      );
+      
+      // Add drop zone after each project (except the last one)
+      if (i < projects.length - 1) {
+        widgets.add(ReorderDropZone(
+          targetDomain: widget.domain,
+          insertIndex: i + 1,
+          onProjectReorder: _handleProjectReorder,
+        ));
+      }
+    }
+    
+    // Add final drop zone at the end
+    widgets.add(ReorderDropZone(
+      targetDomain: widget.domain,
+      insertIndex: projects.length,
+      onProjectReorder: _handleProjectReorder,
+    ));
+    
+    return widgets;
+  }
+
+  /// Handle reordering a project within this domain
+  void _handleProjectReorder(ProjectDragData dragData, int insertIndex) async {
+    try {
+      AppLogger.info('DomainSection: Reordering project ${dragData.project.summary} to index $insertIndex in domain ${widget.domain}');
+      
+      final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+      await projectListViewModel.reorderProject(dragData.project.uid, insertIndex);
+      
+      AppLogger.info('DomainSection: Successfully reordered project ${dragData.project.summary}');
+    } catch (e) {
+      AppLogger.error('DomainSection: Failed to reorder project ${dragData.project.summary}: $e');
+      
+      // Show error feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to reorder project: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  /// Get projects in custom order for this specific domain
+  Future<List<TaskCalendar>> _getCustomOrderedProjectsForDomain() async {
+    final userRepository = ref.read(userRepositoryProvider);
+    final preferencesResult = await userRepository.getUserPreferences();
+    
+    return preferencesResult.when(
+      success: (preferences) {
+        final projectOrder = preferences.projectOrder;
+        final domainProjects = widget.projects;
+        
+        if (projectOrder.isEmpty) {
+          // No custom order defined, return projects sorted by name
+          final sorted = List<TaskCalendar>.from(domainProjects);
+          sorted.sort((a, b) => a.displayName.compareTo(b.displayName));
+          return sorted;
+        }
+        
+        // Apply user-defined ordering within this domain
+        final orderedProjects = <TaskCalendar>[];
+        final unorderedProjects = <TaskCalendar>[];
+        
+        // Add projects in user-defined order (only those in this domain)
+        for (final projectUid in projectOrder) {
+          final project = domainProjects.cast<TaskCalendar?>().firstWhere(
+            (p) => p?.uid == projectUid,
+            orElse: () => null,
+          );
+          if (project != null) {
+            orderedProjects.add(project);
+          }
+        }
+        
+        // Add any projects in this domain that aren't in the user order
+        for (final project in domainProjects) {
+          if (!projectOrder.contains(project.uid)) {
+            unorderedProjects.add(project);
+          }
+        }
+        
+        // Sort unordered projects by name and append to the end
+        unorderedProjects.sort((a, b) => a.displayName.compareTo(b.displayName));
+        
+        return [...orderedProjects, ...unorderedProjects];
+      },
+      failure: (failure) {
+        AppLogger.error('DomainSection: Failed to get user preferences for ordering', failure.exception, failure.stackTrace);
+        // Fallback to name sorting
+        final sorted = List<TaskCalendar>.from(widget.projects);
+        sorted.sort((a, b) => a.displayName.compareTo(b.displayName));
+        return sorted;
+      },
+    );
+  }
+
   /// Handle dropping a project onto this domain section
   void _handleProjectDrop(BuildContext context, ProjectDragData dragData) async {
     // Don't move project if it's already in this domain
@@ -390,6 +529,11 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
   @override
   Widget build(BuildContext context) {
     return DragTarget<ProjectDragData>(
+      onWillAcceptWithDetails: (details) {
+        // Only accept projects from different domains (for domain change, not reordering)
+        final draggedFromDomain = details.data.currentDomain;
+        return draggedFromDomain != widget.domain;
+      },
       onAcceptWithDetails: (details) => _handleProjectDrop(context, details.data),
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty;
@@ -517,14 +661,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                           ),
                         ),
                       )
-                    : Column(
-                        children: widget.projects.map((project) => 
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16),
-                            child: ProjectItemWidget(project: project, isDesktop: widget.isDesktop),
-                          )
-                        ).toList(),
-                      ),
+                    : _buildReorderableProjectList(),
               ),
               
               const SizedBox(height: 8),
@@ -550,9 +687,150 @@ class _NoDomainSection extends ConsumerWidget {
     required this.isDesktop,
   });
 
+  /// Build project list for projects without domain with custom ordering support
+  Widget _buildReorderableProjectList(BuildContext context, WidgetRef ref) {
+    // Get projects in custom order, but always show all projects
+    return FutureBuilder<List<TaskCalendar>>(
+      future: _getCustomOrderedProjectsWithoutDomain(ref),
+      builder: (context, snapshot) {
+        final orderedProjects = snapshot.data ?? projects;
+        
+        return Column(
+          children: _buildProjectListWithDropZones(orderedProjects, context, ref),
+        );
+      },
+    );
+  }
+
+  /// Build project list with reorder drop zones between projects
+  List<Widget> _buildProjectListWithDropZones(List<TaskCalendar> projects, BuildContext context, WidgetRef ref) {
+    final widgets = <Widget>[];
+    
+    // Add drop zone at the beginning for inserting at index 0
+    widgets.add(ReorderDropZone(
+      targetDomain: null, // No domain
+      insertIndex: 0,
+      onProjectReorder: (dragData, insertIndex) => _handleProjectReorder(context, ref, dragData, insertIndex),
+    ));
+    
+    // Add projects with drop zones between them
+    for (int i = 0; i < projects.length; i++) {
+      // Add project item
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: ProjectItemWidget(
+            project: projects[i], 
+            isDesktop: isDesktop,
+          ),
+        ),
+      );
+      
+      // Add drop zone after each project (except the last one)
+      if (i < projects.length - 1) {
+        widgets.add(ReorderDropZone(
+          targetDomain: null, // No domain
+          insertIndex: i + 1,
+          onProjectReorder: (dragData, insertIndex) => _handleProjectReorder(context, ref, dragData, insertIndex),
+        ));
+      }
+    }
+    
+    // Add final drop zone at the end
+    widgets.add(ReorderDropZone(
+      targetDomain: null, // No domain
+      insertIndex: projects.length,
+      onProjectReorder: (dragData, insertIndex) => _handleProjectReorder(context, ref, dragData, insertIndex),
+    ));
+    
+    return widgets;
+  }
+
+  /// Handle reordering a project within the no-domain section
+  void _handleProjectReorder(BuildContext context, WidgetRef ref, ProjectDragData dragData, int insertIndex) async {
+    try {
+      AppLogger.info('NoDomainSection: Reordering project ${dragData.project.summary} to index $insertIndex');
+      
+      final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+      await projectListViewModel.reorderProject(dragData.project.uid, insertIndex);
+      
+      AppLogger.info('NoDomainSection: Successfully reordered project ${dragData.project.summary}');
+    } catch (e) {
+      AppLogger.error('NoDomainSection: Failed to reorder project ${dragData.project.summary}: $e');
+      
+      // Show error feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to reorder project: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  /// Get projects in custom order for projects without domain
+  Future<List<TaskCalendar>> _getCustomOrderedProjectsWithoutDomain(WidgetRef ref) async {
+    final userRepository = ref.read(userRepositoryProvider);
+    final preferencesResult = await userRepository.getUserPreferences();
+    
+    return preferencesResult.when(
+      success: (preferences) {
+        final projectOrder = preferences.projectOrder;
+        final noDomainProjects = projects;
+        
+        if (projectOrder.isEmpty) {
+          // No custom order defined, return projects sorted by name
+          final sorted = List<TaskCalendar>.from(noDomainProjects);
+          sorted.sort((a, b) => a.displayName.compareTo(b.displayName));
+          return sorted;
+        }
+        
+        // Apply user-defined ordering for projects without domain
+        final orderedProjects = <TaskCalendar>[];
+        final unorderedProjects = <TaskCalendar>[];
+        
+        // Add projects in user-defined order (only those without domain)
+        for (final projectUid in projectOrder) {
+          final project = noDomainProjects.cast<TaskCalendar?>().firstWhere(
+            (p) => p?.uid == projectUid,
+            orElse: () => null,
+          );
+          if (project != null) {
+            orderedProjects.add(project);
+          }
+        }
+        
+        // Add any projects without domain that aren't in the user order
+        for (final project in noDomainProjects) {
+          if (!projectOrder.contains(project.uid)) {
+            unorderedProjects.add(project);
+          }
+        }
+        
+        // Sort unordered projects by name and append to the end
+        unorderedProjects.sort((a, b) => a.displayName.compareTo(b.displayName));
+        
+        return [...orderedProjects, ...unorderedProjects];
+      },
+      failure: (failure) {
+        AppLogger.error('NoDomainSection: Failed to get user preferences for ordering', failure.exception, failure.stackTrace);
+        // Fallback to name sorting
+        final sorted = List<TaskCalendar>.from(projects);
+        sorted.sort((a, b) => a.displayName.compareTo(b.displayName));
+        return sorted;
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DragTarget<ProjectDragData>(
+      onWillAcceptWithDetails: (details) {
+        // Only accept projects from domains (for removing from domain, not reordering)
+        final draggedFromDomain = details.data.currentDomain;
+        return draggedFromDomain != null; // Only accept projects that have a domain
+      },
       onAcceptWithDetails: (details) => _handleProjectDrop(context, details.data),
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty;
@@ -562,12 +840,7 @@ class _NoDomainSection extends ConsumerWidget {
           children: [
             // Projects without domain
             if (projects.isNotEmpty) ...[
-              ...projects.map((project) => 
-                Padding(
-                  padding: const EdgeInsets.only(left: 16),
-                  child: ProjectItemWidget(project: project, isDesktop: this.isDesktop),
-                )
-              ),
+              _buildReorderableProjectList(context, ref),
             ],
             
             // Drop zone for removing projects from domains - only show when dragging

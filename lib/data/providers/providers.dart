@@ -10,6 +10,7 @@ import '../services/status_service.dart';
 import '../repositories/task_repository.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
+import '../repositories/user_repository.dart';
 import '../models/task.dart';
 import '../models/task_calendar.dart';
 import '../models/caldav_account.dart';
@@ -44,6 +45,11 @@ final calendarRepositoryProvider = Provider<CalendarRepository>((ref) {
 final accountRepositoryProvider = Provider<AccountRepository>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
   return LocalAccountRepository(storageService);
+});
+
+final userRepositoryProvider = Provider<UserRepository>((ref) {
+  final storageService = ref.watch(localStorageServiceProvider);
+  return LocalUserRepository(storageService);
 });
 
 // CalDAV service provider  
@@ -155,7 +161,8 @@ final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel,
   final syncService = ref.watch(syncServiceProvider);
   final domainService = ref.watch(domainServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
-  return ProjectListViewModel(calendarRepository, taskRepository, syncService, domainService, accountRepository);
+  final userRepository = ref.watch(userRepositoryProvider);
+  return ProjectListViewModel(calendarRepository, taskRepository, syncService, domainService, accountRepository, userRepository);
 });
 
 final validatorViewModelProvider = StateNotifierProvider<ValidatorViewModel, ValidatorViewModelState>((ref) {
