@@ -2,6 +2,7 @@
 // Displays radio button options with selection interaction and edit capabilities for organizers
 
 import 'package:flutter/material.dart';
+import '../../utils/enhanced_text_field.dart';
 
 class ValidatorSelect extends StatelessWidget {
   final Map<String, dynamic> validator;
@@ -94,7 +95,7 @@ class ValidatorSelect extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Edit Option'),
-        content: TextField(
+        content: EnhancedTextField(
           controller: controller,
           decoration: const InputDecoration(
             labelText: 'Option text',

@@ -1,6 +1,8 @@
 ﻿// CalDAV service implementing RFC 4791 for calendar operations
 // Provides high-level CalDAV operations for VTODO synchronization
 
+import 'dart:math' as math;
+
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/caldav_account.dart';
@@ -406,11 +408,68 @@ class CalDAVService {
     );
   }
 
+  /// Delete a calendar collection from the server using DELETE
+  Future<Result<void>> deleteCalendar(String calendarPath) async {
+    try {
+      // Normalize calendar path to ensure it ends with /
+      final normalizedPath = calendarPath.endsWith('/') ? calendarPath : '$calendarPath/';
+      AppLogger.info('CalDAVService: Deleting calendar collection at $normalizedPath');
+      
+      // Send DELETE request to remove the calendar collection
+      final response = await _client.delete(normalizedPath);
+      return await response.when(
+        success: (webDavResponse) async {
+          AppLogger.debug('CalDAVService: DELETE response status: ${webDavResponse.statusCode}');
+          AppLogger.debug('CalDAVService: DELETE response body: ${webDavResponse.body}');
+          
+          // According to RFC 4918, successful collection deletion should return 204 No Content
+          // Some servers might return 200 OK or 202 Accepted
+          if (webDavResponse.statusCode == 204 || 
+              webDavResponse.statusCode == 200 || 
+              webDavResponse.statusCode == 202) {
+            AppLogger.info('CalDAVService: Calendar collection deleted successfully with status ${webDavResponse.statusCode}');
+            return Result.success(null);
+          } else if (webDavResponse.statusCode == 404) {
+            // 404 Not Found - calendar doesn't exist (consider this success)
+            AppLogger.warning('CalDAVService: Calendar not found at $normalizedPath (already deleted?)');
+            return Result.success(null);
+          } else if (webDavResponse.statusCode == 403) {
+            // 403 Forbidden - no permission to delete calendar
+            AppLogger.warning('CalDAVService: No permission to delete calendar at $normalizedPath');
+            return Result.failure(Failure(
+              message: 'Permission denied - cannot delete calendar at this location',
+              exception: Exception('HTTP 403 Forbidden'),
+            ));
+          } else {
+            AppLogger.error('CalDAVService: Failed to delete calendar with status ${webDavResponse.statusCode}');
+            return Result.failure(Failure(
+              message: 'Failed to delete calendar: HTTP ${webDavResponse.statusCode}\nResponse: ${webDavResponse.body}',
+              exception: Exception('Server returned ${webDavResponse.statusCode}'),
+            ));
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: DELETE request failed', failure.exception, failure.stackTrace);
+          return Result.failure(failure);
+        },
+      );
+
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Failed to delete calendar', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to delete calendar: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
   /// Create a new calendar on the server using MKCALENDAR
   Future<Result<TaskCalendar>> createCalendar({
     required String calendarPath,
     required String displayName,
     String? description,
+    String? uid,
   }) async {
     try {
       // Normalize calendar path to ensure it ends with /
@@ -456,6 +515,7 @@ class CalDAVService {
                path: normalizedPath,
                displayName: displayName,
                description: description ?? 'Created by FlowIt',
+               uid: uid,
              ));
                      } else if (webDavResponse.statusCode == 409) {
              // 409 Conflict - calendar already exists
@@ -495,86 +555,178 @@ class CalDAVService {
     }
   }
 
-  /// Update calendar FlowIt properties (domain, status, etc.) on server using PROPPATCH
+  /// Update calendar properties (standard + FlowIt properties) on server using PROPPATCH
   Future<Result<void>> updateCalendarProperties(TaskCalendar calendar) async {
     try {
-      AppLogger.info('CalDAVService: Starting FlowIt properties PROPPATCH for ${calendar.displayName}');
+      AppLogger.info('CalDAVService: Starting calendar properties PROPPATCH for ${calendar.displayName}');
       AppLogger.info('CalDAVService: Calendar path: ${calendar.path}');
+      AppLogger.info('CalDAVService: Calendar UID: ${calendar.uid}');
+      AppLogger.info('CalDAVService: Description: ${calendar.description.isNotEmpty ? calendar.description.substring(0, math.min(50, calendar.description.length)) + "..." : "(empty)"}');
       AppLogger.info('CalDAVService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
       AppLogger.info('CalDAVService: Status value: ${calendar.flowitStatus ?? "(null)"}');
       
-      // Generate PROPPATCH XML for FlowIt properties
+      // First update WebDAV properties with PROPPATCH
       final proppatchXml = _generateFlowItPropertiesPropPatch(calendar);
       AppLogger.info('CalDAVService: Generated PROPPATCH XML:\n$proppatchXml');
       
-      // Use PROPPATCH to set WebDAV property on calendar collection
       AppLogger.info('CalDAVService: Sending PROPPATCH request to: ${calendar.path}');
       
       final proppatchResult = await _client.proppatch(calendar.path, proppatchXml);
       
-      return await proppatchResult.when(
+      final proppatchSuccess = await proppatchResult.when(
         success: (response) async {
           AppLogger.info('CalDAVService: PROPPATCH completed with status: ${response.statusCode}');
           AppLogger.info('CalDAVService: Response headers: ${response.headers}');
-          AppLogger.info('CalDAVService: Response body: ${response.body}');
+          
+          // Log response body only if it's not too long
+          final responseBody = response.body;
+          if (responseBody.length > 500) {
+            AppLogger.info('CalDAVService: Response body (truncated): ${responseBody.substring(0, 500)}...');
+          } else {
+            AppLogger.info('CalDAVService: Response body: $responseBody');
+          }
           
           if (response.statusCode == 207 || response.statusCode == 200) {
-            AppLogger.info('CalDAVService: FlowIt properties (domain, status) updated successfully');
-            return Result.success(null);
+            AppLogger.info('CalDAVService: Calendar WebDAV properties updated successfully');
+            return true;
           } else {
-            AppLogger.warning('CalDAVService: PROPPATCH returned ${response.statusCode} (non-critical)');
-            return Result.success(null);
+            final errorMsg = 'PROPPATCH returned ${response.statusCode}: ${responseBody.isNotEmpty ? responseBody : "No error details"}';
+            AppLogger.warning('CalDAVService: $errorMsg');
+            return false;
           }
         },
         failure: (failure) async {
           AppLogger.error('CalDAVService: PROPPATCH failed: ${failure.message}');
-          AppLogger.error('CalDAVService: Failure code: ${failure.code}');
-          return Result.success(null);
+          return false;
         },
       );
+      
+      // Also update the calendar content (VCALENDAR) with PUT
+      final contentUpdateResult = await updateCalendarContent(calendar);
+      final contentSuccess = await contentUpdateResult.when(
+        success: (_) async {
+          AppLogger.info('CalDAVService: Calendar content updated successfully');
+          return true;
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: Calendar content update failed: ${failure.message}');
+          return false;
+        },
+      );
+      
+      // Return success if at least one update succeeded
+      if (proppatchSuccess || contentSuccess) {
+        AppLogger.info('CalDAVService: Calendar update completed (properties: $proppatchSuccess, content: $contentSuccess)');
+        return Result.success(null);
+      } else {
+        return Result.failure(Failure(
+          message: 'Both property and content updates failed',
+          code: 'UPDATE_FAILED',
+        ));
+      }
     } catch (e, stackTrace) {
-      AppLogger.error('CalDAVService: Exception during PROPPATCH', e, stackTrace);
-      return Result.success(null);
+      AppLogger.error('CalDAVService: Exception during calendar update', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Exception during calendar update: $e',
+        code: 'EXCEPTION',
+      ));
     }
   }
 
-  /// Generate PROPPATCH XML for setting FlowIt properties (domain, status, etc.)
+  /// Update calendar content (VCALENDAR) on server using PUT
+  Future<Result<void>> updateCalendarContent(TaskCalendar calendar) async {
+    try {
+      AppLogger.info('CalDAVService: Starting calendar content update for ${calendar.displayName}');
+      
+      // Generate VCALENDAR content
+      final vcalendarContent = _serializeCalendarProperties(calendar);
+      AppLogger.info('CalDAVService: Generated VCALENDAR content (${vcalendarContent.length} chars)');
+      
+      // Construct calendar URL (path + .ics)
+      final calendarUrl = '${calendar.path}.ics';
+      AppLogger.info('CalDAVService: Updating calendar content at: $calendarUrl');
+      
+      // PUT calendar content to server
+      final result = await _client.put(
+        calendarUrl,
+        vcalendarContent,
+      );
+      
+      return await result.when(
+        success: (response) async {
+          AppLogger.info('CalDAVService: PUT calendar content completed with status: ${response.statusCode}');
+          
+          if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+            AppLogger.info('CalDAVService: Calendar content updated successfully');
+            return Result.success(null);
+          } else {
+            final errorMsg = 'PUT calendar content returned ${response.statusCode}: ${response.body}';
+            AppLogger.warning('CalDAVService: $errorMsg');
+            return Result.failure(Failure(
+              message: errorMsg,
+              code: response.statusCode.toString(),
+            ));
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: PUT calendar content failed: ${failure.message}');
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Exception during calendar content update', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Exception during calendar content update: $e',
+        code: 'EXCEPTION',
+      ));
+    }
+  }
+
+  /// Generate PROPPATCH XML for setting both standard and FlowIt properties
   String _generateFlowItPropertiesPropPatch(TaskCalendar calendar) {
     final xml = StringBuffer();
     
     xml.writeln('<?xml version="1.0" encoding="utf-8"?>');
-    xml.writeln('<D:propertyupdate xmlns:D="DAV:" xmlns:FLOWIT="https://flowit.app/ns/">');
+    xml.writeln('<D:propertyupdate xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:FLOWIT="https://flowit.app/ns/">');
     
-    // Handle domain property
-    if (calendar.flowitDomain != null && calendar.flowitDomain!.isNotEmpty) {
-      // Set the domain property
-      xml.writeln('  <D:set>');
-      xml.writeln('    <D:prop>');
-      xml.writeln('      <FLOWIT:domain>${_escapeXmlText(calendar.flowitDomain!)}</FLOWIT:domain>');
-      xml.writeln('    </D:prop>');
-      xml.writeln('  </D:set>');
+    xml.writeln('  <D:set>');
+    xml.writeln('    <D:prop>');
+    
+    // Set standard CalDAV properties
+    xml.writeln('      <D:displayname><![CDATA[${calendar.displayName}]]></D:displayname>');
+    
+    if (calendar.description.isNotEmpty) {
+      xml.writeln('      <C:calendar-description><![CDATA[${calendar.description}]]></C:calendar-description>');
     } else {
-      // Remove the domain property if null/empty
-      xml.writeln('  <D:remove>');
-      xml.writeln('    <D:prop>');
-      xml.writeln('      <FLOWIT:domain/>');
-      xml.writeln('    </D:prop>');
-      xml.writeln('  </D:remove>');
+      xml.writeln('      <C:calendar-description></C:calendar-description>');
     }
     
-    // Handle status property
+    // Set FlowIt properties if they exist
+    if (calendar.flowitDomain != null && calendar.flowitDomain!.isNotEmpty) {
+      xml.writeln('      <FLOWIT:domain>${_escapeXmlText(calendar.flowitDomain!)}</FLOWIT:domain>');
+    }
+    
     if (calendar.flowitStatus != null && calendar.flowitStatus!.isNotEmpty) {
-      // Set the status property
-      xml.writeln('  <D:set>');
-      xml.writeln('    <D:prop>');
       xml.writeln('      <FLOWIT:status>${_escapeXmlText(calendar.flowitStatus!)}</FLOWIT:status>');
-      xml.writeln('    </D:prop>');
-      xml.writeln('  </D:set>');
-    } else {
-      // Remove the status property if null/empty (default to ONGOING)
+    }
+    
+    xml.writeln('    </D:prop>');
+    xml.writeln('  </D:set>');
+    
+    // Remove FlowIt properties if they're null/empty
+    if ((calendar.flowitDomain == null || calendar.flowitDomain!.isEmpty) || 
+        (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty)) {
       xml.writeln('  <D:remove>');
       xml.writeln('    <D:prop>');
-      xml.writeln('      <FLOWIT:status/>');
+      
+      if (calendar.flowitDomain == null || calendar.flowitDomain!.isEmpty) {
+        xml.writeln('      <FLOWIT:domain/>');
+      }
+      
+      if (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) {
+        xml.writeln('      <FLOWIT:status/>');
+      }
+      
       xml.writeln('    </D:prop>');
       xml.writeln('  </D:remove>');
     }
@@ -607,7 +759,7 @@ class CalDAVService {
     vcalendar.writeln('DTSTAMP:${_formatDateTime(calendar.dtstamp)}');
     vcalendar.writeln('CREATED:${_formatDateTime(calendar.created)}');
     vcalendar.writeln('LAST-MODIFIED:${_formatDateTime(calendar.lastModified)}');
-    vcalendar.writeln('SUMMARY:${_escapeCalendarText(calendar.summary)}');
+    vcalendar.writeln('SUMMARY:${_escapeCalendarText(calendar.displayName)}');
     vcalendar.writeln('STATUS:${calendar.status}');
     vcalendar.writeln('PERCENT-COMPLETE:${calendar.percentComplete}');
     
@@ -704,7 +856,6 @@ class CalDAVService {
         dtstamp: dtstamp,
         created: created,
         lastModified: lastModified,
-        summary: summary,
         status: status,
         percentComplete: percentComplete,
         organizer: organizer,
@@ -788,5 +939,5 @@ class CalDAVCapabilities {
     required this.taskCalendars,
     required this.serverInfo,
   });
-  }
+}
    

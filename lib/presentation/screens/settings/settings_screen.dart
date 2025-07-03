@@ -4,19 +4,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
-import '../../../data/services/sync_service.dart';
 import 'caldav_management_screen.dart';
+import 'connection_info_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
+    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
+    
     return Scaffold(
-      appBar: AppBar(
+      appBar: isDesktop ? AppBar(
         title: const Text('Settings'),
         automaticallyImplyLeading: false,
-      ),
+        scrolledUnderElevation: 0,
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+      ) : null,
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
@@ -24,15 +31,16 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Account',
             children: [
               _SettingsItem(
-                title: 'CalDAV Connection',
-                subtitle: 'Manage server connections',
-                icon: Icons.cloud_rounded,
-                onTap: () => _showConnectionManagement(context, ref),
+                title: 'Connection Information',
+                subtitle: 'View account details and status',
+                icon: Icons.info_rounded,
+                onTap: () => _showConnectionInfo(context, ref),
               ),
-              const _SettingsItem(
-                title: 'Sync Settings',
-                subtitle: 'Configure sync behavior',
+              _SettingsItem(
+                title: 'Sync Setting',
+                subtitle: 'Manage CalDAV synchronization',
                 icon: Icons.sync_rounded,
+                onTap: () => _showSyncSettings(context, ref),
               ),
             ],
           ),
@@ -67,12 +75,6 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsSection(
             title: 'Debug',
             children: [
-              _SettingsItem(
-                title: 'Sync Now',
-                subtitle: 'Force immediate sync with server',
-                icon: Icons.sync_rounded,
-                onTap: () => _performSync(context, ref),
-              ),
               _SettingsItem(
                 title: 'Clear All Data',
                 subtitle: 'Delete all local data without disconnecting',
@@ -111,6 +113,15 @@ class SettingsScreen extends ConsumerWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const CalDAVManagementScreen(),
+      ),
+    );
+  }
+
+  Future<void> _showConnectionInfo(BuildContext context, WidgetRef ref) async {
+    // Navigate to connection information screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ConnectionInfoScreen(),
       ),
     );
   }
@@ -196,56 +207,13 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _performSync(BuildContext context, WidgetRef ref) async {
-    try {
-      final syncService = ref.read(syncServiceProvider);
-      
-      // Show loading indicator
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🔄 Syncing...')),
-      );
-      
-      final result = await syncService.syncNow();
-      
-      if (context.mounted) {
-        result.when(
-          success: (syncResult) {
-            if (syncResult.success) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('✅ Sync completed: ${syncResult.syncedItems} items synced'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('⚠️ Sync completed with errors: ${syncResult.errors.join(', ')}'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            }
-          },
-          failure: (failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('❌ Sync failed: ${failure.message}'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          },
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Sync error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+  Future<void> _showSyncSettings(BuildContext context, WidgetRef ref) async {
+    // Navigate to sync/CalDAV management screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const CalDAVManagementScreen(),
+      ),
+    );
   }
 
   Future<void> _clearAllData(BuildContext context, WidgetRef ref) async {

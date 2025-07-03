@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
+import '../../../../core/theme/chart_theme_usage.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../data/models/task_calendar.dart';
 import 'domain_creation_dialog.dart';
@@ -66,7 +67,7 @@ class _MoveToDomainDialogState extends ConsumerState<MoveToDomainDialog> {
   Widget _buildDialog(BuildContext context, List<String> availableDomains) {
 
     return AlertDialog(
-      title: Text('Move "${widget.project.summary}" to Domain'),
+      title: Text('Move "${widget.project.displayName}" to Domain'),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -99,7 +100,10 @@ class _MoveToDomainDialogState extends ConsumerState<MoveToDomainDialog> {
             
             // Existing domains
             ...availableDomains.map((domain) => RadioListTile<String?>(
-              title: Text(domain),
+              title: Text(
+                domain,
+                style: context.domainNameStyle,
+              ),
               value: domain,
               groupValue: selectedDomain,
               onChanged: (value) => setState(() => selectedDomain = value),
@@ -174,8 +178,8 @@ class _MoveToDomainDialogState extends ConsumerState<MoveToDomainDialog> {
         SnackBar(
           content: Text(
             selectedDomain == null 
-                ? 'Removed "${widget.project.summary}" from domain'
-                : 'Moved "${widget.project.summary}" to "$selectedDomain"'
+                ? 'Removed "${widget.project.displayName}" from domain'
+                : 'Moved "${widget.project.displayName}" to "$selectedDomain"'
           ),
         ),
       );

@@ -7,6 +7,7 @@ import '../../../../data/models/caldav_account.dart';
 import '../../../../data/services/caldav_service.dart';
 import 'calendar_selection_screen.dart';
 import 'package:uuid/uuid.dart';
+import '../../../widgets/utils/enhanced_text_field.dart';
 
 class CustomCaldavDialog extends ConsumerStatefulWidget {
   const CustomCaldavDialog({super.key});
@@ -98,28 +99,26 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
                     return Row(
                       children: [
                         Expanded(
-                          child: TextFormField(
+                          child: EnhancedTextFormField(
                             controller: _firstNameController,
                             decoration: const InputDecoration(
                               labelText: 'First Name',
                               hintText: 'John',
                               border: OutlineInputBorder(),
                             ),
-                            textCapitalization: TextCapitalization.words,
-                            autofillHints: const [AutofillHints.givenName],
+                            textInputAction: TextInputAction.next,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: TextFormField(
+                          child: EnhancedTextFormField(
                             controller: _lastNameController,
                             decoration: const InputDecoration(
                               labelText: 'Last Name',
                               hintText: 'Doe',
                               border: OutlineInputBorder(),
                             ),
-                            textCapitalization: TextCapitalization.words,
-                            autofillHints: const [AutofillHints.familyName],
+                            textInputAction: TextInputAction.next,
                           ),
                         ),
                       ],

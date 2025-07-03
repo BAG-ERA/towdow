@@ -2,6 +2,7 @@
 // Displays checklist items with checkbox interaction and edit capabilities for organizers
 
 import 'package:flutter/material.dart';
+import '../../utils/enhanced_text_field.dart';
 
 class ValidatorChecklist extends StatelessWidget {
   final Map<String, dynamic> validator;
@@ -135,7 +136,7 @@ class ValidatorChecklist extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Edit Item'),
-        content: TextField(
+        content: EnhancedTextField(
           controller: controller,
           decoration: const InputDecoration(
             labelText: 'Item text',

@@ -13,6 +13,7 @@ import 'data/models/automated_task.dart';
 import 'data/models/caldav_account.dart';
 import 'data/models/validator.dart';
 import 'data/models/task_calendar.dart';
+import 'data/models/user_preferences.dart';
 import 'data/services/local_storage_service.dart';
 import 'data/providers/providers.dart';
 
@@ -35,6 +36,9 @@ void main() async {
   Hive.registerAdapter(AttendeeStatusAdapter());
   Hive.registerAdapter(AttendeeRoleAdapter());
   Hive.registerAdapter(CalendarUserTypeAdapter());
+  
+  // Register User Preferences adapter
+  Hive.registerAdapter(UserPreferencesAdapter());
   
   // Initialize local storage service
   final storageService = LocalStorageService();

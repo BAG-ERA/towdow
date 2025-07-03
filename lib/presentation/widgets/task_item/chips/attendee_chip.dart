@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../../../../data/models/attendee.dart';
+import '../../../../core/theme/chart_theme.dart';
 
 class AttendeeChip extends StatelessWidget {
   final Attendee attendee;
@@ -14,30 +15,30 @@ class AttendeeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Color based on status
+    // Color based on status using FlowIt brand colors
     Color containerColor;
     Color textColor;
     
     switch (attendee.status) {
       case AttendeeStatus.accepted:
-        containerColor = Colors.green.withValues(alpha: 0.15);
-        textColor = Colors.green.shade700;
+        containerColor = context.chartTheme.colors.success.withValues(alpha: 0.15); // Water Green
+        textColor = context.chartTheme.colors.success;
         break;
       case AttendeeStatus.declined:
-        containerColor = Colors.red.withValues(alpha: 0.15);
-        textColor = Colors.red.shade700;
+        containerColor = context.chartTheme.colors.error.withValues(alpha: 0.15); // Pink
+        textColor = context.chartTheme.colors.error;
         break;
       case AttendeeStatus.tentative:
-        containerColor = Colors.orange.withValues(alpha: 0.15);
-        textColor = Colors.orange.shade700;
+        containerColor = context.chartTheme.colors.warning.withValues(alpha: 0.15); // Yellow Dark
+        textColor = context.chartTheme.colors.warning;
         break;
       case AttendeeStatus.delegated:
-        containerColor = Colors.purple.withValues(alpha: 0.15);
-        textColor = Colors.purple.shade700;
+        containerColor = context.chartTheme.colors.tertiary.withValues(alpha: 0.15); // Violet
+        textColor = context.chartTheme.colors.tertiary;
         break;
       default:
-        containerColor = Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.7);
-        textColor = Theme.of(context).colorScheme.onSecondaryContainer;
+        containerColor = context.chartTheme.colors.secondary.withValues(alpha: 0.15); // Water Green Light
+        textColor = context.chartTheme.colors.secondary;
     }
     
     return Container(

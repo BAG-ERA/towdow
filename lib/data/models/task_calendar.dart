@@ -30,7 +30,6 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(9) required DateTime dtstamp,
     @HiveField(10) required DateTime created,
     @HiveField(11) required DateTime lastModified,
-    @HiveField(12) required String summary,
     @HiveField(13) required String status,
     @HiveField(14) @Default(0) int percentComplete,
     
@@ -71,7 +70,6 @@ extension TaskCalendarFactory on TaskCalendar {
       dtstamp: now,
       created: now,
       lastModified: now,
-      summary: displayName,
       status: 'NEEDS-ACTION',
       organizer: organizer,
       attendees: attendees,
@@ -93,6 +91,7 @@ extension TaskCalendarFactory on TaskCalendar {
     bool? flowitAsFlow,
     String? flowitOwner,
     String? flowitTemplate,
+    String? uid,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -102,11 +101,10 @@ extension TaskCalendarFactory on TaskCalendar {
       etag: etag,
       color: color,
       isReadOnly: isReadOnly,
-      uid: 'discovered-${path.hashCode}',
+      uid: uid ?? 'discovered-${path.hashCode}',
       dtstamp: now,
       created: now,
       lastModified: now,
-      summary: displayName,
       status: 'NEEDS-ACTION',
       flowitDomain: domain,
       flowitType: flowitType ?? 'PROJECT',

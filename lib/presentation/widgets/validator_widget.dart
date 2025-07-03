@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../data/models/task.dart';
 import '../../data/providers/providers.dart';
 import '../../data/services/validator_service.dart';
@@ -302,66 +303,107 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
     final validatorId = validator['id'] as String;
     
     return Column(
-      children: options.asMap().entries.map((entry) {
-        final index = entry.key;
-        final option = entry.value as Map<String, dynamic>;
-        final optionId = option['id'] as String;
-        final text = option['text'] as String;
-        final isSelected = selected == optionId;
-        
-        return Padding(
-          padding: EdgeInsets.only(bottom: index < options.length - 1 ? 4 : 0),
-          child: Row(
-            children: [
-              InkWell(
-                onTap: () => _updateSelection(validatorId, optionId),
-                borderRadius: BorderRadius.circular(4),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Icon(
-                    isSelected
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    size: 20,
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+      children: [
+        ...options.asMap().entries.map((entry) {
+          final index = entry.key;
+          final option = entry.value as Map<String, dynamic>;
+          final optionId = option['id'] as String;
+          final text = option['text'] as String;
+          final isSelected = selected == optionId;
+          
+          return Padding(
+            padding: EdgeInsets.only(bottom: index < options.length - 1 ? 4 : 0),
+            child: Row(
+              children: [
+                InkWell(
+                  onTap: () => _updateSelection(validatorId, optionId),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Icon(
+                      isSelected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      size: 20,
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _isOrganizer()
-                    ? InkWell(
-                        onTap: () => _editSelectOption(validatorId, optionId, text),
-                        child: Text(
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _isOrganizer()
+                      ? InkWell(
+                          onTap: () => _editSelectOption(validatorId, optionId, text),
+                          child: Text(
+                            text,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                              decoration: TextDecoration.underline,
+                              decorationStyle: TextDecorationStyle.dotted,
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                            ),
+                          ),
+                        )
+                      : Text(
                           text,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                            decoration: TextDecoration.underline,
-                            decorationStyle: TextDecorationStyle.dotted,
                             color: isSelected
                                 ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                : Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
-                      )
-                    : Text(
-                        text,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.onSurface,
-                        ),
+                ),
+                if (_isOrganizer()) ...[
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () => _removeSelectOption(validatorId, optionId),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: Icon(
+                        Icons.remove_circle_outline,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.7),
                       ),
-              ),
-            ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }),
+        if (_isOrganizer()) ...[
+          const SizedBox(height: 4),
+          InkWell(
+            onTap: () => _addSelectOption(validatorId),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.add_circle_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Add option',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      }).toList(),
+        ],
+      ],
     );
   }
 
@@ -393,7 +435,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
   }
 
   String _generateId() {
-    return DateTime.now().millisecondsSinceEpoch.toString();
+    return const Uuid().v4();
   }
 
   // State update methods
@@ -567,6 +609,44 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
                 return true;
               }
             }
+          }
+        }
+      }
+      return false;
+    });
+  }
+
+  void _removeSelectOption(String validatorId, String optionId) {
+    _updateValidatorInTask((validators) {
+      for (final validatorList in validators) {
+        for (final validator in validatorList) {
+          if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
+            final options = validator['options'] as List<dynamic>? ?? [];
+            for (int i = 0; i < options.length; i++) {
+              final option = options[i];
+              if (option is Map<String, dynamic> && option['id'] == optionId) {
+                options.removeAt(i);
+                return true;
+              }
+            }
+          }
+        }
+      }
+      return false;
+    });
+  }
+
+  void _addSelectOption(String validatorId) {
+    _updateValidatorInTask((validators) {
+      for (final validatorList in validators) {
+        for (final validator in validatorList) {
+          if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
+            final options = validator['options'] as List<dynamic>? ?? [];
+            options.add({
+              'id': _generateId(),
+              'text': 'New option',
+            });
+            return true;
           }
         }
       }

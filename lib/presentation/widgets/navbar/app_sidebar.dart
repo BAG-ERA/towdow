@@ -1,15 +1,12 @@
 ﻿// Main application sidebar component
-// Displays navigation sections, projects, and user account info using modular widgets
+// Displays navigation sections and projects using modular widgets
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'account_card.dart';
 import 'main_navigation.dart';
 import 'projects_section.dart';
-import 'create_button.dart';
+import 'toolbar_widget.dart';
 
-import '../../../data/providers/providers.dart';
 import '../adaptive_app_layout.dart';
 
 class AppSidebar extends ConsumerWidget {
@@ -22,106 +19,50 @@ class AppSidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasAccount = ref.watch(hasActiveAccountProvider);
+    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
+    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
     return Container(
       width: 280,
       decoration: BoxDecoration(
-        //of(context).colorScheme.surface,//ContainerHighest.withValues(alpha: 1),
-        border: Border(
+        borderRadius: isDesktop ? null : BorderRadius.zero, // Remove rounded corners on mobile
+        border: isDesktop ? Border(
           right: BorderSide(
             color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
             width: 1,
           ),
-        ),
+        ) : null, // Remove right border on mobile since drawer is full-screen
       ),
       child: Column(
         children: [
-          // Main navigation
-          MainNavigation(currentDestination: currentDestination),
+          // Add top padding on mobile for status bar
+          if (!isDesktop) const SizedBox(height: 8),
           
-          // Archived projects link
-          hasAccount.when(
-            data: (hasActiveAccount) => hasActiveAccount 
-                ? _buildArchivedProjectsLink(context)
-                : const SizedBox.shrink(),
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
+          // Main navigation
+          MainNavigation(
+            currentDestination: currentDestination,
+            isDesktop: isDesktop,
           ),
           
-          const Divider(height: 1),
+          const Divider(height: 24, color: Colors.transparent),
           
           // Projects section
-          const Expanded(
-            child: ProjectsSection(),
+          Expanded(
+            child: ProjectsSection(isDesktop: isDesktop),
           ),
           
-          // Create button
-          hasAccount.when(
-            data: (hasActiveAccount) => hasActiveAccount 
-                ? const CreateButton()
-                : const SizedBox.shrink(),
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-          ),
+          // Bottom toolbar with Create, Archive, and Settings
+          const ToolbarWidget(),
           
-          const Divider(height: 1),
-          
-          // Account info and settings
-          hasAccount.when(
-            data: (hasActiveAccount) => hasActiveAccount 
-                ? const AccountCard()
-                : const SizedBox.shrink(),
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-          ),
+          // Add bottom padding on mobile for home indicator
+          if (!isDesktop) 
+            SizedBox(height: MediaQuery.of(context).padding.bottom > 0 ? 8 : 0),
         ],
       ),
     );
   }
 
-  Widget _buildArchivedProjectsLink(BuildContext context) {
-    final isArchiveSelected = GoRouterState.of(context).uri.path == '/archived';
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      child: Material(
-        color: isArchiveSelected 
-            ? Theme.of(context).colorScheme.secondaryContainer
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: ListTile(
-          leading: Icon(
-            Icons.archive_rounded,
-            color: isArchiveSelected
-                ? Theme.of(context).colorScheme.onSecondaryContainer
-                : Theme.of(context).colorScheme.onSurfaceVariant,
-            size: 20,
-          ),
-          title: Text(
-            'Archived Projects',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: isArchiveSelected
-                  ? Theme.of(context).colorScheme.onSecondaryContainer
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: isArchiveSelected ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
-          onTap: () {
-            context.go('/archived');
-            // Close drawer on mobile
-            if (Scaffold.of(context).hasDrawer) {
-              Navigator.of(context).pop();
-            }
-          },
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-    );
-  }
+
 
 
 } 
