@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'navbar/app_sidebar.dart';
 import '../../data/models/task_calendar.dart';
+import 'utils/enhanced_text_field.dart';
 
 // Provider for dynamic mobile title (used by detail screens)
 final mobileTitleProvider = StateProvider<String?>((ref) => null);
@@ -309,7 +310,7 @@ class _MobileEditableProjectTitleState extends State<_MobileEditableProjectTitle
     if (_isEditing) {
       return SizedBox(
         width: double.infinity,
-        child: TextField(
+        child: EnhancedTextField(
           controller: _controller,
           focusNode: _focusNode,
           decoration: InputDecoration(
