@@ -4,8 +4,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
+import '../../../../core/theme/chart_theme_usage.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../data/services/caldav_service.dart';
+import 'domain_creation_dialog.dart';
 
 class ProjectCreationDialog extends ConsumerStatefulWidget {
   const ProjectCreationDialog({super.key});
@@ -17,7 +19,10 @@ class ProjectCreationDialog extends ConsumerStatefulWidget {
 class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
+  String? selectedDomain;
+  bool isDomainSectionExpanded = false;
   bool isLoading = false;
+  int _domainRefreshKey = 0;
 
   @override
   void dispose() {
@@ -68,6 +73,38 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
               maxLines: 3,
               onChanged: (_) => setState(() {}),
             ),
+            
+            const SizedBox(height: 16),
+            
+            // Domain selection section
+            ExpansionTile(
+              title: Row(
+                children: [
+                  const Icon(Icons.folder_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Domain (optional)',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ],
+              ),
+              subtitle: selectedDomain != null 
+                  ? Text(
+                      'Selected: $selectedDomain',
+                      style: context.domainNameStyle?.copyWith(
+                        fontSize: 12,
+                      ),
+                    )
+                  : const Text('No domain selected'),
+              initiallyExpanded: isDomainSectionExpanded,
+              onExpansionChanged: (expanded) => setState(() => isDomainSectionExpanded = expanded),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: _buildDomainSelection(),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -90,6 +127,101 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
     );
   }
 
+  Widget _buildDomainSelection() {
+    return FutureBuilder<List<String>>(
+      key: ValueKey(_domainRefreshKey),
+      future: _getAllAvailableDomains(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        
+        final availableDomains = snapshot.data ?? [];
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Select a domain for this project:',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            // No domain option
+            RadioListTile<String?>(
+              title: const Text('No domain'),
+              value: null,
+              groupValue: selectedDomain,
+              onChanged: (value) => setState(() => selectedDomain = value),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+            
+            // Existing domains
+            ...availableDomains.map((domain) => RadioListTile<String?>(
+              title: Text(
+                domain,
+                style: context.domainNameStyle,
+              ),
+              value: domain,
+              groupValue: selectedDomain,
+              onChanged: (value) => setState(() => selectedDomain = value),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            )),
+            
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: _showCreateDomainDialog,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Create new domain'),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<List<String>> _getAllAvailableDomains() async {
+    try {
+      final domainService = ref.read(domainServiceProvider);
+      final result = await domainService.getAvailableDomains();
+      return result.when(
+        success: (domains) => domains,
+        failure: (failure) {
+          AppLogger.warning('ProjectCreation: Failed to get available domains: ${failure.message}');
+          return <String>[];
+        },
+      );
+    } catch (e) {
+      AppLogger.error('ProjectCreation: Exception getting available domains: $e');
+      return <String>[];
+    }
+  }
+
+  void _showCreateDomainDialog() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => const DomainCreationDialog(),
+    );
+    
+    if (result != null && result.isNotEmpty) {
+      setState(() {
+        selectedDomain = result;
+        _domainRefreshKey++; // Trigger FutureBuilder rebuild
+      });
+    }
+  }
+
   bool _canCreate() {
     return nameController.text.trim().isNotEmpty;
   }
@@ -105,7 +237,7 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
     setState(() => isLoading = true);
 
     try {
-      AppLogger.info('ProjectCreation: Creating project "$projectName"');
+      AppLogger.info('ProjectCreation: Creating project "$projectName" with domain "${selectedDomain ?? 'none'}"');
       
       // Get current account for CalDAV operations
       final accountRepository = ref.read(accountRepositoryProvider);
@@ -166,6 +298,23 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
                     success: (_) async {
                       AppLogger.info('ProjectCreation: Calendar saved locally successfully');
                       
+                      // Assign domain if one was selected
+                      if (selectedDomain != null) {
+                        AppLogger.info('ProjectCreation: Assigning domain "$selectedDomain" to project');
+                        final domainService = ref.read(domainServiceProvider);
+                        final domainResult = await domainService.assignDomainToCalendar(newCalendar.uid, selectedDomain);
+                        
+                        await domainResult.when(
+                          success: (_) {
+                            AppLogger.info('ProjectCreation: Domain assigned successfully');
+                          },
+                          failure: (failure) {
+                            AppLogger.warning('ProjectCreation: Failed to assign domain, but project was created: ${failure.message}');
+                            // Don't fail the creation, just log the warning
+                          },
+                        );
+                      }
+                      
                       // Refresh the project list to show the new project
                       ref.invalidate(projectListProvider);
                       ref.invalidate(calendarListProvider);
@@ -174,9 +323,13 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
                       if (mounted) {
                         Navigator.of(context).pop(projectName);
                         
+                        final message = selectedDomain != null 
+                            ? 'Project "$projectName" created in domain "$selectedDomain"'
+                            : 'Project "$projectName" created successfully';
+                        
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Project "$projectName" created successfully'),
+                            content: Text(message),
                             backgroundColor: Theme.of(context).colorScheme.primary,
                           ),
                         );
