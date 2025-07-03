@@ -1,6 +1,8 @@
 ﻿// CalDAV service implementing RFC 4791 for calendar operations
 // Provides high-level CalDAV operations for VTODO synchronization
 
+import 'dart:math' as math;
+
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/caldav_account.dart';
@@ -553,15 +555,16 @@ class CalDAVService {
     }
   }
 
-  /// Update calendar FlowIt properties (domain, status, etc.) on server using PROPPATCH
+  /// Update calendar properties (standard + FlowIt properties) on server using PROPPATCH
   Future<Result<void>> updateCalendarProperties(TaskCalendar calendar) async {
     try {
-      AppLogger.info('CalDAVService: Starting FlowIt properties PROPPATCH for ${calendar.displayName}');
+      AppLogger.info('CalDAVService: Starting calendar properties PROPPATCH for ${calendar.displayName}');
       AppLogger.info('CalDAVService: Calendar path: ${calendar.path}');
+      AppLogger.info('CalDAVService: Description: ${calendar.description.isNotEmpty ? calendar.description.substring(0, math.min(50, calendar.description.length)) + "..." : "(empty)"}');
       AppLogger.info('CalDAVService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
       AppLogger.info('CalDAVService: Status value: ${calendar.flowitStatus ?? "(null)"}');
       
-      // Generate PROPPATCH XML for FlowIt properties
+      // Generate PROPPATCH XML for both standard and FlowIt properties
       final proppatchXml = _generateFlowItPropertiesPropPatch(calendar);
       AppLogger.info('CalDAVService: Generated PROPPATCH XML:\n$proppatchXml');
       
@@ -577,7 +580,7 @@ class CalDAVService {
           AppLogger.info('CalDAVService: Response body: ${response.body}');
           
           if (response.statusCode == 207 || response.statusCode == 200) {
-            AppLogger.info('CalDAVService: FlowIt properties (domain, status) updated successfully');
+            AppLogger.info('CalDAVService: Calendar properties (displayName, description, domain, status) updated successfully');
             return Result.success(null);
           } else {
             AppLogger.warning('CalDAVService: PROPPATCH returned ${response.statusCode} (non-critical)');
@@ -596,43 +599,51 @@ class CalDAVService {
     }
   }
 
-  /// Generate PROPPATCH XML for setting FlowIt properties (domain, status, etc.)
+  /// Generate PROPPATCH XML for setting both standard and FlowIt properties
   String _generateFlowItPropertiesPropPatch(TaskCalendar calendar) {
     final xml = StringBuffer();
     
     xml.writeln('<?xml version="1.0" encoding="utf-8"?>');
-    xml.writeln('<D:propertyupdate xmlns:D="DAV:" xmlns:FLOWIT="https://flowit.app/ns/">');
+    xml.writeln('<D:propertyupdate xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:FLOWIT="https://flowit.app/ns/">');
     
-    // Handle domain property
-    if (calendar.flowitDomain != null && calendar.flowitDomain!.isNotEmpty) {
-      // Set the domain property
-      xml.writeln('  <D:set>');
-      xml.writeln('    <D:prop>');
-      xml.writeln('      <FLOWIT:domain>${_escapeXmlText(calendar.flowitDomain!)}</FLOWIT:domain>');
-      xml.writeln('    </D:prop>');
-      xml.writeln('  </D:set>');
+    xml.writeln('  <D:set>');
+    xml.writeln('    <D:prop>');
+    
+    // Set standard CalDAV properties
+    xml.writeln('      <D:displayname><![CDATA[${calendar.displayName}]]></D:displayname>');
+    
+    if (calendar.description.isNotEmpty) {
+      xml.writeln('      <C:calendar-description><![CDATA[${calendar.description}]]></C:calendar-description>');
     } else {
-      // Remove the domain property if null/empty
-      xml.writeln('  <D:remove>');
-      xml.writeln('    <D:prop>');
-      xml.writeln('      <FLOWIT:domain/>');
-      xml.writeln('    </D:prop>');
-      xml.writeln('  </D:remove>');
+      xml.writeln('      <C:calendar-description></C:calendar-description>');
     }
     
-    // Handle status property
+    // Set FlowIt properties if they exist
+    if (calendar.flowitDomain != null && calendar.flowitDomain!.isNotEmpty) {
+      xml.writeln('      <FLOWIT:domain>${_escapeXmlText(calendar.flowitDomain!)}</FLOWIT:domain>');
+    }
+    
     if (calendar.flowitStatus != null && calendar.flowitStatus!.isNotEmpty) {
-      // Set the status property
-      xml.writeln('  <D:set>');
-      xml.writeln('    <D:prop>');
       xml.writeln('      <FLOWIT:status>${_escapeXmlText(calendar.flowitStatus!)}</FLOWIT:status>');
-      xml.writeln('    </D:prop>');
-      xml.writeln('  </D:set>');
-    } else {
-      // Remove the status property if null/empty (default to ONGOING)
+    }
+    
+    xml.writeln('    </D:prop>');
+    xml.writeln('  </D:set>');
+    
+    // Remove FlowIt properties if they're null/empty
+    if ((calendar.flowitDomain == null || calendar.flowitDomain!.isEmpty) || 
+        (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty)) {
       xml.writeln('  <D:remove>');
       xml.writeln('    <D:prop>');
-      xml.writeln('      <FLOWIT:status/>');
+      
+      if (calendar.flowitDomain == null || calendar.flowitDomain!.isEmpty) {
+        xml.writeln('      <FLOWIT:domain/>');
+      }
+      
+      if (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) {
+        xml.writeln('      <FLOWIT:status/>');
+      }
+      
       xml.writeln('    </D:prop>');
       xml.writeln('  </D:remove>');
     }

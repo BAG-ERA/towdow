@@ -122,26 +122,36 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
           // Create CalDAV service instance
           final caldavService = CalDAVService(account: account);
           
-          // Generate a safe path name from the display name
+          // Generate unique UID first to ensure path uniqueness
+          final now = DateTime.now();
+          final projectUid = 'project-${now.millisecondsSinceEpoch}-${projectName.hashCode}';
+          
+          // Generate a safe path name from the display name and include UID for uniqueness
           final safeName = projectName.toLowerCase()
               .replaceAll(RegExp(r'[^a-z0-9\s]'), '')
               .replaceAll(RegExp(r'\s+'), '-')
               .replaceAll(RegExp(r'-+'), '-')
               .replaceAll(RegExp(r'^-|-$'), '');
           
+          // Use UID suffix to ensure path uniqueness
+          final uidSuffix = projectUid.split('-').last; // Get the hash part
+          final pathName = safeName.isEmpty ? 'flowit-project' : safeName;
+          final uniquePathName = '${pathName}-${uidSuffix}';
+          
           // Get server capabilities to determine calendar home
           final capabilitiesResult = await caldavService.testConnection();
           
           await capabilitiesResult.when(
             success: (capabilities) async {
-              final calendarPath = '${capabilities.calendarHome}${safeName.isEmpty ? 'flowit-project' : safeName}/';
-              AppLogger.info('ProjectCreation: Creating calendar at path: $calendarPath');
+              final calendarPath = '${capabilities.calendarHome}${uniquePathName}/';
+              AppLogger.info('ProjectCreation: Creating calendar at path: $calendarPath with UID: $projectUid');
               
               // Create calendar on CalDAV server
               final createResult = await caldavService.createCalendar(
                 calendarPath: calendarPath,
                 displayName: projectName,
                 description: projectDescription.isEmpty ? 'Project created by FlowIt' : projectDescription,
+                uid: projectUid,
               );
               
               await createResult.when(

@@ -19,6 +19,8 @@ import '../../viewmodels/commands/attendee_commands.dart';
 import '../../viewmodels/project_task_search_viewmodel.dart';
 import '../../../core/theme/chart_theme.dart';
 import '../../widgets/adaptive_app_layout.dart';
+import '../../widgets/project_detail/project_info_card.dart';
+import '../../../data/services/caldav_service.dart';
 
 // Provider for a specific project/calendar
 final projectProvider = FutureProvider.family<TaskCalendar?, String>((ref, projectUid) async {
@@ -96,7 +98,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     return Scaffold(
       appBar: isDesktop ? AppBar(
         title: projectAsync.when(
-          data: (project) => Text(project?.displayName ?? 'Unknown Project'),
+          data: (project) => project != null 
+              ? _EditableProjectTitle(
+                  project: project,
+                  onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                  isInAppBar: true,
+                )
+              : const Text('Unknown Project'),
           loading: () => const Text('Loading...'),
           error: (_, _) => const Text('Error'),
         ),
@@ -108,7 +116,54 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       body: Column(
         children: [
           // Project Info Card
-          _buildProjectInfoCard(context, projectAsync, tasksAsync),
+          projectAsync.when(
+            data: (project) => ProjectInfoCard(
+              project: project,
+              tasksAsync: tasksAsync,
+              projectUid: widget.projectUid,
+              onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+            ),
+            loading: () => Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Loading project...'),
+                ],
+              ),
+            ),
+            error: (error, _) => Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.error_rounded,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Failed to load project: $error',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           
           // View Tabs - Updated labels for new views
           _buildViewTabs(context),
@@ -128,202 +183,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
   }
 
-  Widget _buildProjectInfoCard(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
-    return projectAsync.when(
-      data: (project) {
-        if (project == null) {
-          return Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.errorContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.error_rounded,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Project not found: ${widget.projectUid}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onErrorContainer,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
 
-        return Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (project.description.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  project.description,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              // Dynamic stats based on actual tasks
-              tasksAsync.when(
-                data: (tasks) {
-                  final stats = project.getStats(tasks);
-                  return Row(
-                    children: [
-                      _buildProjectStat(context, 'Progress', '${stats.progressPercentage}%'),
-                      const SizedBox(width: 16),
-                      _buildProjectStat(context, 'Tasks', '${stats.completedTasks}/${stats.totalTasks}'),
-                      const SizedBox(width: 16),
-                      if (project.lastSyncAt != null)
-                        _buildProjectStat(context, 'Last Update', _formatLastSync(project.lastSyncAt!)),
-                    ],
-                  );
-                },
-                loading: () => Row(
-                  children: [
-                    _buildProjectStat(context, 'Progress', '...'),
-                    const SizedBox(width: 16),
-                    _buildProjectStat(context, 'Tasks', '...'),
-                    const SizedBox(width: 16),
-                    if (project.lastSyncAt != null)
-                      _buildProjectStat(context, 'Last Update', _formatLastSync(project.lastSyncAt!)),
-                  ],
-                ),
-                error: (_, _) => Row(
-                  children: [
-                    _buildProjectStat(context, 'Progress', '0%'),
-                    const SizedBox(width: 16),
-                    _buildProjectStat(context, 'Status', project.status),
-                    const SizedBox(width: 16),
-                    if (project.lastSyncAt != null)
-                      _buildProjectStat(context, 'Last Update', _formatLastSync(project.lastSyncAt!)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-      loading: () => Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Text('Loading project...'),
-          ],
-        ),
-      ),
-      error: (error, _) => Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.errorContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.error_rounded,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Failed to load project: $error',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProjectStatusChip(BuildContext context, TaskCalendar project) {
-    final status = project.status.toLowerCase();
-    final color = switch (status) {
-             'completed' => context.chartTheme.colors.success, // Water Green
-       'needs-action' => context.chartTheme.colors.primary, // Blue Medium
-       'in-process' => context.chartTheme.colors.warning, // Yellow Dark
-       'cancelled' => context.chartTheme.colors.error, // Pink
-       _ => context.chartTheme.colors.onSurfaceVariant,
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProjectStat(BuildContext context, String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
-          ),
-        ),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatLastSync(DateTime lastSync) {
-    final now = DateTime.now();
-    final difference = now.difference(lastSync);
-    
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${difference.inDays}d ago';
-    }
-  }
 
   Widget _buildViewTabs(BuildContext context) {
     return Container(
@@ -1210,5 +1070,273 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _updateProject(TaskCalendar updatedProject) async {
+    try {
+      final calendarRepository = ref.read(calendarRepositoryProvider);
+      
+      // Save locally first
+      final result = await calendarRepository.save(updatedProject);
+      
+      result.when(
+        success: (_) async {
+          // Refresh the project data
+          ref.invalidate(projectProvider(widget.projectUid));
+          
+          // Sync changes to CalDAV server
+          await _syncProjectToServer(updatedProject);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('✅ Project updated successfully')),
+            );
+          }
+        },
+        failure: (failure) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('❌ Failed to update project: ${failure.message}')),
+            );
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Error updating project: $e')),
+        );
+      }
+    }
+  }
+
+  /// Sync project metadata changes to CalDAV server
+  Future<void> _syncProjectToServer(TaskCalendar project) async {
+    try {
+      // Get active account
+      final accountRepository = ref.read(accountRepositoryProvider);
+      final accountResult = await accountRepository.getActiveAccount();
+      
+      await accountResult.when(
+        success: (account) async {
+          if (account == null) {
+            // No active account, skip server sync (local save already succeeded)
+            return;
+          }
+          
+          // Create CalDAV service and sync to server
+          final caldavService = CalDAVService(account: account);
+          final syncResult = await caldavService.updateCalendarProperties(project);
+          
+          await syncResult.when(
+            success: (_) {
+              // Server sync successful - no additional action needed
+            },
+            failure: (failure) {
+              // Log the error but don't show user error since local save succeeded
+              AppLogger.warning('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');
+            },
+          );
+        },
+        failure: (failure) {
+          AppLogger.warning('ProjectDetail: No active account found, skipping server sync: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectDetail: Exception during server sync', e, stackTrace);
+    }
+  }
+}
+
+// Editable Project Title Widget
+class _EditableProjectTitle extends StatefulWidget {
+  final TaskCalendar project;
+  final Function(TaskCalendar) onProjectUpdated;
+  final bool isInAppBar;
+
+  const _EditableProjectTitle({
+    required this.project,
+    required this.onProjectUpdated,
+    this.isInAppBar = false,
+  });
+
+  @override
+  State<_EditableProjectTitle> createState() => _EditableProjectTitleState();
+}
+
+class _EditableProjectTitleState extends State<_EditableProjectTitle> {
+  bool _isEditing = false;
+  bool _isHovered = false;
+  late TextEditingController _controller;
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.project.displayName);
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isInAppBar = widget.isInAppBar;
+    final primaryColor = isInAppBar 
+        ? Theme.of(context).colorScheme.onSurface 
+        : Theme.of(context).colorScheme.onPrimaryContainer;
+    
+    if (_isEditing) {
+      if (isInAppBar) {
+        // Simplified editing for AppBar
+        return TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            isDense: true,
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.close, size: 16),
+                  onPressed: _cancelEdit,
+                  tooltip: 'Cancel',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.check, size: 16),
+                  onPressed: _saveTitle,
+                  tooltip: 'Save',
+                ),
+              ],
+            ),
+          ),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: primaryColor,
+          ),
+          onSubmitted: (_) => _saveTitle(),
+        );
+      }
+      
+      return Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Theme.of(context).colorScheme.primary,
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                isDense: true,
+              ),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
+              onSubmitted: (_) => _saveTitle(),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _cancelEdit,
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _saveTitle,
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: InkWell(
+        onTap: _startEditing,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: isInAppBar ? null : double.infinity,
+          padding: EdgeInsets.symmetric(
+            horizontal: isInAppBar ? 4 : 4, 
+            vertical: isInAppBar ? 4 : 8
+          ),
+          decoration: BoxDecoration(
+            color: _isHovered
+                ? (isInAppBar 
+                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)
+                    : Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.1))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            widget.project.displayName,
+            style: (isInAppBar 
+                ? Theme.of(context).textTheme.titleLarge 
+                : Theme.of(context).textTheme.headlineSmall)?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: primaryColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _startEditing() {
+    setState(() {
+      _isEditing = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+      _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
+    });
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _isEditing = false;
+      _controller.text = widget.project.displayName;
+    });
+  }
+
+  void _saveTitle() {
+    if (_controller.text.trim().isNotEmpty) {
+      final updatedProject = widget.project.copyWith(
+        summary: _controller.text.trim(),
+        lastModified: DateTime.now(),
+      );
+      widget.onProjectUpdated(updatedProject);
+    }
+    
+    setState(() {
+      _isEditing = false;
+    });
   }
 } 
