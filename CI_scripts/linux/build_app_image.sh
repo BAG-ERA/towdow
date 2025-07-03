@@ -2,9 +2,10 @@
 APP_DIR=appdir_towdow
 APP_NAME=towdow_app
 ARCH=x86_64
-APP_IMAGE_TOOL=appimagetool-${ARCH}.AppImage
+APP_IMAGE_TOOL="$(dirname "$0")"/appimagetool-${ARCH}.AppImage
 APPIMAGE_OUTPUT=${3-build/linux/x64/release/${APP_NAME}.AppImage}
 
+rm $APPIMAGE_OUTPUT
 rm -rf ${APP_DIR}
 mkdir -p ${APP_DIR}
 
@@ -12,6 +13,8 @@ echo "getting appimagetool"
 
 #curl -L -o ${APP_IMAGE_TOOL} "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${ARCH}.AppImage"
 #chmod +x ${APP_IMAGE_TOOL}
+./${APP_IMAGE_TOOL} --appimage-extract
+export PATH="$(pwd)/squashfs-root:$PATH"
 
 echo "building app"
 flutter pub get
@@ -32,8 +35,13 @@ Categories=Utility
 cp assets/icons/logo/Flow-it_Default.png ${APP_DIR}/icon.png
 
 echo "create app image"
-./"$(dirname "$0")"/"${APP_IMAGE_TOOL}" "${APP_DIR}" "${APPIMAGE_OUTPUT}"
+./${APP_IMAGE_TOOL}  --appimage-extract-and-run ${APP_DIR} ${APPIMAGE_OUTPUT}
 
-ls -l "${APPIMAGE_OUTPUT}"
+if [ ! -f "${APPIMAGE_OUTPUT}" ]; then
+  echo "Error: AppImage was not created at ${APPIMAGE_OUTPUT}"
+  exit 1
+fi
+
+ls -l ${APPIMAGE_OUTPUT}
 
 echo "done"
