@@ -79,7 +79,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
             child: InkWell(
               borderRadius: widget.isDesktop ? BorderRadius.circular(8) : BorderRadius.zero,
               onTap: () {
-                AppLogger.info('ProjectItem: Navigating to project ${widget.project.uid} (${widget.project.summary})');
+                AppLogger.info('ProjectItem: Navigating to project ${widget.project.uid} (${widget.project.displayName})');
                 context.go('/project/${widget.project.uid}');
                 // Close drawer on mobile using provided controller
                 if (!widget.isDesktop) {
@@ -104,7 +104,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
                     
                     Expanded(
                       child: Text(
-                        widget.project.summary,
+                        widget.project.displayName,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                           color: isSelected
@@ -209,14 +209,14 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
               child: projectWidget,
             ),
             onDragStarted: () {
-              AppLogger.info('ProjectItem: Started dragging project ${widget.project.summary}');
+              AppLogger.info('ProjectItem: Started dragging project ${widget.project.displayName}');
               // Notify global drag state
               ref.read(dragStateProvider.notifier).startDragging(widget.project.flowitDomain);
               // Provide haptic feedback
               HapticFeedback.lightImpact();
             },
             onDragEnd: (details) {
-              AppLogger.info('ProjectItem: Ended dragging project ${widget.project.summary}');
+              AppLogger.info('ProjectItem: Ended dragging project ${widget.project.displayName}');
               // Stop global drag state
               ref.read(dragStateProvider.notifier).stopDragging();
             },
@@ -329,7 +329,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
         success: (_) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Project "${widget.project.summary}" archived successfully'),
+              content: Text('Project "${widget.project.displayName}" archived successfully'),
               backgroundColor: Theme.of(context).colorScheme.primary,
               action: SnackBarAction(
                 label: 'Undo',
@@ -377,7 +377,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
         success: (_) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Project "${widget.project.summary}" unarchived successfully'),
+              content: Text('Project "${widget.project.displayName}" unarchived successfully'),
               backgroundColor: Theme.of(context).colorScheme.primary,
             ),
           );
@@ -407,7 +407,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       builder: (BuildContext dialogContext) => AlertDialog(
         title: const Text('Delete Project'),
         content: Text(
-          'Are you sure you want to delete "${widget.project.summary}"? This action cannot be undone and will remove all associated tasks.',
+          'Are you sure you want to delete "${widget.project.displayName}"? This action cannot be undone and will remove all associated tasks.',
         ),
         actions: [
           TextButton(
@@ -431,7 +431,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
 
   void _deleteProject(BuildContext context) async {
     try {
-      AppLogger.info('ProjectItem: Deleting project ${widget.project.uid} (${widget.project.summary})');
+      AppLogger.info('ProjectItem: Deleting project ${widget.project.uid} (${widget.project.displayName})');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.deleteProject(widget.project.uid);
@@ -445,7 +445,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Project "${widget.project.summary}" deleted successfully'),
+          content: Text('Project "${widget.project.displayName}" deleted successfully'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           duration: const Duration(seconds: 3),
         ),
@@ -474,12 +474,12 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
   void _handleTaskDrop(BuildContext context, Task task) async {
     // Don't move if task is already in this project
     if (task.sourceCalendarUid == widget.project.uid) {
-      AppLogger.info('ProjectItem: Task ${task.summary} is already in project ${widget.project.summary}');
+      AppLogger.info('ProjectItem: Task ${task.summary} is already in project ${widget.project.displayName}');
       return;
     }
 
     try {
-      AppLogger.info('ProjectItem: Moving task ${task.summary} to project ${widget.project.summary}');
+      AppLogger.info('ProjectItem: Moving task ${task.summary} to project ${widget.project.displayName}');
       
       // Use the existing TaskViewModel moveTask functionality
       final taskViewModel = ref.read(taskViewModelProvider.notifier);
@@ -488,7 +488,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       // Show success feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Moved "${task.summary}" to "${widget.project.summary}"'),
+          content: Text('Moved "${task.summary}" to "${widget.project.displayName}"'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           duration: const Duration(seconds: 2),
           action: SnackBarAction(
@@ -500,9 +500,9 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
         ),
       );
       
-      AppLogger.info('ProjectItem: Successfully moved task ${task.summary} to project ${widget.project.summary}');
+      AppLogger.info('ProjectItem: Successfully moved task ${task.summary} to project ${widget.project.displayName}');
     } catch (e) {
-      AppLogger.error('ProjectItem: Failed to move task ${task.summary} to project ${widget.project.summary}: $e');
+      AppLogger.error('ProjectItem: Failed to move task ${task.summary} to project ${widget.project.displayName}: $e');
       
       // Show error feedback
       ScaffoldMessenger.of(context).showSnackBar(
@@ -545,7 +545,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                widget.project.summary,
+                widget.project.displayName,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).colorScheme.onPrimaryContainer,

@@ -73,8 +73,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   @override
   void dispose() {
-    // Clear mobile title when leaving the screen
+    // Clear mobile providers when leaving the screen
     ref.read(mobileTitleProvider.notifier).state = null;
+    ref.read(mobileProjectProvider.notifier).state = null;
+    ref.read(mobileProjectUpdateProvider.notifier).state = null;
     super.dispose();
   }
 
@@ -87,11 +89,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
-    // Update mobile title when project data is available
+    // Update mobile providers when project data is available
     projectAsync.whenData((project) {
       if (project != null && !isDesktop) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           ref.read(mobileTitleProvider.notifier).state = project.displayName;
+          ref.read(mobileProjectProvider.notifier).state = project;
+          ref.read(mobileProjectUpdateProvider.notifier).state = _updateProject;
         });
       }
     });
@@ -957,6 +961,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           // Refresh the project data immediately
           ref.invalidate(projectProvider(widget.projectUid));
           
+          // Also invalidate the project list provider so navbar updates
+          ref.invalidate(projectListProvider);
+          
           // Show success message
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1060,6 +1067,26 @@ class _EditableProjectTitleState extends State<_EditableProjectTitle> {
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_EditableProjectTitle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // If the project changed while we were editing, we need to handle it
+    if (oldWidget.project.uid != widget.project.uid) {
+      // Different project - reset editing state and update controller
+      setState(() {
+        _isEditing = false;
+        _isHovered = false;
+      });
+      _controller.text = widget.project.displayName;
+    } else if (oldWidget.project.displayName != widget.project.displayName) {
+      // Same project but title changed externally - update controller if not editing
+      if (!_isEditing) {
+        _controller.text = widget.project.displayName;
+      }
+    }
   }
 
   @override

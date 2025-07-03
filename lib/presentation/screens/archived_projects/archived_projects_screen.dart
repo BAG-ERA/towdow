@@ -188,7 +188,7 @@ class ArchivedProjectsScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        project.summary,
+                        project.displayName,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -312,7 +312,7 @@ class ArchivedProjectsScreen extends ConsumerWidget {
       builder: (BuildContext dialogContext) => AlertDialog(
         title: const Text('Unarchive Project'),
         content: Text(
-          'Are you sure you want to unarchive "${project.summary}"? This will make it visible in the main navigation again.',
+          'Are you sure you want to unarchive "${project.displayName}"? This will make it visible in the main navigation again.',
         ),
         actions: [
           TextButton(
@@ -347,7 +347,7 @@ class ArchivedProjectsScreen extends ConsumerWidget {
         success: (_) {
           messenger.showSnackBar(
             SnackBar(
-              content: Text('Project "${project.summary}" unarchived successfully'),
+              content: Text('Project "${project.displayName}" unarchived successfully'),
               backgroundColor: theme.colorScheme.primary,
             ),
           );

@@ -429,14 +429,14 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
   /// Handle reordering a project within this domain
   void _handleProjectReorder(ProjectDragData dragData, int insertIndex) async {
     try {
-      AppLogger.info('DomainSection: Reordering project ${dragData.project.summary} to index $insertIndex in domain ${widget.domain}');
+      AppLogger.info('DomainSection: Reordering project ${dragData.project.displayName} to index $insertIndex in domain ${widget.domain}');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.reorderProject(dragData.project.uid, insertIndex);
       
-      AppLogger.info('DomainSection: Successfully reordered project ${dragData.project.summary}');
+      AppLogger.info('DomainSection: Successfully reordered project ${dragData.project.displayName}');
     } catch (e) {
-      AppLogger.error('DomainSection: Failed to reorder project ${dragData.project.summary}: $e');
+      AppLogger.error('DomainSection: Failed to reorder project ${dragData.project.displayName}: $e');
       
       // Show error feedback
       ScaffoldMessenger.of(context).showSnackBar(
@@ -507,12 +507,12 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
   void _handleProjectDrop(BuildContext context, ProjectDragData dragData) async {
     // Don't move project if it's already in this domain
     if (dragData.currentDomain == widget.domain) {
-      AppLogger.info('DomainSection: Project ${dragData.project.summary} already in domain ${widget.domain}');
+      AppLogger.info('DomainSection: Project ${dragData.project.displayName} already in domain ${widget.domain}');
       return;
     }
 
     try {
-      AppLogger.info('DomainSection: Moving project ${dragData.project.summary} to domain ${widget.domain}');
+      AppLogger.info('DomainSection: Moving project ${dragData.project.displayName} to domain ${widget.domain}');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.assignDomainToProject(dragData.project.uid, widget.domain);
@@ -520,15 +520,15 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
       // Show success feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Moved "${dragData.project.summary}" to "${widget.domain}" domain'),
+          content: Text('Moved "${dragData.project.displayName}" to "${widget.domain}" domain'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           duration: const Duration(seconds: 2),
         ),
       );
       
-      AppLogger.info('DomainSection: Successfully moved project ${dragData.project.summary} to domain ${widget.domain}');
+              AppLogger.info('DomainSection: Successfully moved project ${dragData.project.displayName} to domain ${widget.domain}');
     } catch (e) {
-      AppLogger.error('DomainSection: Failed to move project ${dragData.project.summary} to domain ${widget.domain}: $e');
+              AppLogger.error('DomainSection: Failed to move project ${dragData.project.displayName} to domain ${widget.domain}: $e');
       
       // Show error feedback
       ScaffoldMessenger.of(context).showSnackBar(
@@ -785,14 +785,14 @@ class _NoDomainSection extends ConsumerWidget {
   /// Handle reordering a project within the no-domain section
   void _handleProjectReorder(BuildContext context, WidgetRef ref, ProjectDragData dragData, int insertIndex) async {
     try {
-      AppLogger.info('NoDomainSection: Reordering project ${dragData.project.summary} to index $insertIndex');
+      AppLogger.info('NoDomainSection: Reordering project ${dragData.project.displayName} to index $insertIndex');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.reorderProject(dragData.project.uid, insertIndex);
       
-      AppLogger.info('NoDomainSection: Successfully reordered project ${dragData.project.summary}');
+      AppLogger.info('NoDomainSection: Successfully reordered project ${dragData.project.displayName}');
     } catch (e) {
-      AppLogger.error('NoDomainSection: Failed to reorder project ${dragData.project.summary}: $e');
+      AppLogger.error('NoDomainSection: Failed to reorder project ${dragData.project.displayName}: $e');
       
       // Show error feedback
       ScaffoldMessenger.of(context).showSnackBar(
@@ -928,12 +928,12 @@ class _NoDomainSection extends ConsumerWidget {
   void _handleProjectDrop(BuildContext context, ProjectDragData dragData) async {
     // Don't move if project is already without domain
     if (dragData.currentDomain == null) {
-      AppLogger.info('NoDomainSection: Project ${dragData.project.summary} already has no domain');
+      AppLogger.info('NoDomainSection: Project ${dragData.project.displayName} already has no domain');
       return;
     }
 
     try {
-      AppLogger.info('NoDomainSection: Removing project ${dragData.project.summary} from domain ${dragData.currentDomain}');
+      AppLogger.info('NoDomainSection: Removing project ${dragData.project.displayName} from domain ${dragData.currentDomain}');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.assignDomainToProject(dragData.project.uid, null);
@@ -941,15 +941,15 @@ class _NoDomainSection extends ConsumerWidget {
       // Show success feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Removed "${dragData.project.summary}" from "${dragData.currentDomain}" domain'),
+          content: Text('Removed "${dragData.project.displayName}" from "${dragData.currentDomain}" domain'),
           backgroundColor: Theme.of(context).colorScheme.secondary,
           duration: const Duration(seconds: 2),
         ),
       );
       
-      AppLogger.info('NoDomainSection: Successfully removed project ${dragData.project.summary} from domain');
+      AppLogger.info('NoDomainSection: Successfully removed project ${dragData.project.displayName} from domain');
     } catch (e) {
-      AppLogger.error('NoDomainSection: Failed to remove project ${dragData.project.summary} from domain: $e');
+      AppLogger.error('NoDomainSection: Failed to remove project ${dragData.project.displayName} from domain: $e');
       
       // Show error feedback
       ScaffoldMessenger.of(context).showSnackBar(

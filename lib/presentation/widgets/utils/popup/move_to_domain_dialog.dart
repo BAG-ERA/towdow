@@ -67,7 +67,7 @@ class _MoveToDomainDialogState extends ConsumerState<MoveToDomainDialog> {
   Widget _buildDialog(BuildContext context, List<String> availableDomains) {
 
     return AlertDialog(
-      title: Text('Move "${widget.project.summary}" to Domain'),
+      title: Text('Move "${widget.project.displayName}" to Domain'),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -178,8 +178,8 @@ class _MoveToDomainDialogState extends ConsumerState<MoveToDomainDialog> {
         SnackBar(
           content: Text(
             selectedDomain == null 
-                ? 'Removed "${widget.project.summary}" from domain'
-                : 'Moved "${widget.project.summary}" to "$selectedDomain"'
+                ? 'Removed "${widget.project.displayName}" from domain'
+                : 'Moved "${widget.project.displayName}" to "$selectedDomain"'
           ),
         ),
       );

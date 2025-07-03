@@ -676,7 +676,7 @@ class CalDAVService {
     vcalendar.writeln('DTSTAMP:${_formatDateTime(calendar.dtstamp)}');
     vcalendar.writeln('CREATED:${_formatDateTime(calendar.created)}');
     vcalendar.writeln('LAST-MODIFIED:${_formatDateTime(calendar.lastModified)}');
-    vcalendar.writeln('SUMMARY:${_escapeCalendarText(calendar.summary)}');
+    vcalendar.writeln('SUMMARY:${_escapeCalendarText(calendar.displayName)}');
     vcalendar.writeln('STATUS:${calendar.status}');
     vcalendar.writeln('PERCENT-COMPLETE:${calendar.percentComplete}');
     
@@ -773,7 +773,6 @@ class CalDAVService {
         dtstamp: dtstamp,
         created: created,
         lastModified: lastModified,
-        summary: summary,
         status: status,
         percentComplete: percentComplete,
         organizer: organizer,

@@ -42,7 +42,7 @@ class _ReorderDropZoneState extends ConsumerState<ReorderDropZone> {
       return;
     }
     
-    AppLogger.info('ReorderDropZone: Reordering project ${dragData.project.summary} to index ${widget.insertIndex}');
+          AppLogger.info('ReorderDropZone: Reordering project ${dragData.project.displayName} to index ${widget.insertIndex}');
     
     // Provide haptic feedback
     HapticFeedback.lightImpact();
@@ -58,7 +58,7 @@ class _ReorderDropZoneState extends ConsumerState<ReorderDropZone> {
     return DragTarget<ProjectDragData>(
       onWillAcceptWithDetails: (details) {
         final canAccept = _canAcceptProject(details.data);
-        AppLogger.debug('ReorderDropZone: Will accept? $canAccept for project ${details.data.project.summary}');
+        AppLogger.debug('ReorderDropZone: Will accept? $canAccept for project ${details.data.project.displayName}');
         return canAccept;
       },
       onAcceptWithDetails: (details) => _handleProjectDrop(details.data),
