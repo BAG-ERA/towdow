@@ -34,7 +34,7 @@ class ToolbarWidget extends ConsumerWidget {
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: Colors.transparent,
         border: Border(
           top: BorderSide(
             color: theme.colorScheme.outline.withAlpha(25),
