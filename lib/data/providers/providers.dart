@@ -153,11 +153,13 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final lifecycleManager = ref.watch(appLifecycleManagerProvider);
   final syncService = ref.watch(syncServiceProvider);
   final backgroundSyncService = ref.watch(backgroundSyncServiceProvider);
+  final externalSyncService = ref.watch(externalCalendarSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
 
   final result = await lifecycleManager.initialize(
     syncService: syncService,
     backgroundSyncService: backgroundSyncService,
+    externalSyncService: externalSyncService,
     accountRepository: accountRepository,
   );
 
