@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../../../data/models/task.dart';
+import '../../../core/theme/chart_theme.dart';
 
 class TaskItemDateBadge extends StatelessWidget {
   final Task task;
@@ -18,7 +19,7 @@ class TaskItemDateBadge extends StatelessWidget {
     
     final dueColor = _getDueDateColor(context);
     final dueText = _formatCompactDueDate(task.due!);
-    final isOverdue = task.due!.isBefore(DateTime.now());
+    final isOverdue = _dateOnly(task.due!).isBefore(_dateOnly(DateTime.now()));
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -51,41 +52,47 @@ class TaskItemDateBadge extends StatelessWidget {
   }
 
   Color _getDueDateColor(BuildContext context) {
-    if (task.due == null) return Theme.of(context).colorScheme.onSurface;
+    if (task.due == null) return context.chartTheme.colors.onSurfaceVariant;
     
-    final now = DateTime.now();
-    final due = task.due!;
-    final daysUntilDue = due.difference(now).inDays;
+    final today = _dateOnly(DateTime.now());
+    final dueDay = _dateOnly(task.due!);
+    final daysDifference = dueDay.difference(today).inDays;
     
-    if (daysUntilDue < 0) {
-      return Colors.red.shade600; // Overdue
-    } else if (daysUntilDue == 0) {
-      return Colors.orange.shade600; // Due today
-    } else if (daysUntilDue <= 3) {
-      return Colors.amber.shade600; // Due soon
+    if (daysDifference < 0) {
+      return context.chartTheme.colors.error; // Overdue - FlowIt Pink
+    } else if (daysDifference == 0) {
+      return context.chartTheme.colors.warning; // Due today - FlowIt Yellow Dark
+    } else if (daysDifference <= 3) {
+      return FlowItColors.coral; // Due soon - FlowIt Coral
     } else {
-      return Theme.of(context).colorScheme.primary;
+      return context.chartTheme.colors.primary; // FlowIt Blue Medium
     }
   }
 
   String _formatCompactDueDate(DateTime dueDate) {
-    final now = DateTime.now();
-    final difference = dueDate.difference(now);
+    final today = _dateOnly(DateTime.now());
+    final dueDay = _dateOnly(dueDate);
+    final daysDifference = dueDay.difference(today).inDays;
     
-    if (difference.inDays < 0) {
-      final daysOverdue = -difference.inDays;
+    if (daysDifference < 0) {
+      final daysOverdue = -daysDifference;
       return daysOverdue == 1 ? '1d ago' : '${daysOverdue}d ago';
-    } else if (difference.inDays == 0) {
+    } else if (daysDifference == 0) {
       return 'Today';
-    } else if (difference.inDays == 1) {
+    } else if (daysDifference == 1) {
       return 'Tomorrow';
-    } else if (difference.inDays <= 7) {
-      return '${difference.inDays}d';
-    } else if (difference.inDays <= 30) {
-      return '${(difference.inDays / 7).round()}w';
+    } else if (daysDifference <= 7) {
+      return '${daysDifference}d';
+    } else if (daysDifference <= 30) {
+      return '${(daysDifference / 7).round()}w';
     } else {
       return '${dueDate.day}/${dueDate.month}';
     }
+  }
+
+  /// Helper method to get date-only (year, month, day) without time component
+  DateTime _dateOnly(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
   }
 
 

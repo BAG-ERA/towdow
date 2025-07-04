@@ -40,7 +40,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
         setState(() {
           _selectedCalendars = Set.from(calendars);
         });
-        // AppLogger.info('CalDAVManagement: Loaded ${calendars.length} selected calendars from repository');
+        AppLogger.info('CalDAVManagement: Loaded ${calendars.length} selected calendars from repository');
       },
       failure: (failure) {
         AppLogger.warning('CalDAVManagement: Failed to load selected calendars: ${failure.message}');
@@ -52,6 +52,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
   }
 
   Future<void> _loadAccountAndDiscoverCalendars() async {
+    AppLogger.debug('CalDAVManagement: Starting account and calendar discovery');
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -60,9 +61,10 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
     try {
       // Load current account
       final accountResult = ref.read(activeAccountProvider);
-      accountResult.when(
+      await accountResult.when(
         data: (account) async {
           if (account != null) {
+            AppLogger.debug('CalDAVManagement: Account loaded, starting calendar discovery');
             setState(() {
               _currentAccount = account;
             });
@@ -73,26 +75,31 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
             // Discover calendars via PROPFIND
             await _discoverCalendars(account);
           } else {
+            AppLogger.warning('CalDAVManagement: No active CalDAV account found');
             setState(() {
               _errorMessage = 'No active CalDAV account found';
             });
           }
         },
-        loading: () {
+        loading: () async {
+          AppLogger.debug('CalDAVManagement: Account provider is loading');
           // Keep loading state
         },
-        error: (error, stack) {
+        error: (error, stack) async {
+          AppLogger.error('CalDAVManagement: Failed to load account: $error');
           setState(() {
             _errorMessage = 'Failed to load account: $error';
           });
         },
       );
     } catch (e) {
+      AppLogger.error('CalDAVManagement: Unexpected error during initialization', e, StackTrace.current);
       setState(() {
         _errorMessage = 'Unexpected error: $e';
       });
     } finally {
       if (mounted) {
+        AppLogger.debug('CalDAVManagement: Setting loading to false. Capabilities: ${_capabilities?.taskCalendars.length ?? 0} calendars');
         setState(() {
           _isLoading = false;
         });
@@ -101,15 +108,15 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
   }
 
   Future<void> _discoverCalendars(CaldavAccount account) async {
-    // AppLogger.info('CalDAVManagement: Starting calendar discovery for ${account.serverUrl}');
+    AppLogger.info('CalDAVManagement: Starting calendar discovery for ${account.serverUrl}');
     
     try {
       final caldavService = CalDAVService(account: account);
       final capabilitiesResult = await caldavService.discoverCapabilities();
       
-      capabilitiesResult.when(
+      await capabilitiesResult.when(
         success: (capabilities) async {
-          // AppLogger.info('CalDAVManagement: Discovered ${capabilities.taskCalendars.length} calendars');
+          AppLogger.info('CalDAVManagement: Successfully discovered ${capabilities.taskCalendars.length} calendars');
           setState(() {
             _capabilities = capabilities;
           });
@@ -131,7 +138,20 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
 
   Future<void> _refreshCalendars() async {
     if (_currentAccount != null) {
-      await _discoverCalendars(_currentAccount!);
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      
+      try {
+        await _discoverCalendars(_currentAccount!);
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
     }
   }
 
@@ -402,13 +422,33 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
     }
 
     if (_capabilities == null || _capabilities!.taskCalendars.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            'No calendars found that support tasks (VTODO).\n\nMake sure your CalDAV server has task-enabled calendars.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.calendar_today_rounded,
+                size: 48,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _capabilities == null ? 'No calendars discovered' : 'No task calendars found',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _capabilities == null 
+                  ? 'Calendar discovery may still be in progress or failed.'
+                  : 'No calendars found that support tasks (VTODO).\n\nMake sure your CalDAV server has task-enabled calendars.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ],
           ),
         ),
       );

@@ -243,7 +243,52 @@ class DomainService {
       ));
     }
     
-    return await _calendarRepository.renameDomain(oldDomain, newDomain);
+    // Get all calendars with the old domain name before renaming
+    final calendarsResult = await _calendarRepository.getCalendarsByDomain(oldDomain);
+    return calendarsResult.when(
+      success: (calendarsToUpdate) async {
+        // Rename domain in local storage first
+        final renameResult = await _calendarRepository.renameDomain(oldDomain, newDomain);
+        if (renameResult is Error<void>) {
+          return renameResult;
+        }
+        
+        AppLogger.info('DomainService: Successfully renamed domain locally, now syncing to server for ${calendarsToUpdate.length} calendars');
+        
+        // Sync each updated calendar to the CalDAV server
+        bool hadSyncErrors = false;
+        for (final calendar in calendarsToUpdate) {
+          // Get the updated calendar with the new domain
+          final updatedCalendarResult = await _calendarRepository.getById(calendar.uid);
+          await updatedCalendarResult.when(
+            success: (updatedCalendar) async {
+              if (updatedCalendar != null) {
+                final syncResult = await _syncDomainToServer(updatedCalendar);
+                if (syncResult is Error<void>) {
+                  AppLogger.warning('DomainService: Failed to sync calendar ${updatedCalendar.uid} to server after domain rename, but continuing with others');
+                  hadSyncErrors = true;
+                }
+              }
+            },
+            failure: (failure) async {
+              AppLogger.error('DomainService: Could not get updated calendar ${calendar.uid} after domain rename: ${failure.message}');
+              hadSyncErrors = true;
+            },
+          );
+        }
+        
+        if (hadSyncErrors) {
+          AppLogger.warning('DomainService: Domain renamed locally but some calendars could not be synced to server');
+        } else {
+          AppLogger.info('DomainService: Successfully renamed domain and synced all calendars to server');
+        }
+        
+        // Return success even if sync had some errors, since local rename succeeded
+        // and the sync will be retried during next full sync
+        return Result.success(null);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
   }
 
   /// Bulk assign domain to multiple calendars

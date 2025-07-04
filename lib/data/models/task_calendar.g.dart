@@ -30,7 +30,6 @@ class TaskCalendarAdapter extends TypeAdapter<TaskCalendar> {
       dtstamp: fields[9] as DateTime,
       created: fields[10] as DateTime,
       lastModified: fields[11] as DateTime,
-      summary: fields[12] as String,
       status: fields[13] as String,
       percentComplete: fields[14] as int,
       flowitType: fields[15] as String,
@@ -50,7 +49,7 @@ class TaskCalendarAdapter extends TypeAdapter<TaskCalendar> {
   @override
   void write(BinaryWriter writer, TaskCalendar obj) {
     writer
-      ..writeByte(27)
+      ..writeByte(26)
       ..writeByte(0)
       ..write(obj.path)
       ..writeByte(1)
@@ -77,8 +76,6 @@ class TaskCalendarAdapter extends TypeAdapter<TaskCalendar> {
       ..write(obj.created)
       ..writeByte(11)
       ..write(obj.lastModified)
-      ..writeByte(12)
-      ..write(obj.summary)
       ..writeByte(13)
       ..write(obj.status)
       ..writeByte(14)
@@ -139,7 +136,6 @@ _$TaskCalendarImpl _$$TaskCalendarImplFromJson(Map<String, dynamic> json) =>
       dtstamp: DateTime.parse(json['dtstamp'] as String),
       created: DateTime.parse(json['created'] as String),
       lastModified: DateTime.parse(json['lastModified'] as String),
-      summary: json['summary'] as String,
       status: json['status'] as String,
       percentComplete: (json['percentComplete'] as num?)?.toInt() ?? 0,
       flowitType: json['flowitType'] as String? ?? 'PROJECT',
@@ -176,7 +172,6 @@ Map<String, dynamic> _$$TaskCalendarImplToJson(_$TaskCalendarImpl instance) =>
       'dtstamp': instance.dtstamp.toIso8601String(),
       'created': instance.created.toIso8601String(),
       'lastModified': instance.lastModified.toIso8601String(),
-      'summary': instance.summary,
       'status': instance.status,
       'percentComplete': instance.percentComplete,
       'flowitType': instance.flowitType,

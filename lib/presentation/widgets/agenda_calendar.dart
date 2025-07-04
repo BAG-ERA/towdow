@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task.dart';
 import 'task_item/task_item.dart';
+import '../../core/theme/chart_theme.dart';
 
 class AgendaCalendar extends ConsumerStatefulWidget {
   final List<Task> tasks;
@@ -184,7 +185,7 @@ class _AgendaCalendarState extends ConsumerState<AgendaCalendar> {
                                     height: 3,
                                     margin: const EdgeInsets.only(bottom: 1),
                                     decoration: BoxDecoration(
-                                      color: _getTaskColor(task),
+                                      color: _getTaskColor(context, task),
                                       borderRadius: BorderRadius.circular(1.5),
                                     ),
                                   );
@@ -271,30 +272,35 @@ class _AgendaCalendarState extends ConsumerState<AgendaCalendar> {
                       ),
                     ),
                   )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: tasksForDate.length,
-                    itemBuilder: (context, index) {
-                      final task = tasksForDate[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: TaskItem(
-                          task: task,
-                          onTap: widget.onTaskTap != null ? () => widget.onTaskTap!(task) : null,
-                          onToggleComplete: widget.onTaskToggle != null ? () => widget.onTaskToggle!(task) : null,
-                          onTaskUpdated: widget.onTaskUpdated != null ? (updatedTask) => widget.onTaskUpdated!(updatedTask) : null,
-                          onTaskDeleted: widget.onTaskDeleted != null ? () => widget.onTaskDeleted!(task) : null,
-                        ),
-                      );
-                    },
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Wrap(
+                      spacing: 12.0, // Horizontal spacing between tasks
+                      runSpacing: 12.0, // Vertical spacing between rows
+                      alignment: WrapAlignment.start,
+                      runAlignment: WrapAlignment.start,
+                      children: tasksForDate.map((task) {
+                        return ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: 420,
+                            minWidth: 300,
+                          ),
+                          child: TaskItem(
+                            task: task,
+                            onTap: widget.onTaskTap != null ? () => widget.onTaskTap!(task) : null,
+                            onToggleComplete: widget.onTaskToggle != null ? () => widget.onTaskToggle!(task) : null,
+                            onTaskUpdated: widget.onTaskUpdated != null ? (updatedTask) => widget.onTaskUpdated!(updatedTask) : null,
+                            onTaskDeleted: widget.onTaskDeleted != null ? () => widget.onTaskDeleted!(task) : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
           ),
         ],
       ),
     );
   }
-
-
 
   List<Task> _getTasksForDate(DateTime date) {
     return widget.tasks.where((task) {
@@ -303,16 +309,15 @@ class _AgendaCalendarState extends ConsumerState<AgendaCalendar> {
     }).toList();
   }
 
-  Color _getTaskColor(Task task) {
-    if (task.status == 'COMPLETED') return Colors.green;
-    if (task.due != null && task.due!.isBefore(DateTime.now())) return Colors.red;
-    if (task.categories.isNotEmpty) {
-      // Simple hash to get consistent colors for categories
-      final hash = task.categories.first.hashCode;
-      final colors = [Colors.blue, Colors.orange, Colors.purple, Colors.teal, Colors.pink];
-      return colors[hash.abs() % colors.length];
-    }
-    return Colors.grey;
+  Color _getTaskColor(BuildContext context, Task task) {
+    // Color tasks based on status and urgency using FlowIt brand colors
+    if (task.status == 'COMPLETED') return context.chartTheme.colors.success; // Water Green
+    if (task.due != null && task.due!.isBefore(DateTime.now())) return context.chartTheme.colors.error; // Pink
+    
+    // Use FlowIt chart series colors for consistent branding
+    int hash = task.uid.hashCode;
+    final colors = context.chartTheme.colors.chartSeries;
+    return colors[hash.abs() % colors.length];
   }
 
   String _formatMonthYear(DateTime date) {

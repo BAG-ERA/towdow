@@ -86,7 +86,7 @@ class StatusService {
         
         // Sort each group by calendar name
         for (final entry in grouped.entries) {
-          entry.value.sort((a, b) => a.summary.toLowerCase().compareTo(b.summary.toLowerCase()));
+          entry.value.sort((a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
         }
         
         AppLogger.info('StatusService: Grouped ${calendars.length} calendars into ${grouped.length} status groups');

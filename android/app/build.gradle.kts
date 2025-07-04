@@ -13,7 +13,6 @@ android {
     compileOptions {
         // For AGP 4.1+
         isCoreLibraryDesugaringEnabled = true
-        // Sets Java compatibility to Java 8
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }

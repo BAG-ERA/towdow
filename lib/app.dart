@@ -11,7 +11,9 @@ import 'presentation/screens/archived_projects/archived_projects_screen.dart';
 
 import 'presentation/screens/project_detail/project_detail_screen.dart';
 import 'presentation/widgets/adaptive_app_layout.dart';
+import 'presentation/providers/home_providers.dart';
 import 'data/providers/providers.dart';
+import 'core/theme/chart_theme.dart';
 
 class FlowItApp extends ConsumerWidget {
   const FlowItApp({super.key});
@@ -25,7 +27,7 @@ class FlowItApp extends ConsumerWidget {
       title: 'FlowIt',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
+          seedColor: FlowItColors.primary,
           brightness: Brightness.light,
         ),
         useMaterial3: true,
@@ -44,10 +46,16 @@ class FlowItApp extends ConsumerWidget {
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
         ),
+        extensions: <ThemeExtension<dynamic>>[
+          ChartTheme.light(ColorScheme.fromSeed(
+            seedColor: FlowItColors.primary,
+            brightness: Brightness.light,
+          )),
+        ],
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
+          seedColor: FlowItColors.primary,
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
@@ -66,6 +74,12 @@ class FlowItApp extends ConsumerWidget {
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
         ),
+        extensions: <ThemeExtension<dynamic>>[
+          ChartTheme.dark(ColorScheme.fromSeed(
+            seedColor: FlowItColors.primary,
+            brightness: Brightness.dark,
+          )),
+        ],
       ),
       themeMode: ThemeMode.system,
       routerConfig: _createRouter(),
@@ -74,10 +88,12 @@ class FlowItApp extends ConsumerWidget {
 
   GoRouter _createRouter() {
     return GoRouter(
-      initialLocation: '/',
+      initialLocation: '/today',
       redirect: (context, state) {
-        // For now, let's disable the automatic redirect to allow testing
-        // We'll implement the proper redirect logic later
+        // Redirect root path to today view
+        if (state.uri.path == '/') {
+          return '/today';
+        }
         return null;
       },
       routes: [
@@ -89,13 +105,22 @@ class FlowItApp extends ConsumerWidget {
             final location = state.uri.path;
             
             if (location.startsWith('/settings')) {
-              currentDestination = AppDestination.settings;
+              currentDestination = null; // Settings handled by toolbar
             } else if (location.startsWith('/archived')) {
               currentDestination = null; // Archived projects have no main navigation active
             } else if (location.startsWith('/project/')) {
-              currentDestination = AppDestination.myTasks; // Project details use myTasks navigation
+              currentDestination = null; // Project details have no main navigation active
+            } else if (location == '/today' || location == '/') {
+              currentDestination = AppDestination.today;
+            } else if (location == '/soon') {
+              currentDestination = AppDestination.soon;
+            } else if (location == '/anytime') {
+              currentDestination = AppDestination.anytime;
+            } else if (location == '/next-week' || location == '/later') {
+              // Next week and later tabs exist but are not shown in sidebar
+              currentDestination = null;
             } else {
-              currentDestination = AppDestination.myTasks;
+              currentDestination = AppDestination.today; // Default to today
             }
 
             return AdaptiveAppLayout(
@@ -107,6 +132,26 @@ class FlowItApp extends ConsumerWidget {
             GoRoute(
               path: '/',
               builder: (context, state) => const _AppShell(),
+            ),
+            GoRoute(
+              path: '/today',
+              builder: (context, state) => const _TaskViewShell(initialTab: 0),
+            ),
+            GoRoute(
+              path: '/soon',
+              builder: (context, state) => const _TaskViewShell(initialTab: 1),
+            ),
+            GoRoute(
+              path: '/next-week',
+              builder: (context, state) => const _TaskViewShell(initialTab: 2),
+            ),
+            GoRoute(
+              path: '/later',
+              builder: (context, state) => const _TaskViewShell(initialTab: 3),
+            ),
+            GoRoute(
+              path: '/anytime',
+              builder: (context, state) => const _TaskViewShell(initialTab: 4),
             ),
 
             GoRoute(
@@ -174,6 +219,59 @@ class _AppShell extends ConsumerWidget {
       data: (hasAccount) {
         if (hasAccount) {
           // User has an active account, show main app
+          return const HomeScreen();
+        } else {
+          // No active account, show connection screen
+          return const ConnectionScreen();
+        }
+      },
+    );
+  }
+}
+
+// Task View Shell to handle time-based task views
+class _TaskViewShell extends ConsumerWidget {
+  const _TaskViewShell({required this.initialTab});
+  
+  final int initialTab;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasAccountAsync = ref.watch(hasActiveAccountProvider);
+
+    return hasAccountAsync.when(
+      loading: () => const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      error: (error, stackTrace) => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_rounded,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text('Error checking account status: $error'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.refresh(hasActiveAccountProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (hasAccount) {
+        if (hasAccount) {
+          // Set the initial tab and show the home screen
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.read(selectedTabIndexProvider.notifier).state = initialTab;
+          });
           return const HomeScreen();
         } else {
           // No active account, show connection screen

@@ -3,6 +3,7 @@
 // Maintains backward compatibility with legacy validator format
 
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 import '../../core/logger.dart';
 
 /// Service for managing validator logic
@@ -154,15 +155,15 @@ class ValidatorService {
     required List<String> itemTexts,
     bool required = true,
   }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
+    const uuid = Uuid();
     return {
-      'id': 'checklist-$now',
+      'id': uuid.v4(),
       'type': 'checklist',
       'required': required,
       'title': title,
-      'items': itemTexts.asMap().entries.map((entry) => {
-        'id': 'item-$now-${entry.key}',
-        'text': entry.value,
+      'items': itemTexts.map((text) => {
+        'id': uuid.v4(),
+        'text': text,
         'checked': false,
       }).toList(),
     };
@@ -173,15 +174,15 @@ class ValidatorService {
     required List<String> optionTexts,
     bool required = true,
   }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
+    const uuid = Uuid();
     return {
-      'id': 'select-$now',
+      'id': uuid.v4(),
       'type': 'single_select',
       'required': required,
       'title': title,
-      'options': optionTexts.asMap().entries.map((entry) => {
-        'id': 'option-$now-${entry.key}',
-        'text': entry.value,
+      'options': optionTexts.map((text) => {
+        'id': uuid.v4(),
+        'text': text,
       }).toList(),
       'selected': '',
     };
@@ -192,9 +193,9 @@ class ValidatorService {
     String? helper,
     bool required = true,
   }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
+    const uuid = Uuid();
     return {
-      'id': 'field-$now',
+      'id': uuid.v4(),
       'type': 'free_field',
       'required': required,
       'title': title,
@@ -234,21 +235,22 @@ class ValidatorService {
   
   static Map<String, dynamic> _migrateFormQuestion(Map<String, dynamic> question) {
     final type = question['questiontype'] as String?;
-    final id = question['questionid'] as String? ?? 'migrated-${DateTime.now().millisecondsSinceEpoch}';
+    final id = question['questionid'] as String? ?? const Uuid().v4();
     final title = question['questiontext'] as String? ?? 'Migrated Question';
     final required = question['mandatory'] as bool? ?? true;
     final options = question['questionoption'] as List? ?? [];
     
     switch (type) {
       case 'select':
+        const uuid = Uuid();
         return {
           'id': id,
           'type': 'single_select',
           'required': required,
           'title': title,
-          'options': options.asMap().entries.map((entry) => {
-            'id': 'option-$id-${entry.key}',
-            'text': entry.value.toString(),
+          'options': options.map((option) => {
+            'id': uuid.v4(),
+            'text': option.toString(),
           }).toList(),
           'selected': '',
         };
@@ -264,14 +266,15 @@ class ValidatorService {
         
       case 'multiselect':
         // Convert to checklist
+        const uuid = Uuid();
         return {
           'id': id,
           'type': 'checklist',
           'required': required,
           'title': title,
-          'items': options.asMap().entries.map((entry) => {
-            'id': 'item-$id-${entry.key}',
-            'text': entry.value.toString(),
+          'items': options.map((option) => {
+            'id': uuid.v4(),
+            'text': option.toString(),
             'checked': false,
           }).toList(),
         };

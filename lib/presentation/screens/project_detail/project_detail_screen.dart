@@ -5,14 +5,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/task_item/task_item.dart';
-import '../../widgets/styled_tab_bar.dart';
+import '../../widgets/utils/overlay_draggable_task.dart';
+import '../../widgets/utils/styled_tab_bar.dart';
+import '../../widgets/utils/buttons/create_task_button.dart';
 import '../../widgets/kanban_board.dart';
 import '../../widgets/agenda_calendar.dart';
+import '../../widgets/utils/tasklist_toolbar.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../viewmodels/commands/attendee_commands.dart';
+import '../../viewmodels/project_task_search_viewmodel.dart';
+import '../../../core/theme/chart_theme.dart';
+import '../../widgets/adaptive_app_layout.dart';
+import '../../widgets/project_detail/project_info_card.dart';
+import '../../widgets/project_detail/project_task_list_view.dart';
+import '../../../data/services/caldav_service.dart';
 
 // Provider for a specific project/calendar
 final projectProvider = FutureProvider.family<TaskCalendar?, String>((ref, projectUid) async {
@@ -63,59 +72,103 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   int _selectedTabIndex = 0;
 
   @override
+  void dispose() {
+    // Clear mobile providers when leaving the screen
+    ref.read(mobileTitleProvider.notifier).state = null;
+    ref.read(mobileProjectProvider.notifier).state = null;
+    ref.read(mobileProjectUpdateProvider.notifier).state = null;
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // AppLogger.info('ProjectDetailScreen: Building screen for project UID: ${widget.projectUid}');
     final projectAsync = ref.watch(projectProvider(widget.projectUid));
     final tasksAsync = ref.watch(projectTasksProvider(widget.projectUid));
 
+    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
+    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
+
+    // Update mobile providers when project data is available
+    projectAsync.whenData((project) {
+      if (project != null && !isDesktop) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(mobileTitleProvider.notifier).state = project.displayName;
+          ref.read(mobileProjectProvider.notifier).state = project;
+          ref.read(mobileProjectUpdateProvider.notifier).state = _updateProject;
+        });
+      }
+    });
+
     return Scaffold(
-      appBar: AppBar(
+      appBar: isDesktop ? AppBar(
         title: projectAsync.when(
-          data: (project) => Text(project?.displayName ?? 'Unknown Project'),
+          data: (project) => project != null 
+              ? _EditableProjectTitle(
+                  project: project,
+                  onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                  isInAppBar: true,
+                )
+              : const Text('Unknown Project'),
           loading: () => const Text('Loading...'),
           error: (_, _) => const Text('Error'),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.sync_rounded),
-            onPressed: () => _syncProject(context, ref),
-            tooltip: 'Sync Project',
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) => _handleMenuAction(context, ref, value),
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'kanban',
-                child: ListTile(
-                  leading: Icon(Icons.view_kanban_rounded),
-                  title: Text('Kanban View'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'list',
-                child: ListTile(
-                  leading: Icon(Icons.view_list_rounded),
-                  title: Text('List View'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'edit',
-                child: ListTile(
-                  leading: Icon(Icons.edit_rounded),
-                  title: Text('Edit Project'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        scrolledUnderElevation: 0,
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+      ) : null,
       body: Column(
         children: [
           // Project Info Card
-          _buildProjectInfoCard(context, projectAsync, tasksAsync),
+          projectAsync.when(
+            data: (project) => ProjectInfoCard(
+              project: project,
+              tasksAsync: tasksAsync,
+              projectUid: widget.projectUid,
+              onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+            ),
+            loading: () => Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Loading project...'),
+                ],
+              ),
+            ),
+            error: (error, _) => Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.error_rounded,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Failed to load project: $error',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           
           // View Tabs - Updated labels for new views
           _buildViewTabs(context),
@@ -124,232 +177,18 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           Expanded(
             child: _buildTabContent(context, ref, tasksAsync),
           ),
+          
+          // Bottom toolbar with search and create task button
+          TaskListToolbar(
+            projectUid: widget.projectUid,
+            projectName: projectAsync.asData?.value?.displayName,
+          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addTask(context, ref),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Task'),
-      ),
     );
   }
 
-  Widget _buildProjectInfoCard(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
-    return projectAsync.when(
-      data: (project) {
-        if (project == null) {
-          return Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.errorContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.error_rounded,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Project not found: ${widget.projectUid}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onErrorContainer,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
 
-        return Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.folder_rounded,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      project.displayName,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                  ),
-                  _buildProjectStatusChip(context, project),
-                ],
-              ),
-              if (project.description.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  project.description,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              // Dynamic stats based on actual tasks
-              tasksAsync.when(
-                data: (tasks) {
-                  final stats = project.getStats(tasks);
-                  return Row(
-                    children: [
-                      _buildProjectStat(context, 'Progress', '${stats.progressPercentage}%'),
-                      const SizedBox(width: 16),
-                      _buildProjectStat(context, 'Tasks', '${stats.completedTasks}/${stats.totalTasks}'),
-                      const SizedBox(width: 16),
-                      if (project.lastSyncAt != null)
-                        _buildProjectStat(context, 'Last Sync', _formatLastSync(project.lastSyncAt!)),
-                    ],
-                  );
-                },
-                loading: () => Row(
-                  children: [
-                    _buildProjectStat(context, 'Progress', '...'),
-                    const SizedBox(width: 16),
-                    _buildProjectStat(context, 'Tasks', '...'),
-                    const SizedBox(width: 16),
-                    if (project.lastSyncAt != null)
-                      _buildProjectStat(context, 'Last Sync', _formatLastSync(project.lastSyncAt!)),
-                  ],
-                ),
-                error: (_, _) => Row(
-                  children: [
-                    _buildProjectStat(context, 'Progress', '0%'),
-                    const SizedBox(width: 16),
-                    _buildProjectStat(context, 'Status', project.status),
-                    const SizedBox(width: 16),
-                    if (project.lastSyncAt != null)
-                      _buildProjectStat(context, 'Last Sync', _formatLastSync(project.lastSyncAt!)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-      loading: () => Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Text('Loading project...'),
-          ],
-        ),
-      ),
-      error: (error, _) => Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.errorContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.error_rounded,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Failed to load project: $error',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProjectStatusChip(BuildContext context, TaskCalendar project) {
-    final status = project.status.toLowerCase();
-    final color = switch (status) {
-      'completed' => Colors.green,
-      'needs-action' => Colors.orange,
-      'in-process' => Colors.blue,
-      'cancelled' => Colors.red,
-      _ => Colors.grey,
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: color.shade700,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProjectStat(BuildContext context, String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
-          ),
-        ),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatLastSync(DateTime lastSync) {
-    final now = DateTime.now();
-    final difference = now.difference(lastSync);
-    
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${difference.inDays}d ago';
-    }
-  }
 
   Widget _buildViewTabs(BuildContext context) {
     return Container(
@@ -389,218 +228,24 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   Widget _buildTabContent(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
     return switch (_selectedTabIndex) {
-      0 => _buildListView(context, ref, tasksAsync),
+      0 => ProjectTaskListView(
+        projectUid: widget.projectUid,
+        tasksAsync: tasksAsync,
+        onTasksRefresh: () => _refreshProjectTasks(ref),
+      ),
       1 => _buildTimingView(context, ref, tasksAsync),
       2 => _buildAttendeeView(context, ref, tasksAsync),
       3 => _buildKanbanView(context, ref, tasksAsync),
       4 => _buildAgendaView(context, ref, tasksAsync),
-      _ => _buildListView(context, ref, tasksAsync),
+      _ => ProjectTaskListView(
+        projectUid: widget.projectUid,
+        tasksAsync: tasksAsync,
+        onTasksRefresh: () => _refreshProjectTasks(ref),
+      ),
     };
   }
 
-  Widget _buildListView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
-    return tasksAsync.when(
-      data: (tasks) {
-        if (tasks.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.task_alt_rounded,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No Tasks Yet',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Add your first task to get started',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
 
-        // Organize tasks by priority: overdue → to be done → done
-        final now = DateTime.now();
-        final today = DateTime(now.year, now.month, now.day);
-        
-        final overdueTasks = tasks.where((task) => 
-          task.status != 'COMPLETED' && 
-          task.due != null && 
-          DateTime(task.due!.year, task.due!.month, task.due!.day).isBefore(today)
-        ).toList();
-        
-        final pendingTasks = tasks.where((task) => 
-          task.status != 'COMPLETED' && 
-          (task.due == null || !DateTime(task.due!.year, task.due!.month, task.due!.day).isBefore(today))
-        ).toList();
-        
-        final completedTasks = tasks.where((task) => 
-          task.status == 'COMPLETED'
-        ).toList();
-
-        return Column(
-          children: [
-            // Header with task count
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                border: Border(
-                  bottom: BorderSide(
-                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.checklist_rounded,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Tasks (${tasks.length})',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => ref.invalidate(projectTasksProvider(widget.projectUid)),
-                    icon: const Icon(Icons.refresh_rounded),
-                    iconSize: 20,
-                    tooltip: 'Refresh Tasks',
-                  ),
-                ],
-              ),
-            ),
-            
-            // Tasks list with sections
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // Overdue tasks section
-                  if (overdueTasks.isNotEmpty) ...[
-                    _buildSectionHeader(context, 'Overdue', overdueTasks.length, Colors.red),
-                    const SizedBox(height: 8),
-                    ...overdueTasks.map((task) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: TaskItem(
-                        task: task,
-                        onTap: () => _viewTask(context, task),
-                        onToggleComplete: () => _toggleTaskComplete(context, ref, task),
-                        onTaskUpdated: (updatedTask) async {
-                          await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                          _refreshProjectTasks(ref);
-                        },
-                        onTaskDeleted: () => _deleteTask(context, ref, task),
-                      ),
-                    )),
-                    if (pendingTasks.isNotEmpty || completedTasks.isNotEmpty)
-                      const SizedBox(height: 16),
-                  ],
-                  
-                  // Pending tasks section
-                  if (pendingTasks.isNotEmpty) ...[
-                    _buildSectionHeader(context, 'To Be Done', pendingTasks.length, Colors.orange),
-                    const SizedBox(height: 8),
-                    ...pendingTasks.map((task) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: TaskItem(
-                        task: task,
-                        onTap: () => _viewTask(context, task),
-                        onToggleComplete: () => _toggleTaskComplete(context, ref, task),
-                        onTaskUpdated: (updatedTask) async {
-                          await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                          _refreshProjectTasks(ref);
-                        },
-                        onTaskDeleted: () => _deleteTask(context, ref, task),
-                      ),
-                    )),
-                    if (completedTasks.isNotEmpty)
-                      const SizedBox(height: 16),
-                  ],
-                  
-                  // Completed tasks section with separator
-                  if (completedTasks.isNotEmpty) ...[
-                    _buildSectionHeader(context, 'Done', completedTasks.length, Colors.green),
-                    const SizedBox(height: 8),
-                    ...completedTasks.map((task) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: TaskItem(
-                        task: task,
-                        onTap: () => _viewTask(context, task),
-                        onToggleComplete: () => _toggleTaskComplete(context, ref, task),
-                        onTaskUpdated: (updatedTask) async {
-                          await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                          _refreshProjectTasks(ref);
-                        },
-                        onTaskDeleted: () => _deleteTask(context, ref, task),
-                      ),
-                    )),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-      loading: () => const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading tasks...'),
-          ],
-        ),
-      ),
-      error: (error, _) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_rounded,
-              size: 64,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load tasks',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error.toString(),
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => ref.invalidate(projectTasksProvider(widget.projectUid)),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   // Timing View - Kanban organized by time periods
   Widget _buildTimingView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
@@ -643,13 +288,21 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     
     final anytimeTasks = tasks.where((task) => task.due == null).toList();
 
+    // Sort all task lists by status (completed tasks last)
+    _sortTasksByStatus(overdueTasks);
+    _sortTasksByStatus(todayTasks);
+    _sortTasksByStatus(soonTasks);
+    _sortTasksByStatus(nextWeekTasks);
+    _sortTasksByStatus(laterTasks);
+    _sortTasksByStatus(anytimeTasks);
+
     final columns = [
       KanbanColumn(
         id: 'overdue',
         title: 'Overdue',
         subtitle: '${overdueTasks.length} tasks',
         tasks: overdueTasks,
-        color: Colors.red,
+                 color: context.chartTheme.colors.error,
         icon: Icons.warning_rounded,
       ),
       KanbanColumn(
@@ -657,7 +310,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: 'Today',
         subtitle: _formatDate(today),
         tasks: todayTasks,
-        color: Colors.green,
+                 color: context.chartTheme.colors.success,
         icon: Icons.today_rounded,
       ),
       KanbanColumn(
@@ -665,7 +318,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: 'Soon',
         subtitle: 'Next 2 days',
         tasks: soonTasks,
-        color: Colors.orange,
+                 color: context.chartTheme.colors.warning,
         icon: Icons.schedule_rounded,
       ),
       KanbanColumn(
@@ -673,7 +326,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: 'Next Week',
         subtitle: '${nextWeekTasks.length} tasks',
         tasks: nextWeekTasks,
-        color: Colors.blue,
+                 color: context.chartTheme.colors.primary,
         icon: Icons.date_range_rounded,
       ),
       KanbanColumn(
@@ -681,7 +334,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: 'Later',
         subtitle: '${laterTasks.length} tasks',
         tasks: laterTasks,
-        color: Colors.purple,
+                 color: context.chartTheme.colors.tertiary,
         icon: Icons.event_rounded,
       ),
       KanbanColumn(
@@ -696,13 +349,58 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     return KanbanBoard(
       columns: columns,
-      onTaskTap: (task) => _viewTask(context, task),
-      onTaskToggle: (task) => _toggleTaskComplete(context, ref, task),
+      onTaskTap: (task) {
+        // Navigate to task detail
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('👁️ View task: ${task.summary}')),
+        );
+      },
+      onTaskToggle: (task) async {
+        final taskViewModel = ref.read(taskViewModelProvider.notifier);
+        await taskViewModel.toggleTaskCompletion(task);
+        
+        // Refresh the tasks list
+        _refreshProjectTasks(ref);
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                task.status == 'COMPLETED' 
+                    ? '✅ Task marked as incomplete' 
+                    : '✅ Task completed!',
+              ),
+            ),
+          );
+        }
+      },
       onTaskUpdated: (task) async {
         await ref.read(taskViewModelProvider.notifier).updateTask(task);
         _refreshProjectTasks(ref);
       },
-      onTaskDeleted: (task) => _deleteTask(context, ref, task),
+      onTaskDeleted: (task) async {
+        // Handle task deletion
+        final taskViewModel = ref.read(taskViewModelProvider.notifier);
+        await taskViewModel.deleteTask(task.uid);
+        
+        // Refresh the tasks list
+        _refreshProjectTasks(ref);
+        
+        // Show confirmation
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Task "${task.summary}" deleted'),
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  // TODO: Implement undo functionality
+                },
+              ),
+            ),
+          );
+        }
+      },
     );
   }
 
@@ -764,28 +462,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     }
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, int count, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 20,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          '$title ($count)',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
+
 
   // Attendee View - Kanban organized by attendees
   Widget _buildAttendeeView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
@@ -828,8 +505,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     final attendeesList = allAttendees.toList()..sort();
     
-    // Tasks without attendees
+    // Tasks without attendees - sorted by status (done tasks last)
     final unassignedTasks = tasks.where((task) => task.attendees.isEmpty).toList();
+    _sortTasksByStatus(unassignedTasks);
     
     final columns = <KanbanColumn>[];
     
@@ -849,6 +527,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     // Add columns for each attendee
     for (final attendee in attendeesList) {
       final attendeeTasks = _getTasksForAttendee(tasks, attendee);
+      _sortTasksByStatus(attendeeTasks);
       final completedTasks = attendeeTasks.where((task) => task.status == 'COMPLETED').length;
       final progressPercentage = attendeeTasks.isNotEmpty 
           ? (completedTasks * 100 / attendeeTasks.length).round() 
@@ -869,8 +548,31 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     return KanbanBoard(
       columns: columns,
-      onTaskTap: (task) => _viewTask(context, task),
-      onTaskToggle: (task) => _toggleTaskComplete(context, ref, task),
+      onTaskTap: (task) {
+        // Navigate to task detail
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('👁️ View task: ${task.summary}')),
+        );
+      },
+      onTaskToggle: (task) async {
+        final taskViewModel = ref.read(taskViewModelProvider.notifier);
+        await taskViewModel.toggleTaskCompletion(task);
+        
+        // Refresh the tasks list
+        _refreshProjectTasks(ref);
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                task.status == 'COMPLETED' 
+                    ? '✅ Task marked as incomplete' 
+                    : '✅ Task completed!',
+              ),
+            ),
+          );
+        }
+      },
       onTaskMoved: (task, columnId) => _handleAttendeeTaskMove(context, ref, task, columnId),
     );
   }
@@ -1016,8 +718,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     
     final categoriesList = allCategories.toList()..sort();
     
-    // Tasks without categories
+    // Tasks without categories - sorted by status (done tasks last)
     final uncategorizedTasks = tasks.where((task) => task.categories.isEmpty).toList();
+    _sortTasksByStatus(uncategorizedTasks);
     
     final columns = <KanbanColumn>[];
     
@@ -1037,6 +740,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     // Add columns for each category
     for (final category in categoriesList) {
       final categoryTasks = tasks.where((task) => task.categories.contains(category)).toList();
+      _sortTasksByStatus(categoryTasks);
       
       columns.add(
         KanbanColumn(
@@ -1053,8 +757,31 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     return KanbanBoard(
       columns: columns,
-      onTaskTap: (task) => _viewTask(context, task),
-      onTaskToggle: (task) => _toggleTaskComplete(context, ref, task),
+      onTaskTap: (task) {
+        // Navigate to task detail
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('👁️ View task: ${task.summary}')),
+        );
+      },
+      onTaskToggle: (task) async {
+        final taskViewModel = ref.read(taskViewModelProvider.notifier);
+        await taskViewModel.toggleTaskCompletion(task);
+        
+        // Refresh the tasks list
+        _refreshProjectTasks(ref);
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                task.status == 'COMPLETED' 
+                    ? '✅ Task marked as incomplete' 
+                    : '✅ Task completed!',
+              ),
+            ),
+          );
+        }
+      },
     );
   }
 
@@ -1063,6 +790,36 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final hash = category.hashCode;
     final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.teal, Colors.pink, Colors.indigo, Colors.red];
     return colors[hash.abs() % colors.length];
+  }
+
+  /// Sort tasks by status with completed tasks appearing last
+  void _sortTasksByStatus(List<Task> tasks) {
+    tasks.sort((a, b) {
+      // First, sort by completion status (incomplete tasks first)
+      if (a.status == 'COMPLETED' && b.status != 'COMPLETED') {
+        return 1; // a (completed) comes after b (incomplete)
+      }
+      if (a.status != 'COMPLETED' && b.status == 'COMPLETED') {
+        return -1; // a (incomplete) comes before b (completed)
+      }
+      
+      // If both have the same completion status, sort by priority/due date
+      // Tasks with due dates come before tasks without due dates
+      if (a.due != null && b.due == null) {
+        return -1; // a (has due date) comes before b (no due date)
+      }
+      if (a.due == null && b.due != null) {
+        return 1; // a (no due date) comes after b (has due date)
+      }
+      
+      // If both have due dates, sort by due date (earliest first)
+      if (a.due != null && b.due != null) {
+        return a.due!.compareTo(b.due!);
+      }
+      
+      // If neither has due dates, sort alphabetically by summary
+      return a.summary.toLowerCase().compareTo(b.summary.toLowerCase());
+    });
   }
 
   Future<void> _addTaskToCategory(BuildContext context, WidgetRef ref, String? category) async {
@@ -1120,170 +877,430 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     return tasksAsync.when(
       data: (tasks) => AgendaCalendar(
         tasks: tasks,
-        onTaskTap: (task) => _viewTask(context, task),
-        onTaskToggle: (task) => _toggleTaskComplete(context, ref, task),
+        onTaskTap: (task) {
+          // Navigate to task detail
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('👁️ View task: ${task.summary}')),
+          );
+        },
+        onTaskToggle: (task) async {
+          final taskViewModel = ref.read(taskViewModelProvider.notifier);
+          await taskViewModel.toggleTaskCompletion(task);
+          
+          // Refresh the tasks list
+          _refreshProjectTasks(ref);
+          
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  task.status == 'COMPLETED' 
+                      ? '✅ Task marked as incomplete' 
+                      : '✅ Task completed!',
+                ),
+              ),
+            );
+          }
+        },
         onTaskUpdated: (task) async {
           await ref.read(taskViewModelProvider.notifier).updateTask(task);
           _refreshProjectTasks(ref);
         },
-        onTaskDeleted: (task) => _deleteTask(context, ref, task),
+        onTaskDeleted: (task) async {
+          // Handle task deletion
+          final taskViewModel = ref.read(taskViewModelProvider.notifier);
+          await taskViewModel.deleteTask(task.uid);
+          
+          // Refresh the tasks list
+          _refreshProjectTasks(ref);
+          
+          // Show confirmation
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Task "${task.summary}" deleted'),
+                action: SnackBarAction(
+                  label: 'Undo',
+                  onPressed: () {
+                    // TODO: Implement undo functionality
+                  },
+                ),
+              ),
+            );
+          }
+        },
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('Error loading tasks: $error')),
     );
   }
 
-  Future<void> _syncProject(BuildContext context, WidgetRef ref) async {
-    final syncService = ref.read(syncServiceProvider);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🔄 Syncing project...')),
-    );
-    
-    final result = await syncService.syncNow();
-    
-    if (context.mounted) {
-      result.when(
-        success: (syncResult) {
-          ref.invalidate(projectProvider(widget.projectUid));
-          ref.invalidate(projectTasksProvider(widget.projectUid));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ Synced ${syncResult.syncedItems} items'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-        failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ Sync failed: ${failure.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        },
-      );
-    }
-  }
 
-  void _handleMenuAction(BuildContext context, WidgetRef ref, String action) {
-    switch (action) {
-      case 'kanban':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('🚧 Kanban view coming soon')),
-        );
-        break;
-      case 'list':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('📋 Already in list view')),
-        );
-        break;
-      case 'edit':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✏️ Edit project coming soon')),
-        );
-        break;
-    }
-  }
-
-  Future<void> _addTask(BuildContext context, WidgetRef ref) async {
-    // Simple dialog to add a task to this project
-    final textController = TextEditingController();
-    
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Task'),
-        content: TextField(
-          controller: textController,
-          decoration: const InputDecoration(
-            hintText: 'Enter task summary',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(textController.text.trim()),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-    
-    if (result != null && result.isNotEmpty) {
-      final taskViewModel = ref.read(taskViewModelProvider.notifier);
-      await taskViewModel.createTask(
-        summary: result,
-        sourceCalendarUid: widget.projectUid,
-      );
-      
-      // Refresh the tasks list
-      ref.invalidate(projectTasksProvider(widget.projectUid));
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Task "$result" added to project')),
-        );
-      }
-    }
-  }
-
-  void _viewTask(BuildContext context, Task task) {
-    // Navigate to task detail
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('👁️ View task: ${task.summary}')),
-    );
-  }
-
-  Future<void> _toggleTaskComplete(BuildContext context, WidgetRef ref, Task task) async {
-    final taskViewModel = ref.read(taskViewModelProvider.notifier);
-    await taskViewModel.toggleTaskCompletion(task);
-    
-    // Refresh the tasks list
-    ref.invalidate(projectTasksProvider(widget.projectUid));
-    
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            task.status == 'COMPLETED' 
-                ? '✅ Task marked as incomplete' 
-                : '✅ Task completed!',
-          ),
-        ),
-      );
-    }
-  }
 
   void _refreshProjectTasks(WidgetRef ref) {
     // Refresh the project tasks list
     ref.invalidate(projectTasksProvider(widget.projectUid));
   }
 
-  Future<void> _deleteTask(BuildContext context, WidgetRef ref, Task task) async {
-    // Handle task deletion
-    final taskViewModel = ref.read(taskViewModelProvider.notifier);
-    await taskViewModel.deleteTask(task.uid);
+
+
+
+
+  Future<void> _updateProject(TaskCalendar updatedProject) async {
+    try {
+      AppLogger.info('ProjectDetail: _updateProject called for project: ${updatedProject.displayName}');
+      
+      final calendarRepository = ref.read(calendarRepositoryProvider);
+      
+      // Save locally first
+      AppLogger.info('ProjectDetail: Saving project locally...');
+      final result = await calendarRepository.save(updatedProject);
+      
+      await result.when(
+        success: (data) async {
+          // Refresh the project data immediately
+          ref.invalidate(projectProvider(widget.projectUid));
+          
+          // Also invalidate the project list provider so navbar updates
+          ref.invalidate(projectListProvider);
+          
+          // Show success message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('✅ Project updated successfully')),
+            );
+          }
+          
+          // Sync changes to CalDAV server (don't wait for this)
+          AppLogger.info('ProjectDetail: About to call _syncProjectToServer...');
+          _syncProjectToServer(updatedProject);
+          AppLogger.info('ProjectDetail: _syncProjectToServer call initiated (running in background)');
+        },
+        failure: (failure) async {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('❌ Failed to update project: ${failure.message}')),
+            );
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Error updating project: $e')),
+        );
+      }
+    }
+  }
+
+  /// Sync project metadata changes to CalDAV server
+  Future<void> _syncProjectToServer(TaskCalendar project) async {
+    AppLogger.info('ProjectDetail: _syncProjectToServer method entered for project: ${project.displayName}');
     
-    // Refresh the tasks list
-    ref.invalidate(projectTasksProvider(widget.projectUid));
-    
-    // Show confirmation
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Task "${task.summary}" deleted'),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () {
-              // TODO: Implement undo functionality
+    try {
+      AppLogger.info('ProjectDetail: Starting server sync for project: ${project.displayName}');
+      
+      // Get active account
+      final accountRepository = ref.read(accountRepositoryProvider);
+      AppLogger.info('ProjectDetail: Getting active account from repository...');
+      final accountResult = await accountRepository.getActiveAccount();
+      AppLogger.info('ProjectDetail: Account result obtained, processing...');
+      
+      await accountResult.when(
+        success: (account) async {
+          if (account == null) {
+            AppLogger.warning('ProjectDetail: No active account found, skipping server sync');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('⚠️ No CalDAV account found - changes saved locally only'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+            return;
+          }
+          
+          AppLogger.info('ProjectDetail: Found active account: ${account.username}@${account.serverUrl}');
+          
+          // Create CalDAV service and sync to server
+          final caldavService = CalDAVService(account: account);
+          AppLogger.info('ProjectDetail: Calling CalDAV updateCalendarProperties...');
+          final syncResult = await caldavService.updateCalendarProperties(project);
+          
+          await syncResult.when(
+            success: (_) {
+              AppLogger.info('ProjectDetail: Successfully synced project metadata to server');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('☁️ Project synced to server'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             },
+            failure: (failure) {
+              AppLogger.error('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('❌ Server sync failed: ${failure.message}'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 5),
+                    action: SnackBarAction(
+                      label: 'Retry',
+                      textColor: Colors.white,
+                      onPressed: () => _syncProjectToServer(project),
+                    ),
+                  ),
+                );
+              }
+            },
+          );
+        },
+        failure: (failure) {
+          AppLogger.warning('ProjectDetail: No active account found, skipping server sync: ${failure.message}');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('⚠️ Account error: ${failure.message}'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectDetail: Exception during server sync', e, stackTrace);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Sync error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
+        );
+      }
+    }
+  }
+}
+
+// Editable Project Title Widget
+class _EditableProjectTitle extends StatefulWidget {
+  final TaskCalendar project;
+  final Function(TaskCalendar) onProjectUpdated;
+  final bool isInAppBar;
+
+  const _EditableProjectTitle({
+    required this.project,
+    required this.onProjectUpdated,
+    this.isInAppBar = false,
+  });
+
+  @override
+  State<_EditableProjectTitle> createState() => _EditableProjectTitleState();
+}
+
+class _EditableProjectTitleState extends State<_EditableProjectTitle> {
+  bool _isEditing = false;
+  bool _isHovered = false;
+  late TextEditingController _controller;
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.project.displayName);
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_EditableProjectTitle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // If the project changed while we were editing, we need to handle it
+    if (oldWidget.project.uid != widget.project.uid) {
+      // Different project - reset editing state and update controller
+      setState(() {
+        _isEditing = false;
+        _isHovered = false;
+      });
+      _controller.text = widget.project.displayName;
+    } else if (oldWidget.project.displayName != widget.project.displayName) {
+      // Same project but title changed externally - update controller if not editing
+      if (!_isEditing) {
+        _controller.text = widget.project.displayName;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isInAppBar = widget.isInAppBar;
+    final primaryColor = isInAppBar 
+        ? Theme.of(context).colorScheme.onSurface 
+        : Theme.of(context).colorScheme.onPrimaryContainer;
+    
+    if (_isEditing) {
+      if (isInAppBar) {
+        // Simplified editing for AppBar
+        return TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            isDense: true,
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.close, size: 16),
+                  onPressed: _cancelEdit,
+                  tooltip: 'Cancel',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.check, size: 16),
+                  onPressed: _saveTitle,
+                  tooltip: 'Save',
+                ),
+              ],
+            ),
+          ),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: primaryColor,
+          ),
+          onSubmitted: (_) => _saveTitle(),
+        );
+      }
+      
+      return Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Theme.of(context).colorScheme.primary,
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                isDense: true,
+              ),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: primaryColor,
+              ),
+              onSubmitted: (_) => _saveTitle(),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _cancelEdit,
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _saveTitle,
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
     }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: InkWell(
+        onTap: _startEditing,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: isInAppBar ? null : double.infinity,
+          padding: EdgeInsets.symmetric(
+            horizontal: isInAppBar ? 4 : 4, 
+            vertical: isInAppBar ? 4 : 8
+          ),
+          decoration: BoxDecoration(
+            color: _isHovered
+                ? (isInAppBar 
+                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)
+                    : Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.1))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            widget.project.displayName,
+            style: (isInAppBar 
+                ? Theme.of(context).textTheme.titleLarge 
+                : Theme.of(context).textTheme.headlineSmall)?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: primaryColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _startEditing() {
+    setState(() {
+      _isEditing = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+      _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
+    });
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _isEditing = false;
+      _controller.text = widget.project.displayName;
+    });
+  }
+
+  void _saveTitle() {
+    if (_controller.text.trim().isNotEmpty) {
+      final newTitle = _controller.text.trim();
+      AppLogger.info('ProjectDetail: Saving new title: "$newTitle" (was: "${widget.project.displayName}")');
+      
+      final updatedProject = widget.project.copyWith(
+        displayName: newTitle,
+        lastModified: DateTime.now(),
+      );
+      
+      AppLogger.info('ProjectDetail: Calling onProjectUpdated callback...');
+      widget.onProjectUpdated(updatedProject);
+    }
+    
+    setState(() {
+      _isEditing = false;
+    });
   }
 } 

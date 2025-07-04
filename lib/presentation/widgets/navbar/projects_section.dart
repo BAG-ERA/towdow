@@ -5,12 +5,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/logger.dart';
+import '../../../core/theme/chart_theme_usage.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task_calendar.dart';
+import '../../../data/repositories/user_repository.dart';
+import '../../viewmodels/project_list_viewmodel.dart';
+import '../utils/popup/domain_rename_dialog.dart';
+import '../utils/popup/project_creation_dialog.dart';
 import 'project_item_widget.dart';
+import 'reorder_drop_zone.dart';
 
 class ProjectsSection extends ConsumerWidget {
-  const ProjectsSection({super.key});
+  const ProjectsSection({
+    super.key,
+    this.isDesktop = true,
+  });
+
+  final bool isDesktop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,6 +36,20 @@ class ProjectsSection extends ConsumerWidget {
   }
 
   Widget _buildProjectsSection(BuildContext context, WidgetRef ref, List<TaskCalendar> projects, dynamic projectListState) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).colorScheme.outline.withAlpha(25),
+            width: 1,
+          ),
+        ),
+      ),
+      child: _buildProjectsContent(context, ref, projects, projectListState),
+    );
+  }
+
+  Widget _buildProjectsContent(BuildContext context, WidgetRef ref, List<TaskCalendar> projects, dynamic projectListState) {
     // Group projects by domain
     final projectsWithoutDomain = projects.where((project) => !project.hasDomain).toList();
     final domainGroups = <String, List<TaskCalendar>>{};
@@ -59,44 +84,6 @@ class ProjectsSection extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.folder_rounded,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Projects',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  if (projects.isNotEmpty) ...[
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${projects.length}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
             
             // Projects list
             Expanded(
@@ -106,12 +93,13 @@ class ProjectsSection extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       children: [
                         // Projects without domain (with drop target)
-                        if (projectsWithoutDomain.isNotEmpty || sortedDomains.isNotEmpty) 
-                          _NoDomainSection(
-                            projects: projectsWithoutDomain,
-                            ref: ref,
-                            showSeparator: sortedDomains.isNotEmpty,
-                          ),
+                        // Always show this section to provide a drop target for removing projects from domains
+                        _NoDomainSection(
+                          projects: projectsWithoutDomain,
+                          ref: ref,
+                          showSeparator: sortedDomains.isNotEmpty,
+                          isDesktop: isDesktop,
+                        ),
                         
                         // Domain sections (including empty ones)
                         ...sortedDomains.map((domain) => 
@@ -119,6 +107,7 @@ class ProjectsSection extends ConsumerWidget {
                             domain: domain,
                             projects: domainGroups[domain]!,
                             ref: ref,
+                            isDesktop: isDesktop,
                           )
                         ),
                       ],
@@ -229,11 +218,13 @@ class _DomainSection extends ConsumerStatefulWidget {
   final String domain;
   final List<TaskCalendar> projects;
   final WidgetRef ref;
+  final bool isDesktop;
 
   const _DomainSection({
     required this.domain,
     required this.projects,
     required this.ref,
+    required this.isDesktop,
   });
 
   @override
@@ -363,16 +354,180 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     }
   }
 
+  void _createProjectInDomain() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => ProjectCreationDialog(
+        initialDomain: widget.domain,
+      ),
+    );
+
+    if (result != null) {
+      // Project creation dialog already handles the creation and UI feedback
+      // No additional logic needed here
+    }
+  }
+
+  void _renameDomain() async {
+    final newDomainName = await showDialog<String>(
+      context: context,
+      builder: (context) => DomainRenameDialog(
+        currentDomainName: widget.domain,
+      ),
+    );
+
+    if (newDomainName != null && newDomainName != widget.domain) {
+      // The dialog already handles the rename operation and UI feedback
+      // No additional logic needed here since it's all handled in the dialog
+    }
+  }
+
+  /// Build project list for this domain with custom ordering support
+  Widget _buildReorderableProjectList() {
+    // Get projects in custom order, but always show all projects
+    return FutureBuilder<List<TaskCalendar>>(
+      future: _getCustomOrderedProjectsForDomain(),
+      builder: (context, snapshot) {
+        final orderedProjects = snapshot.data ?? widget.projects;
+        
+        return Column(
+          children: _buildProjectListWithDropZones(orderedProjects),
+        );
+      },
+    );
+  }
+
+  /// Build project list with reorder drop zones between projects
+  List<Widget> _buildProjectListWithDropZones(List<TaskCalendar> projects) {
+    final widgets = <Widget>[];
+    
+    // Add drop zone at the beginning for inserting at index 0
+    widgets.add(ReorderDropZone(
+      targetDomain: widget.domain,
+      insertIndex: 0,
+      onProjectReorder: _handleProjectReorder,
+    ));
+    
+    // Add projects with drop zones between them
+    for (int i = 0; i < projects.length; i++) {
+      // Add project item
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: ProjectItemWidget(
+            project: projects[i], 
+            isDesktop: widget.isDesktop,
+          ),
+        ),
+      );
+      
+      // Add drop zone after each project (except the last one)
+      if (i < projects.length - 1) {
+        widgets.add(ReorderDropZone(
+          targetDomain: widget.domain,
+          insertIndex: i + 1,
+          onProjectReorder: _handleProjectReorder,
+        ));
+      }
+    }
+    
+    // Add final drop zone at the end
+    widgets.add(ReorderDropZone(
+      targetDomain: widget.domain,
+      insertIndex: projects.length,
+      onProjectReorder: _handleProjectReorder,
+    ));
+    
+    return widgets;
+  }
+
+  /// Handle reordering a project within this domain
+  void _handleProjectReorder(ProjectDragData dragData, int insertIndex) async {
+    try {
+      AppLogger.info('DomainSection: Reordering project ${dragData.project.displayName} to index $insertIndex in domain ${widget.domain}');
+      
+      final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+      await projectListViewModel.reorderProject(dragData.project.uid, insertIndex);
+      
+      AppLogger.info('DomainSection: Successfully reordered project ${dragData.project.displayName}');
+    } catch (e) {
+      AppLogger.error('DomainSection: Failed to reorder project ${dragData.project.displayName}: $e');
+      
+      // Show error feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to reorder project: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  /// Get projects in custom order for this specific domain
+  Future<List<TaskCalendar>> _getCustomOrderedProjectsForDomain() async {
+    final userRepository = ref.read(userRepositoryProvider);
+    final preferencesResult = await userRepository.getUserPreferences();
+    
+    return preferencesResult.when(
+      success: (preferences) {
+        final projectOrder = preferences.projectOrder;
+        final domainProjects = widget.projects;
+        
+        if (projectOrder.isEmpty) {
+          // No custom order defined, return projects sorted by name
+          final sorted = List<TaskCalendar>.from(domainProjects);
+          sorted.sort((a, b) => a.displayName.compareTo(b.displayName));
+          return sorted;
+        }
+        
+        // Apply user-defined ordering within this domain
+        final orderedProjects = <TaskCalendar>[];
+        final unorderedProjects = <TaskCalendar>[];
+        
+        // Add projects in user-defined order (only those in this domain)
+        for (final projectUid in projectOrder) {
+          final project = domainProjects.cast<TaskCalendar?>().firstWhere(
+            (p) => p?.uid == projectUid,
+            orElse: () => null,
+          );
+          if (project != null) {
+            orderedProjects.add(project);
+          }
+        }
+        
+        // Add any projects in this domain that aren't in the user order
+        for (final project in domainProjects) {
+          if (!projectOrder.contains(project.uid)) {
+            unorderedProjects.add(project);
+          }
+        }
+        
+        // Sort unordered projects by name and append to the end
+        unorderedProjects.sort((a, b) => a.displayName.compareTo(b.displayName));
+        
+        return [...orderedProjects, ...unorderedProjects];
+      },
+      failure: (failure) {
+        AppLogger.error('DomainSection: Failed to get user preferences for ordering', failure.exception, failure.stackTrace);
+        // Fallback to name sorting
+        final sorted = List<TaskCalendar>.from(widget.projects);
+        sorted.sort((a, b) => a.displayName.compareTo(b.displayName));
+        return sorted;
+      },
+    );
+  }
+
   /// Handle dropping a project onto this domain section
   void _handleProjectDrop(BuildContext context, ProjectDragData dragData) async {
     // Don't move project if it's already in this domain
     if (dragData.currentDomain == widget.domain) {
-      AppLogger.info('DomainSection: Project ${dragData.project.summary} already in domain ${widget.domain}');
+      AppLogger.info('DomainSection: Project ${dragData.project.displayName} already in domain ${widget.domain}');
       return;
     }
 
     try {
-      AppLogger.info('DomainSection: Moving project ${dragData.project.summary} to domain ${widget.domain}');
+      AppLogger.info('DomainSection: Moving project ${dragData.project.displayName} to domain ${widget.domain}');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.assignDomainToProject(dragData.project.uid, widget.domain);
@@ -380,15 +535,15 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
       // Show success feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Moved "${dragData.project.summary}" to "${widget.domain}" domain'),
+          content: Text('Moved "${dragData.project.displayName}" to "${widget.domain}" domain'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           duration: const Duration(seconds: 2),
         ),
       );
       
-      AppLogger.info('DomainSection: Successfully moved project ${dragData.project.summary} to domain ${widget.domain}');
+              AppLogger.info('DomainSection: Successfully moved project ${dragData.project.displayName} to domain ${widget.domain}');
     } catch (e) {
-      AppLogger.error('DomainSection: Failed to move project ${dragData.project.summary} to domain ${widget.domain}: $e');
+              AppLogger.error('DomainSection: Failed to move project ${dragData.project.displayName} to domain ${widget.domain}: $e');
       
       // Show error feedback
       ScaffoldMessenger.of(context).showSnackBar(
@@ -404,6 +559,11 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
   @override
   Widget build(BuildContext context) {
     return DragTarget<ProjectDragData>(
+      onWillAcceptWithDetails: (details) {
+        // Only accept projects from different domains (for domain change, not reordering)
+        final draggedFromDomain = details.data.currentDomain;
+        return draggedFromDomain != widget.domain;
+      },
       onAcceptWithDetails: (details) => _handleProjectDrop(context, details.data),
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty;
@@ -427,7 +587,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
             children: [
               // Domain header
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 0),
                 child: Material(
                   color: Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
@@ -435,7 +595,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                     borderRadius: BorderRadius.circular(8),
                     onTap: _toggleExpanded,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
                       child: Row(
                         children: [
                           AnimatedRotation(
@@ -450,9 +610,8 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              widget.domain.toUpperCase(),
-                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
+                              widget.domain,
+                              style: context.domainNameStyle.copyWith(
                                 color: isHovering 
                                     ? Theme.of(context).colorScheme.primary
                                     : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
@@ -481,11 +640,54 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                             ),
                             padding: EdgeInsets.zero,
                             onSelected: (value) {
-                              if (value == 'delete') {
+                              if (value == 'create_project') {
+                                _createProjectInDomain();
+                              } else if (value == 'rename') {
+                                _renameDomain();
+                              } else if (value == 'delete') {
                                 _deleteDomain();
                               }
                             },
                             itemBuilder: (context) => [
+                              PopupMenuItem<String>(
+                                value: 'create_project',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.add,
+                                      size: 16,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Create project',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuDivider(),
+                              PopupMenuItem<String>(
+                                value: 'rename',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.edit_outlined,
+                                      size: 16,
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Rename domain',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                               PopupMenuItem<String>(
                                 value: 'delete',
                                 child: Row(
@@ -532,14 +734,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                           ),
                         ),
                       )
-                    : Column(
-                        children: widget.projects.map((project) => 
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16),
-                            child: ProjectItemWidget(project: project),
-                          )
-                        ).toList(),
-                      ),
+                    : _buildReorderableProjectList(),
               ),
               
               const SizedBox(height: 8),
@@ -556,16 +751,159 @@ class _NoDomainSection extends ConsumerWidget {
   final List<TaskCalendar> projects;
   final WidgetRef ref;
   final bool showSeparator;
+  final bool isDesktop;
 
   const _NoDomainSection({
     required this.projects,
     required this.ref,
     this.showSeparator = false,
+    required this.isDesktop,
   });
+
+  /// Build project list for projects without domain with custom ordering support
+  Widget _buildReorderableProjectList(BuildContext context, WidgetRef ref) {
+    // Get projects in custom order, but always show all projects
+    return FutureBuilder<List<TaskCalendar>>(
+      future: _getCustomOrderedProjectsWithoutDomain(ref),
+      builder: (context, snapshot) {
+        final orderedProjects = snapshot.data ?? projects;
+        
+        return Column(
+          children: _buildProjectListWithDropZones(orderedProjects, context, ref),
+        );
+      },
+    );
+  }
+
+  /// Build project list with reorder drop zones between projects
+  List<Widget> _buildProjectListWithDropZones(List<TaskCalendar> projects, BuildContext context, WidgetRef ref) {
+    final widgets = <Widget>[];
+    
+    // Add drop zone at the beginning for inserting at index 0
+    widgets.add(ReorderDropZone(
+      targetDomain: null, // No domain
+      insertIndex: 0,
+      onProjectReorder: (dragData, insertIndex) => _handleProjectReorder(context, ref, dragData, insertIndex),
+    ));
+    
+    // Add projects with drop zones between them
+    for (int i = 0; i < projects.length; i++) {
+      // Add project item
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: ProjectItemWidget(
+            project: projects[i], 
+            isDesktop: isDesktop,
+          ),
+        ),
+      );
+      
+      // Add drop zone after each project (except the last one)
+      if (i < projects.length - 1) {
+        widgets.add(ReorderDropZone(
+          targetDomain: null, // No domain
+          insertIndex: i + 1,
+          onProjectReorder: (dragData, insertIndex) => _handleProjectReorder(context, ref, dragData, insertIndex),
+        ));
+      }
+    }
+    
+    // Add final drop zone at the end
+    widgets.add(ReorderDropZone(
+      targetDomain: null, // No domain
+      insertIndex: projects.length,
+      onProjectReorder: (dragData, insertIndex) => _handleProjectReorder(context, ref, dragData, insertIndex),
+    ));
+    
+    return widgets;
+  }
+
+  /// Handle reordering a project within the no-domain section
+  void _handleProjectReorder(BuildContext context, WidgetRef ref, ProjectDragData dragData, int insertIndex) async {
+    try {
+      AppLogger.info('NoDomainSection: Reordering project ${dragData.project.displayName} to index $insertIndex');
+      
+      final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+      await projectListViewModel.reorderProject(dragData.project.uid, insertIndex);
+      
+      AppLogger.info('NoDomainSection: Successfully reordered project ${dragData.project.displayName}');
+    } catch (e) {
+      AppLogger.error('NoDomainSection: Failed to reorder project ${dragData.project.displayName}: $e');
+      
+      // Show error feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to reorder project: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  /// Get projects in custom order for projects without domain
+  Future<List<TaskCalendar>> _getCustomOrderedProjectsWithoutDomain(WidgetRef ref) async {
+    final userRepository = ref.read(userRepositoryProvider);
+    final preferencesResult = await userRepository.getUserPreferences();
+    
+    return preferencesResult.when(
+      success: (preferences) {
+        final projectOrder = preferences.projectOrder;
+        final noDomainProjects = projects;
+        
+        if (projectOrder.isEmpty) {
+          // No custom order defined, return projects sorted by name
+          final sorted = List<TaskCalendar>.from(noDomainProjects);
+          sorted.sort((a, b) => a.displayName.compareTo(b.displayName));
+          return sorted;
+        }
+        
+        // Apply user-defined ordering for projects without domain
+        final orderedProjects = <TaskCalendar>[];
+        final unorderedProjects = <TaskCalendar>[];
+        
+        // Add projects in user-defined order (only those without domain)
+        for (final projectUid in projectOrder) {
+          final project = noDomainProjects.cast<TaskCalendar?>().firstWhere(
+            (p) => p?.uid == projectUid,
+            orElse: () => null,
+          );
+          if (project != null) {
+            orderedProjects.add(project);
+          }
+        }
+        
+        // Add any projects without domain that aren't in the user order
+        for (final project in noDomainProjects) {
+          if (!projectOrder.contains(project.uid)) {
+            unorderedProjects.add(project);
+          }
+        }
+        
+        // Sort unordered projects by name and append to the end
+        unorderedProjects.sort((a, b) => a.displayName.compareTo(b.displayName));
+        
+        return [...orderedProjects, ...unorderedProjects];
+      },
+      failure: (failure) {
+        AppLogger.error('NoDomainSection: Failed to get user preferences for ordering', failure.exception, failure.stackTrace);
+        // Fallback to name sorting
+        final sorted = List<TaskCalendar>.from(projects);
+        sorted.sort((a, b) => a.displayName.compareTo(b.displayName));
+        return sorted;
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DragTarget<ProjectDragData>(
+      onWillAcceptWithDetails: (details) {
+        // Only accept projects from domains (for removing from domain, not reordering)
+        final draggedFromDomain = details.data.currentDomain;
+        return draggedFromDomain != null; // Only accept projects that have a domain
+      },
       onAcceptWithDetails: (details) => _handleProjectDrop(context, details.data),
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty;
@@ -575,55 +913,38 @@ class _NoDomainSection extends ConsumerWidget {
           children: [
             // Projects without domain
             if (projects.isNotEmpty) ...[
-              ...projects.map((project) => ProjectItemWidget(project: project)),
+              _buildReorderableProjectList(context, ref),
             ],
             
-            // Drop zone for removing projects from domains
-            if (isHovering || projects.isEmpty) 
+            // Drop zone for removing projects from domains - only show when dragging
+            if (isHovering) 
               AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 decoration: BoxDecoration(
-                  color: isHovering 
-                      ? Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.4)
-                      : Colors.transparent,
+                  color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(8),
-                  border: isHovering 
-                      ? Border.all(
-                          color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.6),
-                          width: 2,
-                          style: BorderStyle.solid,
-                        )
-                      : Border.all(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
-                          width: 1,
-                          style: BorderStyle.solid,
-                        ),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.6),
+                    width: 2,
+                    style: BorderStyle.solid,
+                  ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      isHovering ? Icons.remove_circle_outline : Icons.folder_outlined,
+                      Icons.remove_circle_outline,
                       size: 16,
-                      color: isHovering
-                          ? Theme.of(context).colorScheme.secondary
-                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: Theme.of(context).colorScheme.secondary,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        isHovering 
-                            ? 'Drop here to remove from domain'
-                            : projects.isEmpty 
-                                ? 'No projects without domain'
-                                : 'Projects without domain',
+                        'Drop here to remove from domain',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isHovering
-                              ? Theme.of(context).colorScheme.secondary
-                              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                          fontStyle: projects.isEmpty ? FontStyle.italic : null,
-                          fontWeight: isHovering ? FontWeight.w500 : FontWeight.normal,
+                          color: Theme.of(context).colorScheme.secondary,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -644,12 +965,12 @@ class _NoDomainSection extends ConsumerWidget {
   void _handleProjectDrop(BuildContext context, ProjectDragData dragData) async {
     // Don't move if project is already without domain
     if (dragData.currentDomain == null) {
-      AppLogger.info('NoDomainSection: Project ${dragData.project.summary} already has no domain');
+      AppLogger.info('NoDomainSection: Project ${dragData.project.displayName} already has no domain');
       return;
     }
 
     try {
-      AppLogger.info('NoDomainSection: Removing project ${dragData.project.summary} from domain ${dragData.currentDomain}');
+      AppLogger.info('NoDomainSection: Removing project ${dragData.project.displayName} from domain ${dragData.currentDomain}');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.assignDomainToProject(dragData.project.uid, null);
@@ -657,15 +978,15 @@ class _NoDomainSection extends ConsumerWidget {
       // Show success feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Removed "${dragData.project.summary}" from "${dragData.currentDomain}" domain'),
+          content: Text('Removed "${dragData.project.displayName}" from "${dragData.currentDomain}" domain'),
           backgroundColor: Theme.of(context).colorScheme.secondary,
           duration: const Duration(seconds: 2),
         ),
       );
       
-      AppLogger.info('NoDomainSection: Successfully removed project ${dragData.project.summary} from domain');
+      AppLogger.info('NoDomainSection: Successfully removed project ${dragData.project.displayName} from domain');
     } catch (e) {
-      AppLogger.error('NoDomainSection: Failed to remove project ${dragData.project.summary} from domain: $e');
+      AppLogger.error('NoDomainSection: Failed to remove project ${dragData.project.displayName} from domain: $e');
       
       // Show error feedback
       ScaffoldMessenger.of(context).showSnackBar(

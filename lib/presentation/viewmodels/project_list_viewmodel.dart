@@ -5,8 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/task_repository.dart';
+import '../../data/repositories/account_repository.dart';
+import '../../data/repositories/user_repository.dart';
 import '../../data/services/sync_service.dart';
 import '../../data/services/domain_service.dart';
+import '../../data/services/caldav_service.dart';
+import '../../data/models/user_preferences.dart';
 import '../../core/logger.dart';
 
 // Project with associated statistics
@@ -124,7 +128,7 @@ class ProjectListState {
     this.projects = const [],
     this.domainGroups = const [],
     this.filter = ProjectFilter.all,
-    this.sortBy = ProjectSort.name,
+    this.sortBy = ProjectSort.custom,
     this.searchQuery = '',
     this.selectedDomain,
     this.isDomainGroupingEnabled = true,
@@ -232,6 +236,10 @@ class ProjectListState {
           return a.project.displayName.compareTo(b.project.displayName);
         });
         break;
+      case ProjectSort.custom:
+        // Custom ordering will be handled by the ViewModel
+        // For now, keep the original order
+        break;
     }
     
     return filtered;
@@ -270,6 +278,7 @@ enum ProjectSort {
   lastModified,
   taskCount,
   domain,
+  custom, // User-defined ordering
 }
 
 // Project List ViewModel
@@ -278,12 +287,16 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   final TaskRepository _taskRepository;
   final SyncService _syncService;
   final DomainService _domainService;
+  final AccountRepository _accountRepository;
+  final UserRepository _userRepository;
 
   ProjectListViewModel(
     this._calendarRepository,
     this._taskRepository,
     this._syncService,
     this._domainService,
+    this._accountRepository,
+    this._userRepository,
   ) : super(const ProjectListState());
 
   /// Initialize the view model
@@ -470,18 +483,26 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
       state = state.copyWith(error: null);
       
       // Create new project calendar
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final path = '/calendars/project_${timestamp}_${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}/';
+      AppLogger.info('ProjectListViewModel: Creating project with path: $path');
+      
       final newProject = TaskCalendarFactory.createNew(
-        path: '/calendars/${DateTime.now().millisecondsSinceEpoch}/',
+        path: path,
         displayName: name,
         description: description,
         organizer: organizer,
         categories: categories,
       );
       
+      AppLogger.info('ProjectListViewModel: Created project object with UID: ${newProject.uid}');
+      
       final result = await _calendarRepository.save(newProject);
       await result.when(
         success: (_) async {
           // AppLogger.info('ProjectListViewModel: Project created successfully: $name');
+          // Add to user ordering
+          await _addProjectToUserOrder(newProject.uid);
           // Reload projects to show the new one
           await loadProjects();
         },
@@ -498,21 +519,67 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
 
   /// Delete a project
   Future<void> deleteProject(String projectUid) async {
-    // AppLogger.info('ProjectListViewModel: Deleting project: $projectUid');
+    AppLogger.info('ProjectListViewModel: Deleting project: $projectUid');
     
     try {
       state = state.copyWith(error: null);
       
-      final result = await _calendarRepository.delete(projectUid);
-      await result.when(
-        success: (_) async {
-          // AppLogger.info('ProjectListViewModel: Project deleted successfully: $projectUid');
-          // Remove from local state
-          final updatedProjects = state.projects.where((p) => p.project.uid != projectUid).toList();
-          state = state.copyWith(projects: updatedProjects);
+      // First get the project to obtain its path for server deletion
+      final calendarResult = await _calendarRepository.getById(projectUid);
+      await calendarResult.when(
+        success: (calendar) async {
+          if (calendar == null) {
+            AppLogger.warning('ProjectListViewModel: Project $projectUid not found for deletion');
+            return; // Already deleted
+          }
+
+          // Delete from server first (if we have an active account)
+          try {
+            final accountResult = await _accountRepository.getActiveAccount();
+            await accountResult.when(
+              success: (account) async {
+                if (account != null) {
+                  final caldavService = CalDAVService(account: account);
+                  final serverDeleteResult = await caldavService.deleteCalendar(calendar.path);
+                  
+                  serverDeleteResult.when(
+                    success: (_) {
+                      AppLogger.info('ProjectListViewModel: Project deleted from server successfully');
+                    },
+                    failure: (failure) {
+                      AppLogger.warning('ProjectListViewModel: Failed to delete project from server: ${failure.message}');
+                      // Continue with local deletion even if server deletion fails
+                    },
+                  );
+                }
+              },
+              failure: (failure) {
+                AppLogger.warning('ProjectListViewModel: No active account, skipping server deletion');
+              },
+            );
+          } catch (e) {
+            AppLogger.warning('ProjectListViewModel: Server deletion failed, continuing with local deletion: $e');
+          }
+
+          // Delete locally
+          final result = await _calendarRepository.delete(projectUid);
+          await result.when(
+            success: (_) async {
+              AppLogger.info('ProjectListViewModel: Project deleted successfully: $projectUid');
+              // Remove from user ordering
+              await _removeProjectFromUserOrder(projectUid);
+              // Remove from local state
+              final updatedProjects = state.projects.where((p) => p.project.uid != projectUid).toList();
+              state = state.copyWith(projects: updatedProjects);
+            },
+            failure: (failure) async {
+              AppLogger.error('ProjectListViewModel: Failed to delete project locally', failure.exception, failure.stackTrace);
+              state = state.copyWith(error: 'Failed to delete project: ${failure.message}');
+            },
+          );
         },
         failure: (failure) async {
-          AppLogger.error('ProjectListViewModel: Failed to delete project', failure.exception, failure.stackTrace);
+          AppLogger.error('ProjectListViewModel: Failed to get project for deletion', failure.exception, failure.stackTrace);
           state = state.copyWith(error: 'Failed to delete project: ${failure.message}');
         },
       );
@@ -569,6 +636,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         return 'Task Count';
       case ProjectSort.domain:
         return 'Domain';
+      case ProjectSort.custom:
+        return 'Custom Order';
     }
   }
 
@@ -618,6 +687,174 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Exception assigning domain', e, stackTrace);
       state = state.copyWith(error: 'Failed to assign domain: $e');
+    }
+  }
+
+  /// Reorder project to a new position in the user's custom ordering
+  Future<void> reorderProject(String projectUid, int newIndex) async {
+    AppLogger.info('ProjectListViewModel: Reordering project $projectUid to index $newIndex');
+    
+    try {
+      state = state.copyWith(error: null);
+      
+      final result = await _userRepository.reorderProject(projectUid, newIndex);
+      await result.when(
+        success: (_) async {
+          AppLogger.info('ProjectListViewModel: Project reordered successfully');
+          // If we're currently using custom sorting, reload to reflect the change
+          if (state.sortBy == ProjectSort.custom) {
+            await loadProjects();
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('ProjectListViewModel: Failed to reorder project', failure.exception, failure.stackTrace);
+          state = state.copyWith(error: 'Failed to reorder project: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectListViewModel: Exception reordering project', e, stackTrace);
+      state = state.copyWith(error: 'Failed to reorder project: $e');
+    }
+  }
+
+  /// Set custom sort order as the default
+  Future<void> setCustomSortOrder() async {
+    AppLogger.info('ProjectListViewModel: Switching to custom sort order');
+    state = state.copyWith(sortBy: ProjectSort.custom);
+  }
+
+  /// Get projects in user-defined order (for custom sorting)
+  Future<List<ProjectWithStats>> _getCustomOrderedProjects() async {
+    final preferencesResult = await _userRepository.getUserPreferences();
+    
+    return await preferencesResult.when(
+      success: (preferences) async {
+        final projectOrder = preferences.projectOrder;
+        final allProjects = state.projects;
+        
+        if (projectOrder.isEmpty) {
+          // No custom order defined, return projects sorted by name as default
+          final sorted = List<ProjectWithStats>.from(allProjects);
+          sorted.sort((a, b) => a.project.displayName.compareTo(b.project.displayName));
+          return sorted;
+        }
+        
+        // Apply user-defined ordering
+        final orderedProjects = <ProjectWithStats>[];
+        final unorderedProjects = <ProjectWithStats>[];
+        
+        // Add projects in user-defined order
+        for (final projectUid in projectOrder) {
+          final project = allProjects.cast<ProjectWithStats?>().firstWhere(
+            (p) => p?.project.uid == projectUid,
+            orElse: () => null,
+          );
+          if (project != null) {
+            orderedProjects.add(project);
+          }
+        }
+        
+        // Add any projects that aren't in the user order (new projects)
+        for (final project in allProjects) {
+          if (!projectOrder.contains(project.project.uid)) {
+            unorderedProjects.add(project);
+          }
+        }
+        
+        // Sort unordered projects by name and append to the end
+        unorderedProjects.sort((a, b) => a.project.displayName.compareTo(b.project.displayName));
+        
+        return [...orderedProjects, ...unorderedProjects];
+      },
+      failure: (failure) async {
+        AppLogger.error('ProjectListViewModel: Failed to get user preferences for ordering', failure.exception, failure.stackTrace);
+        // Fallback to name sorting
+        final sorted = List<ProjectWithStats>.from(state.projects);
+        sorted.sort((a, b) => a.project.displayName.compareTo(b.project.displayName));
+        return sorted;
+      },
+    );
+  }
+
+  /// Get filtered and sorted projects (override for custom ordering)
+  Future<List<ProjectWithStats>> getFilteredProjects() async {
+    if (state.sortBy == ProjectSort.custom) {
+      // Use custom ordering
+      final customOrdered = await _getCustomOrderedProjects();
+      
+      // Apply filters to the custom-ordered list
+      return customOrdered.where((projectWithStats) {
+        final project = projectWithStats.project;
+        final stats = projectWithStats.stats;
+        
+        // Apply domain filter
+        if (state.selectedDomain != null) {
+          if (!project.belongsToDomain(state.selectedDomain!)) {
+            return false;
+          }
+        }
+        
+        // Apply search filter
+        if (state.searchQuery.isNotEmpty) {
+          final searchLower = state.searchQuery.toLowerCase();
+          if (!project.displayName.toLowerCase().contains(searchLower) &&
+              !project.description.toLowerCase().contains(searchLower) &&
+              !(project.flowitDomain?.toLowerCase().contains(searchLower) ?? false)) {
+            return false;
+          }
+        }
+        
+        // Apply status filter
+        switch (state.filter) {
+          case ProjectFilter.all:
+            return true;
+          case ProjectFilter.active:
+            return stats.progressPercentage < 100;
+          case ProjectFilter.completed:
+            return stats.progressPercentage == 100;
+          case ProjectFilter.inProgress:
+            return stats.progressPercentage > 0 && stats.progressPercentage < 100;
+          case ProjectFilter.notStarted:
+            return stats.progressPercentage == 0;
+        }
+      }).toList();
+    } else {
+      // Use the existing filteredProjects getter from state
+      return state.filteredProjects;
+    }
+  }
+
+  /// Initialize project ordering for a new project
+  Future<void> _addProjectToUserOrder(String projectUid) async {
+    try {
+      final result = await _userRepository.addProjectToOrder(projectUid);
+      result.when(
+        success: (_) {
+          AppLogger.info('ProjectListViewModel: Added project $projectUid to user order');
+        },
+        failure: (failure) {
+          AppLogger.warning('ProjectListViewModel: Failed to add project to user order: ${failure.message}');
+        },
+      );
+    } catch (e) {
+      AppLogger.warning('ProjectListViewModel: Exception adding project to user order: $e');
+    }
+  }
+
+  /// Clean up deleted projects from user ordering
+  Future<void> _removeProjectFromUserOrder(String projectUid) async {
+    try {
+      final result = await _userRepository.removeProjectFromOrder(projectUid);
+      result.when(
+        success: (_) {
+          AppLogger.info('ProjectListViewModel: Removed project $projectUid from user order');
+        },
+        failure: (failure) {
+          AppLogger.warning('ProjectListViewModel: Failed to remove project from user order: ${failure.message}');
+        },
+      );
+    } catch (e) {
+      AppLogger.warning('ProjectListViewModel: Exception removing project from user order: $e');
     }
   }
 

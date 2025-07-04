@@ -48,8 +48,6 @@ mixin _$TaskCalendar {
   DateTime get created => throw _privateConstructorUsedError;
   @HiveField(11)
   DateTime get lastModified => throw _privateConstructorUsedError;
-  @HiveField(12)
-  String get summary => throw _privateConstructorUsedError;
   @HiveField(13)
   String get status => throw _privateConstructorUsedError;
   @HiveField(14)
@@ -115,7 +113,6 @@ abstract class $TaskCalendarCopyWith<$Res> {
       @HiveField(9) DateTime dtstamp,
       @HiveField(10) DateTime created,
       @HiveField(11) DateTime lastModified,
-      @HiveField(12) String summary,
       @HiveField(13) String status,
       @HiveField(14) int percentComplete,
       @HiveField(15) String flowitType,
@@ -159,7 +156,6 @@ class _$TaskCalendarCopyWithImpl<$Res, $Val extends TaskCalendar>
     Object? dtstamp = null,
     Object? created = null,
     Object? lastModified = null,
-    Object? summary = null,
     Object? status = null,
     Object? percentComplete = null,
     Object? flowitType = null,
@@ -227,10 +223,6 @@ class _$TaskCalendarCopyWithImpl<$Res, $Val extends TaskCalendar>
           ? _value.lastModified
           : lastModified // ignore: cast_nullable_to_non_nullable
               as DateTime,
-      summary: null == summary
-          ? _value.summary
-          : summary // ignore: cast_nullable_to_non_nullable
-              as String,
       status: null == status
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
@@ -309,7 +301,6 @@ abstract class _$$TaskCalendarImplCopyWith<$Res>
       @HiveField(9) DateTime dtstamp,
       @HiveField(10) DateTime created,
       @HiveField(11) DateTime lastModified,
-      @HiveField(12) String summary,
       @HiveField(13) String status,
       @HiveField(14) int percentComplete,
       @HiveField(15) String flowitType,
@@ -351,7 +342,6 @@ class __$$TaskCalendarImplCopyWithImpl<$Res>
     Object? dtstamp = null,
     Object? created = null,
     Object? lastModified = null,
-    Object? summary = null,
     Object? status = null,
     Object? percentComplete = null,
     Object? flowitType = null,
@@ -419,10 +409,6 @@ class __$$TaskCalendarImplCopyWithImpl<$Res>
           ? _value.lastModified
           : lastModified // ignore: cast_nullable_to_non_nullable
               as DateTime,
-      summary: null == summary
-          ? _value.summary
-          : summary // ignore: cast_nullable_to_non_nullable
-              as String,
       status: null == status
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
@@ -496,7 +482,6 @@ class _$TaskCalendarImpl implements _TaskCalendar {
       @HiveField(9) required this.dtstamp,
       @HiveField(10) required this.created,
       @HiveField(11) required this.lastModified,
-      @HiveField(12) required this.summary,
       @HiveField(13) required this.status,
       @HiveField(14) this.percentComplete = 0,
       @HiveField(15) this.flowitType = 'PROJECT',
@@ -560,9 +545,6 @@ class _$TaskCalendarImpl implements _TaskCalendar {
   @override
   @HiveField(11)
   final DateTime lastModified;
-  @override
-  @HiveField(12)
-  final String summary;
   @override
   @HiveField(13)
   final String status;
@@ -637,7 +619,7 @@ class _$TaskCalendarImpl implements _TaskCalendar {
 
   @override
   String toString() {
-    return 'TaskCalendar(path: $path, displayName: $displayName, description: $description, supportsTodos: $supportsTodos, etag: $etag, color: $color, lastSyncAt: $lastSyncAt, isReadOnly: $isReadOnly, syncToken: $syncToken, uid: $uid, dtstamp: $dtstamp, created: $created, lastModified: $lastModified, summary: $summary, status: $status, percentComplete: $percentComplete, flowitType: $flowitType, flowitAsFlow: $flowitAsFlow, flowitKanban: $flowitKanban, flowitOwner: $flowitOwner, flowitTemplate: $flowitTemplate, calendarOrder: $calendarOrder, organizer: $organizer, attendees: $attendees, categories: $categories, flowitDomain: $flowitDomain, flowitStatus: $flowitStatus)';
+    return 'TaskCalendar(path: $path, displayName: $displayName, description: $description, supportsTodos: $supportsTodos, etag: $etag, color: $color, lastSyncAt: $lastSyncAt, isReadOnly: $isReadOnly, syncToken: $syncToken, uid: $uid, dtstamp: $dtstamp, created: $created, lastModified: $lastModified, status: $status, percentComplete: $percentComplete, flowitType: $flowitType, flowitAsFlow: $flowitAsFlow, flowitKanban: $flowitKanban, flowitOwner: $flowitOwner, flowitTemplate: $flowitTemplate, calendarOrder: $calendarOrder, organizer: $organizer, attendees: $attendees, categories: $categories, flowitDomain: $flowitDomain, flowitStatus: $flowitStatus)';
   }
 
   @override
@@ -665,7 +647,6 @@ class _$TaskCalendarImpl implements _TaskCalendar {
             (identical(other.created, created) || other.created == created) &&
             (identical(other.lastModified, lastModified) ||
                 other.lastModified == lastModified) &&
-            (identical(other.summary, summary) || other.summary == summary) &&
             (identical(other.status, status) || other.status == status) &&
             (identical(other.percentComplete, percentComplete) ||
                 other.percentComplete == percentComplete) &&
@@ -710,7 +691,6 @@ class _$TaskCalendarImpl implements _TaskCalendar {
         dtstamp,
         created,
         lastModified,
-        summary,
         status,
         percentComplete,
         flowitType,
@@ -757,7 +737,6 @@ abstract class _TaskCalendar implements TaskCalendar {
       @HiveField(9) required final DateTime dtstamp,
       @HiveField(10) required final DateTime created,
       @HiveField(11) required final DateTime lastModified,
-      @HiveField(12) required final String summary,
       @HiveField(13) required final String status,
       @HiveField(14) final int percentComplete,
       @HiveField(15) final String flowitType,
@@ -815,9 +794,6 @@ abstract class _TaskCalendar implements TaskCalendar {
   @override
   @HiveField(11)
   DateTime get lastModified;
-  @override
-  @HiveField(12)
-  String get summary;
   @override
   @HiveField(13)
   String get status;

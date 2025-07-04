@@ -9,12 +9,23 @@ import 'task_item_description.dart';
 import 'task_item_validatorlist.dart';
 import 'task_item_toolbar.dart';
 
+class TaskItemController {
+  _TaskItemState? _state;
+  
+  void _attach(_TaskItemState state) => _state = state;
+  void _detach() => _state = null;
+  
+  void expand() => _state?.expandTask();
+  void collapse() => _state?.collapseTask();
+}
+
 class TaskItem extends StatefulWidget {
   final Task task;
   final VoidCallback? onTap;
   final VoidCallback? onToggleComplete;
   final Function(Task)? onTaskUpdated;
   final VoidCallback? onTaskDeleted;
+  final TaskItemController? controller;
 
   const TaskItem({
     super.key,
@@ -23,6 +34,7 @@ class TaskItem extends StatefulWidget {
     this.onToggleComplete,
     this.onTaskUpdated,
     this.onTaskDeleted,
+    this.controller,
   });
 
   @override
@@ -31,6 +43,34 @@ class TaskItem extends StatefulWidget {
 
 class _TaskItemState extends State<TaskItem> {
   bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller?._attach(this);
+  }
+
+  @override
+  void dispose() {
+    widget.controller?._detach();
+    super.dispose();
+  }
+
+  void expandTask() {
+    if (!_isExpanded) {
+      setState(() {
+        _isExpanded = true;
+      });
+    }
+  }
+
+  void collapseTask() {
+    if (_isExpanded) {
+      setState(() {
+        _isExpanded = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +113,10 @@ class _TaskItemState extends State<TaskItem> {
               const SizedBox(height: 12),
               
               // Description, attendees, and categories
-              TaskItemDescription(task: widget.task),
+              TaskItemDescription(
+                task: widget.task,
+                onTaskUpdated: widget.onTaskUpdated,
+              ),
               
               // Validators
               const SizedBox(height: 8),

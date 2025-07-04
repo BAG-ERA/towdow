@@ -64,7 +64,7 @@ class AppLifecycleManager {
 
       // Check if we have an active account before starting services
       final accountResult = await _accountRepository!.getActiveAccount();
-      await accountResult.when(
+      accountResult.when(
         success: (account) async {
           if (account != null) {
             // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Active account found: ${account.username}');
@@ -107,7 +107,7 @@ class AppLifecycleManager {
       if (_syncService != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Initializing SyncService');
         final syncResult = await _syncService!.initialize();
-        await syncResult.when(
+        syncResult.when(
           success: (_) {
             // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService initialized successfully');
           },
@@ -122,7 +122,7 @@ class AppLifecycleManager {
       if (_backgroundSyncService != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting BackgroundSyncService');
         final bgResult = await _backgroundSyncService!.start();
-        await bgResult.when(
+        bgResult.when(
           success: (_) {
             // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] BackgroundSyncService started successfully');
           },

@@ -5,14 +5,40 @@ import 'package:flutter/material.dart';
 import '../../../data/models/task.dart';
 import 'chips/attendee_chip.dart';
 import 'chips/category_chip.dart';
+import '../utils/enhanced_text_field.dart';
 
-class TaskItemDescription extends StatelessWidget {
+class TaskItemDescription extends StatefulWidget {
   final Task task;
+  final Function(Task)? onTaskUpdated;
 
   const TaskItemDescription({
     super.key,
     required this.task,
+    this.onTaskUpdated,
   });
+
+  @override
+  State<TaskItemDescription> createState() => _TaskItemDescriptionState();
+}
+
+class _TaskItemDescriptionState extends State<TaskItemDescription> {
+  bool _isEditing = false;
+  late TextEditingController _controller;
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.task.description);
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,13 +49,13 @@ class TaskItemDescription extends StatelessWidget {
         _buildCompactDescriptionSection(context),
         
         // Attendees
-        if (task.attendees.isNotEmpty) ...[
+        if (widget.task.attendees.isNotEmpty) ...[
           const SizedBox(height: 8),
           _buildCompactAttendeesSection(context),
         ],
         
         // Categories
-        if (task.categories.isNotEmpty) ...[
+        if (widget.task.categories.isNotEmpty) ...[
           const SizedBox(height: 8),
           _buildCompactCategoriesSection(context),
         ],
@@ -38,25 +64,117 @@ class TaskItemDescription extends StatelessWidget {
   }
 
   Widget _buildCompactDescriptionSection(BuildContext context) {
-    final hasDescription = task.description.isNotEmpty;
+    final hasDescription = widget.task.description.isNotEmpty;
     
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(8),
-      child: Text(
-        hasDescription 
-            ? task.description 
-            : 'No description provided',
-        style: TextStyle(
-          fontSize: 13,
-          color: hasDescription 
-              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
-              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-          fontStyle: hasDescription ? FontStyle.normal : FontStyle.italic,
-          height: 1.3,
+    if (_isEditing) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Theme.of(context).colorScheme.primary,
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            EnhancedTextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              maxLines: null,
+              decoration: const InputDecoration(
+                hintText: 'Enter task description...',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+              ),
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                height: 1.3,
+              ),
+              onSubmitted: (_) => _saveDescription(),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _cancelEdit,
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _saveDescription,
+                  child: const Text('Save'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return InkWell(
+      onTap: widget.onTaskUpdated != null ? _startEditing : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Colors.transparent,
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          hasDescription 
+              ? widget.task.description 
+              : 'No description provided • Click to add',
+          style: TextStyle(
+            fontSize: 13,
+            color: hasDescription 
+                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            fontStyle: hasDescription ? FontStyle.normal : FontStyle.italic,
+            height: 1.3,
+          ),
         ),
       ),
     );
+  }
+
+  void _startEditing() {
+    setState(() {
+      _isEditing = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _isEditing = false;
+      _controller.text = widget.task.description;
+    });
+  }
+
+  void _saveDescription() {
+    if (widget.onTaskUpdated != null) {
+      final updatedTask = widget.task.copyWith(
+        description: _controller.text.trim(),
+        lastModified: DateTime.now(),
+      );
+      widget.onTaskUpdated!(updatedTask);
+    }
+    
+    setState(() {
+      _isEditing = false;
+    });
   }
 
   Widget _buildCompactAttendeesSection(BuildContext context) {
@@ -66,13 +184,13 @@ class TaskItemDescription extends StatelessWidget {
         Row(
           children: [
             Icon(
-              task.attendees.length == 1 ? Icons.person : Icons.group,
+              widget.task.attendees.length == 1 ? Icons.person : Icons.group,
               size: 14,
               color: Theme.of(context).colorScheme.secondary,
             ),
             const SizedBox(width: 4),
             Text(
-              task.attendees.length == 1 ? 'Attendee' : 'Attendees',
+              widget.task.attendees.length == 1 ? 'Attendee' : 'Attendees',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -85,7 +203,7 @@ class TaskItemDescription extends StatelessWidget {
         Wrap(
           spacing: 4,
           runSpacing: 3,
-          children: task.attendees.map((attendee) {
+          children: widget.task.attendees.map((attendee) {
             return AttendeeChip(attendee: attendee);
           }).toList(),
         ),
@@ -97,7 +215,7 @@ class TaskItemDescription extends StatelessWidget {
     return Wrap(
       spacing: 4,
       runSpacing: 3,
-      children: task.categories.map((category) {
+      children: widget.task.categories.map((category) {
         return CategoryChip(category: category);
       }).toList(),
     );
