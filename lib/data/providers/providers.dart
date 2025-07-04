@@ -11,10 +11,18 @@ import '../repositories/task_repository.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/user_repository.dart';
+import '../repositories/external_account_repository.dart';
+import '../repositories/external_calendar_repository.dart';
+import '../repositories/external_event_repository.dart';
 import '../models/task.dart';
 import '../models/task_calendar.dart';
 import '../models/caldav_account.dart';
+import '../models/external_caldav_account.dart';
+import '../models/external_calendar.dart';
+import '../models/calendar_event.dart';
 import '../services/caldav_service.dart';
+import '../services/external_caldav_service.dart';
+import '../services/external_sync_service.dart';
 import '../../core/app_lifecycle_manager.dart';
 
 import '../../presentation/viewmodels/task_viewmodel.dart';
@@ -52,9 +60,43 @@ final userRepositoryProvider = Provider<UserRepository>((ref) {
   return LocalUserRepository(storageService);
 });
 
+// External calendar repository providers
+final externalAccountRepositoryProvider = Provider<ExternalAccountRepository>((ref) {
+  final storageService = ref.watch(localStorageServiceProvider);
+  return LocalExternalAccountRepository(storageService);
+});
+
+final externalCalendarRepositoryProvider = Provider<ExternalCalendarRepository>((ref) {
+  final storageService = ref.watch(localStorageServiceProvider);
+  return LocalExternalCalendarRepository(storageService);
+});
+
+final externalEventRepositoryProvider = Provider<ExternalEventRepository>((ref) {
+  final storageService = ref.watch(localStorageServiceProvider);
+  return LocalExternalEventRepository(storageService);
+});
+
 // CalDAV service provider  
 final caldavServiceProvider = Provider.family<CalDAVService, CaldavAccount>((ref, account) {
   return CalDAVService(account: account);
+});
+
+// External CalDAV service provider
+final externalCalDAVServiceProvider = Provider.family<ExternalCalDAVService, ExternalCaldavAccount>((ref, account) {
+  return ExternalCalDAVService(account: account);
+});
+
+// External calendar sync service provider
+final externalCalendarSyncServiceProvider = Provider<ExternalCalendarSyncService>((ref) {
+  final accountRepository = ref.watch(externalAccountRepositoryProvider);
+  final calendarRepository = ref.watch(externalCalendarRepositoryProvider);
+  final eventRepository = ref.watch(externalEventRepositoryProvider);
+  
+  return ExternalCalendarSyncService(
+    accountRepository,
+    calendarRepository,
+    eventRepository,
+  );
 });
 
 // Background sync service provider

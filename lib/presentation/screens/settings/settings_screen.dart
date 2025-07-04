@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
 import 'caldav_management_screen.dart';
 import 'connection_info_screen.dart';
+import 'external_calendar_management_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -41,6 +42,18 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: 'Manage CalDAV synchronization',
                 icon: Icons.sync_rounded,
                 onTap: () => _showSyncSettings(context, ref),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _SettingsSection(
+            title: 'Integration',
+            children: [
+              _SettingsItem(
+                title: 'External Calendars',
+                subtitle: 'Connect external CalDAV calendars',
+                icon: Icons.calendar_view_month_rounded,
+                onTap: () => _showExternalCalendars(context, ref),
               ),
             ],
           ),
@@ -212,6 +225,15 @@ class SettingsScreen extends ConsumerWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const CalDAVManagementScreen(),
+      ),
+    );
+  }
+
+  Future<void> _showExternalCalendars(BuildContext context, WidgetRef ref) async {
+    // Navigate to external calendar management screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ExternalCalendarManagementScreen(),
       ),
     );
   }

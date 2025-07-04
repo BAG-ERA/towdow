@@ -14,6 +14,11 @@ import 'data/models/caldav_account.dart';
 import 'data/models/validator.dart';
 import 'data/models/task_calendar.dart';
 import 'data/models/user_preferences.dart';
+
+// External calendar models
+import 'data/models/external_calendar.dart';
+import 'data/models/external_caldav_account.dart';
+import 'data/models/calendar_event.dart';
 import 'data/services/local_storage_service.dart';
 import 'data/providers/providers.dart';
 
@@ -38,6 +43,12 @@ void main() async {
   
   // Register User Preferences adapter
   Hive.registerAdapter(UserPreferencesAdapter());
+  
+  // Register External Calendar adapters
+  Hive.registerAdapter(ExternalCalendarAdapter());
+  Hive.registerAdapter(ExternalCalendarAuthTypeAdapter());
+  Hive.registerAdapter(ExternalCaldavAccountAdapter());
+  Hive.registerAdapter(CalendarEventAdapter());
   
   // Initialize local storage service
   final storageService = LocalStorageService();
