@@ -94,7 +94,34 @@ class FlowItApp extends ConsumerWidget {
         if (state.uri.path == '/') {
           return '/today';
         }
-        return null;
+        
+        // Skip account check if already on connection screen
+        if (state.uri.path == '/connect') {
+          return null;
+        }
+        
+        // Check if user has active CalDAV account for all main app routes
+        final container = ProviderScope.containerOf(context);
+        final hasAccountAsync = container.read(hasActiveAccountProvider);
+        
+        // Handle AsyncValue directly
+        return hasAccountAsync.when(
+          data: (hasAccount) {
+            if (!hasAccount) {
+              // No active account, redirect to connection screen
+              return '/connect';
+            }
+            return null;
+          },
+          loading: () {
+            // Still loading, allow route to proceed (loading will be handled by widgets)
+            return null;
+          },
+          error: (error, stackTrace) {
+            // Error checking account status, redirect to connection screen
+            return '/connect';
+          },
+        );
       },
       routes: [
         // Main app shell with adaptive navigation
@@ -181,51 +208,15 @@ class FlowItApp extends ConsumerWidget {
   }
 }
 
-// App Shell to handle account status checking
+// App Shell - account checking now handled by router
 class _AppShell extends ConsumerWidget {
   const _AppShell();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasAccountAsync = ref.watch(hasActiveAccountProvider);
-
-    return hasAccountAsync.when(
-      loading: () => const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      ),
-      error: (error, stackTrace) => Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_rounded,
-                size: 64,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(height: 16),
-              Text('Error checking account status: $error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.refresh(hasActiveAccountProvider),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      ),
-      data: (hasAccount) {
-        if (hasAccount) {
-          // User has an active account, show main app
-          return const HomeScreen();
-        } else {
-          // No active account, show connection screen
-          return const ConnectionScreen();
-        }
-      },
-    );
+    // Account checking is now handled by router redirect
+    // This will only be called when user has an active account
+    return const HomeScreen();
   }
 }
 
@@ -237,47 +228,13 @@ class _TaskViewShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasAccountAsync = ref.watch(hasActiveAccountProvider);
-
-    return hasAccountAsync.when(
-      loading: () => const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      ),
-      error: (error, stackTrace) => Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_rounded,
-                size: 64,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(height: 16),
-              Text('Error checking account status: $error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.refresh(hasActiveAccountProvider),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      ),
-      data: (hasAccount) {
-        if (hasAccount) {
-          // Set the initial tab and show the home screen
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ref.read(selectedTabIndexProvider.notifier).state = initialTab;
-          });
-          return const HomeScreen();
-        } else {
-          // No active account, show connection screen
-          return const ConnectionScreen();
-        }
-      },
-    );
+    // Account checking is now handled by router redirect
+    // This will only be called when user has an active account
+    
+    // Set the initial tab and show the home screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(selectedTabIndexProvider.notifier).state = initialTab;
+    });
+    return const HomeScreen();
   }
 } 
