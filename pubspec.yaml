@@ -126,3 +126,6 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+inno_bundle:
+  id: c4bffb50-581c-11f0-bf1a-3f05c3b48c9a
+  publisher: Maxime
