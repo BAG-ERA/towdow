@@ -410,6 +410,55 @@ final serverCapabilitiesProvider = FutureProvider.family.autoDispose<CalDAVCapab
   );
 });
 
+// External calendar data providers
+final externalCalendarListProvider = StreamProvider<List<ExternalCalendar>>((ref) {
+  final repository = ref.watch(externalCalendarRepositoryProvider);
+  return repository.watchCalendars();
+});
+
+final externalEventListProvider = StreamProvider<List<CalendarEvent>>((ref) {
+  final repository = ref.watch(externalEventRepositoryProvider);
+  return repository.watchEvents();
+});
+
+final enabledExternalCalendarListProvider = Provider<AsyncValue<List<ExternalCalendar>>>((ref) {
+  final calendarsAsync = ref.watch(externalCalendarListProvider);
+  return calendarsAsync.when(
+    loading: () => const AsyncValue.loading(),
+    error: (error, stack) => AsyncValue.error(error, stack),
+    data: (calendars) => AsyncValue.data(calendars.where((calendar) => calendar.isEnabled).toList()),
+  );
+});
+
+final enabledExternalEventListProvider = Provider<AsyncValue<List<CalendarEvent>>>((ref) {
+  final eventsAsync = ref.watch(externalEventListProvider);
+  final enabledCalendarsAsync = ref.watch(enabledExternalCalendarListProvider);
+  
+  // Handle loading states
+  if (eventsAsync.isLoading || enabledCalendarsAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+  
+  // Handle error states
+  if (eventsAsync.hasError) {
+    return AsyncValue.error(eventsAsync.error!, eventsAsync.stackTrace!);
+  }
+  if (enabledCalendarsAsync.hasError) {
+    return AsyncValue.error(enabledCalendarsAsync.error!, enabledCalendarsAsync.stackTrace!);
+  }
+  
+  // Handle data
+  if (eventsAsync.hasValue && enabledCalendarsAsync.hasValue) {
+    final events = eventsAsync.value!;
+    final enabledCalendars = enabledCalendarsAsync.value!;
+    final enabledCalendarUids = enabledCalendars.map((cal) => cal.uid).toSet();
+    final filteredEvents = events.where((event) => enabledCalendarUids.contains(event.sourceCalendarUid)).toList();
+    return AsyncValue.data(filteredEvents);
+  }
+  
+  return const AsyncValue.loading();
+});
+
 // DEBUG: Provider pour compter les tâches avec attendees
 final tasksWithAttendeesProvider = FutureProvider<Map<String, int>>((ref) async {
   final repository = ref.watch(taskRepositoryProvider);

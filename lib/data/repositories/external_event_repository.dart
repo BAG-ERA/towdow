@@ -93,6 +93,7 @@ class LocalExternalEventRepository implements ExternalEventRepository {
 
   @override
   Future<Result<void>> save(CalendarEvent event) async {
+    AppLogger.debug('LocalExternalEventRepository: Saving event "${event.summary}" (UID: ${event.uid}) from calendar ${event.sourceCalendarUid} in account ${event.accountId}');
     return await _storageService.put(_boxName, event.uid, event);
   }
 
@@ -207,7 +208,16 @@ class LocalExternalEventRepository implements ExternalEventRepository {
         // Sort by start time
         rangeEvents.sort((a, b) => a.dtstart.compareTo(b.dtstart));
         
+        // Debug log calendar breakdown
+        final calendarBreakdown = <String, int>{};
+        for (final event in rangeEvents) {
+          final calendarName = event.sourceCalendarUid;
+          calendarBreakdown[calendarName] = (calendarBreakdown[calendarName] ?? 0) + 1;
+        }
+        
         AppLogger.info('LocalExternalEventRepository: Found ${rangeEvents.length} events in range $start to $end');
+        AppLogger.debug('LocalExternalEventRepository: Calendar breakdown: $calendarBreakdown');
+        
         return Result.success(rangeEvents);
       },
       failure: (failure) => Result.failure(failure),

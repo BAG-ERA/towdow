@@ -131,7 +131,12 @@ class ExternalCalendarSyncService {
       return await calendarsResult.when(
         success: (calendars) async {
           final enabledCalendars = calendars.where((cal) => cal.isEnabled).toList();
-          AppLogger.info('ExternalCalendarSyncService: Found ${enabledCalendars.length} enabled calendars for account ${account.id}');
+          AppLogger.info('ExternalCalendarSyncService: Account ${account.id} has ${calendars.length} total calendars, ${enabledCalendars.length} enabled');
+          
+          // Debug log each calendar
+          for (final calendar in calendars) {
+            AppLogger.debug('ExternalCalendarSyncService: Calendar "${calendar.displayName}" (${calendar.uid}) - enabled: ${calendar.isEnabled}, path: ${calendar.href}');
+          }
           
           // Sync each enabled calendar
           for (final calendar in enabledCalendars) {
@@ -185,11 +190,12 @@ class ExternalCalendarSyncService {
       // Create CalDAV service for this account
       final caldavService = ExternalCalDAVService(account: account);
       
-      // Calculate time range for sync (today to next 365 days - future events only)
+      // Calculate time range for sync (yesterday to +30 days)
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day); // Start of today
-      final timeMin = today;
-      final timeMax = now.add(const Duration(days: 365));
+      final yesterday = today.subtract(const Duration(days: 1)); // Start of yesterday
+      final timeMin = yesterday;
+      final timeMax = now.add(const Duration(days: 30)); // 30 days from now
       
       AppLogger.debug('ExternalCalendarSyncService: Syncing events from ${timeMin.toIso8601String()} to ${timeMax.toIso8601String()}');
       
@@ -205,8 +211,17 @@ class ExternalCalendarSyncService {
         success: (events) async {
           AppLogger.info('ExternalCalendarSyncService: Fetched ${events.length} events from calendar ${calendar.displayName}');
           
-          // Save events to local storage
+          // Debug log some event details
+          for (int i = 0; i < events.length && i < 3; i++) {
+            final event = events[i];
+            AppLogger.debug('ExternalCalendarSyncService: Event "${event.summary}" from ${event.dtstart} (recurring: ${event.isRecurring})');
+            AppLogger.debug('ExternalCalendarSyncService: Event UID: ${event.uid}, Calendar: ${event.sourceCalendarUid}, Account: ${event.accountId}');
+          }
+          
+          // Save events to local storage with detailed logging
+          AppLogger.debug('ExternalCalendarSyncService: Saving ${events.length} events from calendar ${calendar.displayName}');
           for (final event in events) {
+            AppLogger.debug('ExternalCalendarSyncService: Saving event "${event.summary}" (UID: ${event.uid}) from calendar ${event.sourceCalendarUid}');
             await _eventRepository.save(event);
           }
           

@@ -347,12 +347,8 @@ class _TaskListTab extends ConsumerWidget {
         return RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(taskListProvider);
-            // Also refresh external events
-            ref.invalidate(todayExternalEventsProvider);
-            ref.invalidate(soonExternalEventsProvider);
-            ref.invalidate(nextWeekExternalEventsProvider);
-            ref.invalidate(laterExternalEventsProvider);
-            ref.invalidate(anytimeExternalEventsProvider);
+            // External events now automatically refresh via streams
+            // Manual invalidation removed as it should be handled reactively
           },
           child: Column(
             children: [

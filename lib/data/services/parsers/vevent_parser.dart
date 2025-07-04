@@ -50,29 +50,37 @@ class VEventParser {
           lastModified = _parseDateTime(line.substring(14));
         } else if (line.startsWith('DTSTART')) {
           final dtStartLine = line.substring(7);
+          AppLogger.debug('VEventParser: DTSTART line: $dtStartLine');
           if (dtStartLine.startsWith(';VALUE=DATE:')) {
             isAllDay = true;
             dtstart = _parseDate(dtStartLine.substring(12));
+            AppLogger.debug('VEventParser: All-day event, dtstart: $dtstart');
           } else if (dtStartLine.startsWith(':')) {
-            dtstart = _parseDateTime(dtStartLine.substring(1));
+            // Even simple DTSTART should be converted to UTC
+            dtstart = _parseDateTimeWithTimezone(dtStartLine.substring(1), null);
+            AppLogger.debug('VEventParser: Simple DTSTART, dtstart: $dtstart (isUtc: ${dtstart?.isUtc})');
           } else {
             // Handle DTSTART with timezone or other parameters
             final colonIndex = dtStartLine.indexOf(':');
             if (colonIndex != -1) {
               final params = dtStartLine.substring(0, colonIndex);
               final value = dtStartLine.substring(colonIndex + 1);
+              AppLogger.debug('VEventParser: DTSTART params: $params, value: $value');
               if (params.contains('VALUE=DATE')) {
                 isAllDay = true;
                 dtstart = _parseDate(value);
+                AppLogger.debug('VEventParser: All-day event, dtstart: $dtstart');
               } else {
                 // Extract timezone parameter if present
                 String? tzid;
                 if (params.contains('TZID=')) {
                   tzid = _extractParameter(params, 'TZID');
                   timeZone = tzid; // Store for calendar event
+                  AppLogger.debug('VEventParser: Found TZID: $tzid');
                 }
                 // Use timezone-aware parsing
                 dtstart = _parseDateTimeWithTimezone(value, tzid);
+                AppLogger.debug('VEventParser: Timezone-aware dtstart: $dtstart (isUtc: ${dtstart?.isUtc})');
               }
             }
           }
@@ -81,7 +89,8 @@ class VEventParser {
           if (dtEndLine.startsWith(';VALUE=DATE:')) {
             dtend = _parseDate(dtEndLine.substring(12));
           } else if (dtEndLine.startsWith(':')) {
-            dtend = _parseDateTime(dtEndLine.substring(1));
+            // Even simple DTEND should be converted to UTC
+            dtend = _parseDateTimeWithTimezone(dtEndLine.substring(1), null);
           } else {
             // Handle DTEND with timezone or other parameters
             final colonIndex = dtEndLine.indexOf(':');
@@ -519,12 +528,22 @@ class VEventParser {
         baseDateTime.second,
       );
       
-      // Convert to UTC and return as proper UTC DateTime
-      final utcDateTime = sourceDateTime.toUtc();
+      // Convert to UTC and return as proper regular DateTime (not TZDateTime)
+      final tzUtcDateTime = sourceDateTime.toUtc();
+      final utcDateTime = DateTime.utc(
+        tzUtcDateTime.year,
+        tzUtcDateTime.month,
+        tzUtcDateTime.day,
+        tzUtcDateTime.hour,
+        tzUtcDateTime.minute,
+        tzUtcDateTime.second,
+        tzUtcDateTime.millisecond,
+        tzUtcDateTime.microsecond,
+      );
       
       // Log the conversion details
       AppLogger.debug('VEventParser: Source datetime: $sourceDateTime (${sourceDateTime.timeZoneOffset})');
-      AppLogger.debug('VEventParser: UTC datetime: $utcDateTime');
+      AppLogger.debug('VEventParser: UTC datetime: $utcDateTime (isUtc: ${utcDateTime.isUtc})');
       AppLogger.debug('VEventParser: Conversion: ${sourceDateTime.hour}:${sourceDateTime.minute.toString().padLeft(2, '0')} ${sourceDateTime.timeZoneName} → ${utcDateTime.hour}:${utcDateTime.minute.toString().padLeft(2, '0')} UTC');
       
       return utcDateTime;

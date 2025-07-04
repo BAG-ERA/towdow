@@ -252,12 +252,22 @@ class ExternalCalDAVService {
         if (timeMax != null) AppLogger.debug('ExternalCalDAVService: timeMax formatted as: ${_formatDateTime(timeMax)}');
       }
       
-      // CalDAV REPORT query to fetch all VEVENTs
+      // Build calendar-data element with optional expansion for recurring events
+      String calendarDataElement = '<C:calendar-data />';
+      if (timeMin != null && timeMax != null) {
+        // Expand recurring events when time range is specified
+        calendarDataElement = '''<C:calendar-data>
+      <C:expand start="${_formatDateTime(timeMin)}" end="${_formatDateTime(timeMax)}" />
+    </C:calendar-data>''';
+        AppLogger.debug('ExternalCalDAVService: Using recurring event expansion from ${_formatDateTime(timeMin)} to ${_formatDateTime(timeMax)}');
+      }
+      
+      // CalDAV REPORT query to fetch all VEVENTs with recurring event expansion
       final reportQuery = '''<?xml version="1.0" encoding="utf-8" ?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
   <D:prop>
     <D:getetag />
-    <C:calendar-data />
+    $calendarDataElement
   </D:prop>
   <C:filter>
     <C:comp-filter name="VCALENDAR">

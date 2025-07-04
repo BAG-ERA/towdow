@@ -119,6 +119,51 @@ extension CalendarEventOperations on CalendarEvent {
   /// Alias for uid (for compatibility with sync service)
   String get id => uid;
   
+  /// Get dtstart converted to local time for display
+  DateTime get localDtstart {
+    // Raw dtstart should always be UTC after parsing, convert to local time
+    // If for some reason it's not marked as UTC but should be treated as UTC,
+    // we create a UTC datetime with the same values and then convert to local
+    if (dtstart.isUtc) {
+      return dtstart.toLocal();
+    } else {
+      // Treat as if it's UTC even if not marked as such (parser should ensure this)
+      final utcDateTime = DateTime.utc(
+        dtstart.year,
+        dtstart.month,
+        dtstart.day,
+        dtstart.hour,
+        dtstart.minute,
+        dtstart.second,
+        dtstart.millisecond,
+        dtstart.microsecond,
+      );
+      return utcDateTime.toLocal();
+    }
+  }
+  
+  /// Get dtend converted to local time for display
+  DateTime? get localDtend {
+    if (dtend == null) return null;
+    // Raw dtend should always be UTC after parsing, convert to local time
+    if (dtend!.isUtc) {
+      return dtend!.toLocal();
+    } else {
+      // Treat as if it's UTC even if not marked as such (parser should ensure this)
+      final utcDateTime = DateTime.utc(
+        dtend!.year,
+        dtend!.month,
+        dtend!.day,
+        dtend!.hour,
+        dtend!.minute,
+        dtend!.second,
+        dtend!.millisecond,
+        dtend!.microsecond,
+      );
+      return utcDateTime.toLocal();
+    }
+  }
+  
   /// Computed duration from dtstart and dtend
   Duration? get effectiveDuration {
     if (dtend != null) {
@@ -127,25 +172,25 @@ extension CalendarEventOperations on CalendarEvent {
     return null;
   }
   
-  /// Check if event is happening today
+  /// Check if event is happening today (using local time)
   bool get isToday {
     final today = DateTime.now();
-    final eventDate = dtstart;
+    final eventDate = localDtstart;
     return eventDate.year == today.year &&
            eventDate.month == today.month &&
            eventDate.day == today.day;
   }
   
-  /// Check if event is in the future
-  bool get isFuture => dtstart.isAfter(DateTime.now());
+  /// Check if event is in the future (using local time)
+  bool get isFuture => localDtstart.isAfter(DateTime.now());
   
-  /// Check if event is in the past
-  bool get isPast => (dtend ?? dtstart).isBefore(DateTime.now());
+  /// Check if event is in the past (using local time)
+  bool get isPast => (localDtend ?? localDtstart).isBefore(DateTime.now());
   
-  /// Check if event is currently happening
+  /// Check if event is currently happening (using local time)
   bool get isNow {
     final now = DateTime.now();
-    return dtstart.isBefore(now) && (dtend?.isAfter(now) ?? false);
+    return localDtstart.isBefore(now) && (localDtend?.isAfter(now) ?? false);
   }
   
   /// Get event duration as a string
@@ -162,23 +207,40 @@ extension CalendarEventOperations on CalendarEvent {
     }
   }
   
-  /// Get formatted date and time
+  /// Get formatted date and time (using local time)
   String get formattedDateTime {
-    if (isAllDay) {
-      return '${dtstart.day}/${dtstart.month}/${dtstart.year}';
+    final localStart = localDtstart;
+    if (isAllDay == true) {
+      return '${localStart.day}/${localStart.month}/${localStart.year}';
     } else {
-      return '${dtstart.day}/${dtstart.month}/${dtstart.year} ${dtstart.hour}:${dtstart.minute.toString().padLeft(2, '0')}';
+      return '${localStart.day}/${localStart.month}/${localStart.year} ${localStart.hour}:${localStart.minute.toString().padLeft(2, '0')}';
     }
   }
   
-  /// Get formatted time range
+  /// Get formatted time range (using local time)
   String get formattedTimeRange {
-    if (isAllDay) {
-      return 'All day';
-    } else if (dtend != null) {
-      return '${dtstart.hour}:${dtstart.minute.toString().padLeft(2, '0')} - ${dtend!.hour}:${dtend!.minute.toString().padLeft(2, '0')}';
+    final localStart = localDtstart;
+    final localEnd = localDtend;
+    
+    if (isAllDay == true) return 'All Day';
+    
+    String result = '${localStart.hour}:${localStart.minute.toString().padLeft(2, '0')}';
+    if (localEnd != null) {
+      result += ' - ${localEnd.hour}:${localEnd.minute.toString().padLeft(2, '0')}';
+    }
+    return result;
+  }
+  
+  /// Get timezone information for debugging
+  String get timezoneInfo {
+    final startUtc = dtstart.isUtc ? 'UTC' : 'Local';
+    final endUtc = dtend?.isUtc == true ? 'UTC' : 'Local';
+    final tzInfo = timeZone != null ? ' (TZID: $timeZone)' : '';
+    
+    if (dtend != null) {
+      return 'Start: $startUtc, End: $endUtc$tzInfo';
     } else {
-      return '${dtstart.hour}:${dtstart.minute.toString().padLeft(2, '0')}';
+      return 'Start: $startUtc$tzInfo';
     }
   }
   

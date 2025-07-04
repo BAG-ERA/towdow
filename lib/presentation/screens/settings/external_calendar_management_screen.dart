@@ -520,36 +520,58 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
     setState(() => _isLoading = true);
     
     try {
-      final repository = ref.read(externalAccountRepositoryProvider);
-      final result = await repository.delete(account.id);
+      // Perform cascading deletion to clean up all associated data
+      final accountRepository = ref.read(externalAccountRepositoryProvider);
+      final calendarRepository = ref.read(externalCalendarRepositoryProvider);
+      final eventRepository = ref.read(externalEventRepositoryProvider);
       
-      result.when(
-        success: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('External calendar deleted successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-        failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${failure.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        },
+      AppLogger.info('ExternalCalendarManagement: Starting cascading deletion for account ${account.id}');
+      
+      // Step 1: Delete all events for this account
+      final deleteEventsResult = await eventRepository.deleteByAccount(account.id);
+      deleteEventsResult.when(
+        success: (_) => AppLogger.info('ExternalCalendarManagement: Deleted events for account ${account.id}'),
+        failure: (failure) => throw Exception('Failed to delete events: ${failure.message}'),
       );
+      
+      // Step 2: Delete all calendars for this account  
+      final deleteCalendarsResult = await calendarRepository.deleteCalendarsByAccount(account.id);
+      deleteCalendarsResult.when(
+        success: (_) => AppLogger.info('ExternalCalendarManagement: Deleted calendars for account ${account.id}'),
+        failure: (failure) => throw Exception('Failed to delete calendars: ${failure.message}'),
+      );
+      
+      // Step 3: Delete the account itself
+      final deleteAccountResult = await accountRepository.delete(account.id);
+      deleteAccountResult.when(
+        success: (_) => AppLogger.info('ExternalCalendarManagement: Deleted account ${account.id}'),
+        failure: (failure) => throw Exception('Failed to delete account: ${failure.message}'),
+      );
+      
+      // Success
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('External calendar deleted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppLogger.error('ExternalCalendarManagement: Failed to delete account ${account.id}', e, StackTrace.current);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting calendar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

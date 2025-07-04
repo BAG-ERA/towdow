@@ -1,9 +1,11 @@
 ﻿// Main entry point for FlowIt application
-// Sets up ProviderScope, Hive initialization, and app routing
+// Sets up ProviderScope, Hive initialization, timezone database, and app routing
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 import 'app.dart';
 import 'core/logger.dart';
 import 'data/models/task.dart';
@@ -25,7 +27,16 @@ import 'data/providers/providers.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+<<<<<<< HEAD
   
+=======
+  // Initialize timezone database for proper timezone conversions
+  tz.initializeTimeZones();
+  AppLogger.info('Main: Timezone database initialized');
+  
+  // Initialize Hive
+  await Hive.initFlutter();
+>>>>>>> ea1e158 (timezone fix)
   
   // Register Hive adapters for all models
   Hive.registerAdapter(TaskAdapter());
