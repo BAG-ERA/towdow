@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/task_item/task_item.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
+import '../../widgets/external_calendar/external_events_list.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/calendar_event.dart';
 import '../../../data/services/sync_service.dart';
 import '../../providers/home_providers.dart';
 
@@ -264,6 +266,7 @@ class _TaskListTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     AsyncValue<List<Task>> tasksAsync;
+    AsyncValue<List<CalendarEvent>> eventsAsync;
     String title;
     String subtitle;
     IconData icon;
@@ -271,30 +274,35 @@ class _TaskListTab extends ConsumerWidget {
     switch (type) {
       case TaskListType.today:
         tasksAsync = ref.watch(todayTasksProvider);
+        eventsAsync = ref.watch(todayExternalEventsProvider);
         title = 'Today\'s Tasks';
         subtitle = 'Overdue and tasks due before midnight';
         icon = Icons.today_rounded;
         break;
       case TaskListType.soon:
         tasksAsync = ref.watch(soonTasksProvider);
+        eventsAsync = ref.watch(soonExternalEventsProvider);
         title = 'Soon Tasks';
         subtitle = 'Tasks due from tomorrow until next Monday';
         icon = Icons.schedule_rounded;
         break;
       case TaskListType.nextWeek:
         tasksAsync = ref.watch(nextWeekTasksProvider);
+        eventsAsync = ref.watch(nextWeekExternalEventsProvider);
         title = 'Next Week Tasks';
         subtitle = 'Tasks due from next Monday to the following Monday';
         icon = Icons.date_range_rounded;
         break;
       case TaskListType.later:
         tasksAsync = ref.watch(laterTasksProvider);
+        eventsAsync = ref.watch(laterExternalEventsProvider);
         title = 'Later Tasks';
         subtitle = 'Tasks due after next week';
         icon = Icons.event_rounded;
         break;
       case TaskListType.anytime:
         tasksAsync = ref.watch(anytimeTasksProvider);
+        eventsAsync = ref.watch(anytimeExternalEventsProvider);
         title = 'Anytime Tasks';
         subtitle = 'Tasks without due dates';
         icon = Icons.inbox_rounded;
@@ -339,106 +347,172 @@ class _TaskListTab extends ConsumerWidget {
         return RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(taskListProvider);
+            // Also refresh external events
+            ref.invalidate(todayExternalEventsProvider);
+            ref.invalidate(soonExternalEventsProvider);
+            ref.invalidate(nextWeekExternalEventsProvider);
+            ref.invalidate(laterExternalEventsProvider);
+            ref.invalidate(anytimeExternalEventsProvider);
           },
           child: Column(
             children: [
               Expanded(
-                child: tasks.isEmpty
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.task_alt_rounded, size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text(
-                              'No tasks yet',
-                              style: TextStyle(fontSize: 18, color: Colors.grey),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Tap + to create your first task',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Wrap(
-                          spacing: 12.0, // Horizontal spacing between tasks
-                          runSpacing: 12.0, // Vertical spacing between rows
-                          alignment: WrapAlignment.start,
-                          runAlignment: WrapAlignment.start,
-                          children: tasks.map((task) {
-                            return ConstrainedBox(
-                              constraints: const BoxConstraints(
-                                maxWidth: 420,
-                                minWidth: 300,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // External calendar events section
+                      eventsAsync.when(
+                        loading: () => Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
                               ),
-                              child: TaskItem(
-                                task: task,
-                                onTap: () {
-                                  // Navigate to task detail
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Navigate to task ${task.uid}')),
-                                  );
-                                },
-                                onToggleComplete: () async {
-                                  // Toggle task completion
-                                  await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
-                                  
-                                  // Refresh the task lists
-                                  ref.invalidate(taskListProvider);
-                                  ref.invalidate(todayTasksProvider);
-                                  ref.invalidate(soonTasksProvider);
-                                  ref.invalidate(nextWeekTasksProvider);
-                                  ref.invalidate(laterTasksProvider);
-                                  ref.invalidate(anytimeTasksProvider);
-                                },
-                                onTaskUpdated: (updatedTask) async {
-                                  // Handle task updates - save to repository and sync
-                                  await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                                  
-                                  // Refresh the task lists
-                                  ref.invalidate(taskListProvider);
-                                  ref.invalidate(todayTasksProvider);
-                                  ref.invalidate(soonTasksProvider);
-                                  ref.invalidate(nextWeekTasksProvider);
-                                  ref.invalidate(laterTasksProvider);
-                                  ref.invalidate(anytimeTasksProvider);
-                                },
-                                onTaskDeleted: () async {
-                                  // Handle task deletion
-                                  await ref.read(taskViewModelProvider.notifier).deleteTask(task.uid);
-                                  
-                                  // Refresh the task lists
-                                  ref.invalidate(taskListProvider);
-                                  ref.invalidate(todayTasksProvider);
-                                  ref.invalidate(soonTasksProvider);
-                                  ref.invalidate(nextWeekTasksProvider);
-                                  ref.invalidate(laterTasksProvider);
-                                  ref.invalidate(anytimeTasksProvider);
-                                  
-                                  // Show confirmation
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Task "${task.summary}" deleted'),
-                                        action: SnackBarAction(
-                                          label: 'Undo',
-                                          onPressed: () {
-                                            // TODO: Implement undo functionality
-                                          },
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
+                              const SizedBox(width: 12),
+                              Text(
+                                'Loading calendar events...',
+                                style: Theme.of(context).textTheme.bodyMedium,
                               ),
-                            );
-                          }).toList(),
+                            ],
+                          ),
                         ),
+                        error: (error, _) => Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                color: Theme.of(context).colorScheme.error,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Failed to load calendar events',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.onErrorContainer,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        data: (events) => ExternalEventsList(events: events),
                       ),
+                      
+                      // Tasks section
+                      if (tasks.isEmpty)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(icon, size: 64, color: Theme.of(context).colorScheme.primary),
+                                const SizedBox(height: 16),
+                                Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                                const SizedBox(height: 8),
+                                Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+                                const SizedBox(height: 32),
+                                const Text('No tasks yet. Tap + to create your first task!'),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Wrap(
+                            spacing: 12.0, // Horizontal spacing between tasks
+                            runSpacing: 12.0, // Vertical spacing between rows
+                            alignment: WrapAlignment.start,
+                            runAlignment: WrapAlignment.start,
+                            children: tasks.map((task) {
+                              return ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 420,
+                                  minWidth: 300,
+                                ),
+                                child: TaskItem(
+                                  task: task,
+                                  onTap: () {
+                                    // Navigate to task detail
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Navigate to task ${task.uid}')),
+                                    );
+                                  },
+                                  onToggleComplete: () async {
+                                    // Toggle task completion
+                                    await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
+                                    
+                                    // Refresh the task lists
+                                    ref.invalidate(taskListProvider);
+                                    ref.invalidate(todayTasksProvider);
+                                    ref.invalidate(soonTasksProvider);
+                                    ref.invalidate(nextWeekTasksProvider);
+                                    ref.invalidate(laterTasksProvider);
+                                    ref.invalidate(anytimeTasksProvider);
+                                  },
+                                  onTaskUpdated: (updatedTask) async {
+                                    // Handle task updates - save to repository and sync
+                                    await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
+                                    
+                                    // Refresh the task lists
+                                    ref.invalidate(taskListProvider);
+                                    ref.invalidate(todayTasksProvider);
+                                    ref.invalidate(soonTasksProvider);
+                                    ref.invalidate(nextWeekTasksProvider);
+                                    ref.invalidate(laterTasksProvider);
+                                    ref.invalidate(anytimeTasksProvider);
+                                  },
+                                  onTaskDeleted: () async {
+                                    // Handle task deletion
+                                    await ref.read(taskViewModelProvider.notifier).deleteTask(task.uid);
+                                    
+                                    // Refresh the task lists
+                                    ref.invalidate(taskListProvider);
+                                    ref.invalidate(todayTasksProvider);
+                                    ref.invalidate(soonTasksProvider);
+                                    ref.invalidate(nextWeekTasksProvider);
+                                    ref.invalidate(laterTasksProvider);
+                                    ref.invalidate(anytimeTasksProvider);
+                                    
+                                    // Show confirmation
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Task "${task.summary}" deleted'),
+                                          action: SnackBarAction(
+                                            label: 'Undo',
+                                            onPressed: () {
+                                              // TODO: Implement undo functionality
+                                            },
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
