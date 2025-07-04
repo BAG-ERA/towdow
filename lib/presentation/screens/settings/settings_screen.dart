@@ -183,6 +183,14 @@ class SettingsScreen extends ConsumerWidget {
             );
           }
           
+          // Invalidate all relevant providers to clear cached data
+          ref.invalidate(taskListProvider);
+          ref.invalidate(calendarListProvider);
+          ref.invalidate(externalCalendarListProvider);
+          ref.invalidate(externalEventListProvider);
+          ref.invalidate(enabledExternalCalendarListProvider);
+          ref.invalidate(enabledExternalEventListProvider);
+          
           // Restart the app
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
@@ -278,6 +286,14 @@ class SettingsScreen extends ConsumerWidget {
       if (context.mounted) {
         result.when(
           success: (_) {
+            // Invalidate all relevant providers to clear cached data
+            ref.invalidate(taskListProvider);
+            ref.invalidate(calendarListProvider);
+            ref.invalidate(externalCalendarListProvider);
+            ref.invalidate(externalEventListProvider);
+            ref.invalidate(enabledExternalCalendarListProvider);
+            ref.invalidate(enabledExternalEventListProvider);
+            
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('✅ All data cleared successfully!'),

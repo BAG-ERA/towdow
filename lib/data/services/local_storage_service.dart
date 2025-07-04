@@ -304,6 +304,12 @@ class LocalStorageService {
       await clear(syncQueueBoxName);
       await clear(domainsBoxName);
       await clear(statusesBoxName);
+      await clear(userPreferencesBoxName);
+      
+      // Clear external calendar data
+      await clear(externalAccountsBoxName);
+      await clear(externalCalendarsBoxName);
+      await clear(externalEventsBoxName);
       
       // AppLogger.info('LocalStorageService: Successfully cleared ALL data');
       return const Result.success(null);
@@ -331,6 +337,10 @@ class LocalStorageService {
         syncQueueBoxName,
         domainsBoxName,
         statusesBoxName,
+        userPreferencesBoxName,
+        externalAccountsBoxName,
+        externalCalendarsBoxName,
+        externalEventsBoxName,
       ];
       
       // Close all boxes first
