@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/logger.dart';
+import '../../../core/theme/chart_theme.dart';
 import '../../../data/models/external_caldav_account.dart';
 import '../../../data/models/external_calendar.dart';
 import '../../../data/providers/providers.dart';
@@ -299,15 +300,38 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       margin: const EdgeInsets.only(bottom: 4),
       child: ListTile(
         dense: true,
-        leading: Icon(
-          calendar.isEnabled ? Icons.check_circle : Icons.circle_outlined,
-          color: calendar.isEnabled ? Colors.green : Colors.grey,
+        leading: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: calendar.color != null 
+                ? Color(int.parse(calendar.color!.replaceFirst('#', '0xFF')))
+                : Colors.grey.shade300,
+            border: Border.all(
+              color: calendar.isEnabled ? Colors.black26 : Colors.grey.shade400,
+              width: 1,
+            ),
+          ),
+          child: calendar.isEnabled 
+              ? const Icon(Icons.check, size: 16, color: Colors.white)
+              : null,
         ),
         title: Text(calendar.displayName),
-        subtitle: Text(calendar.color != null ? 'Color: ${calendar.color}' : 'No color'),
-        trailing: Switch(
-          value: calendar.isEnabled,
-          onChanged: (value) => _toggleCalendar(calendar, value),
+        subtitle: Text(calendar.color != null ? 'Color: ${calendar.color}' : 'No color set'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.color_lens, size: 20),
+              onPressed: () => _showColorPicker(calendar),
+              tooltip: 'Change color',
+            ),
+            Switch(
+              value: calendar.isEnabled,
+              onChanged: (value) => _toggleCalendar(calendar, value),
+            ),
+          ],
         ),
       ),
     );
@@ -559,6 +583,151 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showColorPicker(ExternalCalendar calendar) async {
+    // FlowIt brand color palette from chart theme
+    final colors = [
+      // Blue family
+      FlowItColors.blueDark,
+      FlowItColors.blue,
+      FlowItColors.blueMedium, // Primary
+      FlowItColors.blueLight,
+      
+      // Water Green family
+      FlowItColors.waterGreen,
+      FlowItColors.waterGreenLight,
+      
+      // Violet family
+      FlowItColors.violetDark,
+      FlowItColors.violet,
+      FlowItColors.violetLight,
+      
+      // Green family
+      FlowItColors.greenApple,
+      FlowItColors.greenAnis,
+      FlowItColors.greenLight,
+      
+      // Red/Pink family
+      FlowItColors.pink,
+      FlowItColors.pinkLight,
+      FlowItColors.coral,
+      
+      // Yellow family
+      FlowItColors.yellowDark,
+      FlowItColors.yellow,
+      FlowItColors.yellowLight,
+      
+      // Additional Material colors for variety
+      const Color(0xFFE57373), // Material Red
+      const Color(0xFFF06292), // Material Pink
+      const Color(0xFFBA68C8), // Material Purple
+      const Color(0xFF9575CD), // Material Deep Purple
+      const Color(0xFF4DD0E1), // Material Cyan
+      const Color(0xFF4DB6AC), // Material Teal
+      const Color(0xFFA1887F), // Material Brown
+      const Color(0xFF90A4AE), // Material Blue Grey
+    ];
+
+    final selectedColor = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Choose color for "${calendar.displayName}"'),
+        content: SizedBox(
+          width: 300,
+          child: GridView.builder(
+            shrinkWrap: true,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 6,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: colors.length,
+            itemBuilder: (context, index) {
+              final color = colors[index];
+              final colorHex = '#${color.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
+              final isSelected = calendar.color == colorHex;
+              
+              return GestureDetector(
+                onTap: () => Navigator.of(context).pop(colorHex),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected ? Colors.black : Colors.grey.shade300,
+                      width: isSelected ? 3 : 1,
+                    ),
+                  ),
+                  child: isSelected 
+                      ? const Icon(Icons.check, color: Colors.white, size: 20)
+                      : null,
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          if (calendar.color != null)
+            TextButton(
+              onPressed: () => Navigator.of(context).pop('remove'),
+              child: const Text('Remove Color'),
+            ),
+        ],
+      ),
+    );
+
+    if (selectedColor != null && mounted) {
+      await _updateCalendarColor(calendar, selectedColor == 'remove' ? null : selectedColor);
+    }
+  }
+
+  Future<void> _updateCalendarColor(ExternalCalendar calendar, String? color) async {
+    try {
+      final repository = ref.read(externalCalendarRepositoryProvider);
+      final updatedCalendar = calendar.copyWith(
+        color: color,
+        lastModified: DateTime.now(),
+      );
+      
+      final result = await repository.save(updatedCalendar);
+      
+      result.when(
+        success: (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                color != null 
+                    ? 'Color updated for "${calendar.displayName}"'
+                    : 'Color removed from "${calendar.displayName}"',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Refresh the UI
+          setState(() {});
+        },
+        failure: (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating color: ${failure.message}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating color: $e'),
           backgroundColor: Colors.red,
         ),
       );
