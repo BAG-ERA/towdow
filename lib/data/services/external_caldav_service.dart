@@ -237,6 +237,7 @@ class ExternalCalDAVService {
       
       // Build time range filter if specified
       String timeRangeFilter = '';
+      // Enable time range filter for future-only events
       if (timeMin != null || timeMax != null) {
         timeRangeFilter = '<C:time-range';
         if (timeMin != null) {
@@ -246,6 +247,9 @@ class ExternalCalDAVService {
           timeRangeFilter += ' end="${_formatDateTime(timeMax)}"';
         }
         timeRangeFilter += ' />';
+        AppLogger.debug('ExternalCalDAVService: Using time range filter: $timeRangeFilter');
+        if (timeMin != null) AppLogger.debug('ExternalCalDAVService: timeMin formatted as: ${_formatDateTime(timeMin)}');
+        if (timeMax != null) AppLogger.debug('ExternalCalDAVService: timeMax formatted as: ${_formatDateTime(timeMax)}');
       }
       
       // CalDAV REPORT query to fetch all VEVENTs
@@ -264,14 +268,18 @@ class ExternalCalDAVService {
   </C:filter>
 </C:calendar-query>''';
 
+      AppLogger.debug('ExternalCalDAVService: Sending REPORT query to $calendarPath');
+      AppLogger.debug('ExternalCalDAVService: Query body: $reportQuery');
       final reportResult = await _client.report(calendarPath, reportQuery);
       return await reportResult.when(
         success: (response) async {
+          AppLogger.debug('ExternalCalDAVService: Server response: ${response.statusCode}');
           if (response.statusCode == 207) {
             final events = VEventParser.parseEventsFromResponse(response.body, calendarUid, account.id);
             AppLogger.info('ExternalCalDAVService: Fetched ${events.length} events from $calendarPath');
             return Result.success(events);
           } else {
+            AppLogger.warning('ExternalCalDAVService: Server error ${response.statusCode}, response body: ${response.body}');
             return Result.failure(Failure(
               message: 'Failed to fetch events: HTTP ${response.statusCode}',
               exception: Exception('Server returned ${response.statusCode}'),
@@ -424,9 +432,21 @@ class ExternalCalDAVService {
 
 
 
-  /// Format DateTime to iCalendar format
+  /// Format DateTime to RFC 5545 iCalendar format: YYYYMMDDTHHMMSSZ
+  /// Must be exactly 15 digits + "Z" for UTC time
   String _formatDateTime(DateTime dateTime) {
-    return dateTime.toUtc().toIso8601String().replaceAll(RegExp(r'[:\-]'), '').replaceAll('.000Z', 'Z');
+    // Convert to UTC first
+    final utc = dateTime.toUtc();
+    
+    // Format as YYYYMMDDTHHMMSSZ (exactly 15 digits + Z, no microseconds)
+    final year = utc.year.toString().padLeft(4, '0');
+    final month = utc.month.toString().padLeft(2, '0');
+    final day = utc.day.toString().padLeft(2, '0');
+    final hour = utc.hour.toString().padLeft(2, '0');
+    final minute = utc.minute.toString().padLeft(2, '0');
+    final second = utc.second.toString().padLeft(2, '0');
+    
+    return '${year}${month}${day}T${hour}${minute}${second}Z';
   }
 }
 

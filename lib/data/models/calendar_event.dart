@@ -60,7 +60,7 @@ class CalendarEvent with _$CalendarEvent {
     @HiveField(31) @Default(false) bool isAllDay,
     @HiveField(32) @Default(false) bool isRecurring,
     @HiveField(33) @Default(false) bool isException, // Exception to recurring series
-    @HiveField(34) Duration? computedDuration,
+    Duration? computedDuration, // Computed field - not stored in Hive
   }) = _CalendarEvent;
 
   factory CalendarEvent.fromJson(Map<String, dynamic> json) => _$CalendarEventFromJson(json);
@@ -107,7 +107,6 @@ extension CalendarEventFactory on CalendarEvent {
       timeZone: timeZone,
       recurrenceRule: recurrenceRule,
       isRecurring: recurrenceRule != null,
-      computedDuration: dtend != null ? dtend.difference(dtstart) : null,
       dtstamp: now,
       created: now,
       lastModified: now,
@@ -119,6 +118,14 @@ extension CalendarEventFactory on CalendarEvent {
 extension CalendarEventOperations on CalendarEvent {
   /// Alias for uid (for compatibility with sync service)
   String get id => uid;
+  
+  /// Computed duration from dtstart and dtend
+  Duration? get effectiveDuration {
+    if (dtend != null) {
+      return dtend!.difference(dtstart);
+    }
+    return null;
+  }
   
   /// Check if event is happening today
   bool get isToday {
@@ -143,8 +150,8 @@ extension CalendarEventOperations on CalendarEvent {
   
   /// Get event duration as a string
   String get durationString {
-    if (computedDuration == null) return '';
-    final duration = computedDuration!;
+    if (effectiveDuration == null) return '';
+    final duration = effectiveDuration!;
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
     

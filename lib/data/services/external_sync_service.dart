@@ -6,9 +6,12 @@ import 'dart:async';
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/external_caldav_account.dart';
+import '../models/external_calendar.dart';
+import '../models/calendar_event.dart';
 import '../repositories/external_account_repository.dart';
 import '../repositories/external_calendar_repository.dart';
 import '../repositories/external_event_repository.dart';
+import 'external_caldav_service.dart';
 
 // External calendar sync service
 class ExternalCalendarSyncService {
@@ -55,9 +58,31 @@ class ExternalCalendarSyncService {
     AppLogger.info('ExternalCalendarSyncService: Starting sync for all accounts');
 
     try {
-      // TODO: Implement sync logic
-      AppLogger.info('ExternalCalendarSyncService: Sync not yet implemented');
-      return const Result.success(null);
+      final accountsResult = await _accountRepository.getAll();
+      
+      return await accountsResult.when(
+        success: (accounts) async {
+          final activeAccounts = accounts.where((account) => account.isActive).toList();
+          AppLogger.info('ExternalCalendarSyncService: Found ${activeAccounts.length} active accounts to sync');
+          
+          // Sync each active account
+          for (final account in activeAccounts) {
+            final syncResult = await syncAccount(account.id);
+            syncResult.when(
+              success: (_) => AppLogger.debug('ExternalCalendarSyncService: Successfully synced account ${account.id}'),
+              failure: (failure) => AppLogger.warning('ExternalCalendarSyncService: Failed to sync account ${account.id}: ${failure.message}'),
+            );
+            // Continue with other accounts even if one fails
+          }
+          
+          AppLogger.info('ExternalCalendarSyncService: Completed sync for all accounts');
+          return const Result.success(null);
+        },
+        failure: (failure) {
+          AppLogger.error('ExternalCalendarSyncService: Failed to get accounts: ${failure.message}');
+          return Result.failure(failure);
+        },
+      );
     } catch (e) {
       AppLogger.error('ExternalCalendarSyncService: Unexpected error during sync: $e');
       return Result.failure(Failure(
@@ -74,15 +99,130 @@ class ExternalCalendarSyncService {
     AppLogger.info('ExternalCalendarSyncService: Syncing account: $accountId');
     
     try {
-      // TODO: Implement single account sync logic
-      AppLogger.info('ExternalCalendarSyncService: Account sync not yet implemented');
-      return const Result.success(null);
+      // Get the account
+      final accountResult = await _accountRepository.getById(accountId);
+      return await accountResult.when(
+        success: (account) async {
+          if (account == null) {
+            return Result.failure(Failure(
+              message: 'Account not found: $accountId',
+              exception: Exception('Account not found'),
+            ));
+          }
+          return await _syncAccountInternal(account);
+        },
+        failure: (failure) async => Result.failure(failure),
+      );
     } catch (e) {
       AppLogger.error('ExternalCalendarSyncService: Account sync failed: $e');
       return Result.failure(Failure(
         message: 'Account sync failed: $e',
         exception: e is Exception ? e : Exception(e.toString()),
       ));
+    }
+  }
+  
+  /// Internal method to sync account after validation
+  Future<Result<void>> _syncAccountInternal(ExternalCaldavAccount account) async {
+    try {
+      
+      // Get calendars for this account
+      final calendarsResult = await _calendarRepository.getCalendarsByAccount(account.id);
+      return await calendarsResult.when(
+        success: (calendars) async {
+          final enabledCalendars = calendars.where((cal) => cal.isEnabled).toList();
+          AppLogger.info('ExternalCalendarSyncService: Found ${enabledCalendars.length} enabled calendars for account ${account.id}');
+          
+          // Sync each enabled calendar
+          for (final calendar in enabledCalendars) {
+            await _syncCalendar(account, calendar);
+          }
+          
+          // Update account last sync time
+          final updatedAccount = account.copyWith(
+            lastSyncAt: DateTime.now(),
+            lastSuccessfulSync: DateTime.now(),
+            syncErrorCount: 0,
+            lastSyncError: null,
+          );
+          await _accountRepository.save(updatedAccount);
+          
+          AppLogger.info('ExternalCalendarSyncService: Successfully synced account ${account.id}');
+          return const Result.success(null);
+        },
+        failure: (failure) async {
+          AppLogger.error('ExternalCalendarSyncService: Failed to get calendars for account ${account.id}: ${failure.message}');
+          return Result.failure(failure);
+        },
+      );
+    } catch (e) {
+      AppLogger.error('ExternalCalendarSyncService: Account sync failed: $e');
+      
+      // Update account with error info
+      try {
+        final updatedAccount = account.copyWith(
+          lastSyncAt: DateTime.now(),
+          syncErrorCount: account.syncErrorCount + 1,
+          lastSyncError: e.toString(),
+        );
+        await _accountRepository.save(updatedAccount);
+      } catch (updateError) {
+        AppLogger.warning('ExternalCalendarSyncService: Failed to update account error status: $updateError');
+      }
+      
+      return Result.failure(Failure(
+        message: 'Account sync failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+      ));
+    }
+  }
+  
+  /// Sync a single calendar
+  Future<void> _syncCalendar(ExternalCaldavAccount account, ExternalCalendar calendar) async {
+    AppLogger.debug('ExternalCalendarSyncService: Syncing calendar ${calendar.displayName} (${calendar.uid})');
+    
+    try {
+      // Create CalDAV service for this account
+      final caldavService = ExternalCalDAVService(account: account);
+      
+      // Calculate time range for sync (today to next 365 days - future events only)
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day); // Start of today
+      final timeMin = today;
+      final timeMax = now.add(const Duration(days: 365));
+      
+      AppLogger.debug('ExternalCalendarSyncService: Syncing events from ${timeMin.toIso8601String()} to ${timeMax.toIso8601String()}');
+      
+      // Fetch events from CalDAV server
+      final eventsResult = await caldavService.fetchEvents(
+        calendarPath: calendar.href, 
+        calendarUid: calendar.uid,
+        timeMin: timeMin,
+        timeMax: timeMax,
+      );
+      
+      await eventsResult.when(
+        success: (events) async {
+          AppLogger.info('ExternalCalendarSyncService: Fetched ${events.length} events from calendar ${calendar.displayName}');
+          
+          // Save events to local storage
+          for (final event in events) {
+            await _eventRepository.save(event);
+          }
+          
+          // Update calendar sync status
+          final updatedCalendar = calendar.copyWith(
+            lastSyncAt: DateTime.now(),
+            syncToken: calendar.syncToken, // Will be updated by CalDAV service if needed
+          );
+          await _calendarRepository.save(updatedCalendar);
+        },
+        failure: (failure) {
+          AppLogger.warning('ExternalCalendarSyncService: Failed to fetch events from calendar ${calendar.displayName}: ${failure.message}');
+        },
+      );
+    } catch (e) {
+      AppLogger.error('ExternalCalendarSyncService: Error syncing calendar ${calendar.displayName}: $e');
     }
   }
 
