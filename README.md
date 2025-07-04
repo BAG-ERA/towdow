@@ -37,4 +37,12 @@ docker build --build-arg FLUTTER_VERSION=${FLUTTER_VERSION} \
   -f CI_scripts/windows/Dockerfile .
 ```
 
-The other option is to use shell runners on our PC.
+The other option is to use shell runners on our PC. For this do the following:
+
+1. Configure flutter development environment https://docs.flutter.dev/get-started/install/windows/desktop
+    * Flutter **MUST** be installed in ```C:\flutter``` for the CI to work  
+2. install gitlab runner in ```C:\GitLab-Runner``` https://docs.gitlab.com/runner/install/windows/
+3. configure a new project runner  
+4. set shell executor to powershell in ```C:\GitLab-Runner\config.toml``` (https://docs.gitlab.com/runner/executors/shell/#selecting-your-shell)
+   
+
