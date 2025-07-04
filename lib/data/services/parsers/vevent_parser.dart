@@ -5,6 +5,7 @@
 import '../../../core/logger.dart';
 import '../../models/calendar_event.dart';
 import '../../models/attendee.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 class VEventParser {
   /// Parse a single VEVENT string into a CalendarEvent object
@@ -64,10 +65,14 @@ class VEventParser {
                 isAllDay = true;
                 dtstart = _parseDate(value);
               } else {
-                dtstart = _parseDateTime(value);
-              }
-              if (params.contains('TZID=')) {
-                timeZone = _extractParameter(params, 'TZID');
+                // Extract timezone parameter if present
+                String? tzid;
+                if (params.contains('TZID=')) {
+                  tzid = _extractParameter(params, 'TZID');
+                  timeZone = tzid; // Store for calendar event
+                }
+                // Use timezone-aware parsing
+                dtstart = _parseDateTimeWithTimezone(value, tzid);
               }
             }
           }
@@ -86,7 +91,13 @@ class VEventParser {
               if (params.contains('VALUE=DATE')) {
                 dtend = _parseDate(value);
               } else {
-                dtend = _parseDateTime(value);
+                // Extract timezone parameter if present (should match DTSTART timezone)
+                String? tzid;
+                if (params.contains('TZID=')) {
+                  tzid = _extractParameter(params, 'TZID');
+                }
+                // Use timezone-aware parsing
+                dtend = _parseDateTimeWithTimezone(value, tzid);
               }
             }
           }
@@ -328,9 +339,19 @@ class VEventParser {
     return null;
   }
 
-  /// Unescape calendar text according to RFC 5545
+  /// Unescape calendar text according to RFC 5545 and decode HTML entities
   static String _unescapeCalendarText(String text) {
     return text
+        // First handle HTML entities (common in CalDAV responses)
+        .replaceAll('&#13;', '') // Remove carriage return entities
+        .replaceAll('&#10;', '\n') // Line feed entity to newline
+        .replaceAll('&#9;', '\t') // Tab entity
+        .replaceAll('&lt;', '<') // Less than entity
+        .replaceAll('&gt;', '>') // Greater than entity
+        .replaceAll('&amp;', '&') // Ampersand entity (must be last)
+        .replaceAll('&quot;', '"') // Quote entity
+        .replaceAll('&apos;', "'") // Apostrophe entity
+        // Then handle standard iCalendar escaping (RFC 5545)
         .replaceAll('\\n', '\n')
         .replaceAll('\\;', ';')
         .replaceAll('\\,', ',')
@@ -385,6 +406,132 @@ class VEventParser {
     } catch (e, stackTrace) {
       AppLogger.error('VEventParser: Failed to parse attendee line: $line', e, stackTrace);
       return null;
+    }
+  }
+
+  /// Ensure timezone database is initialized (for testing and first usage)
+  static void _ensureTimezonesInitialized() {
+    try {
+      // This will throw if no timezone data is loaded
+      tz.getLocation('UTC');
+    } catch (e) {
+      // Initialize with basic timezone data if not already done
+      AppLogger.warning('VEventParser: Timezone database not initialized, this may cause issues in production');
+    }
+  }
+
+  /// Map common timezone names to IANA timezone identifiers
+  static String _mapToIANATimezone(String timezoneName) {
+    // Common timezone mappings (Windows timezone names to IANA)
+    final timezoneMap = {
+      // US Timezones
+      'Eastern Standard Time': 'America/New_York',
+      'Eastern Daylight Time': 'America/New_York',
+      'Central Standard Time': 'America/Chicago',
+      'Central Daylight Time': 'America/Chicago',
+      'Mountain Standard Time': 'America/Denver',
+      'Mountain Daylight Time': 'America/Denver',
+      'Pacific Standard Time': 'America/Los_Angeles',
+      'Pacific Daylight Time': 'America/Los_Angeles',
+      'Alaska Standard Time': 'America/Anchorage',
+      'Hawaii-Aleutian Standard Time': 'Pacific/Honolulu',
+      
+      // European timezones
+      'GMT Standard Time': 'Europe/London',
+      'Greenwich Standard Time': 'Europe/London',
+      'Central European Time': 'Europe/Paris',
+      'W. Europe Standard Time': 'Europe/Paris',
+      'Romance Standard Time': 'Europe/Paris',
+      'Central Europe Standard Time': 'Europe/Berlin',
+      'E. Europe Standard Time': 'Europe/Bucharest',
+      'GTB Standard Time': 'Europe/Athens',
+      'Russian Standard Time': 'Europe/Moscow',
+      
+      // Other common timezones
+      'UTC': 'UTC',
+      'GMT': 'UTC',
+      'Tokyo Standard Time': 'Asia/Tokyo',
+      'China Standard Time': 'Asia/Shanghai',
+      'India Standard Time': 'Asia/Kolkata',
+      'Australian Eastern Standard Time': 'Australia/Sydney',
+      'Cen. Australia Standard Time': 'Australia/Adelaide',
+      'AUS Eastern Standard Time': 'Australia/Sydney',
+    };
+    
+    // Try direct mapping first
+    if (timezoneMap.containsKey(timezoneName)) {
+      return timezoneMap[timezoneName]!;
+    }
+    
+    // Try case-insensitive mapping
+    final lowerTimezoneName = timezoneName.toLowerCase();
+    for (final entry in timezoneMap.entries) {
+      if (entry.key.toLowerCase() == lowerTimezoneName) {
+        return entry.value;
+      }
+    }
+    
+    // If it's already an IANA timezone, return as-is
+    try {
+      tz.getLocation(timezoneName);
+      return timezoneName;
+    } catch (e) {
+      // Default to UTC if timezone is unknown
+      AppLogger.warning('VEventParser: Unknown timezone "$timezoneName", defaulting to UTC');
+      return 'UTC';
+    }
+  }
+
+  /// Parse DateTime with timezone conversion - always returns UTC
+  static DateTime? _parseDateTimeWithTimezone(String dateTimeStr, String? timezoneId) {
+    final baseDateTime = _parseDateTime(dateTimeStr);
+    if (baseDateTime == null) return null;
+    
+    // If already UTC, return as-is
+    if (dateTimeStr.endsWith('Z')) {
+      return baseDateTime;
+    }
+    
+    // If no timezone is specified, treat as local and convert to UTC
+    if (timezoneId == null || timezoneId.isEmpty) {
+      return baseDateTime.toUtc();
+    }
+    
+    try {
+      // Ensure timezone database is initialized
+      _ensureTimezonesInitialized();
+      
+      // Map timezone name to IANA timezone identifier
+      final ianaTimezone = _mapToIANATimezone(timezoneId);
+      AppLogger.debug('VEventParser: Mapped "$timezoneId" to IANA timezone "$ianaTimezone"');
+      
+      // Get the source timezone location
+      final sourceLocation = tz.getLocation(ianaTimezone);
+      
+      // Create TZDateTime in the source timezone
+      final sourceDateTime = tz.TZDateTime(
+        sourceLocation, 
+        baseDateTime.year,
+        baseDateTime.month,
+        baseDateTime.day,
+        baseDateTime.hour,
+        baseDateTime.minute,
+        baseDateTime.second,
+      );
+      
+      // Convert to UTC and return as proper UTC DateTime
+      final utcDateTime = sourceDateTime.toUtc();
+      
+      // Log the conversion details
+      AppLogger.debug('VEventParser: Source datetime: $sourceDateTime (${sourceDateTime.timeZoneOffset})');
+      AppLogger.debug('VEventParser: UTC datetime: $utcDateTime');
+      AppLogger.debug('VEventParser: Conversion: ${sourceDateTime.hour}:${sourceDateTime.minute.toString().padLeft(2, '0')} ${sourceDateTime.timeZoneName} → ${utcDateTime.hour}:${utcDateTime.minute.toString().padLeft(2, '0')} UTC');
+      
+      return utcDateTime;
+      
+    } catch (e) {
+      AppLogger.warning('VEventParser: Error converting timezone "$timezoneId": $e - treating as local time and converting to UTC');
+      return baseDateTime.toUtc();
     }
   }
 } 
