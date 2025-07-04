@@ -5,28 +5,45 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/logger.dart';
 import '../../../data/models/calendar_event.dart';
-import '../../../data/models/external_calendar.dart';
 import '../../../data/providers/providers.dart';
+import 'external_event_card.dart';
 
-class ExternalEventsList extends ConsumerWidget {
+class ExternalEventsList extends ConsumerStatefulWidget {
   final List<CalendarEvent> events;
-  
+  final bool startReduced;
+  /// When true, only shows first 3 events in reduced mode. When false, shows all events.
+  final bool limitReducedEvents;
+
   const ExternalEventsList({
     super.key,
     required this.events,
+    this.startReduced = false,
+    this.limitReducedEvents = true,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (events.isEmpty) {
+  ConsumerState<ExternalEventsList> createState() => _ExternalEventsListState();
+}
+
+class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
+  late bool _isReduced;
+  
+  @override
+  void initState() {
+    super.initState();
+    _isReduced = widget.startReduced;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.events.isEmpty) {
       return const SizedBox.shrink();
     }
 
     // Group events by date for better organization (using local time)
     final eventsByDate = <DateTime, List<CalendarEvent>>{};
-    for (final event in events) {
+    for (final event in widget.events) {
       final localStart = event.localDtstart;
       final eventDate = DateTime(
         localStart.year,
@@ -68,7 +85,7 @@ class ExternalEventsList extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Header with title and collapse button
           Row(
             children: [
               Icon(
@@ -85,17 +102,37 @@ class ExternalEventsList extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${events.length}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w500,
+              // Collapse/Expand toggle button with animation
+              Tooltip(
+                message: _isReduced ? 'Expand calendar' : 'Collapse calendar',
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isReduced = !_isReduced;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: !_isReduced 
+                          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                          : null,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: AnimatedRotation(
+                      duration: const Duration(milliseconds: 300),
+                      turns: _isReduced ? 0.0 : 0.5,
+                      child: Icon(
+                        Icons.keyboard_arrow_down,
+                        color: !_isReduced 
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                        size: 16,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -103,265 +140,210 @@ class ExternalEventsList extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           
-          // Events list
-          ...events.map((event) => _ExternalEventCard(event: event)),
-          
-          // Divider after events
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            height: 1,
-            color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ExternalEventCard extends ConsumerWidget {
-  final CalendarEvent event;
-  
-  const _ExternalEventCard({required this.event});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    
-    // Determine if event is all-day
-    final isAllDay = event.isAllDay ?? false;
-    
-    // Format time display using timezone-aware utilities
-    String timeDisplay = '';
-    if (!isAllDay) {
-      // Debug logging to check timezone conversion
-      AppLogger.debug('External Event: ${event.summary}');
-      AppLogger.debug('  Raw dtstart: ${event.dtstart} (isUtc: ${event.dtstart.isUtc})');
-      AppLogger.debug('  Local dtstart: ${event.localDtstart} (isUtc: ${event.localDtstart.isUtc})');
-      if (event.dtend != null) {
-        AppLogger.debug('  Raw dtend: ${event.dtend} (isUtc: ${event.dtend!.isUtc})');
-        AppLogger.debug('  Local dtend: ${event.localDtend} (isUtc: ${event.localDtend?.isUtc})');
-      }
-      
-      final startTime = TimeOfDay.fromDateTime(event.localDtstart);
-      timeDisplay = startTime.format(context);
-      
-      if (event.localDtend != null) {
-        final endTime = TimeOfDay.fromDateTime(event.localDtend!);
-        timeDisplay += ' - ${endTime.format(context)}';
-      }
-    } else {
-      timeDisplay = 'All Day';
-    }
-
-    // Watch external calendars for efficient color lookup
-    final calendarsAsync = ref.watch(externalCalendarListProvider);
-    
-    return calendarsAsync.when(
-      loading: () => _buildLoadingSkeleton(colorScheme),
-      error: (error, stackTrace) => _buildEventCard(
-        context, 
-        timeDisplay, 
-        colorScheme.primary, 
-        textTheme, 
-        null,
-      ),
-      data: (calendars) {
-        final calendar = calendars.where((c) => c.uid == event.sourceCalendarUid).firstOrNull;
-        final eventColor = calendar?.color != null 
-            ? Color(int.parse(calendar!.color!.replaceFirst('#', '0xFF')))
-            : colorScheme.primary;
-        
-        return _buildEventCard(
-          context, 
-          timeDisplay, 
-          eventColor, 
-          textTheme, 
-          calendar,
-        );
-      },
-    );
-  }
-  
-  Widget _buildLoadingSkeleton(ColorScheme colorScheme) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(
-            width: 4,
-            color: colorScheme.outline.withValues(alpha: 0.3),
-          ),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Time column skeleton
-          SizedBox(
-            width: 60,
-            child: Container(
-              height: 14,
-              decoration: BoxDecoration(
-                color: colorScheme.outline.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(4),
+          // Events list with animation
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: AnimatedSlide(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              offset: _isReduced ? const Offset(0, -0.1) : Offset.zero,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 250),
+                opacity: _isReduced ? 0.0 : 1.0,
+                child: _isReduced 
+                  ? const SizedBox.shrink()
+                  : Column(
+                      children: [
+                        _buildEventsLayout(context),
+                        
+                        // Divider after events
+                        Container(
+                          margin: const EdgeInsets.only(top: 8),
+                          height: 1,
+                          color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                        ),
+                      ],
+                    ),
               ),
             ),
           ),
-          
-          const SizedBox(width: 12),
-          
-          // Event content skeleton
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 16,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outline.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  height: 12,
-                  width: 150,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outline.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
   
-  Widget _buildEventCard(
-    BuildContext context,
-    String timeDisplay,
-    Color eventColor,
-    TextTheme textTheme,
-    ExternalCalendar? calendar,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
+  // This method is no longer used since we removed the reduced layout
+  // Keeping it for potential future use or reference
+  Widget _buildReducedLayout() {
+    // This method is deprecated - events are now either shown or hidden completely
+    return const SizedBox.shrink();
+  }
+  
+  Widget _buildEventsLayout(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 1024; // Desktop/large tablet
+    final isLargeDesktop = screenWidth >= 1400; // Large desktop for 3+ columns
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(
-            width: 4,
-            color: eventColor,
-          ),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Time column
-          SizedBox(
-            width: 60,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (timeDisplay.isNotEmpty)
-                  Text(
-                    timeDisplay,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
+    // Sort events by start time (earlier first)
+    final sortedEvents = List<CalendarEvent>.from(widget.events)
+      ..sort((a, b) => a.localDtstart.compareTo(b.localDtstart));
+    
+    // Group events by date
+    final groupedEvents = _groupEventsByDate(sortedEvents);
+    
+    // Determine number of columns based on screen width and day groups
+    if (isLargeDesktop && groupedEvents.length >= 3) {
+      return _buildMultiColumnDayLayout(context, groupedEvents, 3);
+    } else if (isDesktop && groupedEvents.length >= 2) {
+      return _buildMultiColumnDayLayout(context, groupedEvents, 2);
+    } else {
+      return _buildSingleColumnDayLayout(groupedEvents);
+    }
+  }
+  
+  Widget _buildSingleColumnDayLayout(Map<DateTime, List<CalendarEvent>> groupedEvents) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: groupedEvents.entries.map((entry) {
+        final date = entry.key;
+        final events = entry.value;
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Day header
+            Container(
+              margin: const EdgeInsets.only(bottom: 8, top: 16),
+              child: Text(
+                _formatDayHeader(date),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
             ),
-          ),
+            
+            // Events for this day
+            ...events.map((event) => ExternalEventCard(
+              event: event,
+              hideCalendarName: true,
+            )),
+          ],
+        );
+      }).toList(),
+    );
+  }
+  
+  Widget _buildMultiColumnDayLayout(BuildContext context, Map<DateTime, List<CalendarEvent>> groupedEvents, int columnCount) {
+    // Split day groups between columns, distributing evenly
+    final dayGroups = groupedEvents.entries.toList();
+    final columnGroups = List.generate(columnCount, (index) => <MapEntry<DateTime, List<CalendarEvent>>>[]);
+    
+    // Distribute day groups across columns
+    for (int i = 0; i < dayGroups.length; i++) {
+      final columnIndex = i % columnCount;
+      columnGroups[columnIndex].add(dayGroups[i]);
+    }
+    
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: columnGroups.asMap().entries.map((columnEntry) {
+        final columnIndex = columnEntry.key;
+        final groups = columnEntry.value;
+        
+        return [
+          // Add spacing between columns (except for the first column)
+          if (columnIndex > 0) const SizedBox(width: 8),
           
-          const SizedBox(width: 12),
-          
-          // Event content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Event title
-                Text(
-                  event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+              children: groups.map((entry) {
+                final date = entry.key;
+                final events = entry.value;
                 
-                // Location
-                if (event.location?.isNotEmpty == true) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on_outlined,
-                        size: 14,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          event.location!,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Day header
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8, top: 16),
+                      child: Text(
+                        _formatDayHeader(date),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
-                    ],
-                  ),
-                ],
-                
-                // Calendar name with color indicator
-                if (calendar != null) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: eventColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          calendar.displayName,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
+                    ),
+                    
+                    // Events for this day
+                    ...events.map((event) => ExternalEventCard(
+                      event: event,
+                      hideCalendarName: true,
+                    )),
+                  ],
+                );
+              }).toList(),
             ),
           ),
-        ],
-      ),
+        ];
+      }).expand((widgets) => widgets).toList(),
     );
   }
-} 
+  
+  Map<DateTime, List<CalendarEvent>> _groupEventsByDate(List<CalendarEvent> events) {
+    final Map<DateTime, List<CalendarEvent>> groupedEvents = {};
+    
+    for (final event in events) {
+      // Get date without time for grouping
+      final eventDate = DateTime(
+        event.localDtstart.year,
+        event.localDtstart.month,
+        event.localDtstart.day,
+      );
+      
+      if (!groupedEvents.containsKey(eventDate)) {
+        groupedEvents[eventDate] = [];
+      }
+      groupedEvents[eventDate]!.add(event);
+    }
+    
+    return groupedEvents;
+  }
+  
+  String _formatDayHeader(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    
+    // Check for Today/Tomorrow
+    if (date == today) {
+      return 'Today ${_getOrdinalDay(date.day)}';
+    } else if (date == tomorrow) {
+      return 'Tomorrow ${_getOrdinalDay(date.day)}';
+    } else {
+      // Format as "Monday 14th"
+      const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      final dayName = dayNames[date.weekday - 1];
+      return '$dayName ${_getOrdinalDay(date.day)}';
+    }
+  }
+  
+  String _getOrdinalDay(int day) {
+    if (day >= 11 && day <= 13) {
+      return '${day}th';
+    }
+    switch (day % 10) {
+      case 1:
+        return '${day}st';
+      case 2:
+        return '${day}nd';
+      case 3:
+        return '${day}rd';
+      default:
+        return '${day}th';
+    }
+  }
+}

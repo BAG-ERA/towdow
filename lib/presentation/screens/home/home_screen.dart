@@ -406,7 +406,11 @@ class _TaskListTab extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        data: (events) => ExternalEventsList(events: events),
+                        data: (events) => ExternalEventsList(
+                          events: events,
+                          startReduced: true,
+                          limitReducedEvents: false,
+                        ),
                       ),
                       
                       // Tasks section
