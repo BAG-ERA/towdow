@@ -107,6 +107,7 @@ build_windows:
       when: always
     - when: never
   script:
+    - git config --global --add safe.directory C:/flutter
     - $env:CI_COMMIT_TAG_CLEAN=$env:CI_COMMIT_TAG -replace '^v', ''
     - flutter pub get
     - flutter build windows --release --build-name=$CI_COMMIT_TAG_CLEAN --build-number=$CI_PIPELINE_IID
