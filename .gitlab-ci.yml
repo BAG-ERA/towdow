@@ -114,12 +114,7 @@ build_windows:
     - flutter build windows --release --build-name=$CI_COMMIT_TAG_CLEAN --build-number=$CI_PIPELINE_IID
     - Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "build/windows/x64/runner/Release/towdow_app-$CI_COMMIT_TAG_CLEAN.zip"
     # now package with Inno bundle to havoid msi paid certificates https://hahouari.medium.com/easy-windows-installers-for-flutter-apps-with-inno-bundle-2ec9b05d2c75
-    - echo "--- Installing Inno Setup ---"
-    - $inno_url = "https://files.jrsoftware.org/is/6/is-6.2.2.exe"
-    - $inno_installer = Join-Path $env:TEMP "inno_setup.exe"
-    - Invoke-WebRequest -Uri $inno_url -OutFile $inno_installer
-    - Start-Process -FilePath $inno_installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-" -Wait
-    - $env:Path = $env:Path + ";C:\Program Files (x86)\Inno Setup 6"
+    - powershell -ExecutionPolicy Bypass -File .\CI_scripts\windows\install_inno.ps1
     - dart run inno_bundle:build --release --app-version $CI_COMMIT_TAG_CLEAN --no-gen-app-id --no-gen-publisher --no-app
   artifacts:
     paths:
