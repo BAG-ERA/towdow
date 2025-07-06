@@ -98,15 +98,14 @@ build_android:
 
 build_windows:
   stage: build
-#  image: $WINDOWS_CUSTOM_IMAGE_NAME:$WINDOWS_CUSTOM_IMAGE_TAG
   tags:
     - windows
   rules:
-#    - if: '$CI_COMMIT_TAG'
-    - if: '$CI_COMMIT_BRANCH == "CI/release_windows"'
+    - if: '$CI_COMMIT_TAG'
       when: always
     - when: never
   script:
+    - echo "WINDOWS_JOB_ID=$CI_JOB_ID" > build.env
     # prevent fatal: detected dubious ownership in repository at 'C:/flutter'
     - git config --global --add safe.directory C:/flutter
     - $env:CI_COMMIT_TAG_CLEAN=$env:CI_COMMIT_TAG -replace '^v', ''
@@ -160,5 +159,5 @@ release:
           url: "$CI_PROJECT_URL/-/jobs/$APPIMAGE_JOB_ID/artifacts/file/$APPIMAGE_OUTPUT"
         - name: "Towdow Android APK"
           url: "$CI_PROJECT_URL/-/jobs/$ANDROID_JOB_ID/artifacts/file/$APK_OUTPUT"
-#        - name: "Towdow Windows Executable"
-#          filepath: "build/windows/runner/Release/towdow.exe"
+        - name: "Towdow Windows Installer"
+          url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/installer/Release/TowdowApp-x86_64-$CI_COMMIT_TAG_CLEAN-Installer.exe"
