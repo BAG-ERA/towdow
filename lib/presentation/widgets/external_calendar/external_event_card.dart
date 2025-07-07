@@ -166,91 +166,94 @@ class ExternalEventCard extends ConsumerWidget {
     
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 420),
-      child: GestureDetector(
-        onTap: () => ExternalEventDetailsDialog.show(context, event: event),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: EdgeInsets.all(hideCalendarName ? 8 : 12),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Time column
-              SizedBox(
-                width: 80,
-                child: Text(
-                  timeDisplay,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: eventColor,
-                    fontWeight: FontWeight.w500,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => ExternalEventDetailsDialog.show(context, event: event),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: EdgeInsets.all(hideCalendarName ? 8 : 12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Time column
+                SizedBox(
+                  width: 80,
+                  child: Text(
+                    timeDisplay,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: eventColor,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
-              
-              const SizedBox(width: 12),
-              
-              // Event content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Event title and location icon on same line
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (event.location?.isNotEmpty == true)
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 14,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                      ],
-                    ),
-                    
-                    // Calendar name with color indicator
-                    if (calendar != null && !hideCalendarName) ...[
-                      const SizedBox(height: 4),
+                
+                const SizedBox(width: 12),
+                
+                // Event content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Event title and location icon on same line
                       Row(
                         children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: eventColor,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              calendar.displayName,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontSize: 11,
+                              event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
                               ),
-                              maxLines: 1,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          if (event.location?.isNotEmpty == true)
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 14,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                         ],
                       ),
+                      
+                      // Calendar name with color indicator
+                      if (calendar != null && !hideCalendarName) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: eventColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                calendar.displayName,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontSize: 11,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
