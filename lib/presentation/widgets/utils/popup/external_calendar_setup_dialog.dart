@@ -26,8 +26,8 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
   
   bool _isLoading = false;
   bool _showAdvanced = false;
-  bool _requiresAuth = true;
-  ExternalCalendarAuthType _authType = ExternalCalendarAuthType.basic;
+  ExternalCalendarAuthType _authType = ExternalCalendarAuthType.anonymous;
+  final Map<String, Color?> _calendarColors = {};
   
   List<ExternalCalendar> _discoveredCalendars = [];
   Set<String> _selectedCalendars = {};
@@ -162,18 +162,28 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
             ),
             const SizedBox(height: 16),
             
-            // Authentication toggle
-            CheckboxListTile(
-              title: const Text('Requires Authentication'),
-              value: _requiresAuth,
+            // Authentication type selector (always visible)
+            DropdownButtonFormField<ExternalCalendarAuthType>(
+              value: _authType,
+              decoration: const InputDecoration(
+                labelText: 'Authentication Type',
+                border: OutlineInputBorder(),
+              ),
+              items: ExternalCalendarAuthType.values.map((type) {
+                return DropdownMenuItem(
+                  value: type,
+                  child: Text(type.name.toUpperCase()),
+                );
+              }).toList(),
               onChanged: (value) {
                 setState(() {
-                  _requiresAuth = value ?? false;
+                  _authType = value ?? ExternalCalendarAuthType.anonymous;
                 });
               },
             ),
             
-            if (_requiresAuth) ...[
+            // Username/password fields (only for basic or oauth)
+            if (_authType == ExternalCalendarAuthType.basic || _authType == ExternalCalendarAuthType.oauth) ...[
               const SizedBox(height: 8),
               
               // Username
@@ -184,7 +194,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
-                  if (_requiresAuth && (value == null || value.trim().isEmpty)) {
+                  if ((_authType == ExternalCalendarAuthType.basic || _authType == ExternalCalendarAuthType.oauth) && (value == null || value.trim().isEmpty)) {
                     return 'Please enter a username';
                   }
                   return null;
@@ -201,61 +211,13 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                 ),
                 obscureText: true,
                 validator: (value) {
-                  if (_requiresAuth && (value == null || value.trim().isEmpty)) {
+                  if ((_authType == ExternalCalendarAuthType.basic || _authType == ExternalCalendarAuthType.oauth) && (value == null || value.trim().isEmpty)) {
                     return 'Please enter a password';
                   }
                   return null;
                 },
               ),
             ],
-            
-            const SizedBox(height: 16),
-            
-            // Advanced options
-            ExpansionTile(
-              title: const Text('Advanced Options'),
-              initiallyExpanded: _showAdvanced,
-              onExpansionChanged: (expanded) {
-                setState(() {
-                  _showAdvanced = expanded;
-                });
-              },
-              children: [
-                const SizedBox(height: 8),
-                
-                // Auth type
-                DropdownButtonFormField<ExternalCalendarAuthType>(
-                  value: _authType,
-                  decoration: const InputDecoration(
-                    labelText: 'Authentication Type',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: ExternalCalendarAuthType.values.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Text(type.name.toUpperCase()),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _authType = value ?? ExternalCalendarAuthType.basic;
-                    });
-                  },
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Help text
-                Text(
-                  'Basic: Use username/password authentication\n'
-                  'OAuth: Use OAuth2 authentication (advanced)\n'
-                  'Anonymous: No authentication required',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -283,19 +245,38 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
               itemCount: _discoveredCalendars.length,
               itemBuilder: (context, index) {
                 final calendar = _discoveredCalendars[index];
+                final color = _calendarColors[calendar.id] ??
+                  (calendar.color != null ? Color(int.parse(calendar.color!.replaceFirst('#', '0xFF'))) : Colors.blue);
                 return CheckboxListTile(
-                  title: Text(calendar.displayName),
-                  subtitle: Text(calendar.description ?? 'No description'),
-                  secondary: calendar.color != null
-                      ? Container(
+                  title: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () async {
+                          final picked = await _showColorPickerDialog(context, color);
+                          if (picked != null) {
+                            setState(() {
+                              _calendarColors[calendar.id] = picked;
+                            });
+                          }
+                        },
+                        child: Container(
                           width: 20,
                           height: 20,
+                          margin: const EdgeInsets.only(right: 12),
                           decoration: BoxDecoration(
-                            color: Color(int.parse(calendar.color!.replaceFirst('#', '0xFF'))),
+                            color: color,
                             shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                              width: 1,
+                            ),
                           ),
-                        )
-                      : null,
+                        ),
+                      ),
+                      Expanded(child: Text(calendar.displayName)),
+                    ],
+                  ),
+                  subtitle: Text(calendar.description ?? 'No description'),
                   value: _selectedCalendars.contains(calendar.id),
                   onChanged: (selected) {
                     setState(() {
@@ -352,6 +333,150 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
     );
   }
 
+  Future<Color?> _showColorPickerDialog(BuildContext context, Color currentColor) async {
+    Color? pickedColor = currentColor;
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          final colors = [
+            Colors.red,
+            Colors.pink,
+            Colors.purple,
+            Colors.deepPurple,
+            Colors.indigo,
+            Colors.blue,
+            Colors.lightBlue,
+            Colors.cyan,
+            Colors.teal,
+            Colors.green,
+            Colors.lightGreen,
+            Colors.lime,
+            Colors.yellow,
+            Colors.orange,
+            Colors.deepOrange,
+            Colors.brown,
+            Colors.grey,
+            Colors.blueGrey,
+          ];
+          final controller = TextEditingController();
+          String? errorText;
+          return AlertDialog(
+            title: const Text('Choose Calendar Color'),
+            content: SizedBox(
+              width: 300,
+              height: 420,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: GridView.builder(
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 6,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                      ),
+                      itemCount: colors.length,
+                      itemBuilder: (context, index) {
+                        final color = colors[index];
+                        final isSelected = pickedColor == color;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              pickedColor = color;
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+                                width: isSelected ? 3 : 1,
+                              ),
+                            ),
+                            child: isSelected
+                                ? Icon(
+                                    Icons.check,
+                                    color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.edit),
+                    label: const Text('Custom Color'),
+                    onPressed: () async {
+                      final result = await showDialog<String>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Enter Custom Color'),
+                          content: TextField(
+                            controller: controller,
+                            decoration: InputDecoration(
+                              labelText: 'Hex Color (e.g. #FF8800 or 0088FF)',
+                              errorText: errorText,
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                final input = controller.text.trim();
+                                final hex = input.startsWith('#') ? input.substring(1) : input;
+                                if (hex.length == 6 || hex.length == 8) {
+                                  try {
+                                    final color = Color(int.parse(hex.length == 6 ? 'FF$hex' : hex, radix: 16));
+                                    Navigator.of(context).pop('#${hex.toUpperCase()}');
+                                  } catch (_) {
+                                    setState(() {
+                                      errorText = 'Invalid hex color';
+                                    });
+                                  }
+                                } else {
+                                  setState(() {
+                                    errorText = 'Enter 6 or 8 hex digits';
+                                  });
+                                }
+                              },
+                              child: const Text('OK'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (result != null) {
+                        setState(() {
+                          pickedColor = Color(int.parse(result.substring(1), radix: 16));
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(pickedColor),
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    return pickedColor;
+  }
+
   Future<void> _testConnection() async {
     if (!_formKey.currentState!.validate()) return;
     
@@ -362,10 +487,10 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
       final tempAccount = ExternalCaldavAccount(
         id: 'temp',
         serverUrl: _serverUrlController.text.trim(),
-        username: _requiresAuth ? _usernameController.text.trim() : '',
-        password: _requiresAuth ? _passwordController.text.trim() : null,
+        username: _authType == ExternalCalendarAuthType.basic ? _usernameController.text.trim() : '',
+        password: _authType == ExternalCalendarAuthType.basic ? _passwordController.text.trim() : null,
         displayName: _displayNameController.text.trim(),
-        authType: _requiresAuth ? _authType : ExternalCalendarAuthType.anonymous,
+        authType: _authType,
         createdAt: DateTime.now(),
       );
       
@@ -454,10 +579,10 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
       final account = ExternalCaldavAccount(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         serverUrl: _serverUrlController.text.trim(),
-        username: _requiresAuth ? _usernameController.text.trim() : '',
-        password: _requiresAuth ? _passwordController.text.trim() : null,
+        username: _authType == ExternalCalendarAuthType.basic ? _usernameController.text.trim() : '',
+        password: _authType == ExternalCalendarAuthType.basic ? _passwordController.text.trim() : null,
         displayName: _displayNameController.text.trim(),
-        authType: _requiresAuth ? _authType : ExternalCalendarAuthType.anonymous,
+        authType: _authType,
         createdAt: DateTime.now(),
       );
       
@@ -478,10 +603,16 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
           .toList();
       
       for (final calendar in selectedCalendarList) {
+        // Use the selected color for this calendar, or fallback to the calendar's original color
+        final colorHex = _calendarColors[calendar.id] != null
+            ? '#${_calendarColors[calendar.id]!.value.toRadixString(16).padLeft(8, '0').substring(2)}'
+            : calendar.color;
+            
         final calendarWithAccount = calendar.copyWith(
           accountId: account.id,
           uid: '${account.id}_${calendar.uid}',
           isEnabled: true,
+          color: colorHex,
         );
         
         final calendarResult = await calendarRepository.save(calendarWithAccount);
