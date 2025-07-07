@@ -110,10 +110,11 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                 border: OutlineInputBorder(),
               ),
               validator: (value) {
-                if (value == null || value.isEmpty) {
+                if (value == null || value.trim().isEmpty) {
                   return 'Please enter a server URL';
                 }
-                final uri = Uri.tryParse(value);
+                final trimmedValue = value.trim();
+                final uri = Uri.tryParse(trimmedValue);
                 if (uri == null || !uri.hasScheme) {
                   return 'Please enter a valid URL';
                 }
@@ -122,7 +123,8 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
               onChanged: (value) {
                 // Auto-generate display name from URL
                 if (_displayNameController.text.isEmpty) {
-                  final uri = Uri.tryParse(value);
+                  final trimmedValue = value.trim();
+                  final uri = Uri.tryParse(trimmedValue);
                   if (uri != null) {
                     _displayNameController.text = uri.host;
                   }
@@ -152,7 +154,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                 border: OutlineInputBorder(),
               ),
               validator: (value) {
-                if (value == null || value.isEmpty) {
+                if (value == null || value.trim().isEmpty) {
                   return 'Please enter a display name';
                 }
                 return null;
@@ -182,7 +184,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
-                  if (_requiresAuth && (value == null || value.isEmpty)) {
+                  if (_requiresAuth && (value == null || value.trim().isEmpty)) {
                     return 'Please enter a username';
                   }
                   return null;
@@ -199,7 +201,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                 ),
                 obscureText: true,
                 validator: (value) {
-                  if (_requiresAuth && (value == null || value.isEmpty)) {
+                  if (_requiresAuth && (value == null || value.trim().isEmpty)) {
                     return 'Please enter a password';
                   }
                   return null;
@@ -359,10 +361,10 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
       // Create temporary account for testing
       final tempAccount = ExternalCaldavAccount(
         id: 'temp',
-        serverUrl: _serverUrlController.text,
-        username: _requiresAuth ? _usernameController.text : '',
-        password: _requiresAuth ? _passwordController.text : null,
-        displayName: _displayNameController.text,
+        serverUrl: _serverUrlController.text.trim(),
+        username: _requiresAuth ? _usernameController.text.trim() : '',
+        password: _requiresAuth ? _passwordController.text.trim() : null,
+        displayName: _displayNameController.text.trim(),
         authType: _requiresAuth ? _authType : ExternalCalendarAuthType.anonymous,
         createdAt: DateTime.now(),
       );
@@ -433,8 +435,8 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
       
       // Check if account already exists
       final existingAccountResult = await accountRepository.getByServerAndUsername(
-        _serverUrlController.text,
-        _usernameController.text,
+        _serverUrlController.text.trim(),
+        _usernameController.text.trim(),
       );
       
       await existingAccountResult.when(
@@ -451,10 +453,10 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
       // Create account
       final account = ExternalCaldavAccount(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        serverUrl: _serverUrlController.text,
-        username: _requiresAuth ? _usernameController.text : '',
-        password: _requiresAuth ? _passwordController.text : null,
-        displayName: _displayNameController.text,
+        serverUrl: _serverUrlController.text.trim(),
+        username: _requiresAuth ? _usernameController.text.trim() : '',
+        password: _requiresAuth ? _passwordController.text.trim() : null,
+        displayName: _displayNameController.text.trim(),
         authType: _requiresAuth ? _authType : ExternalCalendarAuthType.anonymous,
         createdAt: DateTime.now(),
       );
