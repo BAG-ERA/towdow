@@ -31,13 +31,15 @@ class CaldavAccountAdapter extends TypeAdapter<CaldavAccount> {
       firstName: fields[12] as String?,
       lastName: fields[13] as String?,
       email: fields[14] as String?,
+      clientId: fields[15] as String?,
+      issuerUrl: fields[16] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CaldavAccount obj) {
     writer
-      ..writeByte(14)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -65,7 +67,11 @@ class CaldavAccountAdapter extends TypeAdapter<CaldavAccount> {
       ..writeByte(13)
       ..write(obj.lastName)
       ..writeByte(14)
-      ..write(obj.email);
+      ..write(obj.email)
+      ..writeByte(15)
+      ..write(obj.clientId)
+      ..writeByte(16)
+      ..write(obj.issuerUrl);
   }
 
   @override
@@ -101,6 +107,8 @@ _$CaldavAccountImpl _$$CaldavAccountImplFromJson(Map<String, dynamic> json) =>
       firstName: json['firstName'] as String?,
       lastName: json['lastName'] as String?,
       email: json['email'] as String?,
+      clientId: json['clientId'] as String?,
+      issuerUrl: json['issuerUrl'] as String?,
     );
 
 Map<String, dynamic> _$$CaldavAccountImplToJson(_$CaldavAccountImpl instance) =>
@@ -119,4 +127,6 @@ Map<String, dynamic> _$$CaldavAccountImplToJson(_$CaldavAccountImpl instance) =>
       'firstName': instance.firstName,
       'lastName': instance.lastName,
       'email': instance.email,
+      'clientId': instance.clientId,
+      'issuerUrl': instance.issuerUrl,
     };

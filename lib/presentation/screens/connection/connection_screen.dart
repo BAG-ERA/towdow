@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'widgets/custom_caldav_dialog.dart';
+import 'widgets/flowit-cloud_dialog.dart';
 
 class ConnectionScreen extends ConsumerWidget {
   const ConnectionScreen({super.key});
@@ -42,8 +43,9 @@ class ConnectionScreen extends ConsumerWidget {
               subtitle: 'Official FlowIt hosting',
               icon: Icons.cloud_rounded,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('FlowIt Cloud coming soon!')),
+                showDialog(
+                  context: context,
+                  builder: (context) => const FlowitCloudDialog(isFlowItCloud: true,),
                 );
               },
             ),

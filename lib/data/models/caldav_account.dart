@@ -26,6 +26,8 @@ class CaldavAccount with _$CaldavAccount {
     @HiveField(12) String? firstName, // user's first name
     @HiveField(13) String? lastName, // user's last name
     @HiveField(14) String? email, // user's email address
+    @HiveField(15) String? clientId, // user's email address
+    @HiveField(16) String? issuerUrl, // user's email address
   }) = _CaldavAccount;
 
   factory CaldavAccount.fromJson(Map<String, dynamic> json) => _$CaldavAccountFromJson(json);

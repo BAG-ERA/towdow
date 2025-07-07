@@ -50,7 +50,13 @@ mixin _$CaldavAccount {
   String? get lastName =>
       throw _privateConstructorUsedError; // user's last name
   @HiveField(14)
-  String? get email => throw _privateConstructorUsedError;
+  String? get email =>
+      throw _privateConstructorUsedError; // user's email address
+  @HiveField(15)
+  String? get clientId =>
+      throw _privateConstructorUsedError; // user's email address
+  @HiveField(16)
+  String? get issuerUrl => throw _privateConstructorUsedError;
 
   /// Serializes this CaldavAccount to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -82,7 +88,9 @@ abstract class $CaldavAccountCopyWith<$Res> {
       @HiveField(11) bool isActive,
       @HiveField(12) String? firstName,
       @HiveField(13) String? lastName,
-      @HiveField(14) String? email});
+      @HiveField(14) String? email,
+      @HiveField(15) String? clientId,
+      @HiveField(16) String? issuerUrl});
 }
 
 /// @nodoc
@@ -114,6 +122,8 @@ class _$CaldavAccountCopyWithImpl<$Res, $Val extends CaldavAccount>
     Object? firstName = freezed,
     Object? lastName = freezed,
     Object? email = freezed,
+    Object? clientId = freezed,
+    Object? issuerUrl = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -172,6 +182,14 @@ class _$CaldavAccountCopyWithImpl<$Res, $Val extends CaldavAccount>
           ? _value.email
           : email // ignore: cast_nullable_to_non_nullable
               as String?,
+      clientId: freezed == clientId
+          ? _value.clientId
+          : clientId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      issuerUrl: freezed == issuerUrl
+          ? _value.issuerUrl
+          : issuerUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -198,7 +216,9 @@ abstract class _$$CaldavAccountImplCopyWith<$Res>
       @HiveField(11) bool isActive,
       @HiveField(12) String? firstName,
       @HiveField(13) String? lastName,
-      @HiveField(14) String? email});
+      @HiveField(14) String? email,
+      @HiveField(15) String? clientId,
+      @HiveField(16) String? issuerUrl});
 }
 
 /// @nodoc
@@ -228,6 +248,8 @@ class __$$CaldavAccountImplCopyWithImpl<$Res>
     Object? firstName = freezed,
     Object? lastName = freezed,
     Object? email = freezed,
+    Object? clientId = freezed,
+    Object? issuerUrl = freezed,
   }) {
     return _then(_$CaldavAccountImpl(
       id: null == id
@@ -286,6 +308,14 @@ class __$$CaldavAccountImplCopyWithImpl<$Res>
           ? _value.email
           : email // ignore: cast_nullable_to_non_nullable
               as String?,
+      clientId: freezed == clientId
+          ? _value.clientId
+          : clientId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      issuerUrl: freezed == issuerUrl
+          ? _value.issuerUrl
+          : issuerUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -307,7 +337,9 @@ class _$CaldavAccountImpl implements _CaldavAccount {
       @HiveField(11) this.isActive = true,
       @HiveField(12) this.firstName,
       @HiveField(13) this.lastName,
-      @HiveField(14) this.email});
+      @HiveField(14) this.email,
+      @HiveField(15) this.clientId,
+      @HiveField(16) this.issuerUrl});
 
   factory _$CaldavAccountImpl.fromJson(Map<String, dynamic> json) =>
       _$$CaldavAccountImplFromJson(json);
@@ -362,10 +394,18 @@ class _$CaldavAccountImpl implements _CaldavAccount {
   @override
   @HiveField(14)
   final String? email;
+// user's email address
+  @override
+  @HiveField(15)
+  final String? clientId;
+// user's email address
+  @override
+  @HiveField(16)
+  final String? issuerUrl;
 
   @override
   String toString() {
-    return 'CaldavAccount(id: $id, providerType: $providerType, serverUrl: $serverUrl, username: $username, password: $password, accessToken: $accessToken, refreshToken: $refreshToken, tokenExpiry: $tokenExpiry, createdAt: $createdAt, lastSyncAt: $lastSyncAt, isActive: $isActive, firstName: $firstName, lastName: $lastName, email: $email)';
+    return 'CaldavAccount(id: $id, providerType: $providerType, serverUrl: $serverUrl, username: $username, password: $password, accessToken: $accessToken, refreshToken: $refreshToken, tokenExpiry: $tokenExpiry, createdAt: $createdAt, lastSyncAt: $lastSyncAt, isActive: $isActive, firstName: $firstName, lastName: $lastName, email: $email, clientId: $clientId, issuerUrl: $issuerUrl)';
   }
 
   @override
@@ -398,7 +438,11 @@ class _$CaldavAccountImpl implements _CaldavAccount {
                 other.firstName == firstName) &&
             (identical(other.lastName, lastName) ||
                 other.lastName == lastName) &&
-            (identical(other.email, email) || other.email == email));
+            (identical(other.email, email) || other.email == email) &&
+            (identical(other.clientId, clientId) ||
+                other.clientId == clientId) &&
+            (identical(other.issuerUrl, issuerUrl) ||
+                other.issuerUrl == issuerUrl));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -418,7 +462,9 @@ class _$CaldavAccountImpl implements _CaldavAccount {
       isActive,
       firstName,
       lastName,
-      email);
+      email,
+      clientId,
+      issuerUrl);
 
   /// Create a copy of CaldavAccount
   /// with the given fields replaced by the non-null parameter values.
@@ -451,7 +497,9 @@ abstract class _CaldavAccount implements CaldavAccount {
       @HiveField(11) final bool isActive,
       @HiveField(12) final String? firstName,
       @HiveField(13) final String? lastName,
-      @HiveField(14) final String? email}) = _$CaldavAccountImpl;
+      @HiveField(14) final String? email,
+      @HiveField(15) final String? clientId,
+      @HiveField(16) final String? issuerUrl}) = _$CaldavAccountImpl;
 
   factory _CaldavAccount.fromJson(Map<String, dynamic> json) =
       _$CaldavAccountImpl.fromJson;
@@ -497,7 +545,13 @@ abstract class _CaldavAccount implements CaldavAccount {
   String? get lastName; // user's last name
   @override
   @HiveField(14)
-  String? get email;
+  String? get email; // user's email address
+  @override
+  @HiveField(15)
+  String? get clientId; // user's email address
+  @override
+  @HiveField(16)
+  String? get issuerUrl;
 
   /// Create a copy of CaldavAccount
   /// with the given fields replaced by the non-null parameter values.

@@ -64,6 +64,10 @@ dependencies:
   # Notifications
   flutter_local_notifications: ^19.2.1
 
+  # OAuth2 & Authentication
+  url_launcher: ^6.2.5
+  openid_client: ^0.4.9
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
