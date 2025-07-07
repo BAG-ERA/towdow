@@ -1,4 +1,4 @@
-﻿// WebDAV client for CalDAV operations
+// WebDAV client for CalDAV operations
 // Implements RFC 4791 (CalDAV) and RFC 3744 (WebDAV ACL) HTTP methods
 
 import 'dart:convert';
@@ -21,32 +21,16 @@ class WebDAVResponse {
   bool get isSuccess => statusCode >= 200 && statusCode < 300;
 }
 
-class WebDAVClient {
+abstract class WebDAVClient {
   final String serverUrl;
-  final String username;
-  final String password;
   final Duration timeout;
-
-  late final String _basicAuthHeader;
 
   WebDAVClient({
     required this.serverUrl,
-    required this.username,
-    required this.password,
     this.timeout = const Duration(seconds: 30),
-  }) {
-    // Create Basic Auth header
-    final credentials = base64Encode(utf8.encode('$username:$password'));
-    _basicAuthHeader = 'Basic $credentials';
-  }
+  });
 
-  /// Common headers for CalDAV requests
-  Map<String, String> get _commonHeaders => {
-    'Authorization': _basicAuthHeader,
-    'User-Agent': 'FlowIt/1.0 (CalDAV Client)',
-    'Accept': 'application/xml, text/xml',
-    'Content-Type': 'application/xml; charset=utf-8',
-  };
+  Future<Map<String, String>> getAuthHeaders();
 
   /// Build URI correctly handling absolute vs relative paths
   Uri _buildUri(String path) {
@@ -374,4 +358,40 @@ class WebDAVClient {
     <FLOWIT:template/>
   </D:prop>
 </D:propfind>''';
-} 
+}
+
+class WebDAVClientBasicAuth extends WebDAVClient {
+  final String username;
+  final String password;
+  late final String _basicAuthHeader;
+
+  WebDAVClientBasicAuth({
+    required super.serverUrl,
+    required this.username,
+    required this.password,
+    super.timeout,
+  }) {
+    final credentials = base64Encode(utf8.encode('$username:$password'));
+    _basicAuthHeader = 'Basic $credentials';
+  }
+
+  @override
+  Future<Map<String, String>> getAuthHeaders() async {
+    return {'Authorization': _basicAuthHeader};
+  }
+}
+
+class WebDAVClientKeycloak extends WebDAVClient {
+  final String accessToken;
+
+  WebDAVClientKeycloak({
+    required super.serverUrl,
+    required this.accessToken,
+    super.timeout,
+  });
+
+  @override
+  Future<Map<String, String>> getAuthHeaders() async {
+    return {'Authorization': 'Bearer $accessToken'};
+  }
+}
