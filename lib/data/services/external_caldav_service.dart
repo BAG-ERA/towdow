@@ -21,7 +21,7 @@ class ExternalCalDAVService {
   late final WebDAVClient _client;
 
   ExternalCalDAVService({required this.account}) {
-    _client = WebDAVClient(
+    _client = WebDAVClientBasicAuth(
       serverUrl: account.serverUrl,
       username: account.username,
       password: account.password ?? '',
