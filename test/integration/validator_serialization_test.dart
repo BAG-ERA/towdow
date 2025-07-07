@@ -2,9 +2,9 @@
 // Tests the complete flow of serializing and parsing tasks with long validator JSON
 
 import 'package:test/test.dart';
-import 'package:flowit_app/data/models/task.dart';
-import 'package:flowit_app/data/models/caldav_account.dart';
-import 'package:flowit_app/data/services/caldav_service.dart';
+import 'package:towdow_app/data/models/task.dart';
+import 'package:towdow_app/data/models/caldav_account.dart';
+import 'package:towdow_app/data/services/caldav_service.dart';
 
 void main() {
   group('Validator Serialization Integration Tests', () {

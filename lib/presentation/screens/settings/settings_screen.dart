@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
 import 'caldav_management_screen.dart';
 import 'connection_info_screen.dart';
+import 'external_calendar_management_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -41,6 +42,18 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: 'Manage CalDAV synchronization',
                 icon: Icons.sync_rounded,
                 onTap: () => _showSyncSettings(context, ref),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _SettingsSection(
+            title: 'Integration',
+            children: [
+              _SettingsItem(
+                title: 'External Calendars',
+                subtitle: 'Connect external CalDAV calendars',
+                icon: Icons.calendar_view_month_rounded,
+                onTap: () => _showExternalCalendars(context, ref),
               ),
             ],
           ),
@@ -170,6 +183,14 @@ class SettingsScreen extends ConsumerWidget {
             );
           }
           
+          // Invalidate all relevant providers to clear cached data
+          ref.invalidate(taskListProvider);
+          ref.invalidate(calendarListProvider);
+          ref.invalidate(externalCalendarListProvider);
+          ref.invalidate(externalEventListProvider);
+          ref.invalidate(enabledExternalCalendarListProvider);
+          ref.invalidate(enabledExternalEventListProvider);
+          
           // Restart the app
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
@@ -216,6 +237,15 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _showExternalCalendars(BuildContext context, WidgetRef ref) async {
+    // Navigate to external calendar management screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ExternalCalendarManagementScreen(),
+      ),
+    );
+  }
+
   Future<void> _clearAllData(BuildContext context, WidgetRef ref) async {
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
@@ -256,6 +286,14 @@ class SettingsScreen extends ConsumerWidget {
       if (context.mounted) {
         result.when(
           success: (_) {
+            // Invalidate all relevant providers to clear cached data
+            ref.invalidate(taskListProvider);
+            ref.invalidate(calendarListProvider);
+            ref.invalidate(externalCalendarListProvider);
+            ref.invalidate(externalEventListProvider);
+            ref.invalidate(enabledExternalCalendarListProvider);
+            ref.invalidate(enabledExternalEventListProvider);
+            
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('✅ All data cleared successfully!'),

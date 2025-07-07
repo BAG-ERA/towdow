@@ -18,6 +18,11 @@ class LocalStorageService {
   static const String domainsBoxName = 'domains'; // For storing domain names
   static const String statusesBoxName = 'statuses'; // For storing status names
   static const String userPreferencesBoxName = 'user_preferences'; // For storing user preferences
+  
+  // External calendar boxes
+  static const String externalAccountsBoxName = 'external_accounts'; // For storing external CalDAV accounts
+  static const String externalCalendarsBoxName = 'external_calendars'; // For storing external calendars
+  static const String externalEventsBoxName = 'external_events'; // For storing external calendar events
 
   // Box references
   late Box _tasksBox;
@@ -29,6 +34,11 @@ class LocalStorageService {
   late Box _domainsBox;
   late Box _statusesBox;
   late Box _userPreferencesBox;
+  
+  // External calendar box references
+  late Box _externalAccountsBox;
+  late Box _externalCalendarsBox;
+  late Box _externalEventsBox;
 
   // Initialize all Hive boxes
   Future<Result<void>> initialize() async {
@@ -49,6 +59,11 @@ class LocalStorageService {
       await _initializeBoxSafely(domainsBoxName, 'domains');
       await _initializeBoxSafely(statusesBoxName, 'statuses');
       await _initializeBoxSafely(userPreferencesBoxName, 'user_preferences');
+      
+      // Initialize external calendar boxes
+      await _initializeBoxSafely(externalAccountsBoxName, 'external_accounts');
+      await _initializeBoxSafely(externalCalendarsBoxName, 'external_calendars');
+      await _initializeBoxSafely(externalEventsBoxName, 'external_events');
 
       // Assign the boxes after successful initialization
       _tasksBox = Hive.box(tasksBoxName);
@@ -60,6 +75,11 @@ class LocalStorageService {
       _domainsBox = Hive.box(domainsBoxName);
       _statusesBox = Hive.box(statusesBoxName);
       _userPreferencesBox = Hive.box(userPreferencesBoxName);
+      
+      // Assign external calendar boxes
+      _externalAccountsBox = Hive.box(externalAccountsBoxName);
+      _externalCalendarsBox = Hive.box(externalCalendarsBoxName);
+      _externalEventsBox = Hive.box(externalEventsBoxName);
 
       // AppLogger.info('LocalStorageService: All boxes initialized successfully');
       return const Result.success(null);
@@ -284,6 +304,12 @@ class LocalStorageService {
       await clear(syncQueueBoxName);
       await clear(domainsBoxName);
       await clear(statusesBoxName);
+      await clear(userPreferencesBoxName);
+      
+      // Clear external calendar data
+      await clear(externalAccountsBoxName);
+      await clear(externalCalendarsBoxName);
+      await clear(externalEventsBoxName);
       
       // AppLogger.info('LocalStorageService: Successfully cleared ALL data');
       return const Result.success(null);
@@ -311,6 +337,10 @@ class LocalStorageService {
         syncQueueBoxName,
         domainsBoxName,
         statusesBoxName,
+        userPreferencesBoxName,
+        externalAccountsBoxName,
+        externalCalendarsBoxName,
+        externalEventsBoxName,
       ];
       
       // Close all boxes first
@@ -373,6 +403,12 @@ class LocalStorageService {
         return _statusesBox;
       case userPreferencesBoxName:
         return _userPreferencesBox;
+      case externalAccountsBoxName:
+        return _externalAccountsBox;
+      case externalCalendarsBoxName:
+        return _externalCalendarsBox;
+      case externalEventsBoxName:
+        return _externalEventsBox;
       default:
         throw ArgumentError('Unknown box name: $boxName');
     }
@@ -391,6 +427,9 @@ class LocalStorageService {
       _domainsBox.close(),
       _statusesBox.close(),
       _userPreferencesBox.close(),
+      _externalAccountsBox.close(),
+      _externalCalendarsBox.close(),
+      _externalEventsBox.close(),
     ]);
   }
 

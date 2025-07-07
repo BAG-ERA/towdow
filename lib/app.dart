@@ -15,6 +15,155 @@ import 'presentation/providers/home_providers.dart';
 import 'data/providers/providers.dart';
 import 'core/theme/chart_theme.dart';
 
+// ChangeNotifier wrapper for AsyncValue to make GoRouter reactive
+class AsyncValueNotifier<T> extends ChangeNotifier {
+  AsyncValueNotifier(this._asyncValue);
+  
+  AsyncValue<T> _asyncValue;
+  
+  AsyncValue<T> get asyncValue => _asyncValue;
+  
+  void update(AsyncValue<T> newValue) {
+    if (newValue != _asyncValue) {
+      _asyncValue = newValue;
+      notifyListeners();
+    }
+  }
+}
+
+// Provider for account status change notifier
+final accountStatusNotifierProvider = Provider<AsyncValueNotifier<bool>>((ref) {
+  final asyncValue = ref.watch(hasActiveAccountProvider);
+  final notifier = AsyncValueNotifier<bool>(asyncValue);
+  
+  ref.listen<AsyncValue<bool>>(hasActiveAccountProvider, (previous, next) {
+    notifier.update(next);
+  });
+  
+  return notifier;
+});
+
+// GoRouter provider that's reactive to account changes
+final routerProvider = Provider<GoRouter>((ref) {
+  final accountNotifier = ref.watch(accountStatusNotifierProvider);
+  
+  return GoRouter(
+    initialLocation: '/today',
+    refreshListenable: accountNotifier,
+    redirect: (context, state) {
+      // Redirect root path to today view
+      if (state.uri.path == '/') {
+        return '/today';
+      }
+      
+      // Skip account check if already on connection screen
+      if (state.uri.path == '/connect') {
+        return null;
+      }
+      
+      // Check account status from the notifier
+      return accountNotifier.asyncValue.when(
+        data: (hasAccount) {
+          if (!hasAccount) {
+            // No active account, redirect to connection screen
+            return '/connect';
+          }
+          return null;
+        },
+        loading: () {
+          // Still loading, allow route to proceed
+          return null;
+        },
+        error: (error, stackTrace) {
+          // Error checking account status, redirect to connection screen
+          return '/connect';
+        },
+      );
+    },
+    routes: [
+      // Main app shell with adaptive navigation
+      ShellRoute(
+        builder: (context, state, child) {
+          // Determine current destination from route
+          AppDestination? currentDestination;
+          final location = state.uri.path;
+          
+          if (location.startsWith('/settings')) {
+            currentDestination = null; // Settings handled by toolbar
+          } else if (location.startsWith('/archived')) {
+            currentDestination = null; // Archived projects have no main navigation active
+          } else if (location.startsWith('/project/')) {
+            currentDestination = null; // Project details have no main navigation active
+          } else if (location == '/today' || location == '/') {
+            currentDestination = AppDestination.today;
+          } else if (location == '/soon') {
+            currentDestination = AppDestination.soon;
+          } else if (location == '/anytime') {
+            currentDestination = AppDestination.anytime;
+          } else if (location == '/next-week' || location == '/later') {
+            // Next week and later tabs exist but are not shown in sidebar
+            currentDestination = null;
+          } else {
+            currentDestination = AppDestination.today; // Default to today
+          }
+
+          return AdaptiveAppLayout(
+            currentDestination: currentDestination,
+            child: child,
+          );
+        },
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const _AppShell(),
+          ),
+          GoRoute(
+            path: '/today',
+            builder: (context, state) => const _TaskViewShell(initialTab: 0),
+          ),
+          GoRoute(
+            path: '/soon',
+            builder: (context, state) => const _TaskViewShell(initialTab: 1),
+          ),
+          GoRoute(
+            path: '/next-week',
+            builder: (context, state) => const _TaskViewShell(initialTab: 2),
+          ),
+          GoRoute(
+            path: '/later',
+            builder: (context, state) => const _TaskViewShell(initialTab: 3),
+          ),
+          GoRoute(
+            path: '/anytime',
+            builder: (context, state) => const _TaskViewShell(initialTab: 4),
+          ),
+
+          GoRoute(
+            path: '/project/:uid',
+            builder: (context, state) => ProjectDetailScreen(
+              projectUid: state.pathParameters['uid']!,
+            ),
+          ),
+          GoRoute(
+            path: '/settings',
+            builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: '/archived',
+            builder: (context, state) => const ArchivedProjectsScreen(),
+          ),
+        ],
+      ),
+      
+      // Routes outside the main shell
+      GoRoute(
+        path: '/connect',
+        builder: (context, state) => const ConnectionScreen(),
+      ),
+    ],
+  );
+});
+
 class FlowItApp extends ConsumerWidget {
   const FlowItApp({super.key});
 
@@ -22,6 +171,9 @@ class FlowItApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Initialize AppLifecycleManager
     ref.watch(appLifecycleInitializationProvider);
+    
+    // Get the reactive router
+    final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
       title: 'FlowIt',
@@ -82,150 +234,20 @@ class FlowItApp extends ConsumerWidget {
         ],
       ),
       themeMode: ThemeMode.system,
-      routerConfig: _createRouter(),
-    );
-  }
-
-  GoRouter _createRouter() {
-    return GoRouter(
-      initialLocation: '/today',
-      redirect: (context, state) {
-        // Redirect root path to today view
-        if (state.uri.path == '/') {
-          return '/today';
-        }
-        return null;
-      },
-      routes: [
-        // Main app shell with adaptive navigation
-        ShellRoute(
-          builder: (context, state, child) {
-            // Determine current destination from route
-            AppDestination? currentDestination;
-            final location = state.uri.path;
-            
-            if (location.startsWith('/settings')) {
-              currentDestination = null; // Settings handled by toolbar
-            } else if (location.startsWith('/archived')) {
-              currentDestination = null; // Archived projects have no main navigation active
-            } else if (location.startsWith('/project/')) {
-              currentDestination = null; // Project details have no main navigation active
-            } else if (location == '/today' || location == '/') {
-              currentDestination = AppDestination.today;
-            } else if (location == '/soon') {
-              currentDestination = AppDestination.soon;
-            } else if (location == '/anytime') {
-              currentDestination = AppDestination.anytime;
-            } else if (location == '/next-week' || location == '/later') {
-              // Next week and later tabs exist but are not shown in sidebar
-              currentDestination = null;
-            } else {
-              currentDestination = AppDestination.today; // Default to today
-            }
-
-            return AdaptiveAppLayout(
-              currentDestination: currentDestination,
-              child: child,
-            );
-          },
-          routes: [
-            GoRoute(
-              path: '/',
-              builder: (context, state) => const _AppShell(),
-            ),
-            GoRoute(
-              path: '/today',
-              builder: (context, state) => const _TaskViewShell(initialTab: 0),
-            ),
-            GoRoute(
-              path: '/soon',
-              builder: (context, state) => const _TaskViewShell(initialTab: 1),
-            ),
-            GoRoute(
-              path: '/next-week',
-              builder: (context, state) => const _TaskViewShell(initialTab: 2),
-            ),
-            GoRoute(
-              path: '/later',
-              builder: (context, state) => const _TaskViewShell(initialTab: 3),
-            ),
-            GoRoute(
-              path: '/anytime',
-              builder: (context, state) => const _TaskViewShell(initialTab: 4),
-            ),
-
-            GoRoute(
-              path: '/project/:uid',
-              builder: (context, state) => ProjectDetailScreen(
-                projectUid: state.pathParameters['uid']!,
-              ),
-            ),
-            GoRoute(
-              path: '/settings',
-              builder: (context, state) => const SettingsScreen(),
-            ),
-            GoRoute(
-              path: '/archived',
-              builder: (context, state) => const ArchivedProjectsScreen(),
-            ),
-          ],
-        ),
-        
-        // Routes outside the main shell
-        GoRoute(
-          path: '/connect',
-          builder: (context, state) => const ConnectionScreen(),
-        ),
-      ],
+      routerConfig: router,
     );
   }
 }
 
-// App Shell to handle account status checking
+// App Shell - account checking now handled by router
 class _AppShell extends ConsumerWidget {
   const _AppShell();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasAccountAsync = ref.watch(hasActiveAccountProvider);
-
-    return hasAccountAsync.when(
-      loading: () => const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      ),
-      error: (error, stackTrace) => Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_rounded,
-                size: 64,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(height: 16),
-              Text('Error checking account status: $error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.refresh(hasActiveAccountProvider),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      ),
-      data: (hasAccount) {
-        if (hasAccount) {
-          // User has an active account, show main app
-          return const HomeScreen();
-        } else {
-          // No active account, show connection screen
-          return const ConnectionScreen();
-        }
-      },
-    );
+    // Account checking is now handled by router redirect
+    // This will only be called when user has an active account
+    return const HomeScreen();
   }
 }
 
@@ -237,47 +259,13 @@ class _TaskViewShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasAccountAsync = ref.watch(hasActiveAccountProvider);
-
-    return hasAccountAsync.when(
-      loading: () => const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      ),
-      error: (error, stackTrace) => Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_rounded,
-                size: 64,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(height: 16),
-              Text('Error checking account status: $error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.refresh(hasActiveAccountProvider),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      ),
-      data: (hasAccount) {
-        if (hasAccount) {
-          // Set the initial tab and show the home screen
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ref.read(selectedTabIndexProvider.notifier).state = initialTab;
-          });
-          return const HomeScreen();
-        } else {
-          // No active account, show connection screen
-          return const ConnectionScreen();
-        }
-      },
-    );
+    // Account checking is now handled by router redirect
+    // This will only be called when user has an active account
+    
+    // Set the initial tab and show the home screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(selectedTabIndexProvider.notifier).state = initialTab;
+    });
+    return const HomeScreen();
   }
 } 

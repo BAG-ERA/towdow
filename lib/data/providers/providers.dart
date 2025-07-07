@@ -11,10 +11,18 @@ import '../repositories/task_repository.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/user_repository.dart';
+import '../repositories/external_account_repository.dart';
+import '../repositories/external_calendar_repository.dart';
+import '../repositories/external_event_repository.dart';
 import '../models/task.dart';
 import '../models/task_calendar.dart';
 import '../models/caldav_account.dart';
+import '../models/external_caldav_account.dart';
+import '../models/external_calendar.dart';
+import '../models/calendar_event.dart';
 import '../services/caldav_service.dart';
+import '../services/external_caldav_service.dart';
+import '../services/external_sync_service.dart';
 import '../../core/app_lifecycle_manager.dart';
 
 import '../../presentation/viewmodels/task_viewmodel.dart';
@@ -52,9 +60,43 @@ final userRepositoryProvider = Provider<UserRepository>((ref) {
   return LocalUserRepository(storageService);
 });
 
+// External calendar repository providers
+final externalAccountRepositoryProvider = Provider<ExternalAccountRepository>((ref) {
+  final storageService = ref.watch(localStorageServiceProvider);
+  return LocalExternalAccountRepository(storageService);
+});
+
+final externalCalendarRepositoryProvider = Provider<ExternalCalendarRepository>((ref) {
+  final storageService = ref.watch(localStorageServiceProvider);
+  return LocalExternalCalendarRepository(storageService);
+});
+
+final externalEventRepositoryProvider = Provider<ExternalEventRepository>((ref) {
+  final storageService = ref.watch(localStorageServiceProvider);
+  return LocalExternalEventRepository(storageService);
+});
+
 // CalDAV service provider  
 final caldavServiceProvider = Provider.family<CalDAVService, CaldavAccount>((ref, account) {
   return CalDAVService(account: account);
+});
+
+// External CalDAV service provider
+final externalCalDAVServiceProvider = Provider.family<ExternalCalDAVService, ExternalCaldavAccount>((ref, account) {
+  return ExternalCalDAVService(account: account);
+});
+
+// External calendar sync service provider
+final externalCalendarSyncServiceProvider = Provider<ExternalCalendarSyncService>((ref) {
+  final accountRepository = ref.watch(externalAccountRepositoryProvider);
+  final calendarRepository = ref.watch(externalCalendarRepositoryProvider);
+  final eventRepository = ref.watch(externalEventRepositoryProvider);
+  
+  return ExternalCalendarSyncService(
+    accountRepository,
+    calendarRepository,
+    eventRepository,
+  );
 });
 
 // Background sync service provider
@@ -111,11 +153,13 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final lifecycleManager = ref.watch(appLifecycleManagerProvider);
   final syncService = ref.watch(syncServiceProvider);
   final backgroundSyncService = ref.watch(backgroundSyncServiceProvider);
+  final externalSyncService = ref.watch(externalCalendarSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
 
   final result = await lifecycleManager.initialize(
     syncService: syncService,
     backgroundSyncService: backgroundSyncService,
+    externalSyncService: externalSyncService,
     accountRepository: accountRepository,
   );
 
@@ -366,6 +410,55 @@ final serverCapabilitiesProvider = FutureProvider.family.autoDispose<CalDAVCapab
     success: (capabilities) => capabilities,
     failure: (failure) => throw Exception(failure.message),
   );
+});
+
+// External calendar data providers
+final externalCalendarListProvider = StreamProvider<List<ExternalCalendar>>((ref) {
+  final repository = ref.watch(externalCalendarRepositoryProvider);
+  return repository.watchCalendars();
+});
+
+final externalEventListProvider = StreamProvider<List<CalendarEvent>>((ref) {
+  final repository = ref.watch(externalEventRepositoryProvider);
+  return repository.watchEvents();
+});
+
+final enabledExternalCalendarListProvider = Provider<AsyncValue<List<ExternalCalendar>>>((ref) {
+  final calendarsAsync = ref.watch(externalCalendarListProvider);
+  return calendarsAsync.when(
+    loading: () => const AsyncValue.loading(),
+    error: (error, stack) => AsyncValue.error(error, stack),
+    data: (calendars) => AsyncValue.data(calendars.where((calendar) => calendar.isEnabled).toList()),
+  );
+});
+
+final enabledExternalEventListProvider = Provider<AsyncValue<List<CalendarEvent>>>((ref) {
+  final eventsAsync = ref.watch(externalEventListProvider);
+  final enabledCalendarsAsync = ref.watch(enabledExternalCalendarListProvider);
+  
+  // Handle loading states
+  if (eventsAsync.isLoading || enabledCalendarsAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+  
+  // Handle error states
+  if (eventsAsync.hasError) {
+    return AsyncValue.error(eventsAsync.error!, eventsAsync.stackTrace!);
+  }
+  if (enabledCalendarsAsync.hasError) {
+    return AsyncValue.error(enabledCalendarsAsync.error!, enabledCalendarsAsync.stackTrace!);
+  }
+  
+  // Handle data
+  if (eventsAsync.hasValue && enabledCalendarsAsync.hasValue) {
+    final events = eventsAsync.value!;
+    final enabledCalendars = enabledCalendarsAsync.value!;
+    final enabledCalendarUids = enabledCalendars.map((cal) => cal.uid).toSet();
+    final filteredEvents = events.where((event) => enabledCalendarUids.contains(event.sourceCalendarUid)).toList();
+    return AsyncValue.data(filteredEvents);
+  }
+  
+  return const AsyncValue.loading();
 });
 
 // DEBUG: Provider pour compter les tâches avec attendees

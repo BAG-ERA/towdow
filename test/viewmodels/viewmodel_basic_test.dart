@@ -2,17 +2,17 @@
 /// Vérifie que tous les ViewModels se compilent et fonctionnent correctement
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flowit_app/presentation/viewmodels/caldav_settings_viewmodel.dart';
-import 'package:flowit_app/presentation/viewmodels/navbar_sync_viewmodel.dart';
-import 'package:flowit_app/presentation/viewmodels/project_list_viewmodel.dart';
-import 'package:flowit_app/data/repositories/account_repository.dart';
-import 'package:flowit_app/data/repositories/calendar_repository.dart';
-import 'package:flowit_app/data/repositories/task_repository.dart';
-import 'package:flowit_app/data/services/sync_service.dart';
-import 'package:flowit_app/data/services/local_storage_service.dart';
-import 'package:flowit_app/data/models/task_calendar.dart';
-import 'package:flowit_app/data/models/caldav_account.dart';
-import 'package:flowit_app/core/result.dart';
+import 'package:towdow_app/presentation/viewmodels/caldav_settings_viewmodel.dart';
+import 'package:towdow_app/presentation/viewmodels/navbar_sync_viewmodel.dart';
+import 'package:towdow_app/presentation/viewmodels/project_list_viewmodel.dart';
+import 'package:towdow_app/data/repositories/account_repository.dart';
+import 'package:towdow_app/data/repositories/calendar_repository.dart';
+import 'package:towdow_app/data/repositories/task_repository.dart';
+import 'package:towdow_app/data/services/sync_service.dart';
+import 'package:towdow_app/data/services/local_storage_service.dart';
+import 'package:towdow_app/data/models/task_calendar.dart';
+import 'package:towdow_app/data/models/caldav_account.dart';
+import 'package:towdow_app/core/result.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 

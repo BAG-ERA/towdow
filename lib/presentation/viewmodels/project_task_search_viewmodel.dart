@@ -3,6 +3,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../core/logger.dart';
 import '../../data/models/task.dart';
 import '../screens/project_detail/project_detail_screen.dart';
 
@@ -24,7 +25,7 @@ class ProjectTaskSearchViewModel extends StateNotifier<ProjectTaskSearchState> {
   /// Set search query
   void setSearchQuery(String query) {
     final trimmedQuery = query.trim();
-    print('🔍 ProjectTaskSearchViewModel.setSearchQuery: "${trimmedQuery}" (was: "${state.searchQuery}")');
+    AppLogger.debug('ProjectTaskSearchViewModel.setSearchQuery: "${trimmedQuery}" (was: "${state.searchQuery}")');
     state = state.copyWith(
       searchQuery: trimmedQuery,
       isSearchActive: trimmedQuery.isNotEmpty,
@@ -41,10 +42,10 @@ class ProjectTaskSearchViewModel extends StateNotifier<ProjectTaskSearchState> {
 
   /// Filter tasks based on search query
   List<Task> filterTasks(List<Task> allTasks) {
-    print('🔍 ProjectTaskSearchViewModel.filterTasks: searchQuery="${state.searchQuery}", allTasks.length=${allTasks.length}');
+    AppLogger.debug('ProjectTaskSearchViewModel.filterTasks: searchQuery="${state.searchQuery}", allTasks.length=${allTasks.length}');
     
     if (state.searchQuery.isEmpty) {
-      print('🔍 Empty search query, returning all ${allTasks.length} tasks');
+      AppLogger.debug('Empty search query, returning all ${allTasks.length} tasks');
       return allTasks;
     }
 
@@ -59,13 +60,13 @@ class ProjectTaskSearchViewModel extends StateNotifier<ProjectTaskSearchState> {
       
       final matches = summaryMatch || descriptionMatch || categoriesMatch;
       if (matches) {
-        print('🔍 Task matches: "${task.summary}"');
+        AppLogger.debug('Task matches: "${task.summary}"');
       }
       
       return matches;
     }).toList();
     
-    print('🔍 Filtered ${filteredTasks.length} tasks from ${allTasks.length} total tasks');
+    AppLogger.debug('Filtered ${filteredTasks.length} tasks from ${allTasks.length} total tasks');
     return filteredTasks;
   }
 }
@@ -84,7 +85,7 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   final searchState = ref.watch(projectTaskSearchProvider(projectUid));
   final searchViewModel = ref.read(projectTaskSearchProvider(projectUid).notifier);
   
-  print('🔍 filteredProjectTasksProvider called for project $projectUid with ${allTasks.length} tasks, searchQuery="${searchState.searchQuery}"');
+  AppLogger.debug('filteredProjectTasksProvider called for project $projectUid with ${allTasks.length} tasks, searchQuery="${searchState.searchQuery}"');
   
   return searchViewModel.filterTasks(allTasks);
 }); 
