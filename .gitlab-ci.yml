@@ -103,7 +103,7 @@ build_windows:
   rules:
     - if: '$CI_COMMIT_TAG'
   script:
-    - echo "WINDOWS_JOB_ID=$CI_JOB_ID" > build.env
+    - echo "WINDOWS_JOB_ID=$env:CI_JOB_ID" > build.env
     # prevent fatal: detected dubious ownership in repository at 'C:/flutter'
     - git config --global --add safe.directory C:/flutter
     - flutter pub get
@@ -123,6 +123,8 @@ build_windows:
       - "build/windows/x64/runner/Release/towdow_app-$CI_COMMIT_TAG.zip"
       - "build/windows/x64/installer/Release/TowdowApp-x86_64-$CI_COMMIT_TAG-Installer.exe"
     expire_in: 1 week
+    reports:
+      dotenv: build.env
 
 prepare_release:
   stage: build
@@ -145,6 +147,8 @@ release:
     - job: build_appimage
       artifacts: true
     - job: build_android
+      artifacts: true
+    - job: build_windows
       artifacts: true
     - job: prepare_release
       artifacts: true
