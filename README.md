@@ -10,6 +10,7 @@ These images will be created / updated automatically when a change is pushed to 
 
 If you want to manually build the image you can do this:
 
+### Linux
 ```shell
 docker login registry.gitlab.com/towdow/towdow-flutter
 export FLUTTER_VERSION=3.32.5
@@ -22,3 +23,26 @@ docker build --build-arg FLUTTER_VERSION=${FLUTTER_VERSION} \
   -f CI_scripts/linux/Dockerfile .
 docker push registry.gitlab.com/towdow/towdow-flutter/flutter-build-env:${FLUTTER_VERSION}
 ```
+
+### Windows
+
+So far we are not using docker on Windows because we need Windows pro to use docker windows, but if one is available 
+we could do the same as for Linux and build a Windows docker to build with the CI.   
+
+```shell
+docker login registry.gitlab.com/towdow/towdow-flutter
+export FLUTTER_VERSION=3.32.5
+docker build --build-arg FLUTTER_VERSION=${FLUTTER_VERSION} \
+  -t registry.gitlab.com/towdow/towdow-flutter/flutter-windows-build-env:${FLUTTER_VERSION} \
+  -f CI_scripts/windows/Dockerfile .
+```
+
+The other option is to use shell runners on our PC. For this do the following:
+
+1. Configure flutter development environment https://docs.flutter.dev/get-started/install/windows/desktop
+    * Flutter **MUST** be installed in ```C:\flutter``` for the CI to work  
+2. install gitlab runner in ```C:\GitLab-Runner``` https://docs.gitlab.com/runner/install/windows/
+3. configure a new project runner  
+4. set shell executor to powershell in ```C:\GitLab-Runner\config.toml``` (https://docs.gitlab.com/runner/executors/shell/#selecting-your-shell)
+   
+
