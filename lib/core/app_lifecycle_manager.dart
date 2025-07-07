@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import '../data/services/sync_service.dart';
 import '../data/services/background_sync_service.dart';
+import '../data/services/external_sync_service.dart';
 import '../data/repositories/account_repository.dart';
 import 'logger.dart';
 import 'result.dart';
@@ -29,6 +30,7 @@ class AppLifecycleManager {
   // Services
   SyncService? _syncService;
   BackgroundSyncService? _backgroundSyncService;
+  ExternalCalendarSyncService? _externalSyncService;
   AccountRepository? _accountRepository;
 
   // State management
@@ -43,12 +45,13 @@ class AppLifecycleManager {
   FlowItAppState get state => _state;
   Stream<FlowItAppState> get stateStream => _stateController.stream;
   bool get isReady => _state == FlowItAppState.ready;
-  bool get hasServices => _syncService != null && _backgroundSyncService != null;
+  bool get hasServices => _syncService != null && _backgroundSyncService != null && _externalSyncService != null;
 
   /// Initialize the app lifecycle manager with required services
   Future<Result<void>> initialize({
     required SyncService syncService,
     required BackgroundSyncService backgroundSyncService,
+    required ExternalCalendarSyncService externalSyncService,
     required AccountRepository accountRepository,
   }) async {
     try {
@@ -58,25 +61,33 @@ class AppLifecycleManager {
       // Store service references
       _syncService = syncService;
       _backgroundSyncService = backgroundSyncService;
+      _externalSyncService = externalSyncService;
       _accountRepository = accountRepository;
 
       // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Services assigned, checking for active account');
 
-      // Check if we have an active account before starting services
+      // Always start external calendar sync service (independent of main account)
+      if (_externalSyncService != null) {
+        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting ExternalCalendarSyncService (always)');
+        _externalSyncService!.startBackgroundSync();
+        AppLogger.info('AppLifecycleManager: ExternalCalendarSyncService started successfully (independent)');
+      }
+
+      // Check if we have an active account before starting main FlowIt services
       final accountResult = await _accountRepository!.getActiveAccount();
       accountResult.when(
         success: (account) async {
           if (account != null) {
             // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Active account found: ${account.username}');
-            await _startServices();
+            await _startMainServices();
           } else {
-            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] No active account - services will start when account is configured');
+            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] No active account - main services will start when account is configured');
             _updateState(FlowItAppState.ready);
           }
         },
         failure: (failure) async {
           AppLogger.warning('AppLifecycleManager: Failed to check account status: ${failure.message}');
-          // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account check failed, starting without services');
+          // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account check failed, starting without main services');
           _updateState(FlowItAppState.ready);
         },
       );
@@ -98,10 +109,10 @@ class AppLifecycleManager {
     }
   }
 
-  /// Start sync services when account is available
-  Future<Result<void>> _startServices() async {
+  /// Start main FlowIt sync services (requires main account)
+  Future<Result<void>> _startMainServices() async {
     try {
-      // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting sync services');
+      // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting main sync services');
 
       // Initialize main sync service
       if (_syncService != null) {
@@ -134,30 +145,35 @@ class AppLifecycleManager {
       }
 
       _updateState(FlowItAppState.ready);
-      // AppLogger.info('AppLifecycleManager: All services started successfully');
+      // AppLogger.info('AppLifecycleManager: All main services started successfully');
       return const Result.success(null);
     } catch (e, stackTrace) {
-      AppLogger.error('AppLifecycleManager: Failed to start services', e, stackTrace);
-      // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Service startup failed: $e');
+      AppLogger.error('AppLifecycleManager: Failed to start main services', e, stackTrace);
+      // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Main service startup failed: $e');
       _updateState(FlowItAppState.error);
       return Result.failure(Failure(
-        message: 'Failed to start services: $e',
+        message: 'Failed to start main services: $e',
         exception: e is Exception ? e : Exception(e.toString()),
         stackTrace: stackTrace,
       ));
     }
   }
 
+  /// Start sync services when account is available (legacy method)
+  Future<Result<void>> _startServices() async {
+    return await _startMainServices();
+  }
+
   /// Called when account configuration changes
   Future<void> onAccountConfigured() async {
-    // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account configured, starting services');
+    // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account configured, starting main services');
     
     if (!hasServices) {
       AppLogger.warning('AppLifecycleManager: Cannot start services - services not initialized');
       return;
     }
 
-    await _startServices();
+    await _startMainServices();
   }
 
   /// Called when account is removed
@@ -181,6 +197,13 @@ class AppLifecycleManager {
       if (_syncService != null) {
         _syncService!.stopPeriodicSync();
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService periodic sync stopped');
+      }
+
+      // Stop external calendar sync
+      if (_externalSyncService != null) {
+        _externalSyncService!.stopBackgroundSync();
+        AppLogger.info('AppLifecycleManager: ExternalCalendarSyncService stopped');
+        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] ExternalCalendarSyncService stopped');
       }
 
       // AppLogger.info('AppLifecycleManager: All services stopped');
@@ -271,6 +294,19 @@ class AppLifecycleManager {
         _backgroundSyncService!.start();
       }
 
+      // Check external calendar sync (restart if timer is not active)
+      if (_externalSyncService != null) {
+        // For external sync, we need to check if the background timer is running
+        // Since we don't have direct access to _syncTimer, we'll periodically restart it
+        // This is safer than checking the sync flag which is only true during active sync
+        try {
+          _externalSyncService!.startBackgroundSync(); // This will cancel existing timer and restart
+          // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Ensured external calendar sync service is running');
+        } catch (e) {
+          AppLogger.warning('AppLifecycleManager: Failed to ensure external calendar sync is running: $e');
+        }
+      }
+
       // Check if we have an account and services should be running
       _accountRepository?.getActiveAccount().then((result) {
         result.when(
@@ -310,6 +346,7 @@ class AppLifecycleManager {
       'syncServiceStatus': _syncService?.status.name ?? 'not_initialized',
       'backgroundSyncRunning': _backgroundSyncService?.isRunning ?? false,
       'backgroundSyncing': _backgroundSyncService?.isSyncing ?? false,
+      'externalSyncRunning': _externalSyncService?.isSyncRunning ?? false,
       'lastSyncTime': _syncService?.lastSyncTime?.toIso8601String(),
     };
   }
@@ -322,9 +359,13 @@ class AppLifecycleManager {
     _lifecycleSubscription?.cancel();
     _stateController.close();
     
+    // Dispose services
+    _externalSyncService?.dispose();
+    
     // Services will be disposed by their providers
     _syncService = null;
     _backgroundSyncService = null;
+    _externalSyncService = null;
     _accountRepository = null;
     
     // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Resources disposed');

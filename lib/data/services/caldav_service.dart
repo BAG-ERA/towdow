@@ -907,9 +907,19 @@ class CalDAVService {
         .replaceAll(';', '\\;');
   }
   
-  /// Helper method to unescape calendar text
+  /// Helper method to unescape calendar text and decode HTML entities
   String _unescapeCalendarText(String text) {
     return text
+        // First handle HTML entities (common in CalDAV responses)
+        .replaceAll('&#13;', '') // Remove carriage return entities
+        .replaceAll('&#10;', '\n') // Line feed entity to newline
+        .replaceAll('&#9;', '\t') // Tab entity
+        .replaceAll('&lt;', '<') // Less than entity
+        .replaceAll('&gt;', '>') // Greater than entity
+        .replaceAll('&amp;', '&') // Ampersand entity (must be last)
+        .replaceAll('&quot;', '"') // Quote entity
+        .replaceAll('&apos;', "'") // Apostrophe entity
+        // Then handle standard iCalendar escaping (RFC 5545)
         .replaceAll('\\n', '\n')
         .replaceAll('\\r', '\r')
         .replaceAll('\\,', ',')

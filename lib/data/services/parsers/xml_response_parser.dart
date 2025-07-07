@@ -248,6 +248,110 @@ class XMLResponseParser {
     };
   }
 
+  /// Parse multi-status response to extract calendar properties
+  static List<Map<String, dynamic>> parseMultiStatusResponse(String xmlResponse) {
+    final responses = <Map<String, dynamic>>[];
+    
+    try {
+      AppLogger.debug('XMLResponseParser: Parsing multi-status response');
+      
+      // Extract individual response elements using regex
+      final responsePattern = RegExp(r'<(?:d:)?response[^>]*>(.*?)</(?:d:)?response>', dotAll: true, caseSensitive: false);
+      final responseMatches = responsePattern.allMatches(xmlResponse);
+      
+      for (final responseMatch in responseMatches) {
+        final responseContent = responseMatch.group(1)!;
+        
+        // Check if this response has status 200 OK
+        final statusPattern = RegExp(r'<(?:d:)?status[^>]*>.*?200\s+OK.*?</(?:d:)?status>', caseSensitive: false);
+        if (!statusPattern.hasMatch(responseContent)) {
+          continue; // Skip non-200 responses
+        }
+        
+        final responseData = <String, dynamic>{};
+        
+        // Extract href
+        final hrefPattern = RegExp(r'<(?:d:)?href[^>]*>(.*?)</(?:d:)?href>', caseSensitive: false);
+        final hrefMatch = hrefPattern.firstMatch(responseContent);
+        if (hrefMatch != null) {
+          responseData['href'] = hrefMatch.group(1)!.trim();
+        }
+        
+        // Extract display name
+        final displayNamePattern = RegExp(r'<(?:d:)?displayname[^>]*>(.*?)</(?:d:)?displayname>', dotAll: true, caseSensitive: false);
+        final displayNameMatch = displayNamePattern.firstMatch(responseContent);
+        if (displayNameMatch != null) {
+          responseData['displayname'] = displayNameMatch.group(1)!.trim();
+        }
+        
+        // Extract resource type
+        final resourceTypePattern = RegExp(r'<(?:d:)?resourcetype[^>]*>(.*?)</(?:d:)?resourcetype>', dotAll: true, caseSensitive: false);
+        final resourceTypeMatch = resourceTypePattern.firstMatch(responseContent);
+        if (resourceTypeMatch != null) {
+          responseData['resourcetype'] = resourceTypeMatch.group(1)!.trim();
+        }
+        
+        // Extract calendar description
+        final descriptionPattern = RegExp(r'<(?:C:)?calendar-description[^>]*>(.*?)</(?:C:)?calendar-description>', dotAll: true, caseSensitive: false);
+        final descriptionMatch = descriptionPattern.firstMatch(responseContent);
+        if (descriptionMatch != null) {
+          responseData['calendar-description'] = descriptionMatch.group(1)!.trim();
+        }
+        
+        // Extract calendar color
+        final colorPattern = RegExp(r'<(?:ICAL:)?calendar-color[^>]*>(.*?)</(?:ICAL:)?calendar-color>', dotAll: true, caseSensitive: false);
+        final colorMatch = colorPattern.firstMatch(responseContent);
+        if (colorMatch != null) {
+          responseData['calendar-color'] = colorMatch.group(1)!.trim();
+        }
+        
+        // Extract etag
+        final etagPattern = RegExp(r'<(?:d:)?getetag[^>]*>(.*?)</(?:d:)?getetag>', dotAll: true, caseSensitive: false);
+        final etagMatch = etagPattern.firstMatch(responseContent);
+        if (etagMatch != null) {
+          responseData['getetag'] = etagMatch.group(1)!.trim();
+        }
+        
+        // Extract ctag
+        final ctagPattern = RegExp(r'<(?:CS:)?getctag[^>]*>(.*?)</(?:CS:)?getctag>', dotAll: true, caseSensitive: false);
+        final ctagMatch = ctagPattern.firstMatch(responseContent);
+        if (ctagMatch != null) {
+          responseData['getctag'] = ctagMatch.group(1)!.trim();
+        }
+        
+        // Extract supported calendar component set
+        final componentSetPattern = RegExp(r'<(?:[a-zA-Z0-9]+:)?supported-calendar-component-set[^>]*>(.*?)</(?:[a-zA-Z0-9]+:)?supported-calendar-component-set>', dotAll: true, caseSensitive: false);
+        final componentSetMatch = componentSetPattern.firstMatch(responseContent);
+        if (componentSetMatch != null) {
+          final componentSetContent = componentSetMatch.group(1)!.trim();
+          
+          // Parse individual comp elements to extract component names
+          final compNames = <String>[];
+          final compPattern = RegExp(r'<(?:[a-zA-Z0-9]+:)?comp\s+name=["\x27]([^"\x27]+)["\x27]', caseSensitive: false);
+          final compMatches = compPattern.allMatches(componentSetContent);
+          
+          for (final compMatch in compMatches) {
+            final compName = compMatch.group(1);
+            if (compName != null) {
+              compNames.add(compName);
+            }
+          }
+          
+          // Store the parsed component names as a comma-separated string for backward compatibility
+          responseData['supported-calendar-component-set'] = compNames.join(',');
+        }
+        
+        responses.add(responseData);
+      }
+      
+    } catch (e) {
+      AppLogger.error('XMLResponseParser: Failed to parse multi-status response', e, StackTrace.current);
+    }
+    
+    AppLogger.debug('XMLResponseParser: Parsed ${responses.length} responses from multi-status');
+    return responses;
+  }
+
   /// Extract FlowIt property using known namespace prefixes
   /// This version takes the prefixes as a parameter to avoid re-parsing namespaces for each property
   static String? _extractFlowItPropertyWithPrefixes(String xmlContent, String propertyName, List<String> knownPrefixes) {

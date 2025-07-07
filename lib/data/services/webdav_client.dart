@@ -301,6 +301,7 @@ abstract class WebDAVClient {
       final uri = _buildUri(path);
       final request = http.Request('REPORT', uri)
         ..headers.addAll(await _commonHeaders)
+        ..headers['Depth'] = '1'  // CalDAV requires Depth: 1 for calendar-query
         ..body = body;
 
       final streamedResponse = await request.send().timeout(timeout);

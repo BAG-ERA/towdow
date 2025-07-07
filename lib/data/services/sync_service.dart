@@ -238,11 +238,10 @@ class SyncService {
         errors.add('No calendars selected for synchronization. Please go to Settings > CalDAV Connection to select calendars.');
         failedItems++;
       } else {
-        // 🎯 NOUVELLE LOGIQUE SIMPLIFIÉE (10 secondes)
-        AppLogger.debug('🔄 SyncService: Starting sync for ${selectedCalendars.length} calendars');
+        //AppLogger.debug('🔄 SyncService: Starting sync for ${selectedCalendars.length} calendars');
         
         for (final calendar in selectedCalendars) {
-          AppLogger.debug('🔄 SyncService: Processing calendar ${calendar.path}');
+          //AppLogger.debug('🔄 SyncService: Processing calendar ${calendar.path}');
           
           // Étape 1: Obtenir le sync-token actuel du serveur
           final serverSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
@@ -251,11 +250,11 @@ class SyncService {
             success: (serverSyncToken) async {
               final localSyncToken = calendar.syncToken;
               
-              AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: $localSyncToken, Server: $serverSyncToken');
+              //AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: $localSyncToken, Server: $serverSyncToken');
               
-              // TEST 1: sync-tokens différents → synchroniser depuis serveur
+              
               if (localSyncToken != serverSyncToken) {
-                AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing from server');
+                //AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing from server');
                 await _syncFromServer(caldavService, calendar, serverSyncToken, errors);
                 syncedItems++;
               }
@@ -263,7 +262,7 @@ class SyncService {
               // TEST 2: queue non vide → pousser modifications vers serveur
               final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.uid);
               if (hasQueuedOperations) {
-                AppLogger.debug('🔄 SyncService: Queue has operations - pushing to server');
+                //AppLogger.debug('🔄 SyncService: Queue has operations - pushing to server');
                 await _processSyncQueueForCalendar(caldavService, calendar.uid, errors);
                 
                 // Récupérer le nouveau sync-token après push
@@ -271,7 +270,7 @@ class SyncService {
                 await newServerSyncTokenResult.when(
                   success: (newServerSyncToken) async {
                     if (newServerSyncToken != serverSyncToken) {
-                      AppLogger.debug('🔄 SyncService: Server sync-token updated after push: $newServerSyncToken');
+                      //AppLogger.debug('🔄 SyncService: Server sync-token updated after push: $newServerSyncToken');
                       // Mettre à jour le calendrier avec le nouveau token
                       final updatedCalendar = calendar.copyWith(
                         syncToken: newServerSyncToken,
@@ -289,7 +288,7 @@ class SyncService {
               
               // Si aucun des deux tests n'est vrai, rien à faire
               if (localSyncToken == serverSyncToken && !hasQueuedOperations) {
-                AppLogger.debug('🔄 SyncService: No changes needed for ${calendar.path}');
+                //AppLogger.debug('🔄 SyncService: No changes needed for ${calendar.path}');
               }
             },
             failure: (failure) async {
@@ -297,7 +296,7 @@ class SyncService {
               // Fallback: traiter la queue si elle existe
               final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.uid);
               if (hasQueuedOperations) {
-                AppLogger.debug('🔄 SyncService: Fallback - processing queue without sync token verification');
+                //AppLogger.debug('🔄 SyncService: Fallback - processing queue without sync token verification');
                 await _processSyncQueueForCalendar(caldavService, calendar.uid, errors);
               }
               errors.add('Could not verify sync state for ${calendar.path}: ${failure.message}');
@@ -365,7 +364,7 @@ class SyncService {
                   final result = await caldavService.createTask(task, calendarPath: calendar.path);
                   await result.when(
                     success: (_) async {
-                      AppLogger.debug('SyncService: Created task ${task.uid} on server in calendar ${calendar.path}');
+                      //AppLogger.debug('SyncService: Created task ${task.uid} on server in calendar ${calendar.path}');
                     },
                     failure: (failure) async {
                       throw Exception('Failed to create task: ${failure.message}');
@@ -551,7 +550,7 @@ class SyncService {
       final queueResult = await _localStorage.getAll<Map<String, dynamic>>(syncQueueBoxName);
       return await queueResult.when(
         success: (queueData) async {
-          AppLogger.debug('🔄 SyncService: Total queue items: ${queueData.length}');
+          //AppLogger.debug('🔄 SyncService: Total queue items: ${queueData.length}');
           
           final queueItems = queueData
               .map((data) => _mapToSyncQueueItem(data))
@@ -559,18 +558,18 @@ class SyncService {
               .cast<SyncQueueItem>()
               .toList();
           
-          AppLogger.debug('🔄 SyncService: Valid queue items: ${queueItems.length}');
+          //AppLogger.debug('🔄 SyncService: Valid queue items: ${queueItems.length}');
           
           // Check if any queue item is for this calendar
           final calendarItems = queueItems.where((item) => 
             item.data['calendarUid'] == calendarUid
           ).toList();
           
-          AppLogger.debug('🔄 SyncService: Queue items for calendar $calendarUid: ${calendarItems.length}');
+          //AppLogger.debug('🔄 SyncService: Queue items for calendar $calendarUid: ${calendarItems.length}');
           
           if (calendarItems.isNotEmpty) {
             for (final item in calendarItems) {
-              AppLogger.debug('🔄 SyncService: Queue item: ${item.operation.name} for ${item.itemId}');
+              //AppLogger.debug('🔄 SyncService: Queue item: ${item.operation.name} for ${item.itemId}');
             }
           }
           
@@ -634,7 +633,7 @@ class SyncService {
   /// Sync changes from server using sync-collection REPORT
   Future<void> _syncFromServer(CalDAVService caldavService, TaskCalendar calendar, String newSyncToken, List<String> errors) async {
     try {
-      AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
+      //AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
       
       // Use BackgroundSyncService logic for incremental sync
       final webdavClient = WebDAVClient.fromAccount(caldavService.account);
@@ -648,7 +647,7 @@ class SyncService {
               final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
               await _taskRepository.save(taskWithCalendar);
             }
-            AppLogger.debug('🔄 SyncService: Full sync completed - ${remoteTasks.length} tasks from ${calendar.path}');
+            //AppLogger.debug('🔄 SyncService: Full sync completed - ${remoteTasks.length} tasks from ${calendar.path}');
           },
           failure: (failure) async {
             errors.add('Failed to fetch tasks from ${calendar.path}: ${failure.message}');
@@ -660,7 +659,7 @@ class SyncService {
         await changesResult.when(
           success: (result) async {
             final changes = result['changes'] as List<dynamic>;
-            AppLogger.debug('🔄 SyncService: Processing ${changes.length} changes from server');
+            //AppLogger.debug('🔄 SyncService: Processing ${changes.length} changes from server');
             
             // Process each change
             for (final change in changes) {
@@ -671,14 +670,14 @@ class SyncService {
               if (changeType == 'deleted') {
                 // Delete task from local storage
                 await _deleteTaskByHref(href, calendar.uid);
-                AppLogger.debug('🔄 SyncService: Deleted task $href');
+                //AppLogger.debug('🔄 SyncService: Deleted task $href');
               } else if (changeType == 'updated') {
                 // Create or update task in local storage
                 final taskData = changeMap['task'] as Map<String, dynamic>;
                 final task = Task.fromJson(taskData);
                 final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
                 await _taskRepository.save(taskWithCalendar);
-                AppLogger.debug('🔄 SyncService: Updated task ${task.uid}');
+                //AppLogger.debug('🔄 SyncService: Updated task ${task.uid}');
               }
             }
           },
@@ -704,7 +703,7 @@ class SyncService {
   /// Process sync queue operations for a specific calendar
   Future<void> _processSyncQueueForCalendar(CalDAVService caldavService, String calendarUid, List<String> errors) async {
     try {
-      AppLogger.debug('🔄 SyncService: Processing queue for calendar $calendarUid');
+      //AppLogger.debug('🔄 SyncService: Processing queue for calendar $calendarUid');
       
       final queueResult = await _localStorage.getAll<Map<String, dynamic>>(syncQueueBoxName);
       await queueResult.when(
@@ -716,7 +715,7 @@ class SyncService {
               .where((item) => item.data['calendarUid'] == calendarUid)
               .toList();
 
-          AppLogger.debug('🔄 SyncService: Found ${queueItems.length} queued operations for calendar $calendarUid');
+          //AppLogger.debug('🔄 SyncService: Found ${queueItems.length} queued operations for calendar $calendarUid');
 
           for (final item in queueItems) {
             try {
@@ -752,7 +751,7 @@ class SyncService {
   /// Get sync changes using REPORT sync-collection (RFC 6578)
   Future<Result<Map<String, dynamic>>> _getSyncChanges(WebDAVClient webdavClient, String calendarPath, String syncToken) async {
     try {
-      AppLogger.debug('🔄 SyncService: Making sync-collection request for $calendarPath with token: $syncToken');
+      //AppLogger.debug('🔄 SyncService: Making sync-collection request for $calendarPath with token: $syncToken');
       
       final reportBody = '''<?xml version="1.0" encoding="utf-8" ?>
 <D:sync-collection xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -764,17 +763,17 @@ class SyncService {
   </D:prop>
 </D:sync-collection>''';
 
-      AppLogger.debug('🔄 SyncService: Request body: $reportBody');
+      //AppLogger.debug('🔄 SyncService: Request body: $reportBody');
 
       final result = await webdavClient.report(calendarPath, reportBody);
       return await result.when(
         success: (response) async {
-          AppLogger.debug('🔄 SyncService: REPORT sync-collection response: ${response.statusCode}');
-          AppLogger.debug('🔄 SyncService: Response body: ${response.body}');
+          //AppLogger.debug('🔄 SyncService: REPORT sync-collection response: ${response.statusCode}');
+          //AppLogger.debug('🔄 SyncService: Response body: ${response.body}');
           
           if (response.statusCode == 207) {
             final parsedResult = _parseSyncCollectionResponse(response.body);
-            AppLogger.debug('🔄 SyncService: Parsed result: $parsedResult');
+            //AppLogger.debug('🔄 SyncService: Parsed result: $parsedResult');
             return Result.success(parsedResult);
           } else {
             AppLogger.error('🔄 SyncService: REPORT sync-collection failed with status ${response.statusCode}: ${response.body}');
@@ -805,23 +804,23 @@ class SyncService {
     String? newSyncToken;
 
     try {
-      AppLogger.debug('🔄 SyncService: Parsing sync-collection response...');
+      //AppLogger.debug('🔄 SyncService: Parsing sync-collection response...');
       final document = XmlDocument.parse(xmlResponse);
       
       // Extract new sync token
       final syncTokenElement = document.findAllElements('sync-token').firstOrNull;
       newSyncToken = syncTokenElement?.innerText;
-      AppLogger.debug('🔄 SyncService: Found new sync token: $newSyncToken');
+      //AppLogger.debug('🔄 SyncService: Found new sync token: $newSyncToken');
       
       // Extract responses
       final responseElements = document.findAllElements('response').toList();
-      AppLogger.debug('🔄 SyncService: Found ${responseElements.length} response elements');
+      //AppLogger.debug('🔄 SyncService: Found ${responseElements.length} response elements');
       
       for (final responseElement in responseElements) {
         final href = responseElement.findElements('href').firstOrNull?.innerText;
-        AppLogger.debug('🔄 SyncService: Processing href: $href');
+        //AppLogger.debug('🔄 SyncService: Processing href: $href');
         if (href == null) {
-          AppLogger.warning('🔄 SyncService: Skipping response element without href');
+          //AppLogger.warning('🔄 SyncService: Skipping response element without href');
           continue;
         }
         
@@ -839,7 +838,7 @@ class SyncService {
                 'href': href,
                 'type': 'deleted',
               });
-              AppLogger.debug('🔄 SyncService: Added deleted change for $href');
+              //AppLogger.debug('🔄 SyncService: Added deleted change for $href');
             } else {
               AppLogger.warning('🔄 SyncService: Unhandled direct status for $href: $directStatus');
             }
@@ -851,7 +850,7 @@ class SyncService {
         
         final statusElement = propstatElement.findElements('status').firstOrNull;
         final status = statusElement?.innerText ?? '';
-        AppLogger.debug('🔄 SyncService: Status for $href: $status');
+        //AppLogger.debug('🔄 SyncService: Status for $href: $status');
         
         if (status.contains('404')) {
           // Resource was deleted
@@ -859,30 +858,30 @@ class SyncService {
             'href': href,
             'type': 'deleted',
           });
-          AppLogger.debug('🔄 SyncService: Added deleted change for $href');
+          //AppLogger.debug('🔄 SyncService: Added deleted change for $href');
         } else if (status.contains('200')) {
           // Resource was created or updated
           final propElement = propstatElement.findElements('prop').firstOrNull;
           if (propElement != null) {
-            AppLogger.debug('🔄 SyncService: Prop element children: ${propElement.children.whereType<XmlElement>().map((c) => c.name.local).toList()}');
-            AppLogger.debug('🔄 SyncService: All descendants: ${propElement.descendants.whereType<XmlElement>().map((d) => d.name.local).toList()}');
+            //AppLogger.debug('🔄 SyncService: Prop element children: ${propElement.children.whereType<XmlElement>().map((c) => c.name.local).toList()}');
+            //AppLogger.debug('🔄 SyncService: All descendants: ${propElement.descendants.whereType<XmlElement>().map((d) => d.name.local).toList()}');
             
             final etag = propElement.findElements('getetag').firstOrNull?.innerText;
             final calendarDataElement = propElement.findAllElements('calendar-data').firstOrNull;
             
-            AppLogger.debug('🔄 SyncService: Found etag: $etag, calendar-data present: ${calendarDataElement != null}');
+            //AppLogger.debug('🔄 SyncService: Found etag: $etag, calendar-data present: ${calendarDataElement != null}');
             
             if (calendarDataElement == null) {
               // Try alternative approaches to find calendar-data
               final allElements = propElement.descendants.whereType<XmlElement>().toList();
-              AppLogger.debug('🔄 SyncService: Looking for calendar-data in ${allElements.length} descendants');
+              //AppLogger.debug('🔄 SyncService: Looking for calendar-data in ${allElements.length} descendants');
               for (final element in allElements) {
-                AppLogger.debug('🔄 SyncService: Element: ${element.name.local} (qualified: ${element.name.qualified})');
+                //AppLogger.debug('🔄 SyncService: Element: ${element.name.local} (qualified: ${element.name.qualified})');
                 if (element.name.local == 'calendar-data') {
-                  AppLogger.debug('🔄 SyncService: Found calendar-data by local name!');
+                  //AppLogger.debug('🔄 SyncService: Found calendar-data by local name!');
                   final vtodoContent = element.innerText;
-                  AppLogger.debug('🔄 SyncService: VTODO content length: ${vtodoContent.length}');
-                  AppLogger.debug('🔄 SyncService: VTODO content: $vtodoContent');
+                  //AppLogger.debug('🔄 SyncService: VTODO content length: ${vtodoContent.length}');
+                  //AppLogger.debug('🔄 SyncService: VTODO content: $vtodoContent');
                   
                   final task = _parseVTODOFromCalendarData(vtodoContent);
                   
@@ -902,8 +901,8 @@ class SyncService {
               }
             } else {
               final vtodoContent = calendarDataElement.innerText;
-              AppLogger.debug('🔄 SyncService: VTODO content length: ${vtodoContent.length}');
-              AppLogger.debug('🔄 SyncService: VTODO content: $vtodoContent');
+              //AppLogger.debug('🔄 SyncService: VTODO content length: ${vtodoContent.length}');
+              //AppLogger.debug('🔄 SyncService: VTODO content: $vtodoContent');
               
               final task = _parseVTODOFromCalendarData(vtodoContent);
               
@@ -914,7 +913,7 @@ class SyncService {
                   'type': 'updated',
                   'task': task.toJson(),
                 });
-                AppLogger.debug('🔄 SyncService: Added updated change for task ${task.uid}');
+                //AppLogger.debug('🔄 SyncService: Added updated change for task ${task.uid}');
               } else {
                 AppLogger.warning('🔄 SyncService: Failed to parse VTODO for $href');
               }
@@ -927,7 +926,7 @@ class SyncService {
         }
       }
       
-      AppLogger.debug('🔄 SyncService: Parsing complete. Changes: ${changes.length}, New sync token: $newSyncToken');
+      //AppLogger.debug('🔄 SyncService: Parsing complete. Changes: ${changes.length}, New sync token: $newSyncToken');
     } catch (e) {
       AppLogger.error('🔄 SyncService: Failed to parse sync-collection response', e, StackTrace.current);
     }
@@ -1018,7 +1017,7 @@ class SyncService {
         success: (task) async {
           if (task != null && task.sourceCalendarUid == calendarUid) {
             await _taskRepository.delete(uid);
-            AppLogger.debug('🔄 SyncService: Deleted local task $uid');
+            //AppLogger.debug('🔄 SyncService: Deleted local task $uid');
           }
         },
         failure: (failure) async {

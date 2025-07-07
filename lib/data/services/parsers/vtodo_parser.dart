@@ -256,9 +256,19 @@ class VTODOParser {
         .replaceAll('\n', '\\n');
   }
 
-  /// Unescape calendar text according to RFC 5545
+  /// Unescape calendar text according to RFC 5545 and decode HTML entities
   static String _unescapeCalendarText(String text) {
     return text
+        // First handle HTML entities (common in CalDAV responses)
+        .replaceAll('&#13;', '') // Remove carriage return entities
+        .replaceAll('&#10;', '\n') // Line feed entity to newline
+        .replaceAll('&#9;', '\t') // Tab entity
+        .replaceAll('&lt;', '<') // Less than entity
+        .replaceAll('&gt;', '>') // Greater than entity
+        .replaceAll('&amp;', '&') // Ampersand entity (must be last)
+        .replaceAll('&quot;', '"') // Quote entity
+        .replaceAll('&apos;', "'") // Apostrophe entity
+        // Then handle standard iCalendar escaping (RFC 5545)
         .replaceAll('\\n', '\n')
         .replaceAll('\\;', ';')
         .replaceAll('\\,', ',')
