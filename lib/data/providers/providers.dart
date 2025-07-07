@@ -16,6 +16,7 @@ import '../models/task_calendar.dart';
 import '../models/caldav_account.dart';
 import '../services/caldav_service.dart';
 import '../../core/app_lifecycle_manager.dart';
+import 'package:flutter/material.dart';
 
 import '../../presentation/viewmodels/task_viewmodel.dart';
 import '../../presentation/viewmodels/caldav_settings_viewmodel.dart';
@@ -57,16 +58,32 @@ final caldavServiceProvider = Provider.family<CalDAVService, CaldavAccount>((ref
   return CalDAVService(account: account);
 });
 
+// Global navigator key for session expiry navigation
+final GlobalKey<NavigatorState> globalNavigatorKey = GlobalKey<NavigatorState>();
+BuildContext? get globalContext => globalNavigatorKey.currentContext;
+
 // Background sync service provider
+/// Handles session expiry by navigating to /connect and showing a SnackBar.
 final backgroundSyncServiceProvider = Provider<BackgroundSyncService>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final calendarRepository = ref.watch(calendarRepositoryProvider);
-  
   return BackgroundSyncService(
     taskRepository: taskRepository,
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
+    onSessionExpired: (account) {
+      final context = globalContext;
+      if (context != null && context.mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/connect', (route) => false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Your session has expired. Please log in again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    },
   );
 });
 

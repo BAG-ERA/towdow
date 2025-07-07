@@ -10,10 +10,11 @@ import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import 'package:openid_client/openid_client_io.dart';
+import '../../../../data/services/webdav_client.dart';
 
 const String TOWDOW_ISSUER_URL = "https://auth.towdow.app/realms/towdow";
 const String CLIENT_ID = "radicale-api";
-const String CLIENT_SECRET = "J8cxks5GVinlCFB0x3E39WMOpjnXZjJK";
+
 
 class FlowitCloudDialog extends ConsumerStatefulWidget {
 

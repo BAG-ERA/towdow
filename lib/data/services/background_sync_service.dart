@@ -20,6 +20,9 @@ class BackgroundSyncService {
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
 
+  /// Optional callback to notify UI when session expires (e.g., to show connection screen and SnackBar)
+  final void Function(CaldavAccount account)? onSessionExpired;
+
   Timer? _syncTimer;
   bool _isRunning = false;
   bool _isSyncing = false;
@@ -32,6 +35,7 @@ class BackgroundSyncService {
     required TaskRepository taskRepository,
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
+    this.onSessionExpired,
   })  : _taskRepository = taskRepository,
         _accountRepository = accountRepository,
         _calendarRepository = calendarRepository;
@@ -133,6 +137,12 @@ class BackgroundSyncService {
       } else {
         // Incremental sync using sync token
         await _performIncrementalSync(webdavClient, account, calendar);
+      }
+    } on RefreshTokenExpiredException catch (_) {
+      AppLogger.warning('BackgroundSyncService: Refresh token expired for account ${account.id}, logging out');
+      await _accountRepository.delete(account.id);
+      if (onSessionExpired != null) {
+        onSessionExpired!(account);
       }
     } catch (e, stackTrace) {
       AppLogger.error('BackgroundSyncService: Failed to sync calendar ${calendar.path}', e, stackTrace);
@@ -392,8 +402,6 @@ class BackgroundSyncService {
   Map<String, dynamic> _parseSyncCollectionResponse(String xmlResponse) {
     return XMLResponseParser.parseSyncCollectionResponse(xmlResponse);
   }
-
-
 
   /// Check if service is running
   bool get isRunning => _isRunning;
