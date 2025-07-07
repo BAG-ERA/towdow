@@ -4,8 +4,6 @@ stages:
   - release
 
 variables:
-  APPIMAGE_OUTPUT: "build/linux/x64/release/towdow_app.AppImage"
-  APK_OUTPUT: "build/app/outputs/flutter-apk/app-release.apk"
   FLUTTER_VERSION: "3.32.5"
   CUSTOM_IMAGE_NAME: "$CI_REGISTRY_IMAGE/flutter-build-env"
   CUSTOM_IMAGE_TAG: "$FLUTTER_VERSION"
@@ -68,13 +66,12 @@ build_appimage:
     - if: '$CI_COMMIT_TAG'
   script:
     - echo "APPIMAGE_JOB_ID=$CI_JOB_ID" > build.env
-    - echo "CI_COMMIT_TAG_CLEAN=$CI_COMMIT_TAG_CLEAN" >> build.env
     - echo "CI_PIPELINE_IID=$CI_PIPELINE_IID" >> build.env
-    - CI_COMMIT_TAG_CLEAN=$(echo $CI_COMMIT_TAG | sed 's/^v//')
-    - bash CI_scripts/linux/build_app_image.sh $CI_COMMIT_TAG_CLEAN $CI_PIPELINE_IID $APPIMAGE_OUTPUT
+    - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+    - bash CI_scripts/linux/build_app_image.sh $CI_COMMIT_TAG $CI_PIPELINE_IID "build/linux/x64/release/towdow_app-$CI_COMMIT_TAG.AppImage"
   artifacts:
     paths:
-      - $APPIMAGE_OUTPUT
+      - "build/linux/x64/release/towdow_app-$CI_COMMIT_TAG.AppImage"
     expire_in: 1 week
     reports:
       dotenv: build.env
@@ -86,12 +83,14 @@ build_android:
     - if: '$CI_COMMIT_TAG'
   script:
     - echo "ANDROID_JOB_ID=$CI_JOB_ID" > build.env
-    - CI_COMMIT_TAG_CLEAN=$(echo $CI_COMMIT_TAG | sed 's/^v//')
+    - echo "CI_PIPELINE_IID=$CI_PIPELINE_IID" >> build.env
+    - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
     - flutter pub get
-    - flutter build apk --release --build-name=$CI_COMMIT_TAG_CLEAN --build-number=$CI_PIPELINE_IID
+    - flutter build apk --release --build-name=$CI_COMMIT_TAG --build-number=$CI_PIPELINE_IID
+    - mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/app-release-$CI_COMMIT_TAG.apk"
   artifacts:
     paths:
-      - $APK_OUTPUT
+      - "build/app/outputs/flutter-apk/app-release-$CI_COMMIT_TAG.apk"
     expire_in: 1 week
     reports:
       dotenv: build.env
@@ -102,23 +101,23 @@ build_windows:
     - windows
   rules:
     - if: '$CI_COMMIT_TAG'
-      when: always
-    - when: never
   script:
     - echo "WINDOWS_JOB_ID=$CI_JOB_ID" > build.env
     # prevent fatal: detected dubious ownership in repository at 'C:/flutter'
     - git config --global --add safe.directory C:/flutter
-    - $env:CI_COMMIT_TAG_CLEAN=$env:CI_COMMIT_TAG -replace '^v', ''
     - flutter pub get
-    - flutter build windows --release --build-name=$CI_COMMIT_TAG_CLEAN --build-number=$CI_PIPELINE_IID
+    - echo "tag $env:CI_COMMIT_TAG"
+    - echo "build name $env:CI_COMMIT_TAG"
+    - echo "build number:$env:CI_PIPELINE_IID"
+    - flutter build windows --release --build-name="$env:CI_COMMIT_TAG" --build-number="$env:CI_PIPELINE_IID"
     # now package with Inno bundle to havoid msi paid certificates https://hahouari.medium.com/easy-windows-installers-for-flutter-apps-with-inno-bundle-2ec9b05d2c75
     - powershell -ExecutionPolicy Bypass -File .\CI_scripts\windows\install_inno.ps1
-    - dart run inno_bundle:build --release --app-version $CI_COMMIT_TAG_CLEAN --no-gen-publisher --no-app
-    - Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "build/windows/x64/runner/Release/towdow_app-$CI_COMMIT_TAG_CLEAN.zip"
+    - dart run inno_bundle:build --release --app-version "$env:CI_COMMIT_TAG" --no-gen-publisher --no-app
+    - Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "build/windows/x64/runner/Release/towdow_app-$env:CI_COMMIT_TAG.zip"
   artifacts:
     paths:
-      - build/windows/x64/runner/Release/towdow_app-$CI_COMMIT_TAG.zip
-      - build/windows/x64/installer/Release/TowdowApp-x86_64-$CI_COMMIT_TAG-Installer.exe
+      - "build/windows/x64/runner/Release/towdow_app-$env:CI_COMMIT_TAG.zip"
+      - "build/windows/x64/installer/Release/TowdowApp-x86_64-$env:CI_COMMIT_TAG-Installer.exe"
     expire_in: 1 week
 
 prepare_release:
@@ -156,9 +155,9 @@ release:
     assets:
       links:
         - name: "Towdow AppImage"
-          url: "$CI_PROJECT_URL/-/jobs/$APPIMAGE_JOB_ID/artifacts/file/$APPIMAGE_OUTPUT"
+          url: "$CI_PROJECT_URL/-/jobs/$APPIMAGE_JOB_ID/artifacts/file/build/linux/x64/release/towdow_app-$CI_COMMIT_TAG.AppImage"
         - name: "Towdow Android APK"
-          url: "$CI_PROJECT_URL/-/jobs/$ANDROID_JOB_ID/artifacts/file/$APK_OUTPUT"
+          url: "$CI_PROJECT_URL/-/jobs/$ANDROID_JOB_ID/artifacts/file/build/app/outputs/flutter-apk/app-release-$CI_COMMIT_TAG.apk"
         - name: "Towdow Windows Installer"
           url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/installer/Release/TowdowApp-x86_64-$CI_COMMIT_TAG-Installer.exe"
         - name: "Towdow Windows Installer"
