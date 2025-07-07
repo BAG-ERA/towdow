@@ -44,11 +44,10 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
     // Group events by date for better organization (using local time)
     final eventsByDate = <DateTime, List<CalendarEvent>>{};
     for (final event in widget.events) {
-      final localStart = event.localDtstart;
       final eventDate = DateTime(
-        localStart.year,
-        localStart.month,
-        localStart.day,
+        event.dtstart.year,
+        event.dtstart.month,
+        event.dtstart.day,
       );
       eventsByDate.putIfAbsent(eventDate, () => []).add(event);
     }
@@ -187,7 +186,7 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
     
     // Sort events by start time (earlier first)
     final sortedEvents = List<CalendarEvent>.from(widget.events)
-      ..sort((a, b) => a.localDtstart.compareTo(b.localDtstart));
+      ..sort((a, b) => a.dtstart.compareTo(b.dtstart));
     
     // Group events by date
     final groupedEvents = _groupEventsByDate(sortedEvents);
@@ -299,9 +298,9 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
     for (final event in events) {
       // Get date without time for grouping
       final eventDate = DateTime(
-        event.localDtstart.year,
-        event.localDtstart.month,
-        event.localDtstart.day,
+        event.dtstart.year,
+        event.dtstart.month,
+        event.dtstart.day,
       );
       
       if (!groupedEvents.containsKey(eventDate)) {

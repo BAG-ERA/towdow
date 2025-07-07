@@ -50,14 +50,35 @@ class LocalExternalEventRepository implements ExternalEventRepository {
     final result = await _storageService.getAll<CalendarEvent>(_boxName);
     return result.when(
       success: (events) {
-        AppLogger.info('LocalExternalEventRepository: Found ${events.length} external events');
-        return Result.success(events);
+        // Convert UTC events to local time for display
+        final localEvents = _convertEventsToLocalTime(events);
+        AppLogger.info('LocalExternalEventRepository: Found ${localEvents.length} external events (converted to local time)');
+        return Result.success(localEvents);
       },
       failure: (failure) {
         AppLogger.error('LocalExternalEventRepository: Failed to get external events: ${failure.message}');
         return Result.failure(failure);
       },
     );
+  }
+
+  /// Convert UTC events to local time for display
+  List<CalendarEvent> _convertEventsToLocalTime(List<CalendarEvent> events) {
+    final now = DateTime.now();
+    return events.map((event) {
+      final rawDtstart = event.dtstart;
+      final localDtstart = rawDtstart.toLocal();
+      DateTime? rawDtend = event.dtend;
+      DateTime? localDtend = rawDtend?.toLocal();
+      // Log all info in one entry
+      AppLogger.info(
+        'Event: "${event.summary}" | Raw UTC start: $rawDtstart | Local start: $localDtstart | Raw UTC end: $rawDtend | Local end: $localDtend | Current local time: $now'
+      );
+      return event.copyWith(
+        dtstart: localDtstart,
+        dtend: localDtend,
+      );
+    }).toList();
   }
 
   @override
@@ -199,6 +220,7 @@ class LocalExternalEventRepository implements ExternalEventRepository {
         final rangeEvents = events.where((event) {
           // Event overlaps with the range if it starts before the range ends
           // and ends after the range starts
+          // Note: events are now in local time from getAll()
           final eventStart = event.dtstart;
           final eventEnd = event.dtend ?? event.dtstart;
           
@@ -375,7 +397,6 @@ extension ExternalEventRepositoryExtensions on ExternalEventRepository {
     final result = await getAll();
     return result.when(
       success: (events) {
-        final now = DateTime.now();
         final currentEvents = events.where((event) => event.isNow).toList();
         return Result.success(currentEvents);
       },

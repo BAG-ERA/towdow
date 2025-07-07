@@ -22,7 +22,7 @@ final isAnyCommandExecutingProvider = Provider<bool>((ref) {
 /// Helper function to filter events by date range
 List<CalendarEvent> _filterEventsByDateRange(List<CalendarEvent> events, DateTime start, DateTime end) {
   return events.where((event) {
-    final eventDate = event.localDtstart;
+          final eventDate = event.dtstart;
     return eventDate.isAfter(start.subtract(const Duration(milliseconds: 1))) && 
            eventDate.isBefore(end);
   }).toList();

@@ -33,20 +33,18 @@ class ExternalEventCard extends ConsumerWidget {
     // Format time display using timezone-aware utilities
     String timeDisplay = '';
     if (!isAllDay) {
-      // Debug logging to check timezone conversion
+      // Debug logging to check time display
       AppLogger.debug('External Event: ${event.summary}');
-      AppLogger.debug('  Raw dtstart: ${event.dtstart} (isUtc: ${event.dtstart.isUtc})');
-      AppLogger.debug('  Local dtstart: ${event.localDtstart} (isUtc: ${event.localDtstart.isUtc})');
+      AppLogger.debug('  dtstart: ${event.dtstart}');
       if (event.dtend != null) {
-        AppLogger.debug('  Raw dtend: ${event.dtend} (isUtc: ${event.dtend!.isUtc})');
-        AppLogger.debug('  Local dtend: ${event.localDtend} (isUtc: ${event.localDtend?.isUtc})');
+        AppLogger.debug('  dtend: ${event.dtend}');
       }
       
-      final startTime = TimeOfDay.fromDateTime(event.localDtstart);
+      final startTime = TimeOfDay.fromDateTime(event.dtstart);
       timeDisplay = startTime.format(context);
       
-      if (event.localDtend != null) {
-        final endTime = TimeOfDay.fromDateTime(event.localDtend!);
+      if (event.dtend != null) {
+        final endTime = TimeOfDay.fromDateTime(event.dtend!);
         timeDisplay += ' - ${endTime.format(context)}';
       }
     } else {
