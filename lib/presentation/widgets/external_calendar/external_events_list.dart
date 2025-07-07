@@ -160,10 +160,6 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
   }
   
   Widget _buildEventsLayout(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 1024; // Desktop/large tablet
-    final isLargeDesktop = screenWidth >= 1400; // Large desktop for 3+ columns
-    
     // Sort events by start time (earlier first)
     final sortedEvents = List<CalendarEvent>.from(widget.events)
       ..sort((a, b) => a.dtstart.compareTo(b.dtstart));
@@ -177,7 +173,7 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
       children: [
         // Main events content
         Expanded(
-          child: _buildEventsContent(context, groupedEvents, isDesktop, isLargeDesktop),
+          child: _buildResponsiveGridLayout(context, groupedEvents),
         ),
         
         // Collapse button column
@@ -223,18 +219,32 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
     );
   }
   
-  Widget _buildEventsContent(BuildContext context, Map<DateTime, List<CalendarEvent>> groupedEvents, bool isDesktop, bool isLargeDesktop) {
-    // Determine number of columns based on screen width and day groups
-    if (isLargeDesktop && groupedEvents.length >= 3) {
-      return _buildMultiColumnDayLayout(context, groupedEvents, 3);
-    } else if (isDesktop && groupedEvents.length >= 2) {
-      return _buildMultiColumnDayLayout(context, groupedEvents, 2);
-    } else {
-      return _buildSingleColumnDayLayout(groupedEvents);
-    }
+  Widget _buildResponsiveGridLayout(BuildContext context, Map<DateTime, List<CalendarEvent>> groupedEvents) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate optimal number of columns based on available width
+        final availableWidth = constraints.maxWidth;
+        final minColumnWidth = 280.0; // Minimum width for a day column
+        final columnSpacing = 16.0; // Spacing between columns
+        
+        // Calculate how many columns can fit
+        int maxColumns = (availableWidth / (minColumnWidth + columnSpacing)).floor();
+        maxColumns = maxColumns.clamp(1, 4); // Limit to 1-4 columns
+        
+        // If we have fewer day groups than max columns, use the number of day groups
+        final dayGroups = groupedEvents.entries.toList();
+        final columnCount = dayGroups.length < maxColumns ? dayGroups.length : maxColumns;
+        
+        if (columnCount == 1) {
+          return _buildSingleColumnLayout(groupedEvents);
+        } else {
+          return _buildMultiColumnLayout(context, groupedEvents, columnCount);
+        }
+      },
+    );
   }
   
-  Widget _buildSingleColumnDayLayout(Map<DateTime, List<CalendarEvent>> groupedEvents) {
+  Widget _buildSingleColumnLayout(Map<DateTime, List<CalendarEvent>> groupedEvents) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: groupedEvents.entries.map((entry) {
@@ -267,7 +277,7 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
     );
   }
   
-  Widget _buildMultiColumnDayLayout(BuildContext context, Map<DateTime, List<CalendarEvent>> groupedEvents, int columnCount) {
+  Widget _buildMultiColumnLayout(BuildContext context, Map<DateTime, List<CalendarEvent>> groupedEvents, int columnCount) {
     // Split day groups between columns, distributing evenly
     final dayGroups = groupedEvents.entries.toList();
     final columnGroups = List.generate(columnCount, (index) => <MapEntry<DateTime, List<CalendarEvent>>>[]);
@@ -286,7 +296,7 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
         
         return [
           // Add spacing between columns (except for the first column)
-          if (columnIndex > 0) const SizedBox(width: 8),
+          if (columnIndex > 0) const SizedBox(width: 16),
           
           Expanded(
             child: Column(
