@@ -27,30 +27,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
   late List<String> _categories;
   bool _isLoading = false;
 
-  // Common category suggestions
-  static const List<String> _commonCategories = [
-    'Work',
-    'Personal',
-    'Important',
-    'Urgent',
-    'Meeting',
-    'Research',
-    'Documentation',
-    'Development',
-    'Review',
-    'Testing',
-    'Bug Fix',
-    'Feature',
-    'Planning',
-    'Design',
-    'Finance',
-    'Health',
-    'Learning',
-    'Travel',
-    'Home',
-    'Shopping',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -111,18 +87,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
               ),
               const SizedBox(height: 8),
               _buildAddCategoryForm(),
-              
-              const SizedBox(height: 16),
-              
-              // Common category suggestions
-              Text(
-                'Quick Add',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildCategorySuggestions(),
             ],
           ),
         ),
@@ -206,38 +170,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
     );
   }
 
-  Widget _buildCategorySuggestions() {
-    // Filter out categories that are already added
-    final availableCategories = _commonCategories
-        .where((category) => !_categories.contains(category))
-        .toList();
-
-    if (availableCategories.isEmpty) {
-      return Text(
-        'All common categories are already added',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-        ),
-      );
-    }
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 4,
-      children: availableCategories.take(10).map((category) => 
-        ActionChip(
-          label: Text(
-            category,
-            style: const TextStyle(fontSize: 12),
-          ),
-          onPressed: () => _addCategoryDirectly(category),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-      ).toList(),
-    );
-  }
-
   void _addCategory() {
     if (_formKey.currentState?.validate() == true) {
       final category = _categoryController.text.trim();
@@ -248,14 +180,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
       AppLogger.info('CategoryDialog: Added category "$category"');
       HapticFeedback.lightImpact();
     }
-  }
-
-  void _addCategoryDirectly(String category) {
-    setState(() {
-      _categories.add(category);
-    });
-    AppLogger.info('CategoryDialog: Added category "$category" directly');
-    HapticFeedback.lightImpact();
   }
 
   void _removeCategory(String category) {
