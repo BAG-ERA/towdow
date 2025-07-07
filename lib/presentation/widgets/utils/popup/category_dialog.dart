@@ -3,58 +3,60 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/task.dart';
+import '../../../../data/providers/providers.dart';
 import '../../../../core/logger.dart';
 
+// Provider for tasks in a specific project (copied from ProjectDetailScreen)
+final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, projectUid) {
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  return taskRepository.watchTasks().map((allTasks) {
+    // Filter tasks by their source calendar (Calendar = Project model)
+    final projectTasks = allTasks
+        .where((task) => task.sourceCalendarUid == projectUid)
+        .toList();
+    
+    if (projectTasks.isEmpty && allTasks.isNotEmpty) {
+      AppLogger.warning('CategoryDialog: No tasks found for project $projectUid. Available sourceCalendarUids: ${allTasks.map((t) => t.sourceCalendarUid).toSet()}');
+    }
+    
+    return projectTasks;
+  });
+});
+
 /// Dialog for managing task categories
-class CategoryDialog extends StatefulWidget {
+class CategoryDialog extends ConsumerStatefulWidget {
   final Task task;
   final Function(Task) onTaskUpdated;
+  final String? projectUid; // Optional project UID to get all categories from the project
 
   const CategoryDialog({
     super.key,
     required this.task,
     required this.onTaskUpdated,
+    this.projectUid,
   });
 
   @override
-  State<CategoryDialog> createState() => _CategoryDialogState();
+  ConsumerState<CategoryDialog> createState() => _CategoryDialogState();
 }
 
-class _CategoryDialogState extends State<CategoryDialog> {
+class _CategoryDialogState extends ConsumerState<CategoryDialog> {
   final _formKey = GlobalKey<FormState>();
   final _categoryController = TextEditingController();
   late List<String> _categories;
   bool _isLoading = false;
 
-  // Common category suggestions
-  static const List<String> _commonCategories = [
-    'Work',
-    'Personal',
-    'Important',
-    'Urgent',
-    'Meeting',
-    'Research',
-    'Documentation',
-    'Development',
-    'Review',
-    'Testing',
-    'Bug Fix',
-    'Feature',
-    'Planning',
-    'Design',
-    'Finance',
-    'Health',
-    'Learning',
-    'Travel',
-    'Home',
-    'Shopping',
-  ];
-
   @override
   void initState() {
     super.initState();
     _categories = List.from(widget.task.categories);
+    
+    // Add listener to update UI when text changes
+    _categoryController.addListener(() {
+      setState(() {});
+    });
   }
 
   @override
@@ -89,40 +91,15 @@ class _CategoryDialogState extends State<CategoryDialog> {
               ),
               const SizedBox(height: 16),
               
-              // Current categories
-              if (_categories.isNotEmpty) ...[
-                Text(
-                  'Current Categories',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _buildCurrentCategories(),
-                const SizedBox(height: 16),
-              ],
-              
-              // Add new category form
-              Text(
-                'Add Category',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
+              // Create category form at the top
               _buildAddCategoryForm(),
               
               const SizedBox(height: 16),
               
-              // Common category suggestions
-              Text(
-                'Quick Add',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildCategorySuggestions(),
+              // Project categories section (if projectUid is provided)
+              if (widget.projectUid != null) ...[
+                _buildProjectCategoriesSection(),
+              ],
             ],
           ),
         ),
@@ -146,14 +123,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
     );
   }
 
-  Widget _buildCurrentCategories() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 4,
-      children: _categories.map((category) => _buildCategoryChip(category)).toList(),
-    );
-  }
-
   Widget _buildCategoryChip(String category) {
     return Chip(
       label: Text(
@@ -170,6 +139,75 @@ class _CategoryDialogState extends State<CategoryDialog> {
     );
   }
 
+  Widget _buildProjectCategoriesSection() {
+    return Consumer(
+      builder: (context, ref, child) {
+        final tasksAsync = ref.watch(projectTasksProvider(widget.projectUid!));
+        
+        return tasksAsync.when(
+          data: (tasks) {
+            // Get all unique categories from tasks in the project
+            final Set<String> allCategories = {};
+            for (final task in tasks) {
+              allCategories.addAll(task.categories);
+            }
+            
+            final categoriesList = allCategories.toList()..sort();
+            
+            // Filter out categories that are already added to current task
+            final availableCategories = categoriesList
+                .where((category) => !_categories.contains(category))
+                .toList();
+            
+            // Filter categories based on input field content
+            final searchQuery = _categoryController.text.trim().toLowerCase();
+            final filteredCategories = searchQuery.isEmpty 
+                ? availableCategories 
+                : availableCategories
+                    .where((category) => category.toLowerCase().contains(searchQuery))
+                    .toList();
+            
+            if (filteredCategories.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                Text(
+                  searchQuery.isEmpty 
+                      ? 'Categories used in this project:'
+                      : 'Matching categories:',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: filteredCategories.map((category) => 
+                    ActionChip(
+                      label: Text(
+                        category,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      onPressed: () => _addCategoryDirectly(category),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ).toList(),
+                ),
+              ],
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        );
+      },
+    );
+  }
+
   Widget _buildAddCategoryForm() {
     return Form(
       key: _formKey,
@@ -178,10 +216,25 @@ class _CategoryDialogState extends State<CategoryDialog> {
           Expanded(
             child: TextFormField(
               controller: _categoryController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Enter category name',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
                 isDense: true,
+                prefixIcon: _categories.isNotEmpty 
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: 8.0, right: 8.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: _categories.map((category) => _buildCategoryChip(category)).toList(),
+                            ),
+                          ],
+                        ),
+                      )
+                    : null,
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
@@ -195,46 +248,15 @@ class _CategoryDialogState extends State<CategoryDialog> {
               onFieldSubmitted: (_) => _addCategory(),
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: _addCategory,
-            icon: const Icon(Icons.add),
-            tooltip: 'Add category',
-          ),
+          if (!_isExactMatch() && _categoryController.text.trim().isNotEmpty) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: _addCategory,
+              child: Text(_getButtonText()),
+            ),
+          ],
         ],
       ),
-    );
-  }
-
-  Widget _buildCategorySuggestions() {
-    // Filter out categories that are already added
-    final availableCategories = _commonCategories
-        .where((category) => !_categories.contains(category))
-        .toList();
-
-    if (availableCategories.isEmpty) {
-      return Text(
-        'All common categories are already added',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-        ),
-      );
-    }
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 4,
-      children: availableCategories.take(10).map((category) => 
-        ActionChip(
-          label: Text(
-            category,
-            style: const TextStyle(fontSize: 12),
-          ),
-          onPressed: () => _addCategoryDirectly(category),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-      ).toList(),
     );
   }
 
@@ -256,6 +278,26 @@ class _CategoryDialogState extends State<CategoryDialog> {
     });
     AppLogger.info('CategoryDialog: Added category "$category" directly');
     HapticFeedback.lightImpact();
+  }
+
+  bool _isExactMatch() {
+    final inputText = _categoryController.text.trim();
+    if (inputText.isEmpty) return false;
+    
+    // Check if the input exactly matches any existing category in current task (case-insensitive)
+    final isMatch = _categories.any((category) => 
+        category.toLowerCase() == inputText.toLowerCase());
+    
+    AppLogger.debug('CategoryDialog: Input "$inputText" exact match: $isMatch (categories: $_categories)');
+    return isMatch;
+  }
+
+  String _getButtonText() {
+    final inputText = _categoryController.text.trim();
+    if (inputText.isEmpty) {
+      return 'Add new';
+    }
+    return 'Create "$inputText"';
   }
 
   void _removeCategory(String category) {

@@ -8,6 +8,7 @@ import 'dart:convert';
 import '../../../data/models/task.dart';
 import '../../../data/services/validator_service.dart';
 import '../utils/popup/attendee_dialog.dart';
+import '../utils/popup/category_dialog.dart';
 import '../utils/popup/due_date_dialog.dart';
 import '../utils/popup/move_task_dialog.dart';
 
@@ -333,12 +334,18 @@ class TaskItemToolbar extends StatelessWidget {
   }
 
   void _showCategoryDialog(BuildContext context) {
-    // TODO: Implement category dialog
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Category dialog not implemented yet')),
-      );
-    }
+    showDialog(
+      context: context,
+      builder: (context) => CategoryDialog(
+        task: task,
+        projectUid: task.sourceCalendarUid,
+        onTaskUpdated: (updatedTask) {
+          if (onTaskUpdated != null) {
+            onTaskUpdated!(updatedTask);
+          }
+        },
+      ),
+    );
   }
 
   void _showMoveDialog(BuildContext context) {
