@@ -127,7 +127,7 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
       // Create a temporary account for testing
       final testAccount = CaldavAccount(
         id: const Uuid().v4(),
-        providerType: 'keycloak',
+        providerType: 'flowit_cloud',
         serverUrl: 'https://api.towdow.app',
         username: email ?? _userIdController.text.trim(),
         accessToken: _accessToken,

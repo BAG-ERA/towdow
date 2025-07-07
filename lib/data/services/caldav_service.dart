@@ -19,11 +19,7 @@ class CalDAVService {
   late final WebDAVClient _client;
 
   CalDAVService({required this.account}) {
-    _client = WebDAVClient(
-      serverUrl: account.serverUrl,
-      username: account.username,
-      password: account.password ?? '',
-    );
+    _client = WebDAVClient.fromAccount(account);
   }
 
   /// Test connection to CalDAV server

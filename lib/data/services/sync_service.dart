@@ -591,11 +591,7 @@ class SyncService {
   Future<Result<String>> _getServerSyncToken(CalDAVService caldavService, TaskCalendar calendar) async {
     try {
       // Use WebDAVClient to get sync token
-      final webdavClient = WebDAVClient(
-        serverUrl: caldavService.account.serverUrl,
-        username: caldavService.account.username,
-        password: caldavService.account.password ?? '',
-      );
+      final webdavClient = WebDAVClient.fromAccount(caldavService.account);
       
       final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
 <D:propfind xmlns:D="DAV:">
@@ -641,11 +637,7 @@ class SyncService {
       AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
       
       // Use BackgroundSyncService logic for incremental sync
-      final webdavClient = WebDAVClient(
-        serverUrl: caldavService.account.serverUrl,
-        username: caldavService.account.username,
-        password: caldavService.account.password ?? '',
-      );
+      final webdavClient = WebDAVClient.fromAccount(caldavService.account);
       
       if (calendar.syncToken == null) {
         // First sync - fetch all tasks

@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../core/result.dart';
 import '../../core/logger.dart';
+import '../../data/models/caldav_account.dart';
 
 class WebDAVResponse {
   final int statusCode;
@@ -30,6 +31,26 @@ abstract class WebDAVClient {
     this.timeout = const Duration(seconds: 30),
   });
 
+  static WebDAVClient fromAccount(CaldavAccount account, {Duration timeout = const Duration(seconds: 30)}) {
+    switch (account.providerType) {
+      case 'custom':
+        return WebDAVClientBasicAuth(
+          serverUrl: account.serverUrl,
+          username: account.username,
+          password: account.password ?? '',
+          timeout: timeout,
+        );
+      case 'flowit_cloud':
+        return WebDAVClientKeycloak(
+          serverUrl: account.serverUrl,
+          accessToken: account.accessToken ?? '',
+          timeout: timeout,
+        );
+      default:
+        throw UnsupportedError('Unsupported providerType: \'${account.providerType}\'');
+    }
+  }
+
   Future<Map<String, String>> getAuthHeaders();
 
   /// Build URI correctly handling absolute vs relative paths
@@ -50,6 +71,9 @@ abstract class WebDAVClient {
     }
   }
 
+  /// Protected getter for common headers (including auth)
+  Future<Map<String, String>> get _commonHeaders async => await getAuthHeaders();
+
   /// PROPFIND method - RFC 4918 Section 9.1
   /// Used for capability discovery and resource listing
   Future<Result<WebDAVResponse>> propfind(
@@ -62,7 +86,7 @@ abstract class WebDAVClient {
       
       final uri = _buildUri(path);
       final headers = {
-        ..._commonHeaders,
+        ...await _commonHeaders,
         'Depth': depth.toString(),
       };
 
@@ -99,7 +123,7 @@ abstract class WebDAVClient {
       
       final uri = _buildUri(path);
       final request = http.Request('OPTIONS', uri)
-        ..headers.addAll(_commonHeaders);
+        ..headers.addAll(await _commonHeaders);
 
       final streamedResponse = await request.send().timeout(timeout);
       final responseBody = await streamedResponse.stream.bytesToString();
@@ -129,7 +153,7 @@ abstract class WebDAVClient {
       // AppLogger.debug('WebDAVClient: GET $path');
       
       final uri = _buildUri(path);
-      final response = await http.get(uri, headers: _commonHeaders)
+      final response = await http.get(uri, headers: await _commonHeaders)
           .timeout(timeout);
 
       final result = WebDAVResponse(
@@ -161,7 +185,7 @@ abstract class WebDAVClient {
       AppLogger.info('WebDAVClient: PUT URI: $uri');
       
       final headers = {
-        ..._commonHeaders,
+        ...await _commonHeaders,
         'Content-Type': 'text/calendar; charset=utf-8',
       };
 
@@ -201,7 +225,7 @@ abstract class WebDAVClient {
       // AppLogger.debug('WebDAVClient: DELETE $path');
       
       final uri = _buildUri(path);
-      final headers = Map<String, String>.from(_commonHeaders);
+      final headers = Map<String, String>.from(await _commonHeaders);
 
       // Add If-Match header for conditional deletion
       if (etag != null) {
@@ -237,7 +261,7 @@ abstract class WebDAVClient {
       
       final uri = _buildUri(path);
       final request = http.Request('REPORT', uri)
-        ..headers.addAll(_commonHeaders)
+        ..headers.addAll(await _commonHeaders)
         ..body = body;
 
       final streamedResponse = await request.send().timeout(timeout);
@@ -269,7 +293,7 @@ abstract class WebDAVClient {
       
       final uri = _buildUri(path);
       final headers = {
-        ..._commonHeaders,
+        ...await _commonHeaders,
         'Content-Type': 'application/xml; charset=utf-8',
       };
       
@@ -309,7 +333,7 @@ abstract class WebDAVClient {
       AppLogger.info('WebDAVClient: PROPPATCH URI: $uri');
       
       final headers = {
-        ..._commonHeaders,
+        ...await _commonHeaders,
         'Content-Type': 'application/xml; charset=utf-8',
       };
       

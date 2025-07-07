@@ -104,11 +104,7 @@ class CapabilityDiscoveryService {
   late final WebDAVClient _client;
 
   CapabilityDiscoveryService({required this.account}) {
-    _client = WebDAVClient(
-      serverUrl: account.serverUrl,
-      username: account.username,
-      password: account.password ?? '',
-    );
+    _client = WebDAVClient.fromAccount(account);
   }
 
   /// Perform complete CalDAV discovery process

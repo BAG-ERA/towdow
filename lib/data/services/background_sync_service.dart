@@ -125,11 +125,7 @@ class BackgroundSyncService {
     try {
       // AppLogger.debug('BackgroundSyncService: Syncing calendar ${calendar.path}');
       
-      final webdavClient = WebDAVClient(
-        serverUrl: account.serverUrl,
-        username: account.username,
-        password: account.password ?? '',
-      );
+      final webdavClient = WebDAVClient.fromAccount(account);
 
       if (calendar.syncToken == null) {
         // First sync or calendar without sync token - perform full sync
