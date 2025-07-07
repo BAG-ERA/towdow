@@ -338,6 +338,7 @@ class TaskItemToolbar extends StatelessWidget {
       context: context,
       builder: (context) => CategoryDialog(
         task: task,
+        projectUid: task.sourceCalendarUid,
         onTaskUpdated: (updatedTask) {
           if (onTaskUpdated != null) {
             onTaskUpdated!(updatedTask);
