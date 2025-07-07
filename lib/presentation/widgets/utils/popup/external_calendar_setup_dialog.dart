@@ -495,6 +495,10 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
       
       AppLogger.info('ExternalCalendarSetupDialog: Successfully added external calendar account "${account.displayName}" with ${selectedCalendarList.length} calendars');
       
+      // Trigger immediate sync for the new account
+      final externalSyncService = ref.read(externalCalendarSyncServiceProvider);
+      await externalSyncService.syncAccount(account.id);
+      
       if (mounted) {
         Navigator.of(context).pop(account);
       }
