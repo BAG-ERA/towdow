@@ -12,9 +12,7 @@ class ConnectionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Connect to CalDAV'),
-      ),
+      appBar: AppBar(title: const Text('Connect to CalDAV')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -45,7 +43,7 @@ class ConnectionScreen extends ConsumerWidget {
               onTap: () {
                 showDialog(
                   context: context,
-                  builder: (context) => const FlowitCloudDialog(isFlowItCloud: true,),
+                  builder: (context) => const FlowitCloudDialog(),
                 );
               },
             ),
@@ -115,4 +113,4 @@ class _ConnectionOptionCard extends StatelessWidget {
       ),
     );
   }
-} 
+}

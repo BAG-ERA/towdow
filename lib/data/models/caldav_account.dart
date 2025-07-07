@@ -12,7 +12,7 @@ part 'caldav_account.g.dart';
 class CaldavAccount with _$CaldavAccount {
   const factory CaldavAccount({
     @HiveField(0) required String id,
-    @HiveField(1) required String providerType, // flowit_cloud, google, nextcloud, custom
+    @HiveField(1) required String providerType, // towdow_cloud, google, nextcloud, custom
     @HiveField(2) required String serverUrl,
     @HiveField(3) required String username,
     @HiveField(4) String? password, // for basic auth

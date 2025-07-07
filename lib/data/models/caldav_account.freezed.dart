@@ -24,7 +24,7 @@ mixin _$CaldavAccount {
   String get id => throw _privateConstructorUsedError;
   @HiveField(1)
   String get providerType =>
-      throw _privateConstructorUsedError; // flowit_cloud, google, nextcloud, custom
+      throw _privateConstructorUsedError; // towdow_cloud, google, nextcloud, custom
   @HiveField(2)
   String get serverUrl => throw _privateConstructorUsedError;
   @HiveField(3)
@@ -350,7 +350,7 @@ class _$CaldavAccountImpl implements _CaldavAccount {
   @override
   @HiveField(1)
   final String providerType;
-// flowit_cloud, google, nextcloud, custom
+// towdow_cloud, google, nextcloud, custom
   @override
   @HiveField(2)
   final String serverUrl;
@@ -509,7 +509,7 @@ abstract class _CaldavAccount implements CaldavAccount {
   String get id;
   @override
   @HiveField(1)
-  String get providerType; // flowit_cloud, google, nextcloud, custom
+  String get providerType; // towdow_cloud, google, nextcloud, custom
   @override
   @HiveField(2)
   String get serverUrl;

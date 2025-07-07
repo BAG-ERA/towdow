@@ -11,21 +11,19 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import 'package:openid_client/openid_client_io.dart';
 
-class FlowitCloudDialog extends ConsumerStatefulWidget {
-  final bool isFlowItCloud;
+const String TOWDOW_ISSUER_URL = "https://auth.towdow.app/realms/towdow";
+const String CLIENT_ID = "radicale-api";
+const String CLIENT_SECRET = "J8cxks5GVinlCFB0x3E39WMOpjnXZjJK";
 
-  const FlowitCloudDialog({super.key, this.isFlowItCloud = false});
+class FlowitCloudDialog extends ConsumerStatefulWidget {
+
+  const FlowitCloudDialog({super.key});
 
   @override
   ConsumerState<FlowitCloudDialog> createState() => _FlowitCloudDialogState();
 }
 
 class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _userIdController = TextEditingController();
-  final _issuerUrlController = TextEditingController();
-  final _clientIdController = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -36,23 +34,14 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
   @override
   void initState() {
     super.initState();
-    _issuerUrlController.text = 'https://auth.towdow.app/realms/towdow';
-    _clientIdController.text = 'radicale-client';
-    if (widget.isFlowItCloud) {
       // Start login immediately for FlowIt Cloud
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _authenticateWithKeycloak();
       });
-    }
   }
 
   @override
   void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _userIdController.dispose();
-    _issuerUrlController.dispose();
-    _clientIdController.dispose();
     super.dispose();
   }
 
@@ -65,15 +54,15 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
     try {
       // Discover the OpenID configuration
       final issuer = await Issuer.discover(
-        Uri.parse(_issuerUrlController.text.trim()),
+        Uri.parse(TOWDOW_ISSUER_URL),
       );
       final client = Client(
         issuer,
-        "radicale-api",
-        clientSecret: "J8cxks5GVinlCFB0x3E39WMOpjnXZjJK",
+        CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
       );
 
-      // Use a fixed port for the local redirect server
+      // Use a fixed port for the local redirect server to be allowed on KeyCloak
       final redirectPort = 4000;
       final redirectUri = Uri.parse('http://localhost:$redirectPort/callback');
 
@@ -101,13 +90,11 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
       String? email;
       try {
         final idToken = c.idToken;
-        if (idToken != null) {
-          final claims = idToken.claims;
-          firstName = claims['given_name'] as String?;
-          lastName = claims['family_name'] as String?;
-          email = claims['email'] as String?;
-        }
-        // Fallback: fetch userinfo if not present in idToken
+        final claims = idToken.claims;
+        firstName = claims['given_name'] as String?;
+        lastName = claims['family_name'] as String?;
+        email = claims['email'] as String?;
+              // Fallback: fetch userinfo if not present in idToken
         if (firstName == null || lastName == null || email == null) {
           final userInfo = await c.getUserInfo();
           firstName ??= userInfo.givenName;
@@ -127,14 +114,14 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
       // Create a temporary account for testing
       final testAccount = CaldavAccount(
         id: const Uuid().v4(),
-        providerType: 'flowit_cloud',
+        providerType: 'towdow_cloud',
         serverUrl: 'https://api.towdow.app',
-        username: email ?? _userIdController.text.trim(),
+        username: email ?? '',
         accessToken: _accessToken,
         refreshToken: _refreshToken,
         tokenExpiry: _tokenExpiry,
-        clientId: _clientIdController.text.trim(),
-        issuerUrl: _issuerUrlController.text.trim(),
+        clientId: CLIENT_ID,
+        issuerUrl: TOWDOW_ISSUER_URL,
         firstName: firstName,
         lastName: lastName,
         email: email,

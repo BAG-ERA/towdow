@@ -40,7 +40,7 @@ abstract class WebDAVClient {
           password: account.password ?? '',
           timeout: timeout,
         );
-      case 'flowit_cloud':
+      case 'towdow_cloud':
         return WebDAVClientKeycloak(
           serverUrl: account.serverUrl,
           accessToken: account.accessToken ?? '',
