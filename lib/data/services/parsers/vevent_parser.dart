@@ -115,29 +115,29 @@ class VEventParser {
             }
           }
         } else if (line.startsWith('DURATION:')) {
-          duration = line.substring(9);
+          duration = _unescapeCalendarText(line.substring(9));
         } else if (line.startsWith('LOCATION:')) {
           location = _unescapeCalendarText(line.substring(9));
         } else if (line.startsWith('CATEGORIES:')) {
-          categories = line.substring(11).split(',').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
+          categories = _unescapeCalendarText(line.substring(11)).split(',').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
         } else if (line.startsWith('RESOURCES:')) {
-          resources = line.substring(10).split(',').map((r) => r.trim()).where((r) => r.isNotEmpty).toList();
+          resources = _unescapeCalendarText(line.substring(10)).split(',').map((r) => r.trim()).where((r) => r.isNotEmpty).toList();
         } else if (line.startsWith('SEQUENCE:')) {
-          sequence = int.tryParse(line.substring(9)) ?? 0;
+          sequence = int.tryParse(_unescapeCalendarText(line.substring(9))) ?? 0;
         } else if (line.startsWith('PRIORITY:')) {
-          priority = int.tryParse(line.substring(9)) ?? 0;
+          priority = int.tryParse(_unescapeCalendarText(line.substring(9))) ?? 0;
         } else if (line.startsWith('TRANSP:')) {
-          transparency = line.substring(7);
+          transparency = _unescapeCalendarText(line.substring(7));
         } else if (line.startsWith('CLASS:')) {
-          classification = line.substring(6);
+          classification = _unescapeCalendarText(line.substring(6));
         } else if (line.startsWith('CONTACT:')) {
           contact = _unescapeCalendarText(line.substring(8));
         } else if (line.startsWith('URL:')) {
-          url = line.substring(4);
+          url = _unescapeCalendarText(line.substring(4));
         } else if (line.startsWith('RRULE:')) {
-          recurrenceRule = line.substring(6);
+          recurrenceRule = _unescapeCalendarText(line.substring(6));
         } else if (line.startsWith('RECURRENCE-ID:')) {
-          recurrenceId = line.substring(14);
+          recurrenceId = _unescapeCalendarText(line.substring(14));
         } else if (line.startsWith('RDATE:')) {
           final rdateValue = line.substring(6);
           final dates = _parseMultipleDates(rdateValue);
@@ -150,7 +150,7 @@ class VEventParser {
           // Parse organizer (remove mailto: prefix if present)
           organizer = line.substring(10);
           if (organizer.startsWith('mailto:')) {
-            organizer = organizer.substring(7);
+            organizer = _unescapeCalendarText(organizer.substring(7));
           }
           AppLogger.debug('VEventParser: Found organizer: $organizer');
         } else if (line.startsWith('ATTENDEE:') || line.startsWith('ATTENDEE;')) {
@@ -413,7 +413,7 @@ class VEventParser {
       return Attendee(
         email: email,
         displayName: parameters['CN'],
-        status: AttendeeStatus.fromString(parameters['PARTSTAT'] ?? 'NEEDS-ACTION'),
+        status: AttendeeStatus.fromString(_unescapeCalendarText(parameters['PARTSTAT'] ?? 'NEEDS-ACTION')),
         role: AttendeeRole.fromString(parameters['ROLE'] ?? 'REQ-PARTICIPANT'),
         rsvpRequested: parameters['RSVP']?.toUpperCase() == 'TRUE',
         userType: CalendarUserType.fromString(parameters['CUTYPE'] ?? 'INDIVIDUAL'),

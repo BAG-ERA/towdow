@@ -9,6 +9,7 @@ import '../../../core/logger.dart';
 import '../../../data/models/calendar_event.dart';
 import '../../../data/models/external_calendar.dart';
 import '../../../data/providers/providers.dart';
+import '../utils/popup/external_event_details_dialog.dart';
 
 class ExternalEventCard extends ConsumerWidget {
   final CalendarEvent event;
@@ -96,50 +97,50 @@ class ExternalEventCard extends ConsumerWidget {
             ),
           ),
         ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Time column skeleton
-          SizedBox(
-            width: 50,
-            child: Container(
-              height: 14,
-              decoration: BoxDecoration(
-                color: colorScheme.outline.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Time column skeleton
+            SizedBox(
+              width: 50,
+              child: Container(
+                height: 14,
+                decoration: BoxDecoration(
+                  color: colorScheme.outline.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
             ),
-          ),
-          
-          const SizedBox(width: 12),
-          
-          // Event content skeleton
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 16,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outline.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(4),
+            
+            const SizedBox(width: 12),
+            
+            // Event content skeleton
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 16,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: colorScheme.outline.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  height: 12,
-                  width: 150,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outline.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
+                  const SizedBox(height: 4),
+                  Container(
+                    height: 12,
+                    width: 150,
+                    decoration: BoxDecoration(
+                      color: colorScheme.outline.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -165,90 +166,93 @@ class ExternalEventCard extends ConsumerWidget {
     
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 420),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: EdgeInsets.all(hideCalendarName ? 8 : 12),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(8),
-        ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Time column
-          SizedBox(
-            width: 80,
-            child: Text(
-              timeDisplay,
-              style: textTheme.bodySmall?.copyWith(
-                color: eventColor,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+      child: GestureDetector(
+        onTap: () => ExternalEventDetailsDialog.show(context, event: event),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: EdgeInsets.all(hideCalendarName ? 8 : 12),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(8),
           ),
-          
-          const SizedBox(width: 12),
-          
-          // Event content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Event title and location icon on same line
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
-                        style: textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (event.location?.isNotEmpty == true)
-                      Icon(
-                        Icons.location_on_outlined,
-                        size: 14,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                  ],
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Time column
+              SizedBox(
+                width: 80,
+                child: Text(
+                  timeDisplay,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: eventColor,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                
-                // Calendar name with color indicator
-                if (calendar != null && !hideCalendarName) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: eventColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          calendar.displayName,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: 11,
+              ),
+              
+              const SizedBox(width: 12),
+              
+              // Event content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Event title and location icon on same line
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
+                        if (event.location?.isNotEmpty == true)
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 14,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                      ],
+                    ),
+                    
+                    // Calendar name with color indicator
+                    if (calendar != null && !hideCalendarName) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: eventColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              calendar.displayName,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
-              ],
-            ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
       ),
     );
   }
@@ -262,45 +266,48 @@ class ExternalEventCard extends ConsumerWidget {
   ) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 420),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Time column (no day context)
-            if (timeDisplay.isNotEmpty)
-              SizedBox(
-                width: 80,
-                child: Text(
-                  timeDisplay,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: eventColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+      child: GestureDetector(
+        onTap: () => ExternalEventDetailsDialog.show(context, event: event),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Time column (no day context)
+              if (timeDisplay.isNotEmpty)
+                SizedBox(
+                  width: 80,
+                  child: Text(
+                    timeDisplay,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: eventColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
-            
-            SizedBox(width: timeDisplay.isNotEmpty ? 8 : 0),
-            
-            // Event content
-            Expanded(
-              child: Text(
-                event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
+              
+              SizedBox(width: timeDisplay.isNotEmpty ? 8 : 0),
+              
+              // Event content
+              Expanded(
+                child: Text(
+                  event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
