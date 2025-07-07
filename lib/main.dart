@@ -27,16 +27,12 @@ import 'data/providers/providers.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-<<<<<<< HEAD
-  
-=======
   // Initialize timezone database for proper timezone conversions
   tz.initializeTimeZones();
   AppLogger.info('Main: Timezone database initialized');
   
   // Initialize Hive
   await Hive.initFlutter();
->>>>>>> ea1e158 (timezone fix)
   
   // Register Hive adapters for all models
   Hive.registerAdapter(TaskAdapter());
