@@ -14,11 +14,13 @@ import 'caldav_service.dart';
 import 'webdav_client.dart';
 import 'parsers/vtodo_parser.dart';
 import 'parsers/xml_response_parser.dart';
+import 'sync_service.dart';
 
 class BackgroundSyncService {
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
+  SyncService? _syncService; // Reference to main sync service for queue processing
 
   Timer? _syncTimer;
   bool _isRunning = false;
@@ -32,9 +34,16 @@ class BackgroundSyncService {
     required TaskRepository taskRepository,
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
+    SyncService? syncService, // Optional reference to main sync service
   })  : _taskRepository = taskRepository,
         _accountRepository = accountRepository,
-        _calendarRepository = calendarRepository;
+        _calendarRepository = calendarRepository,
+        _syncService = syncService;
+
+  /// Set the main sync service reference (called after initialization)
+  void setSyncService(SyncService syncService) {
+    _syncService = syncService;
+  }
 
   /// Start background sync service
   Future<Result<void>> start() async {
@@ -103,6 +112,9 @@ class BackgroundSyncService {
               for (final calendar in calendars) {
                 await _syncCalendar(account, calendar);
               }
+              
+              // After successful background sync, trigger queue processing
+              await _triggerQueueProcessing();
             },
             failure: (failure) async {
               AppLogger.error('BackgroundSyncService: Failed to get calendars', failure.exception, failure.stackTrace);
@@ -117,6 +129,21 @@ class BackgroundSyncService {
       AppLogger.error('BackgroundSyncService: Background sync failed', e, stackTrace);
     } finally {
       _isSyncing = false;
+    }
+  }
+
+  /// Trigger queue processing through main sync service
+  Future<void> _triggerQueueProcessing() async {
+    if (_syncService != null) {
+      try {
+        AppLogger.debug('BackgroundSyncService: Triggering queue processing after successful background sync');
+        // Use the simpler forceQueueProcessing method
+        await _syncService!.forceQueueProcessing();
+      } catch (e, stackTrace) {
+        AppLogger.error('BackgroundSyncService: Failed to trigger queue processing', e, stackTrace);
+      }
+    } else {
+      AppLogger.debug('BackgroundSyncService: No main sync service available for queue processing');
     }
   }
 
@@ -396,8 +423,6 @@ class BackgroundSyncService {
   Map<String, dynamic> _parseSyncCollectionResponse(String xmlResponse) {
     return XMLResponseParser.parseSyncCollectionResponse(xmlResponse);
   }
-
-
 
   /// Check if service is running
   bool get isRunning => _isRunning;
