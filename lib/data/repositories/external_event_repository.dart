@@ -83,7 +83,25 @@ class LocalExternalEventRepository implements ExternalEventRepository {
 
   @override
   Future<Result<CalendarEvent?>> getById(String uid) async {
-    return await _storageService.get<CalendarEvent>(_boxName, uid);
+    // Try the original uid first
+    final result = await _storageService.get<CalendarEvent>(_boxName, uid);
+    return result.when(
+      success: (event) {
+        if (event != null) {
+          return Result.success(event);
+        }
+        
+        // If not found, try to find by uid pattern (for recurring events)
+        return getAll().then((allResult) => allResult.when(
+          success: (events) {
+            final foundEvent = events.where((e) => e.uid == uid).firstOrNull;
+            return Result.success(foundEvent);
+          },
+          failure: (failure) => Result.failure(failure),
+        ));
+      },
+      failure: (failure) => Result.failure(failure),
+    );
   }
 
   @override
@@ -114,8 +132,14 @@ class LocalExternalEventRepository implements ExternalEventRepository {
 
   @override
   Future<Result<void>> save(CalendarEvent event) async {
-    AppLogger.debug('LocalExternalEventRepository: Saving event "${event.summary}" (UID: ${event.uid}) from calendar ${event.sourceCalendarUid} in account ${event.accountId}');
-    return await _storageService.put(_boxName, event.uid, event);
+    // Create a unique key for storage
+    // For recurring events, combine uid with recurrenceId to prevent overwriting
+    final storageKey = event.recurrenceId != null 
+        ? '${event.uid}_${event.recurrenceId}'
+        : event.uid;
+    
+    AppLogger.debug('LocalExternalEventRepository: Saving event "${event.summary}" (UID: ${event.uid}, storage key: $storageKey) from calendar ${event.sourceCalendarUid} in account ${event.accountId}');
+    return await _storageService.put(_boxName, storageKey, event);
   }
 
   @override
@@ -141,7 +165,23 @@ class LocalExternalEventRepository implements ExternalEventRepository {
 
   @override
   Future<Result<void>> delete(String uid) async {
-    return await _storageService.delete(_boxName, uid);
+    // Try to find the event first to get the correct storage key
+    final eventResult = await getById(uid);
+    return eventResult.when(
+      success: (event) async {
+        if (event == null) {
+          return const Result.success(null);
+        }
+        
+        // Create the storage key
+        final storageKey = event.recurrenceId != null 
+            ? '${event.uid}_${event.recurrenceId}'
+            : event.uid;
+        
+        return await _storageService.delete(_boxName, storageKey);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
   }
 
   @override

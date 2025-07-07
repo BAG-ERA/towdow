@@ -211,29 +211,15 @@ class ExternalCalendarSyncService {
         success: (events) async {
           AppLogger.info('ExternalCalendarSyncService: Fetched ${events.length} events from calendar ${calendar.displayName}');
           
-          // Debug log some event details
-          for (int i = 0; i < events.length && i < 3; i++) {
-            final event = events[i];
-            AppLogger.debug('ExternalCalendarSyncService: Event "${event.summary}" from ${event.dtstart} (recurring: ${event.isRecurring})');
-            AppLogger.debug('ExternalCalendarSyncService: Event UID: ${event.uid}, Calendar: ${event.sourceCalendarUid}, Account: ${event.accountId}');
-          }
-          
-          // Save events to local storage with detailed logging
-          AppLogger.debug('ExternalCalendarSyncService: Saving ${events.length} events from calendar ${calendar.displayName}');
+          // Save events to repository
           for (final event in events) {
-            AppLogger.debug('ExternalCalendarSyncService: Saving event "${event.summary}" (UID: ${event.uid}) from calendar ${event.sourceCalendarUid}');
             await _eventRepository.save(event);
           }
           
-          // Update calendar sync status
-          final updatedCalendar = calendar.copyWith(
-            lastSyncAt: DateTime.now(),
-            syncToken: calendar.syncToken, // Will be updated by CalDAV service if needed
-          );
-          await _calendarRepository.save(updatedCalendar);
+          AppLogger.info('ExternalCalendarSyncService: Saved ${events.length} events from calendar ${calendar.displayName}');
         },
         failure: (failure) {
-          AppLogger.warning('ExternalCalendarSyncService: Failed to fetch events from calendar ${calendar.displayName}: ${failure.message}');
+          AppLogger.error('ExternalCalendarSyncService: Failed to fetch events from calendar ${calendar.displayName}: ${failure.message}');
         },
       );
     } catch (e) {

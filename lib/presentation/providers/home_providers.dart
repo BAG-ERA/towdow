@@ -22,7 +22,7 @@ final isAnyCommandExecutingProvider = Provider<bool>((ref) {
 /// Helper function to filter events by date range
 List<CalendarEvent> _filterEventsByDateRange(List<CalendarEvent> events, DateTime start, DateTime end) {
   return events.where((event) {
-          final eventDate = event.dtstart;
+    final eventDate = event.dtstart;
     return eventDate.isAfter(start.subtract(const Duration(milliseconds: 1))) && 
            eventDate.isBefore(end);
   }).toList();
@@ -41,7 +41,6 @@ final todayExternalEventsProvider = Provider<AsyncValue<List<CalendarEvent>>>((r
       final endOfDay = startOfDay.add(const Duration(days: 1));
       
       final filteredEvents = _filterEventsByDateRange(events, startOfDay, endOfDay);
-      AppLogger.debug('ExternalEvents: Found ${filteredEvents.length} today events');
       return AsyncValue.data(filteredEvents);
     },
   );

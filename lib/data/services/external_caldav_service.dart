@@ -237,7 +237,6 @@ class ExternalCalDAVService {
       
       // Build time range filter if specified
       String timeRangeFilter = '';
-      // Enable time range filter for future-only events
       if (timeMin != null || timeMax != null) {
         timeRangeFilter = '<C:time-range';
         if (timeMin != null) {
@@ -256,9 +255,7 @@ class ExternalCalDAVService {
       String calendarDataElement = '<C:calendar-data />';
       if (timeMin != null && timeMax != null) {
         // Expand recurring events when time range is specified
-        calendarDataElement = '''<C:calendar-data>
-      <C:expand start="${_formatDateTime(timeMin)}" end="${_formatDateTime(timeMax)}" />
-    </C:calendar-data>''';
+        calendarDataElement = '''<C:calendar-data>\n  <C:expand start=\"${_formatDateTime(timeMin)}\" end=\"${_formatDateTime(timeMax)}\" />\n</C:calendar-data>''';
         AppLogger.debug('ExternalCalDAVService: Using recurring event expansion from ${_formatDateTime(timeMin)} to ${_formatDateTime(timeMax)}');
       }
       

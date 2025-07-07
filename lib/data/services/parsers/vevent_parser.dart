@@ -11,219 +11,115 @@ class VEventParser {
   /// Parse a single VEVENT string into a CalendarEvent object
   static CalendarEvent? parseVEvent(String vevent, String sourceCalendarUid, String accountId) {
     try {
-      // Handle line folding according to RFC 5545 BEFORE trimming lines
-      // Lines can be continued by starting the next line with a space or tab
-      AppLogger.debug('VEventParser: VEVENT before unfolding: \n$vevent');
+      AppLogger.debug('VEventParser: VEVENT after unfolding:');
+      AppLogger.debug(vevent);
 
-      // Use regex to properly handle line folding (RFC 5545)
-      // Pattern: newline followed by one or more whitespace characters
-      final unfoldedVevent = vevent.replaceAll(RegExp(r'\r?\n[\s]+'), '');
+      // Unfold the VEVENT (remove line continuations)
+      final unfoldedVevent = _unfoldCalendarText(vevent);
+      final lines = unfoldedVevent.split('\n');
 
-      AppLogger.debug('VEventParser: VEVENT after unfolding: \n$unfoldedVevent');
-      final lines = unfoldedVevent.split('\n').map((line) => line.trim()).where((line) => line.isNotEmpty);
-      
-      String? uid, summary, description, status, organizer, location, contact, url;
-      String? transparency, classification, timeZone, recurrenceRule, recurrenceId, duration;
-      DateTime? created, lastModified, dtstart, dtend;
-      List<String> categories = [];
-      List<String> resources = [];
-      List<String> alarms = [];
+      String? uid;
+      String? summary;
+      DateTime? dtstart;
+      DateTime? dtend;
+      bool isAllDay = false;
+      String? description;
+      String? location;
+      String? organizer;
       List<Attendee> attendees = [];
+      String? recurrenceRule;
+      String? recurrenceId;
       List<DateTime> recurrenceDates = [];
       List<DateTime> exceptionDates = [];
-      int sequence = 0;
-      int priority = 0;
-      bool isAllDay = false;
-      
-      for (final line in lines) {
+
+      for (String line in lines) {
+        line = line.trim();
+        if (line.isEmpty) continue;
+
         if (line.startsWith('UID:')) {
-          uid = line.substring(4);
+          uid = _unescapeCalendarText(line.substring(4));
         } else if (line.startsWith('SUMMARY:')) {
           summary = _unescapeCalendarText(line.substring(8));
-        } else if (line.startsWith('DESCRIPTION:')) {
-          description = _unescapeCalendarText(line.substring(12));
-        } else if (line.startsWith('STATUS:')) {
-          status = line.substring(7);
-        } else if (line.startsWith('CREATED:')) {
-          created = _parseDateTime(line.substring(8));
-        } else if (line.startsWith('LAST-MODIFIED:')) {
-          lastModified = _parseDateTime(line.substring(14));
         } else if (line.startsWith('DTSTART')) {
-          final dtStartLine = line.substring(7);
-          AppLogger.debug('VEventParser: DTSTART line: $dtStartLine');
-          if (dtStartLine.startsWith(';VALUE=DATE:')) {
+          final dtstartLine = line;
+          AppLogger.debug('VEventParser: DTSTART line: $dtstartLine');
+          
+          if (dtstartLine.contains('VALUE=DATE:')) {
+            // All-day event
+            final dateStr = dtstartLine.split('VALUE=DATE:')[1];
+            dtstart = _parseDate(dateStr);
             isAllDay = true;
-            final dateValue = _unescapeCalendarText(dtStartLine.substring(12));
-            dtstart = _parseDate(dateValue);
-            AppLogger.debug('VEventParser: All-day event, dtstart: $dtstart');
-          } else if (dtStartLine.startsWith(':')) {
-            // Even simple DTSTART should be converted to UTC
-            final dateTimeValue = _unescapeCalendarText(dtStartLine.substring(1));
-            dtstart = _parseDateTimeWithTimezone(dateTimeValue, null);
+            AppLogger.debug('VEventParser: All-day DTSTART, dtstart: $dtstart');
+          } else if (dtstartLine.contains(':')) {
+            // Regular event
+            final dateStr = dtstartLine.split(':')[1];
+            dtstart = _parseDateTime(dateStr);
             AppLogger.debug('VEventParser: Simple DTSTART, dtstart: $dtstart (isUtc: ${dtstart?.isUtc})');
-          } else {
-            // Handle DTSTART with timezone or other parameters
-            final colonIndex = dtStartLine.indexOf(':');
-            if (colonIndex != -1) {
-              final params = dtStartLine.substring(0, colonIndex);
-              final value = _unescapeCalendarText(dtStartLine.substring(colonIndex + 1));
-              AppLogger.debug('VEventParser: DTSTART params: $params, value: $value');
-              if (params.contains('VALUE=DATE')) {
-                isAllDay = true;
-                dtstart = _parseDate(value);
-                AppLogger.debug('VEventParser: All-day event, dtstart: $dtstart');
-              } else {
-                // Extract timezone parameter if present
-                String? tzid;
-                if (params.contains('TZID=')) {
-                  tzid = _extractParameter(params, 'TZID');
-                  timeZone = tzid; // Store for calendar event
-                  AppLogger.debug('VEventParser: Found TZID: $tzid');
-                }
-                // Use timezone-aware parsing
-                dtstart = _parseDateTimeWithTimezone(value, tzid);
-                AppLogger.debug('VEventParser: Timezone-aware dtstart: $dtstart (isUtc: ${dtstart?.isUtc})');
-              }
-            }
           }
         } else if (line.startsWith('DTEND')) {
-          final dtEndLine = line.substring(5);
-          if (dtEndLine.startsWith(';VALUE=DATE:')) {
-            final dateValue = _unescapeCalendarText(dtEndLine.substring(12));
-            dtend = _parseDate(dateValue);
-          } else if (dtEndLine.startsWith(':')) {
-            // Even simple DTEND should be converted to UTC
-            final dateTimeValue = _unescapeCalendarText(dtEndLine.substring(1));
-            dtend = _parseDateTimeWithTimezone(dateTimeValue, null);
-          } else {
-            // Handle DTEND with timezone or other parameters
-            final colonIndex = dtEndLine.indexOf(':');
-            if (colonIndex != -1) {
-              final params = dtEndLine.substring(0, colonIndex);
-              final value = _unescapeCalendarText(dtEndLine.substring(colonIndex + 1));
-              if (params.contains('VALUE=DATE')) {
-                dtend = _parseDate(value);
-              } else {
-                // Extract timezone parameter if present (should match DTSTART timezone)
-                String? tzid;
-                if (params.contains('TZID=')) {
-                  tzid = _extractParameter(params, 'TZID');
-                }
-                // Use timezone-aware parsing
-                dtend = _parseDateTimeWithTimezone(value, tzid);
-              }
-            }
+          if (line.contains('VALUE=DATE:')) {
+            // All-day event
+            final dateStr = line.split('VALUE=DATE:')[1];
+            dtend = _parseDate(dateStr);
+          } else if (line.contains(':')) {
+            // Regular event
+            final dateStr = line.split(':')[1];
+            dtend = _parseDateTime(dateStr);
           }
-        } else if (line.startsWith('DURATION:')) {
-          duration = _unescapeCalendarText(line.substring(9));
+        } else if (line.startsWith('DESCRIPTION:')) {
+          description = _unescapeCalendarText(line.substring(12));
         } else if (line.startsWith('LOCATION:')) {
           location = _unescapeCalendarText(line.substring(9));
-        } else if (line.startsWith('CATEGORIES:')) {
-          categories = _unescapeCalendarText(line.substring(11)).split(',').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
-        } else if (line.startsWith('RESOURCES:')) {
-          resources = _unescapeCalendarText(line.substring(10)).split(',').map((r) => r.trim()).where((r) => r.isNotEmpty).toList();
-        } else if (line.startsWith('SEQUENCE:')) {
-          sequence = int.tryParse(_unescapeCalendarText(line.substring(9))) ?? 0;
-        } else if (line.startsWith('PRIORITY:')) {
-          priority = int.tryParse(_unescapeCalendarText(line.substring(9))) ?? 0;
-        } else if (line.startsWith('TRANSP:')) {
-          transparency = _unescapeCalendarText(line.substring(7));
-        } else if (line.startsWith('CLASS:')) {
-          classification = _unescapeCalendarText(line.substring(6));
-        } else if (line.startsWith('CONTACT:')) {
-          contact = _unescapeCalendarText(line.substring(8));
-        } else if (line.startsWith('URL:')) {
-          url = _unescapeCalendarText(line.substring(4));
-        } else if (line.startsWith('RRULE:')) {
-          recurrenceRule = _unescapeCalendarText(line.substring(6));
-        } else if (line.startsWith('RECURRENCE-ID:')) {
-          recurrenceId = _unescapeCalendarText(line.substring(14));
-        } else if (line.startsWith('RDATE:')) {
-          final rdateValue = line.substring(6);
-          final dates = _parseMultipleDates(rdateValue);
-          recurrenceDates.addAll(dates);
-        } else if (line.startsWith('EXDATE:')) {
-          final exdateValue = line.substring(7);
-          final dates = _parseMultipleDates(exdateValue);
-          exceptionDates.addAll(dates);
         } else if (line.startsWith('ORGANIZER:')) {
-          // Parse organizer (remove mailto: prefix if present)
-          organizer = line.substring(10);
-          if (organizer.startsWith('mailto:')) {
-            organizer = _unescapeCalendarText(organizer.substring(7));
-          }
-          AppLogger.debug('VEventParser: Found organizer: $organizer');
-        } else if (line.startsWith('ATTENDEE:') || line.startsWith('ATTENDEE;')) {
-          // Parse attendee with parameters according to RFC 5545
-          final attendee = _parseAttendee(line);
+          organizer = _parseOrganizer(line.substring(10));
+        } else if (line.startsWith('ATTENDEE:')) {
+          final attendee = _parseAttendee(line.substring(9));
           if (attendee != null) {
-            // Check if attendee already exists (by email)
-            final existingIndex = attendees.indexWhere((a) => a.email == attendee.email);
-            if (existingIndex >= 0) {
-              // Update existing attendee
-              attendees[existingIndex] = attendee;
-            } else {
-              // Add new attendee
-              attendees.add(attendee);
-            }
+            attendees.add(attendee);
             AppLogger.debug('VEventParser: Added attendee: ${attendee.email} (${attendee.displayName ?? 'no name'})');
           }
-        } else if (line.startsWith('BEGIN:VALARM')) {
-          // Simple alarm parsing - just store the type for now
-          alarms.add('ALARM');
+        } else if (line.startsWith('RECURRENCE-ID:')) {
+          recurrenceId = _unescapeCalendarText(line.substring(14));
+          AppLogger.debug('VEventParser: Found RECURRENCE-ID: $recurrenceId');
         }
+        // Note: We're intentionally ignoring RRULE, RDATE, EXDATE since the CalDAV server
+        // handles expansion and returns individual instances
       }
-      
+
       if (uid != null && summary != null && dtstart != null) {
         AppLogger.debug('VEventParser: Successfully parsed VEVENT: $uid');
-        AppLogger.debug('VEventParser: - Summary: $summary');
-        AppLogger.debug('VEventParser: - Start: $dtstart');
-        AppLogger.debug('VEventParser: - End: $dtend');
-        AppLogger.debug('VEventParser: - All Day: $isAllDay');
-        AppLogger.debug('VEventParser: - Organizer: $organizer');
-        AppLogger.debug('VEventParser: - Attendees count: ${attendees.length}');
-        
+
         return CalendarEvent(
           uid: uid,
           summary: summary,
-          description: description ?? '',
-          status: status ?? 'CONFIRMED',
-          lastModified: lastModified ?? DateTime.now(),
-          created: created ?? DateTime.now(),
-          dtstamp: DateTime.now(), // Required by iCalendar specification
           dtstart: dtstart,
           dtend: dtend,
-          duration: duration,
-          transparency: transparency ?? 'OPAQUE',
-          classification: classification ?? 'PUBLIC',
-          sequence: sequence,
-          priority: priority,
+          isAllDay: isAllDay,
+          description: description ?? '',
           location: location,
           organizer: organizer,
           attendees: attendees,
-          contact: contact,
-          url: url,
-          categories: categories,
-          resources: resources,
-          timeZone: timeZone,
-          recurrenceRule: recurrenceRule,
-          recurrenceDates: recurrenceDates,
-          exceptionDates: exceptionDates,
-          recurrenceId: recurrenceId,
-          alarms: alarms,
           sourceCalendarUid: sourceCalendarUid,
           accountId: accountId,
-          isAllDay: isAllDay,
-          isRecurring: recurrenceRule != null,
-          isException: recurrenceId != null,
-          computedDuration: dtend != null ? dtend.difference(dtstart) : null,
+          isRecurring: false, // Server handles expansion, so all events are treated as individual
+          recurrenceRule: null, // Not needed since server handles expansion
+          recurrenceId: recurrenceId,
+          recurrenceDates: [],
+          exceptionDates: [],
+          dtstamp: DateTime.now(),
+          created: DateTime.now(),
+          lastModified: DateTime.now(),
         );
+      } else {
+        AppLogger.warning('VEventParser: Failed to parse VEVENT - missing required fields');
+        AppLogger.warning('VEventParser: uid: $uid, summary: $summary, dtstart: $dtstart');
+        return null;
       }
     } catch (e, stackTrace) {
-      AppLogger.error('VEventParser: Failed to parse VEVENT', e, stackTrace);
+      AppLogger.error('VEventParser: Error parsing VEVENT: $e');
+      AppLogger.error('VEventParser: Stack trace: $stackTrace');
+      return null;
     }
-    
-    return null;
   }
 
   /// Parse multiple VEVENT objects from CalDAV response
@@ -562,5 +458,21 @@ class VEventParser {
       AppLogger.warning('VEventParser: Error converting timezone "$timezoneId": $e - treating as local time and converting to UTC');
       return baseDateTime.toUtc();
     }
+  }
+
+  /// Unfold the VEVENT (remove line continuations)
+  static String _unfoldCalendarText(String vevent) {
+    // Use regex to properly handle line folding (RFC 5545)
+    // Pattern: newline followed by one or more whitespace characters
+    return vevent.replaceAll(RegExp(r'\r?\n[\s]+'), '');
+  }
+
+  /// Parse organizer from ORGANIZER line
+  static String _parseOrganizer(String line) {
+    // Remove mailto: prefix if present
+    if (line.startsWith('mailto:')) {
+      return _unescapeCalendarText(line.substring(7));
+    }
+    return line;
   }
 } 
