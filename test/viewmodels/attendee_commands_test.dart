@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flowit_app/data/models/task.dart';
-import 'package:flowit_app/data/models/attendee.dart';
-import 'package:flowit_app/data/repositories/task_repository.dart';
-import 'package:flowit_app/presentation/viewmodels/commands/attendee_commands.dart';
-import 'package:flowit_app/core/result.dart';
+import 'package:towdow_app/data/models/task.dart';
+import 'package:towdow_app/data/models/attendee.dart';
+import 'package:towdow_app/data/repositories/task_repository.dart';
+import 'package:towdow_app/presentation/viewmodels/commands/attendee_commands.dart';
+import 'package:towdow_app/core/result.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 
