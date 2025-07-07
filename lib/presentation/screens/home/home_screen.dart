@@ -408,7 +408,7 @@ class _TaskListTab extends ConsumerWidget {
                         ),
                         data: (events) => ExternalEventsList(
                           events: events,
-                          startReduced: true,
+                          startReduced: false,
                           limitReducedEvents: false,
                         ),
                       ),
@@ -438,8 +438,8 @@ class _TaskListTab extends ConsumerWidget {
                           child: Wrap(
                             spacing: 12.0, // Horizontal spacing between tasks
                             runSpacing: 12.0, // Vertical spacing between rows
-                            alignment: WrapAlignment.start,
-                            runAlignment: WrapAlignment.start,
+                            alignment: WrapAlignment.center,
+                            runAlignment: WrapAlignment.center,
                             children: tasks.map((task) {
                               return ConstrainedBox(
                                 constraints: const BoxConstraints(
@@ -490,20 +490,6 @@ class _TaskListTab extends ConsumerWidget {
                                     ref.invalidate(laterTasksProvider);
                                     ref.invalidate(anytimeTasksProvider);
                                     
-                                    // Show confirmation
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Task "${task.summary}" deleted'),
-                                          action: SnackBarAction(
-                                            label: 'Undo',
-                                            onPressed: () {
-                                              // TODO: Implement undo functionality
-                                            },
-                                          ),
-                                        ),
-                                      );
-                                    }
                                   },
                                 ),
                               );

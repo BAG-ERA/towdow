@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/models/calendar_event.dart';
-import '../../../data/providers/providers.dart';
 import 'external_event_card.dart';
 
 class ExternalEventsList extends ConsumerStatefulWidget {
@@ -84,61 +83,6 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with title and collapse button
-          Row(
-            children: [
-              Icon(
-                Icons.event_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Agenda',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Collapse/Expand toggle button with animation
-              Tooltip(
-                message: _isReduced ? 'Expand calendar' : 'Collapse calendar',
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _isReduced = !_isReduced;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: !_isReduced 
-                          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                          : null,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: AnimatedRotation(
-                      duration: const Duration(milliseconds: 300),
-                      turns: _isReduced ? 0.0 : 0.5,
-                      child: Icon(
-                        Icons.keyboard_arrow_down,
-                        color: !_isReduced 
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          
           // Events list with animation
           AnimatedSize(
             duration: const Duration(milliseconds: 300),
@@ -147,12 +91,55 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
               offset: _isReduced ? const Offset(0, -0.1) : Offset.zero,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 250),
-                opacity: _isReduced ? 0.0 : 1.0,
-                child: _isReduced 
-                  ? const SizedBox.shrink()
-                  : Column(
+              child: _isReduced 
+                ? Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Tooltip(
+                          message: 'Show agenda',
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _isReduced = false;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.event_rounded,
+                                    color: Theme.of(context).colorScheme.primary,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Agenda',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context).colorScheme.primary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : AnimatedOpacity(
+                    duration: const Duration(milliseconds: 250),
+                    opacity: 1.0,
+                    child: Column(
                       children: [
                         _buildEventsLayout(context),
                         
@@ -164,19 +151,12 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
                         ),
                       ],
                     ),
-              ),
+                  ),
             ),
           ),
         ],
       ),
     );
-  }
-  
-  // This method is no longer used since we removed the reduced layout
-  // Keeping it for potential future use or reference
-  Widget _buildReducedLayout() {
-    // This method is deprecated - events are now either shown or hidden completely
-    return const SizedBox.shrink();
   }
   
   Widget _buildEventsLayout(BuildContext context) {
@@ -191,6 +171,59 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
     // Group events by date
     final groupedEvents = _groupEventsByDate(sortedEvents);
     
+    // Create the main content with button
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Main events content
+        Expanded(
+          child: _buildEventsContent(context, groupedEvents, isDesktop, isLargeDesktop),
+        ),
+        
+        // Collapse button column
+        Column(
+          children: [
+            // Collapse/Expand toggle button with animation
+            Tooltip(
+              message: _isReduced ? 'Expand calendar' : 'Collapse calendar',
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _isReduced = !_isReduced;
+                  });
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: !_isReduced 
+                        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                        : null,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: AnimatedRotation(
+                    duration: const Duration(milliseconds: 300),
+                    turns: _isReduced ? 0.0 : 0.5,
+                    child: Icon(
+                      Icons.keyboard_arrow_down,
+                      color: !_isReduced 
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildEventsContent(BuildContext context, Map<DateTime, List<CalendarEvent>> groupedEvents, bool isDesktop, bool isLargeDesktop) {
     // Determine number of columns based on screen width and day groups
     if (isLargeDesktop && groupedEvents.length >= 3) {
       return _buildMultiColumnDayLayout(context, groupedEvents, 3);
@@ -203,13 +236,13 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
   
   Widget _buildSingleColumnDayLayout(Map<DateTime, List<CalendarEvent>> groupedEvents) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: groupedEvents.entries.map((entry) {
         final date = entry.key;
         final events = entry.value;
         
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Day header
             Container(
@@ -257,13 +290,13 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
           
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: groups.map((entry) {
                 final date = entry.key;
                 final events = entry.value;
                 
                 return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // Day header
                     Container(

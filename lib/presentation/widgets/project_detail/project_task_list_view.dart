@@ -275,8 +275,8 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
     return Wrap(
       spacing: 12.0, // Horizontal spacing between tasks
       runSpacing: 12.0, // Vertical spacing between rows
-      alignment: WrapAlignment.start,
-      runAlignment: WrapAlignment.start,
+      alignment: WrapAlignment.center,
+      runAlignment: WrapAlignment.center,
       children: tasks.map((task) {
         final controller = _sectionControllers[sectionKey]?[task.uid];
         

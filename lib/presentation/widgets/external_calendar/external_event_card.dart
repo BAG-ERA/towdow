@@ -171,31 +171,19 @@ class ExternalEventCard extends ConsumerWidget {
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(8),
-          border: Border(
-            left: BorderSide(
-              width: 4,
-              color: eventColor,
-            ),
-          ),
         ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Time column
           SizedBox(
-            width: 50,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (timeDisplay.isNotEmpty)
-                  Text(
-                    timeDisplay,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
+            width: 80,
+            child: Text(
+              timeDisplay,
+              style: textTheme.bodySmall?.copyWith(
+                color: eventColor,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           
@@ -206,40 +194,27 @@ class ExternalEventCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Event title
-                Text(
-                  event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                
-                // Location
-                if (event.location?.isNotEmpty == true) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
+                // Event title and location icon on same line
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (event.location?.isNotEmpty == true)
                       Icon(
                         Icons.location_on_outlined,
                         size: 14,
                         color: colorScheme.onSurfaceVariant,
                       ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          event.location!,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
                 
                 // Calendar name with color indicator
                 if (calendar != null && !hideCalendarName) ...[
@@ -293,12 +268,6 @@ class ExternalEventCard extends ConsumerWidget {
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(6),
-          border: Border(
-            left: BorderSide(
-              width: 3,
-              color: eventColor,
-            ),
-          ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -306,11 +275,11 @@ class ExternalEventCard extends ConsumerWidget {
             // Time column (no day context)
             if (timeDisplay.isNotEmpty)
               SizedBox(
-                width: 50,
+                width: 80,
                 child: Text(
                   timeDisplay,
                   style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                    color: eventColor,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
