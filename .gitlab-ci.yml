@@ -146,6 +146,8 @@ release:
       artifacts: true
     - job: build_android
       artifacts: true
+    - job: build_windows
+      artifacts: true
     - job: prepare_release
       artifacts: true
   rules:
