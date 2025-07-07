@@ -116,6 +116,8 @@ build_windows:
     - powershell -ExecutionPolicy Bypass -File .\CI_scripts\windows\install_inno.ps1
     - dart run inno_bundle:build --release --app-version "$env:CI_COMMIT_TAG" --no-gen-publisher --no-app
     - Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "build/windows/x64/runner/Release/towdow_app-$env:CI_COMMIT_TAG.zip"
+    - dir "build/windows/x64/runner/Release/towdow_app-$env:CI_COMMIT_TAG.zip"
+    - dir "build/windows/x64/installer/Release/TowdowApp-x86_64-$env:CI_COMMIT_TAG-Installer.exe"
   artifacts:
     paths:
       - "build/windows/x64/runner/Release/towdow_app-$env:CI_COMMIT_TAG.zip"
