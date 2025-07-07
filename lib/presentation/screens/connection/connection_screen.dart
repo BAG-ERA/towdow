@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'widgets/custom_caldav_dialog.dart';
-import 'widgets/flowit-cloud_dialog.dart';
+import 'widgets/towdow-cloud_dialog.dart';
 
 class ConnectionScreen extends ConsumerWidget {
   const ConnectionScreen({super.key});
