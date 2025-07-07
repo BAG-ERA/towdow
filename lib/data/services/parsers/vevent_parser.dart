@@ -53,18 +53,20 @@ class VEventParser {
           AppLogger.debug('VEventParser: DTSTART line: $dtStartLine');
           if (dtStartLine.startsWith(';VALUE=DATE:')) {
             isAllDay = true;
-            dtstart = _parseDate(dtStartLine.substring(12));
+            final dateValue = _unescapeCalendarText(dtStartLine.substring(12));
+            dtstart = _parseDate(dateValue);
             AppLogger.debug('VEventParser: All-day event, dtstart: $dtstart');
           } else if (dtStartLine.startsWith(':')) {
             // Even simple DTSTART should be converted to UTC
-            dtstart = _parseDateTimeWithTimezone(dtStartLine.substring(1), null);
+            final dateTimeValue = _unescapeCalendarText(dtStartLine.substring(1));
+            dtstart = _parseDateTimeWithTimezone(dateTimeValue, null);
             AppLogger.debug('VEventParser: Simple DTSTART, dtstart: $dtstart (isUtc: ${dtstart?.isUtc})');
           } else {
             // Handle DTSTART with timezone or other parameters
             final colonIndex = dtStartLine.indexOf(':');
             if (colonIndex != -1) {
               final params = dtStartLine.substring(0, colonIndex);
-              final value = dtStartLine.substring(colonIndex + 1);
+              final value = _unescapeCalendarText(dtStartLine.substring(colonIndex + 1));
               AppLogger.debug('VEventParser: DTSTART params: $params, value: $value');
               if (params.contains('VALUE=DATE')) {
                 isAllDay = true;
@@ -87,16 +89,18 @@ class VEventParser {
         } else if (line.startsWith('DTEND')) {
           final dtEndLine = line.substring(5);
           if (dtEndLine.startsWith(';VALUE=DATE:')) {
-            dtend = _parseDate(dtEndLine.substring(12));
+            final dateValue = _unescapeCalendarText(dtEndLine.substring(12));
+            dtend = _parseDate(dateValue);
           } else if (dtEndLine.startsWith(':')) {
             // Even simple DTEND should be converted to UTC
-            dtend = _parseDateTimeWithTimezone(dtEndLine.substring(1), null);
+            final dateTimeValue = _unescapeCalendarText(dtEndLine.substring(1));
+            dtend = _parseDateTimeWithTimezone(dateTimeValue, null);
           } else {
             // Handle DTEND with timezone or other parameters
             final colonIndex = dtEndLine.indexOf(':');
             if (colonIndex != -1) {
               final params = dtEndLine.substring(0, colonIndex);
-              final value = dtEndLine.substring(colonIndex + 1);
+              final value = _unescapeCalendarText(dtEndLine.substring(colonIndex + 1));
               if (params.contains('VALUE=DATE')) {
                 dtend = _parseDate(value);
               } else {
@@ -265,9 +269,12 @@ class VEventParser {
   /// Parse DateTime from iCalendar format
   static DateTime? _parseDateTime(String dateTimeStr) {
     try {
+      // Unescape HTML entities first
+      final cleanDateTimeStr = _unescapeCalendarText(dateTimeStr);
+      
       // Handle both YYYYMMDDTHHMMSSZ and YYYYMMDD formats
-      if (dateTimeStr.endsWith('Z')) {
-        final cleanStr = dateTimeStr.substring(0, dateTimeStr.length - 1);
+      if (cleanDateTimeStr.endsWith('Z')) {
+        final cleanStr = cleanDateTimeStr.substring(0, cleanDateTimeStr.length - 1);
         if (cleanStr.length >= 15) {
           return DateTime.utc(
             int.parse(cleanStr.substring(0, 4)),
@@ -278,19 +285,19 @@ class VEventParser {
             int.parse(cleanStr.substring(13, 15)),
           );
         }
-      } else if (dateTimeStr.length >= 15) {
+      } else if (cleanDateTimeStr.length >= 15) {
         // Handle local datetime format YYYYMMDDTHHMMSS
         return DateTime(
-          int.parse(dateTimeStr.substring(0, 4)),
-          int.parse(dateTimeStr.substring(4, 6)),
-          int.parse(dateTimeStr.substring(6, 8)),
-          int.parse(dateTimeStr.substring(9, 11)),
-          int.parse(dateTimeStr.substring(11, 13)),
-          int.parse(dateTimeStr.substring(13, 15)),
+          int.parse(cleanDateTimeStr.substring(0, 4)),
+          int.parse(cleanDateTimeStr.substring(4, 6)),
+          int.parse(cleanDateTimeStr.substring(6, 8)),
+          int.parse(cleanDateTimeStr.substring(9, 11)),
+          int.parse(cleanDateTimeStr.substring(11, 13)),
+          int.parse(cleanDateTimeStr.substring(13, 15)),
         );
       }
       // Try ISO format as fallback
-      return DateTime.tryParse(dateTimeStr);
+      return DateTime.tryParse(cleanDateTimeStr);
     } catch (e) {
       AppLogger.error('VEventParser: Failed to parse date time: $dateTimeStr', e, StackTrace.current);
       return null;
@@ -300,16 +307,19 @@ class VEventParser {
   /// Parse Date from iCalendar format (for all-day events)
   static DateTime? _parseDate(String dateStr) {
     try {
+      // Unescape HTML entities first
+      final cleanDateStr = _unescapeCalendarText(dateStr);
+      
       // Handle YYYYMMDD format
-      if (dateStr.length == 8) {
+      if (cleanDateStr.length == 8) {
         return DateTime(
-          int.parse(dateStr.substring(0, 4)),
-          int.parse(dateStr.substring(4, 6)),
-          int.parse(dateStr.substring(6, 8)),
+          int.parse(cleanDateStr.substring(0, 4)),
+          int.parse(cleanDateStr.substring(4, 6)),
+          int.parse(cleanDateStr.substring(6, 8)),
         );
       }
       // Try ISO format as fallback
-      return DateTime.tryParse(dateStr);
+      return DateTime.tryParse(cleanDateStr);
     } catch (e) {
       AppLogger.error('VEventParser: Failed to parse date: $dateStr', e, StackTrace.current);
       return null;
