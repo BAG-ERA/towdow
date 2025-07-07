@@ -103,7 +103,7 @@ build_windows:
   rules:
     - if: '$CI_COMMIT_TAG'
   script:
-    - echo "WINDOWS_JOB_ID=$CI_JOB_ID" > build.env
+    - echo "WINDOWS_JOB_ID=$env:CI_JOB_ID" > build.env
     # prevent fatal: detected dubious ownership in repository at 'C:/flutter'
     - git config --global --add safe.directory C:/flutter
     - flutter pub get
