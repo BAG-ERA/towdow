@@ -224,12 +224,12 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
       builder: (context, constraints) {
         // Calculate optimal number of columns based on available width
         final availableWidth = constraints.maxWidth;
-        final minColumnWidth = 280.0; // Minimum width for a day column
+        final minColumnWidth = 240.0; // Minimum width for a day column (reduced for more flexibility)
         final columnSpacing = 16.0; // Spacing between columns
         
         // Calculate how many columns can fit
         int maxColumns = (availableWidth / (minColumnWidth + columnSpacing)).floor();
-        maxColumns = maxColumns.clamp(1, 4); // Limit to 1-4 columns
+        maxColumns = maxColumns.clamp(1, 8); // Allow up to 8 columns for very wide screens
         
         // If we have fewer day groups than max columns, use the number of day groups
         final dayGroups = groupedEvents.entries.toList();
@@ -277,17 +277,66 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
     );
   }
   
-  Widget _buildMultiColumnLayout(BuildContext context, Map<DateTime, List<CalendarEvent>> groupedEvents, int columnCount) {
-    // Split day groups between columns, distributing evenly
+  Widget _buildMultiColumnLayout(BuildContext context, Map<DateTime, List<CalendarEvent>> groupedEvents, int maxColumnCount) {
+    // Start with one column per day
     final dayGroups = groupedEvents.entries.toList();
-    final columnGroups = List.generate(columnCount, (index) => <MapEntry<DateTime, List<CalendarEvent>>>[]);
+    final currentColumnCount = dayGroups.length;
     
-    // Distribute day groups across columns
-    for (int i = 0; i < dayGroups.length; i++) {
-      final columnIndex = i % columnCount;
-      columnGroups[columnIndex].add(dayGroups[i]);
+    // Calculate estimated heights for each day group
+    final dayGroupHeights = <MapEntry<DateTime, List<CalendarEvent>>, double>{};
+    for (final entry in dayGroups) {
+      final events = entry.value;
+      // Estimate height: header (40) + events (80 each) + margins
+      final estimatedHeight = 40.0 + (events.length * 80.0) + 16.0;
+      dayGroupHeights[entry] = estimatedHeight;
     }
     
+    // If current column count <= max column count, use one column per day
+    if (currentColumnCount <= maxColumnCount) {
+      final columnGroups = List.generate(currentColumnCount, (index) => <MapEntry<DateTime, List<CalendarEvent>>>[]);
+      for (int i = 0; i < dayGroups.length; i++) {
+        columnGroups[i].add(dayGroups[i]);
+      }
+      return _buildColumnLayout(context, columnGroups);
+    }
+    
+    // Otherwise, we need to combine columns
+    var columnGroups = <List<MapEntry<DateTime, List<CalendarEvent>>>>[];
+    var columnHeights = <double>[];
+    
+    // Initialize: one day per column
+    for (int i = 0; i < dayGroups.length; i++) {
+      columnGroups.add([dayGroups[i]]);
+      columnHeights.add(dayGroupHeights[dayGroups[i]]!);
+    }
+    
+    // Combine columns until we reach the target count
+    while (columnGroups.length > maxColumnCount) {
+      // Find the two adjacent columns with smallest combined height
+      int bestIndex = 0;
+      double bestCombinedHeight = columnHeights[0] + columnHeights[1];
+      
+      for (int i = 0; i < columnGroups.length - 1; i++) {
+        final combinedHeight = columnHeights[i] + columnHeights[i + 1];
+        if (combinedHeight < bestCombinedHeight) {
+          bestCombinedHeight = combinedHeight;
+          bestIndex = i;
+        }
+      }
+      
+      // Combine the two columns
+      columnGroups[bestIndex].addAll(columnGroups[bestIndex + 1]);
+      columnHeights[bestIndex] = bestCombinedHeight;
+      
+      // Remove the second column
+      columnGroups.removeAt(bestIndex + 1);
+      columnHeights.removeAt(bestIndex + 1);
+    }
+    
+    return _buildColumnLayout(context, columnGroups);
+  }
+  
+  Widget _buildColumnLayout(BuildContext context, List<List<MapEntry<DateTime, List<CalendarEvent>>>> columnGroups) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: columnGroups.asMap().entries.map((columnEntry) {
