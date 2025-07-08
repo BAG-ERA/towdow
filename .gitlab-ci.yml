@@ -13,6 +13,8 @@ variables:
 build_base_image:
   stage: prepare
   image: docker:latest
+  tags:
+    - docker-build
   services:
     - docker:dind
   script:
