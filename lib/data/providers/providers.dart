@@ -136,10 +136,13 @@ final backgroundSyncServiceProvider = Provider<BackgroundSyncService>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final syncService = ref.watch(syncServiceProvider);
+  
   return BackgroundSyncService(
     taskRepository: taskRepository,
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
+    syncService: syncService,
     onSessionExpired: (_) => handleSessionExpired(ref),
   );
 });
@@ -512,4 +515,4 @@ final tasksWithAttendeesProvider = FutureProvider<Map<String, int>>((ref) async 
     },
     failure: (failure) => throw Exception(failure.message),
   );
-}); 
+});

@@ -1,4 +1,4 @@
-﻿// Background sync service for incremental CalDAV synchronization using sync tokens
+// Background sync service for incremental CalDAV synchronization using sync tokens
 // Implements RFC 6578 for WebDAV Sync and RFC 4791 for CalDAV sync-collection reports
 // Provides optimistic, offline-first sync every 10 seconds with intelligent etag comparison
 
@@ -14,11 +14,13 @@ import 'caldav_service.dart';
 import 'webdav_client.dart';
 import 'parsers/vtodo_parser.dart';
 import 'parsers/xml_response_parser.dart';
+import 'sync_service.dart';
 
 class BackgroundSyncService {
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
+  SyncService? _syncService; // Reference to main sync service for queue processing
 
   /// Optional callback to notify UI when session expires (e.g., to show connection screen and SnackBar)
   final void Function(CaldavAccount account)? onSessionExpired;
@@ -35,10 +37,17 @@ class BackgroundSyncService {
     required TaskRepository taskRepository,
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
+    SyncService? syncService, // Optional reference to main sync service
     this.onSessionExpired,
   })  : _taskRepository = taskRepository,
         _accountRepository = accountRepository,
-        _calendarRepository = calendarRepository;
+        _calendarRepository = calendarRepository,
+        _syncService = syncService;
+
+  /// Set the main sync service reference (called after initialization)
+  void setSyncService(SyncService syncService) {
+    _syncService = syncService;
+  }
 
   /// Start background sync service
   Future<Result<void>> start() async {
@@ -107,6 +116,9 @@ class BackgroundSyncService {
               for (final calendar in calendars) {
                 await _syncCalendar(account, calendar);
               }
+              
+              // After successful background sync, trigger queue processing
+              await _triggerQueueProcessing();
             },
             failure: (failure) async {
               AppLogger.error('BackgroundSyncService: Failed to get calendars', failure.exception, failure.stackTrace);
@@ -121,6 +133,21 @@ class BackgroundSyncService {
       AppLogger.error('BackgroundSyncService: Background sync failed', e, stackTrace);
     } finally {
       _isSyncing = false;
+    }
+  }
+
+  /// Trigger queue processing through main sync service
+  Future<void> _triggerQueueProcessing() async {
+    if (_syncService != null) {
+      try {
+        AppLogger.debug('BackgroundSyncService: Triggering queue processing after successful background sync');
+        // Use the simpler forceQueueProcessing method
+        await _syncService!.forceQueueProcessing();
+      } catch (e, stackTrace) {
+        AppLogger.error('BackgroundSyncService: Failed to trigger queue processing', e, stackTrace);
+      }
+    } else {
+      AppLogger.debug('BackgroundSyncService: No main sync service available for queue processing');
     }
   }
 

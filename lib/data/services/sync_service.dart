@@ -115,19 +115,16 @@ class SyncService {
   bool get isBackgroundSyncRunning => false;
   bool get isBackgroundSyncing => false;
 
-  /// Initialize the sync service and start periodic sync
+  /// Initialize the sync service
   Future<Result<void>> initialize() async {
     try {
       // AppLogger.info('SyncService: Initializing sync service');
       
-      // Start periodic sync if we have an active account
+      // Check if we have an active account
       final accountResult = await _accountRepository.getActiveAccount();
       await accountResult.when(
         success: (account) async {
           if (account != null) {
-            // Start periodic sync (every 10 seconds)
-            startPeriodicSync();
-            
             // Perform initial sync
             await syncNow();
           }
@@ -149,7 +146,8 @@ class SyncService {
     }
   }
 
-  /// Start periodic background sync
+  /// Start periodic background sync (deprecated - use BackgroundSyncService instead)
+  @Deprecated('Use BackgroundSyncService for periodic sync')
   void startPeriodicSync() {
     _periodicSyncTimer?.cancel();
     _periodicSyncTimer = Timer.periodic(syncInterval, (_) {
@@ -158,7 +156,8 @@ class SyncService {
     // AppLogger.info('SyncService: Started periodic sync (every ${syncInterval.inSeconds} seconds)');
   }
 
-  /// Stop periodic background sync
+  /// Stop periodic background sync (deprecated - use BackgroundSyncService instead)
+  @Deprecated('Use BackgroundSyncService for periodic sync')
   void stopPeriodicSync() {
     _periodicSyncTimer?.cancel();
     _periodicSyncTimer = null;
@@ -1035,9 +1034,158 @@ class SyncService {
     }
   }
 
+  /// Process sync queue only (for background sync service)
+  /// This method bypasses the sync status check and only processes queued operations
+  Future<Result<SyncResult>> processQueueOnly() async {
+    try {
+      AppLogger.debug('SyncService: Processing queue only (bypassing sync status check)');
+      
+      // Get active account
+      final accountResult = await _accountRepository.getActiveAccount();
+      return await accountResult.when(
+        success: (account) async {
+          if (account == null) {
+            return Result.failure(Failure(
+              message: 'No active CalDAV account configured',
+              exception: Exception('No account'),
+            ));
+          }
+
+          return await _performQueueProcessing(account);
+        },
+        failure: (failure) async {
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Queue processing failed', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Queue processing failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Perform queue processing only (without sync status check)
+  Future<Result<SyncResult>> _performQueueProcessing(CaldavAccount account) async {
+    final caldavService = CalDAVService(account: account);
+    final errors = <String>[];
+    int syncedItems = 0;
+    int failedItems = 0;
+
+    try {
+      // Get selected calendars from repository
+      final selectedCalendarsResult = await _calendarRepository.getProjectCalendars();
+      final selectedCalendars = selectedCalendarsResult.when(
+        success: (calendars) => calendars,
+        failure: (failure) {
+          AppLogger.error('SyncService: Failed to get selected calendars: ${failure.message}');
+          return <TaskCalendar>[];
+        },
+      );
+      
+      if (selectedCalendars.isEmpty) {
+        AppLogger.warning('SyncService: No calendars selected for queue processing');
+        errors.add('No calendars selected for queue processing');
+        failedItems++;
+      } else {
+        AppLogger.debug('SyncService: Processing queue for ${selectedCalendars.length} calendars');
+        
+        for (final calendar in selectedCalendars) {
+          // Check if there are queued operations for this calendar
+          final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.uid);
+          if (hasQueuedOperations) {
+            AppLogger.debug('SyncService: Found queued operations for calendar ${calendar.uid}');
+            await _processSyncQueueForCalendar(caldavService, calendar.uid, errors);
+            syncedItems++;
+          } else {
+            AppLogger.debug('SyncService: No queued operations for calendar ${calendar.uid}');
+          }
+        }
+      }
+
+      final result = SyncResult(
+        success: errors.isEmpty,
+        syncedItems: syncedItems,
+        failedItems: failedItems,
+        errors: errors,
+        syncTime: DateTime.now(),
+      );
+
+      AppLogger.info('SyncService: Queue processing completed - ${result.syncedItems} synced, ${result.failedItems} failed');
+      return Result.success(result);
+
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Queue processing operation failed', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Queue processing operation failed: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Force queue processing (for background sync service)
+  /// This method processes the queue without doing full sync
+  Future<void> forceQueueProcessing() async {
+    try {
+      AppLogger.debug('SyncService: Force processing queue');
+      
+      // Get active account
+      final accountResult = await _accountRepository.getActiveAccount();
+      await accountResult.when(
+        success: (account) async {
+          if (account == null) {
+            AppLogger.debug('SyncService: No active account for queue processing');
+            return;
+          }
+
+          // Get selected calendars
+          final selectedCalendarsResult = await _calendarRepository.getProjectCalendars();
+          final selectedCalendars = selectedCalendarsResult.when(
+            success: (calendars) => calendars,
+            failure: (failure) {
+              AppLogger.error('SyncService: Failed to get calendars for queue processing: ${failure.message}');
+              return <TaskCalendar>[];
+            },
+          );
+          
+          if (selectedCalendars.isEmpty) {
+            AppLogger.debug('SyncService: No calendars selected for queue processing');
+            return;
+          }
+
+          // Process queue for each calendar
+          final caldavService = CalDAVService(account: account);
+          final errors = <String>[];
+          
+          for (final calendar in selectedCalendars) {
+            final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.uid);
+            if (hasQueuedOperations) {
+              AppLogger.debug('SyncService: Processing queue for calendar ${calendar.uid}');
+              await _processSyncQueueForCalendar(caldavService, calendar.uid, errors);
+            }
+          }
+          
+          if (errors.isNotEmpty) {
+            AppLogger.warning('SyncService: Queue processing completed with errors: ${errors.join(', ')}');
+          } else {
+            AppLogger.debug('SyncService: Queue processing completed successfully');
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('SyncService: Failed to get account for queue processing: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Exception during force queue processing', e, stackTrace);
+    }
+  }
+
   /// Dispose resources
   void dispose() {
-    stopPeriodicSync();
+    // Note: No periodic sync to stop - BackgroundSyncService handles this
     _statusController.close();
     _progressController.close();
     // AppLogger.info('SyncService: Disposed');

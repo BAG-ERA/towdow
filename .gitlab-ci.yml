@@ -10,54 +10,56 @@ variables:
   ANDROID_TOOL_VERSION_X: "34"
   ANDROID_TOOL_VERSION: "${ANDROID_TOOL_VERSION_X}.0.0"
 
-build_base_image:
-  stage: prepare
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - >
-      docker build
-      --build-arg FLUTTER_VERSION=$FLUTTER_VERSION
-      --build-arg ANDROID_TOOL_VERSION_X=$ANDROID_TOOL_VERSION_X
-      --build-arg ANDROID_TOOL_VERSION=$ANDROID_TOOL_VERSION
-      -t $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG -f CI_scripts/linux/Dockerfile .
-    - docker push $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
-  rules:
-    - if: '$CI_COMMIT_TAG'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      changes:
-        - .gitlab-ci.yml
-      when: always
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      when: manual
+#build_base_image:
+#  stage: prepare
+#  image: docker:latest
+#  tags:
+#    - docker-build
+#  services:
+#    - docker:dind
+#  script:
+#    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#    - >
+#      docker build
+#      --build-arg FLUTTER_VERSION=$FLUTTER_VERSION
+#      --build-arg ANDROID_TOOL_VERSION_X=$ANDROID_TOOL_VERSION_X
+#      --build-arg ANDROID_TOOL_VERSION=$ANDROID_TOOL_VERSION
+#      -t $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG -f CI_scripts/linux/Dockerfile .
+#    - docker push $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
+#  rules:
+#    - if: '$CI_COMMIT_TAG'
+#      when: never
+#    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+#      changes:
+#        - .gitlab-ci.yml
+#      when: always
+#    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+#      when: manual
 
-build_windows_base_image:
-  stage: prepare
-  image: docker:latest
-  tags:
-    - windows
-  services:
-    - docker:dind
-  variables:
-    WINDOWS_CUSTOM_IMAGE_NAME: "$CI_REGISTRY_IMAGE/flutter-windows-build-env"
-    WINDOWS_CUSTOM_IMAGE_TAG: "$FLUTTER_VERSION"
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $WINDOWS_CUSTOM_IMAGE_NAME:$WINDOWS_CUSTOM_IMAGE_TAG -f CI_scripts/windows/Dockerfile .
-    - docker push $WINDOWS_CUSTOM_IMAGE_NAME:$WINDOWS_CUSTOM_IMAGE_TAG
-  rules:
-    - if: '$CI_COMMIT_TAG'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      changes:
-        - .gitlab-ci.yml
-        - CI_scripts/windows/Dockerfile
-      when: always
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      when: manual
+#build_windows_base_image:
+#  stage: prepare
+#  image: docker:latest
+#  tags:
+#    - windows
+#  services:
+#    - docker:dind
+#  variables:
+#    WINDOWS_CUSTOM_IMAGE_NAME: "$CI_REGISTRY_IMAGE/flutter-windows-build-env"
+#    WINDOWS_CUSTOM_IMAGE_TAG: "$FLUTTER_VERSION"
+#  script:
+#    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#    - docker build -t $WINDOWS_CUSTOM_IMAGE_NAME:$WINDOWS_CUSTOM_IMAGE_TAG -f CI_scripts/windows/Dockerfile .
+#    - docker push $WINDOWS_CUSTOM_IMAGE_NAME:$WINDOWS_CUSTOM_IMAGE_TAG
+#  rules:
+#    - if: '$CI_COMMIT_TAG'
+#      when: never
+#    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+#      changes:
+#        - .gitlab-ci.yml
+#        - CI_scripts/windows/Dockerfile
+#      when: always
+#    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+#      when: manual
 
 build_appimage:
   stage: build
@@ -79,6 +81,8 @@ build_appimage:
 build_android:
   stage: build
   image: $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
+  tags:
+    - android-build
   rules:
     - if: '$CI_COMMIT_TAG'
   script:
@@ -99,7 +103,7 @@ build_android:
 build_windows:
   stage: build
   tags:
-    - windows
+    - windows-build
   rules:
     - if: '$CI_COMMIT_TAG'
   script:
