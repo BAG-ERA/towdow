@@ -14,6 +14,7 @@ import '../../../../data/services/webdav_client.dart';
 
 const String TOWDOW_ISSUER_URL = "https://auth.towdow.app/realms/towdow";
 const String CLIENT_ID = "radicale-api";
+const String TOWDOW_SERVER_URL = "https://api.towdow.app";
 
 
 class FlowitCloudDialog extends ConsumerStatefulWidget {
@@ -59,7 +60,8 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
       );
       final client = Client(
         issuer,
-        CLIENT_ID
+        CLIENT_ID,
+        clientSecret: ""
       );
 
       // Use a fixed port for the local redirect server to be allowed on KeyCloak
@@ -115,7 +117,7 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
       final testAccount = CaldavAccount(
         id: const Uuid().v4(),
         providerType: 'towdow_cloud',
-        serverUrl: 'https://api.towdow.app',
+        serverUrl: TOWDOW_SERVER_URL,
         username: email ?? '',
         accessToken: _accessToken,
         refreshToken: _refreshToken,

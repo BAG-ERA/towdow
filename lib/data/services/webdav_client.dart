@@ -476,6 +476,7 @@ class WebDAVClientKeycloak extends WebDAVClient {
         final client = Client(
           issuer,
           clientId!,
+          clientSecret: ""
         );
         final credential = client.createCredential(
           refreshToken: refreshToken,
