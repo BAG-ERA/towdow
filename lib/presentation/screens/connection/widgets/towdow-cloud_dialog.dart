@@ -59,8 +59,7 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
       );
       final client = Client(
         issuer,
-        CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
+        CLIENT_ID
       );
 
       // Use a fixed port for the local redirect server to be allowed on KeyCloak

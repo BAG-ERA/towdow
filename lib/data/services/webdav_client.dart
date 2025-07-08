@@ -26,8 +26,6 @@ import '../../core/logger.dart';
 import '../../data/models/caldav_account.dart';
 import 'package:openid_client/openid_client.dart';
 
-const String CLIENT_SECRET = "J8cxks5GVinlCFB0x3E39WMOpjnXZjJK";
-
 class WebDAVResponse {
   final int statusCode;
   final Map<String, String> headers;
@@ -478,7 +476,6 @@ class WebDAVClientKeycloak extends WebDAVClient {
         final client = Client(
           issuer,
           clientId!,
-          clientSecret: CLIENT_SECRET,
         );
         final credential = client.createCredential(
           refreshToken: refreshToken,
