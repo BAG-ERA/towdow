@@ -573,6 +573,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           );
         }
       },
+      onTaskUpdated: (task) async {
+        await ref.read(taskViewModelProvider.notifier).updateTask(task);
+        _refreshProjectTasks(ref);
+      },
       onTaskMoved: (task, columnId) => _handleAttendeeTaskMove(context, ref, task, columnId),
     );
   }
@@ -781,6 +785,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             ),
           );
         }
+      },
+      onTaskUpdated: (task) async {
+        await ref.read(taskViewModelProvider.notifier).updateTask(task);
+        _refreshProjectTasks(ref);
       },
     );
   }
