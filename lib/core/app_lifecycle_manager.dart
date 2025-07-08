@@ -132,6 +132,12 @@ class AppLifecycleManager {
       // Start background sync service
       if (_backgroundSyncService != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting BackgroundSyncService');
+        
+        // Set the main sync service reference for queue processing
+        if (_syncService != null) {
+          _backgroundSyncService!.setSyncService(_syncService!);
+        }
+        
         final bgResult = await _backgroundSyncService!.start();
         bgResult.when(
           success: (_) {
@@ -193,11 +199,8 @@ class AppLifecycleManager {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] BackgroundSyncService stopped');
       }
 
-      // Stop periodic sync
-      if (_syncService != null) {
-        _syncService!.stopPeriodicSync();
-        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService periodic sync stopped');
-      }
+      // Note: SyncService no longer has periodic sync - BackgroundSyncService handles this
+      // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService periodic sync not needed');
 
       // Stop external calendar sync
       if (_externalSyncService != null) {

@@ -248,16 +248,7 @@ void main() {
       });
     });
 
-    group('periodic sync', () {
-      test('should start and stop periodic sync', () {
-        // Act
-        syncService.startPeriodicSync();
-        expect(syncService.statusStream, isNotNull);
 
-        syncService.stopPeriodicSync();
-        // Periodic timer should be cancelled (hard to test directly)
-      });
-    });
 
     group('status and progress streams', () {
       test('should provide status stream', () {
