@@ -46,10 +46,12 @@ final accountStatusNotifierProvider = Provider<AsyncValueNotifier<bool>>((ref) {
 // GoRouter provider that's reactive to account changes
 final routerProvider = Provider<GoRouter>((ref) {
   final accountNotifier = ref.watch(accountStatusNotifierProvider);
-  
+  final sessionEpoch = ref.watch(sessionEpochProvider);
+
   return GoRouter(
+    navigatorKey: globalNavigatorKey,
     initialLocation: '/today',
-    refreshListenable: accountNotifier,
+    refreshListenable: Listenable.merge([accountNotifier, ValueNotifier(sessionEpoch)]),
     redirect: (context, state) {
       // Redirect root path to today view
       if (state.uri.path == '/') {

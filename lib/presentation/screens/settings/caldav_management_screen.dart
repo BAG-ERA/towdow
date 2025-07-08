@@ -9,6 +9,7 @@ import '../../../data/services/caldav_service.dart';
 import '../../../data/services/local_storage_service.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
+import '../../../data/services/webdav_client.dart';
 
 class CalDAVManagementScreen extends ConsumerStatefulWidget {
   const CalDAVManagementScreen({super.key});
@@ -145,6 +146,14 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
       
       try {
         await _discoverCalendars(_currentAccount!);
+      } on RefreshTokenExpiredException catch (_) {
+        handleSessionExpired();
+        return;
+      } catch (e) {
+        AppLogger.error('CalDAVManagement: Refresh error', e, StackTrace.current);
+        setState(() {
+          _errorMessage = 'Refresh error: $e';
+        });
       } finally {
         if (mounted) {
           setState(() {

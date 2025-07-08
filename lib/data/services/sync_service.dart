@@ -193,13 +193,19 @@ class SyncService {
             ));
           }
 
-          return await _performSync(account);
+          try {
+            return await _performSync(account);
+          } on RefreshTokenExpiredException {
+            rethrow;
+          }
         },
         failure: (failure) async {
           _updateStatus(SyncStatus.error);
           return Result.failure(failure);
         },
       );
+    } on RefreshTokenExpiredException {
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.error('SyncService: Sync failed', e, stackTrace);
       _updateStatus(SyncStatus.error);

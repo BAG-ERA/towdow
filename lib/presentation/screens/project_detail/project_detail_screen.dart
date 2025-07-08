@@ -22,6 +22,7 @@ import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_info_card.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../../data/services/caldav_service.dart';
+import '../../../data/services/webdav_client.dart';
 
 // Provider for a specific project/calendar
 final projectProvider = FutureProvider.family<TaskCalendar?, String>((ref, projectUid) async {
@@ -1080,6 +1081,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           }
         },
       );
+    } on RefreshTokenExpiredException catch (_) {
+      handleSessionExpired();
+      return;
     } catch (e, stackTrace) {
       AppLogger.error('ProjectDetail: Exception during server sync', e, stackTrace);
       if (mounted) {
