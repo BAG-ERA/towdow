@@ -180,8 +180,8 @@ class ConnectionInfoScreen extends ConsumerWidget {
 
   String _formatProviderType(String providerType) {
     switch (providerType.toLowerCase()) {
-      case 'flowit_cloud':
-        return 'FlowIt Cloud';
+      case 'towdow_cloud':
+        return 'TowDow Cloud';
       case 'google':
         return 'Google Calendar';
       case 'nextcloud':

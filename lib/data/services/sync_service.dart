@@ -192,13 +192,19 @@ class SyncService {
             ));
           }
 
-          return await _performSync(account);
+          try {
+            return await _performSync(account);
+          } on RefreshTokenExpiredException {
+            rethrow;
+          }
         },
         failure: (failure) async {
           _updateStatus(SyncStatus.error);
           return Result.failure(failure);
         },
       );
+    } on RefreshTokenExpiredException {
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.error('SyncService: Sync failed', e, stackTrace);
       _updateStatus(SyncStatus.error);
@@ -589,11 +595,7 @@ class SyncService {
   Future<Result<String>> _getServerSyncToken(CalDAVService caldavService, TaskCalendar calendar) async {
     try {
       // Use WebDAVClient to get sync token
-      final webdavClient = WebDAVClient(
-        serverUrl: caldavService.account.serverUrl,
-        username: caldavService.account.username,
-        password: caldavService.account.password ?? '',
-      );
+      final webdavClient = WebDAVClient.fromAccount(caldavService.account);
       
       final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
 <D:propfind xmlns:D="DAV:">
@@ -639,11 +641,7 @@ class SyncService {
       //AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
       
       // Use BackgroundSyncService logic for incremental sync
-      final webdavClient = WebDAVClient(
-        serverUrl: caldavService.account.serverUrl,
-        username: caldavService.account.username,
-        password: caldavService.account.password ?? '',
-      );
+      final webdavClient = WebDAVClient.fromAccount(caldavService.account);
       
       if (calendar.syncToken == null) {
         // First sync - fetch all tasks

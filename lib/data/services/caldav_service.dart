@@ -19,11 +19,7 @@ class CalDAVService {
   late final WebDAVClient _client;
 
   CalDAVService({required this.account}) {
-    _client = WebDAVClient(
-      serverUrl: account.serverUrl,
-      username: account.username,
-      password: account.password ?? '',
-    );
+    _client = WebDAVClient.fromAccount(account);
   }
 
   /// Test connection to CalDAV server
@@ -96,6 +92,8 @@ class CalDAVService {
           return Result.failure(failure);
         },
       );
+    } on RefreshTokenExpiredException {
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVService: Failed to create task', e, stackTrace);
       return Result.failure(Failure(
@@ -131,6 +129,8 @@ class CalDAVService {
           return Result.failure(failure);
         },
       );
+    } on RefreshTokenExpiredException {
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVService: Failed to update task', e, stackTrace);
       return Result.failure(Failure(
@@ -164,6 +164,8 @@ class CalDAVService {
           return Result.failure(failure);
         },
       );
+    } on RefreshTokenExpiredException {
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVService: Failed to delete task', e, stackTrace);
       return Result.failure(Failure(
@@ -214,6 +216,8 @@ class CalDAVService {
           return Result.failure(failure);
         },
       );
+    } on RefreshTokenExpiredException {
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVService: Failed to fetch tasks', e, stackTrace);
       return Result.failure(Failure(
@@ -280,6 +284,8 @@ class CalDAVService {
              failure: (failure) async => Result.failure(failure),
            );
       
+    } on RefreshTokenExpiredException {
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVService: Failed to discover capabilities', e, stackTrace);
       return Result.failure(Failure(

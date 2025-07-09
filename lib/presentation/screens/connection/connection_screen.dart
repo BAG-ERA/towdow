@@ -4,6 +4,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'widgets/custom_caldav_dialog.dart';
+import 'widgets/towdow-cloud_dialog.dart';
+import 'widgets/towdow-self-hosted_dialog.dart';
 
 class ConnectionScreen extends ConsumerWidget {
   const ConnectionScreen({super.key});
@@ -11,9 +13,7 @@ class ConnectionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Connect to CalDAV'),
-      ),
+      appBar: AppBar(title: const Text('Connect to CalDAV')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -38,34 +38,25 @@ class ConnectionScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 32),
             _ConnectionOptionCard(
-              title: 'FlowIt Cloud',
-              subtitle: 'Official FlowIt hosting',
+              title: 'TowDow Cloud',
+              subtitle: 'Official TowDow hosting',
               icon: Icons.cloud_rounded,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('FlowIt Cloud coming soon!')),
+                showDialog(
+                  context: context,
+                  builder: (context) => const FlowitCloudDialog(),
                 );
               },
             ),
             const SizedBox(height: 16),
             _ConnectionOptionCard(
-              title: 'Google Account',
-              subtitle: 'Use Google Calendar',
+              title: 'TowDow self hosted',
+              subtitle: 'Bring your own TowDow',
               icon: Icons.account_circle_rounded,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Google Account coming soon!')),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _ConnectionOptionCard(
-              title: 'Nextcloud',
-              subtitle: 'Your Nextcloud server',
-              icon: Icons.cloud_sync_rounded,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Nextcloud coming soon!')),
+                showDialog(
+                  context: context,
+                  builder: (context) => const TowdowSelfHostedDialog(),
                 );
               },
             ),
@@ -113,4 +104,4 @@ class _ConnectionOptionCard extends StatelessWidget {
       ),
     );
   }
-} 
+}

@@ -1,4 +1,4 @@
-﻿// Background sync service for incremental CalDAV synchronization using sync tokens
+// Background sync service for incremental CalDAV synchronization using sync tokens
 // Implements RFC 6578 for WebDAV Sync and RFC 4791 for CalDAV sync-collection reports
 // Provides optimistic, offline-first sync every 10 seconds with intelligent etag comparison
 
@@ -22,6 +22,9 @@ class BackgroundSyncService {
   final CalendarRepository _calendarRepository;
   SyncService? _syncService; // Reference to main sync service for queue processing
 
+  /// Optional callback to notify UI when session expires (e.g., to show connection screen and SnackBar)
+  final void Function(CaldavAccount account)? onSessionExpired;
+
   Timer? _syncTimer;
   bool _isRunning = false;
   bool _isSyncing = false;
@@ -35,6 +38,7 @@ class BackgroundSyncService {
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
     SyncService? syncService, // Optional reference to main sync service
+    this.onSessionExpired,
   })  : _taskRepository = taskRepository,
         _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
@@ -152,11 +156,7 @@ class BackgroundSyncService {
     try {
       // AppLogger.debug('BackgroundSyncService: Syncing calendar ${calendar.path}');
       
-      final webdavClient = WebDAVClient(
-        serverUrl: account.serverUrl,
-        username: account.username,
-        password: account.password ?? '',
-      );
+      final webdavClient = WebDAVClient.fromAccount(account);
 
       if (calendar.syncToken == null) {
         // First sync or calendar without sync token - perform full sync
@@ -164,6 +164,12 @@ class BackgroundSyncService {
       } else {
         // Incremental sync using sync token
         await _performIncrementalSync(webdavClient, account, calendar);
+      }
+    } on RefreshTokenExpiredException catch (_) {
+      AppLogger.warning('BackgroundSyncService: Refresh token expired for account ${account.id}, logging out');
+      await _accountRepository.delete(account.id);
+      if (onSessionExpired != null) {
+        onSessionExpired!(account);
       }
     } catch (e, stackTrace) {
       AppLogger.error('BackgroundSyncService: Failed to sync calendar ${calendar.path}', e, stackTrace);
@@ -202,6 +208,9 @@ class BackgroundSyncService {
               // AppLogger.info('BackgroundSyncService: Full sync completed for ${calendar.path} - ${remoteTasks.length} tasks, sync token: $syncToken');
             },
             failure: (failure) async {
+              if (failure.exception is RefreshTokenExpiredException) {
+                throw failure.exception!;
+              }
               AppLogger.warning('BackgroundSyncService: Could not get sync token for ${calendar.path}: ${failure.message}');
               // Update without sync token
               final updatedCalendar = calendar.copyWith(lastSyncAt: DateTime.now());
@@ -210,9 +219,14 @@ class BackgroundSyncService {
           );
         },
         failure: (failure) async {
+          if (failure.exception is RefreshTokenExpiredException) {
+            throw failure.exception!;
+          }
           AppLogger.error('BackgroundSyncService: Failed to fetch tasks during full sync', failure.exception, failure.stackTrace);
         },
       );
+    } on RefreshTokenExpiredException {
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.error('BackgroundSyncService: Full sync failed for ${calendar.path}', e, stackTrace);
     }
@@ -252,11 +266,16 @@ class BackgroundSyncService {
           }
         },
         failure: (failure) async {
+          if (failure.exception is RefreshTokenExpiredException) {
+            throw failure.exception!;
+          }
           AppLogger.warning('BackgroundSyncService: Incremental sync failed for ${calendar.path}, falling back to full sync: ${failure.message}');
           // Fallback to full sync if incremental sync fails
           await _performFullSync(webdavClient, account, calendar);
         },
       );
+    } on RefreshTokenExpiredException {
+      rethrow;
     } catch (e, stackTrace) {
       AppLogger.error('BackgroundSyncService: Incremental sync failed for ${calendar.path}', e, stackTrace);
     }

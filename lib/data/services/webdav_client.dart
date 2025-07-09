@@ -1,11 +1,30 @@
-﻿// WebDAV client for CalDAV operations
+// WebDAV client for CalDAV operations
 // Implements RFC 4791 (CalDAV) and RFC 3744 (WebDAV ACL) HTTP methods
+//
+// Throws [RefreshTokenExpiredException] if the refresh token is expired or invalid.
+//
+// WebDAVClientKeycloak now supports automatic access token refresh using the refresh token.
+// When the access token is expired, it will use the refresh token to obtain a new access token
+// and update its internal state. You can provide an onTokenRefresh callback to persist the new tokens.
+//
+// Usage:
+//   WebDAVClientKeycloak(
+//     serverUrl: ...,
+//     accessToken: ...,
+//     refreshToken: ...,
+//     tokenExpiry: ...,
+//     clientId: ...,
+//     issuerUrl: ...,
+//     onTokenRefresh: (newAccessToken, newRefreshToken, newExpiry) { ... },
+//   )
 
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import '../../core/result.dart';
 import '../../core/logger.dart';
+import '../../data/models/caldav_account.dart';
+import 'package:openid_client/openid_client.dart';
 
 class WebDAVResponse {
   final int statusCode;
@@ -21,32 +40,55 @@ class WebDAVResponse {
   bool get isSuccess => statusCode >= 200 && statusCode < 300;
 }
 
-class WebDAVClient {
-  final String serverUrl;
-  final String username;
-  final String password;
-  final Duration timeout;
+/// Exception thrown when the refresh token is expired or invalid.
+class RefreshTokenExpiredException implements Exception {
+  final String message;
+  RefreshTokenExpiredException([this.message = "Refresh token expired, please log in again."]);
+  @override
+  String toString() => message;
+}
 
-  late final String _basicAuthHeader;
+abstract class WebDAVClient {
+  final String serverUrl;
+  final Duration timeout;
 
   WebDAVClient({
     required this.serverUrl,
-    required this.username,
-    required this.password,
     this.timeout = const Duration(seconds: 30),
+  });
+
+  /// Factory to create the correct WebDAVClient for the account.
+  /// Optionally provide onTokenRefresh to persist new tokens when refreshed (Keycloak only).
+  static WebDAVClient fromAccount(
+    CaldavAccount account, {
+    Duration timeout = const Duration(seconds: 30),
+    void Function(String accessToken, String? refreshToken, DateTime? tokenExpiry)? onTokenRefresh,
   }) {
-    // Create Basic Auth header
-    final credentials = base64Encode(utf8.encode('$username:$password'));
-    _basicAuthHeader = 'Basic $credentials';
+    switch (account.providerType) {
+      case 'custom':
+        return WebDAVClientBasicAuth(
+          serverUrl: account.serverUrl,
+          username: account.username,
+          password: account.password ?? '',
+          timeout: timeout,
+        );
+      case 'towdow_cloud':
+        return WebDAVClientKeycloak(
+          serverUrl: account.serverUrl,
+          accessToken: account.accessToken ?? '',
+          refreshToken: account.refreshToken,
+          tokenExpiry: account.tokenExpiry,
+          clientId: account.clientId,
+          issuerUrl: account.issuerUrl,
+          onTokenRefresh: onTokenRefresh,
+          timeout: timeout,
+        );
+      default:
+        throw UnsupportedError('Unsupported providerType: \'${account.providerType}\'');
+    }
   }
 
-  /// Common headers for CalDAV requests
-  Map<String, String> get _commonHeaders => {
-    'Authorization': _basicAuthHeader,
-    'User-Agent': 'FlowIt/1.0 (CalDAV Client)',
-    'Accept': 'application/xml, text/xml',
-    'Content-Type': 'application/xml; charset=utf-8',
-  };
+  Future<Map<String, String>> getAuthHeaders();
 
   /// Build URI correctly handling absolute vs relative paths
   Uri _buildUri(String path) {
@@ -66,6 +108,9 @@ class WebDAVClient {
     }
   }
 
+  /// Protected getter for common headers (including auth)
+  Future<Map<String, String>> get _commonHeaders async => await getAuthHeaders();
+
   /// PROPFIND method - RFC 4918 Section 9.1
   /// Used for capability discovery and resource listing
   Future<Result<WebDAVResponse>> propfind(
@@ -78,7 +123,7 @@ class WebDAVClient {
       
       final uri = _buildUri(path);
       final headers = {
-        ..._commonHeaders,
+        ...await _commonHeaders,
         'Depth': depth.toString(),
       };
 
@@ -115,7 +160,7 @@ class WebDAVClient {
       
       final uri = _buildUri(path);
       final request = http.Request('OPTIONS', uri)
-        ..headers.addAll(_commonHeaders);
+        ..headers.addAll(await _commonHeaders);
 
       final streamedResponse = await request.send().timeout(timeout);
       final responseBody = await streamedResponse.stream.bytesToString();
@@ -145,7 +190,7 @@ class WebDAVClient {
       // AppLogger.debug('WebDAVClient: GET $path');
       
       final uri = _buildUri(path);
-      final response = await http.get(uri, headers: _commonHeaders)
+      final response = await http.get(uri, headers: await _commonHeaders)
           .timeout(timeout);
 
       final result = WebDAVResponse(
@@ -177,7 +222,7 @@ class WebDAVClient {
       AppLogger.info('WebDAVClient: PUT URI: $uri');
       
       final headers = {
-        ..._commonHeaders,
+        ...await _commonHeaders,
         'Content-Type': 'text/calendar; charset=utf-8',
       };
 
@@ -217,7 +262,7 @@ class WebDAVClient {
       // AppLogger.debug('WebDAVClient: DELETE $path');
       
       final uri = _buildUri(path);
-      final headers = Map<String, String>.from(_commonHeaders);
+      final headers = Map<String, String>.from(await _commonHeaders);
 
       // Add If-Match header for conditional deletion
       if (etag != null) {
@@ -253,7 +298,7 @@ class WebDAVClient {
       
       final uri = _buildUri(path);
       final request = http.Request('REPORT', uri)
-        ..headers.addAll(_commonHeaders)
+        ..headers.addAll(await _commonHeaders)
         ..headers['Depth'] = '1'  // CalDAV requires Depth: 1 for calendar-query
         ..body = body;
 
@@ -286,7 +331,7 @@ class WebDAVClient {
       
       final uri = _buildUri(path);
       final headers = {
-        ..._commonHeaders,
+        ...await _commonHeaders,
         'Content-Type': 'application/xml; charset=utf-8',
       };
       
@@ -326,7 +371,7 @@ class WebDAVClient {
       AppLogger.info('WebDAVClient: PROPPATCH URI: $uri');
       
       final headers = {
-        ..._commonHeaders,
+        ...await _commonHeaders,
         'Content-Type': 'application/xml; charset=utf-8',
       };
       
@@ -375,4 +420,82 @@ class WebDAVClient {
     <FLOWIT:template/>
   </D:prop>
 </D:propfind>''';
-} 
+}
+
+class WebDAVClientBasicAuth extends WebDAVClient {
+  final String username;
+  final String password;
+  late final String _basicAuthHeader;
+
+  WebDAVClientBasicAuth({
+    required super.serverUrl,
+    required this.username,
+    required this.password,
+    super.timeout,
+  }) {
+    final credentials = base64Encode(utf8.encode('$username:$password'));
+    _basicAuthHeader = 'Basic $credentials';
+  }
+
+  @override
+  Future<Map<String, String>> getAuthHeaders() async {
+    return {'Authorization': _basicAuthHeader};
+  }
+}
+
+class WebDAVClientKeycloak extends WebDAVClient {
+  String accessToken;
+  String? refreshToken;
+  DateTime? tokenExpiry;
+  final String? clientId;
+  final String? issuerUrl;
+  final void Function(String accessToken, String? refreshToken, DateTime? tokenExpiry)? onTokenRefresh;
+
+  WebDAVClientKeycloak({
+    required super.serverUrl,
+    required this.accessToken,
+    this.refreshToken,
+    this.tokenExpiry,
+    this.clientId,
+    this.issuerUrl,
+    super.timeout,
+    this.onTokenRefresh,
+  });
+
+  bool get _isTokenExpired {
+    if (tokenExpiry == null) return false;
+    // Add a 1 minute buffer
+    return DateTime.now().isAfter(tokenExpiry!.subtract(const Duration(minutes: 1)));
+  }
+
+  @override
+  Future<Map<String, String>> getAuthHeaders() async {
+    if (_isTokenExpired && refreshToken != null && clientId != null && issuerUrl != null) {
+      try {
+        final issuer = await Issuer.discover(Uri.parse(issuerUrl!));
+        final client = Client(
+          issuer,
+          clientId!,
+          clientSecret: ""
+        );
+        final credential = client.createCredential(
+          refreshToken: refreshToken,
+        );
+        final tokenResponse = await credential.getTokenResponse();
+        accessToken = tokenResponse.accessToken!;
+        refreshToken = tokenResponse.refreshToken ?? refreshToken;
+        tokenExpiry = tokenResponse.expiresIn != null
+            ? DateTime.now().add(tokenResponse.expiresIn!)
+            : null;
+        if (onTokenRefresh != null) {
+          onTokenRefresh!(accessToken, refreshToken, tokenExpiry);
+        }
+      } catch (e, st) {
+        AppLogger.error('WebDAVClientKeycloak: Failed to refresh access token', e, st);
+        // If the error is due to invalid_grant or similar, throw our custom exception
+        throw RefreshTokenExpiredException();
+      }
+    }
+    return {'Authorization': 'Bearer $accessToken'};
+  }
+}

@@ -256,6 +256,33 @@ class MockSyncService extends _i1.Mock implements _i6.SyncService {
       ) as _i4.Future<_i2.Result<void>>);
 
   @override
+  _i4.Future<_i2.Result<_i6.SyncResult>> processQueueOnly() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #processQueueOnly,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<_i6.SyncResult>>.value(
+            _FakeResult_0<_i6.SyncResult>(
+          this,
+          Invocation.method(
+            #processQueueOnly,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<_i6.SyncResult>>);
+
+  @override
+  _i4.Future<void> forceQueueProcessing() => (super.noSuchMethod(
+        Invocation.method(
+          #forceQueueProcessing,
+          [],
+        ),
+        returnValue: _i4.Future<void>.value(),
+        returnValueForMissingStub: _i4.Future<void>.value(),
+      ) as _i4.Future<void>);
+
+  @override
   void dispose() => super.noSuchMethod(
         Invocation.method(
           #dispose,

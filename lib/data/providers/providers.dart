@@ -1,4 +1,4 @@
-﻿// Main Riverpod providers for FlowIt state management
+// Main Riverpod providers for FlowIt state management
 // Provides repositories, services, and global app state
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,12 +24,15 @@ import '../services/caldav_service.dart';
 import '../services/external_caldav_service.dart';
 import '../services/external_sync_service.dart';
 import '../../core/app_lifecycle_manager.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../presentation/viewmodels/task_viewmodel.dart';
 import '../../presentation/viewmodels/caldav_settings_viewmodel.dart';
 import '../../presentation/viewmodels/navbar_sync_viewmodel.dart';
 import '../../presentation/viewmodels/project_list_viewmodel.dart';
 import '../../presentation/viewmodels/validator_viewmodel.dart';
+import '../../app.dart';
 
 // Local storage service provider
 // This must be overridden in main.dart with an initialized instance
@@ -99,6 +102,35 @@ final externalCalendarSyncServiceProvider = Provider<ExternalCalendarSyncService
   );
 });
 
+// Global navigator key for session expiry navigation
+final GlobalKey<NavigatorState> globalNavigatorKey = GlobalKey<NavigatorState>();
+BuildContext? get globalContext => globalNavigatorKey.currentContext;
+
+// Session epoch provider to force GoRouter refresh on session expiry
+final sessionEpochProvider = StateProvider<int>((ref) => 0);
+
+/// Global session expiry handler: navigates to /connect, shows a SnackBar, and invalidates account providers.
+void handleSessionExpired([ProviderRef? ref]) {
+  final context = globalContext;
+  if (context != null && context.mounted) {
+    GoRouter.of(context).go('/connect');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Your session has expired. Please log in again.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+  // Invalidate main account providers so UI updates
+  if (ref != null) {
+    ref.invalidate(activeAccountProvider);
+    ref.invalidate(hasActiveAccountProvider);
+    ref.invalidate(accountStatusNotifierProvider);
+    // Force GoRouter to refresh
+    ref.read(sessionEpochProvider.notifier).state++;
+  }
+}
+
 // Background sync service provider
 final backgroundSyncServiceProvider = Provider<BackgroundSyncService>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
@@ -111,6 +143,7 @@ final backgroundSyncServiceProvider = Provider<BackgroundSyncService>((ref) {
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
     syncService: syncService,
+    onSessionExpired: (_) => handleSessionExpired(ref),
   );
 });
 
