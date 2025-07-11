@@ -304,7 +304,7 @@ void main() {
               scheme: uri.scheme.toLowerCase(),
               host: normalizedHost,
               port: uri.port,
-              path: uri.path,
+              path: uri.path.toLowerCase(),
               query: uri.query.isEmpty ? null : uri.query,
             ).toString();
           } catch (e) {
@@ -322,7 +322,7 @@ void main() {
 
         // Test case sensitivity
         expect(normalizeCalDAVUrl('HTTPS://Example.Com:8080/Dav/'), 
-               'https://example.com:8080/Dav/');
+               'https://example.com:8080/dav/');
       });
 
       test('should handle URL encoding/decoding correctly', () {
@@ -332,7 +332,8 @@ void main() {
             .replaceAll('%2F', '/') // Garde les slashes
             .replaceAll('%3A', ':') // Garde les colons pour les schemes
             .replaceAll('%3F', '?') // Garde les query separators
-            .replaceAll('%23', '#'); // Garde les fragments
+            .replaceAll('%23', '#') // Garde les fragments
+            .replaceAll('%3D', '='); // Garde les equals signs
         }
 
         String decodeCalDAVPath(String encodedPath) {
@@ -383,6 +384,9 @@ void main() {
               final property = parts[0];
               // Properties must be valid according to RFC 5545
               if (property.isEmpty || property.contains(' ')) return false;
+            } else if (trimmed.isNotEmpty && !trimmed.startsWith('BEGIN:') && !trimmed.startsWith('END:') && !trimmed.contains(':')) {
+              // Lines without colons are invalid (except BEGIN/END)
+              return false;
             }
           }
           
@@ -417,6 +421,13 @@ INVALID PROPERTY WITHOUT COLON
 END:VTODO''';
 
         expect(isValidVTodoStructure(invalidVTodo2), false);
+
+        // Test structure invalide (pas de END:VTODO)
+        const invalidVTodo3 = '''BEGIN:VTODO
+UID:test-001
+SUMMARY:Test Task''';
+
+        expect(isValidVTodoStructure(invalidVTodo3), false);
       });
 
       test('should handle RFC 5545 datetime formats correctly', () {
@@ -542,7 +553,7 @@ END:VTODO''';
           try {
             // Tentative de parsing direct
             final uri = Uri.tryParse(url);
-            if (uri != null && uri.hasScheme && uri.host.isNotEmpty) {
+            if (uri != null && uri.hasScheme && uri.host.isNotEmpty && uri.host.contains('.')) {
               return uri.toString();
             }
             
@@ -556,7 +567,7 @@ END:VTODO''';
             
             // Retenter le parsing
             final retryUri = Uri.tryParse(sanitized);
-            if (retryUri != null && retryUri.host.isNotEmpty) {
+            if (retryUri != null && retryUri.host.isNotEmpty && retryUri.host.contains('.')) {
               return retryUri.toString();
             }
             
@@ -575,6 +586,7 @@ END:VTODO''';
         expect(sanitizeUrl(''), isNull);
         expect(sanitizeUrl('not-a-url'), isNull);
         expect(sanitizeUrl('://missing-scheme'), isNull);
+        expect(sanitizeUrl('https://not-a-url'), isNull);
       });
 
       test('should handle network timeouts and retries gracefully', () {

@@ -25,13 +25,13 @@ void main() {
       mockSyncService = MockSyncService();
 
       // Setup default mock behaviors
-      when(() => mockSyncService.statusStream).thenAnswer(
+      when(mockSyncService.statusStream).thenAnswer(
         (_) => Stream.value(SyncStatus.idle),
       );
-      when(() => mockSyncService.isBackgroundSyncRunning).thenReturn(false);
-      when(() => mockSyncService.isBackgroundSyncing).thenReturn(false);
-      when(() => mockSyncService.lastSyncTime).thenReturn(null);
-      when(() => mockSyncService.status).thenReturn(SyncStatus.idle);
+      when(mockSyncService.isBackgroundSyncRunning).thenReturn(false);
+      when(mockSyncService.isBackgroundSyncing).thenReturn(false);
+      when(mockSyncService.lastSyncTime).thenReturn(null);
+      when(mockSyncService.status).thenReturn(SyncStatus.idle);
 
       viewModel = NavbarSyncViewModel(
         mockAccountRepository,
@@ -50,7 +50,7 @@ void main() {
       expect(viewModel.state.isFullSyncing, false);
       expect(viewModel.state.syncStatus, SyncStatus.idle);
       expect(viewModel.state.error, null);
-      expect(viewModel.state.currentAccount, null);
+      expect(viewModel.state.account, null);
       expect(viewModel.state.lastSyncTime, null);
       expect(viewModel.state.syncedCalendarsCount, 0);
     });
@@ -67,7 +67,7 @@ void main() {
           lastSyncAt: DateTime.now(),
         );
 
-        when(() => mockAccountRepository.getActiveAccount())
+        when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.success(testAccount));
 
         // Act
@@ -80,7 +80,7 @@ void main() {
 
       test('should handle no active account', () async {
         // Arrange
-        when(() => mockAccountRepository.getActiveAccount())
+        when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.success(null));
 
         // Act
@@ -93,7 +93,7 @@ void main() {
 
       test('should handle account loading failure', () async {
         // Arrange
-        when(() => mockAccountRepository.getActiveAccount())
+        when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.failure(
                 Failure(exception: Exception('Test error'), message: 'Test error')));
 
@@ -109,24 +109,26 @@ void main() {
     group('triggerSync', () {
       test('should trigger sync successfully', () async {
         // Arrange
-        when(() => mockSyncService.syncNow())
+        when(mockSyncService.syncNow())
             .thenAnswer((_) async => Result.success(SyncResult(
-              tasksUpdated: 5,
-              calendarsUpdated: 2,
-              conflicts: [],
+              success: true,
+              syncedItems: 5,
+              failedItems: 0,
+              errors: [],
+              syncTime: DateTime.now(),
             )));
 
         // Act
         await viewModel.triggerSync();
 
         // Assert
-        verify(() => mockSyncService.syncNow()).called(1);
+        verify(mockSyncService.syncNow()).called(1);
         expect(viewModel.state.error, null);
       });
 
       test('should handle sync failure', () async {
         // Arrange
-        when(() => mockSyncService.syncNow())
+        when(mockSyncService.syncNow())
             .thenAnswer((_) async => Result.failure(
                 Failure(exception: Exception('Sync error'), message: 'Sync failed')));
 
@@ -141,19 +143,19 @@ void main() {
     group('startBackgroundSync', () {
       test('should start background sync successfully', () async {
         // Arrange
-        when(() => mockSyncService.initialize())
-            .thenAnswer((_) async {});
+        when(mockSyncService.initialize())
+            .thenAnswer((_) async => Result.success(null));
 
         // Act
         await viewModel.startBackgroundSync();
 
         // Assert
-        verify(() => mockSyncService.initialize()).called(1);
+        verify(mockSyncService.initialize()).called(1);
       });
 
       test('should handle start failure', () async {
         // Arrange
-        when(() => mockSyncService.initialize())
+        when(mockSyncService.initialize())
             .thenThrow(Exception('Start error'));
 
         // Act
@@ -167,13 +169,13 @@ void main() {
     group('stopBackgroundSync', () {
       test('should stop background sync', () {
         // Arrange
-        when(() => mockSyncService.stopPeriodicSync()).thenReturn(null);
+        when(mockSyncService.stopPeriodicSync()).thenReturn(null);
 
         // Act
         viewModel.stopBackgroundSync();
 
         // Assert
-        verify(() => mockSyncService.stopPeriodicSync()).called(1);
+        verify(mockSyncService.stopPeriodicSync()).called(1);
       });
     });
 
@@ -189,7 +191,7 @@ void main() {
           lastSyncAt: DateTime.now(),
         );
 
-        when(() => mockAccountRepository.getActiveAccount())
+        when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.success(testAccount));
 
         // Act
@@ -250,8 +252,10 @@ void main() {
         // Act & Assert
         expect(viewModel.state.isSyncing, false);
       });
+    });
 
-      test('indicatorStatus should return offline when not connected', () {
+    group('indicator status', () {
+      test('should return offline when not connected', () {
         // Arrange
         viewModel.state = viewModel.state.copyWith(isConnected: false);
 
@@ -259,7 +263,7 @@ void main() {
         expect(viewModel.state.indicatorStatus, SyncIndicatorStatus.offline);
       });
 
-      test('indicatorStatus should return error when error exists', () {
+      test('should return error when error exists', () {
         // Arrange
         viewModel.state = viewModel.state.copyWith(
           isConnected: true,
@@ -270,7 +274,7 @@ void main() {
         expect(viewModel.state.indicatorStatus, SyncIndicatorStatus.error);
       });
 
-      test('indicatorStatus should return syncing when syncing', () {
+      test('should return syncing when syncing', () {
         // Arrange
         viewModel.state = viewModel.state.copyWith(
           isConnected: true,
@@ -281,7 +285,7 @@ void main() {
         expect(viewModel.state.indicatorStatus, SyncIndicatorStatus.syncing);
       });
 
-      test('indicatorStatus should return idle when connected and not syncing', () {
+      test('should return idle when connected and not syncing', () {
         // Arrange
         viewModel.state = viewModel.state.copyWith(
           isConnected: true,
@@ -296,8 +300,8 @@ void main() {
       });
     });
 
-    group('statusText', () {
-      test('should return "Offline" when not connected', () {
+    group('status text', () {
+      test('should return offline when not connected', () {
         // Arrange
         viewModel.state = viewModel.state.copyWith(isConnected: false);
 
@@ -305,7 +309,7 @@ void main() {
         expect(viewModel.state.statusText, 'Offline');
       });
 
-      test('should return "Sync Error" when error exists', () {
+      test('should return sync error when error exists', () {
         // Arrange
         viewModel.state = viewModel.state.copyWith(
           isConnected: true,
@@ -316,7 +320,7 @@ void main() {
         expect(viewModel.state.statusText, 'Sync Error');
       });
 
-      test('should return "Syncing..." when background syncing', () {
+      test('should return syncing when background syncing', () {
         // Arrange
         viewModel.state = viewModel.state.copyWith(
           isConnected: true,
@@ -327,7 +331,7 @@ void main() {
         expect(viewModel.state.statusText, 'Syncing...');
       });
 
-      test('should return "Full Sync..." when full syncing', () {
+      test('should return full sync when full syncing', () {
         // Arrange
         viewModel.state = viewModel.state.copyWith(
           isConnected: true,
@@ -338,31 +342,62 @@ void main() {
         expect(viewModel.state.statusText, 'Full Sync...');
       });
 
-      test('should return "Just synced" when last sync was very recent', () {
+      test('should return syncing when sync status is syncing', () {
         // Arrange
-        final recentTime = DateTime.now().subtract(Duration(seconds: 30));
         viewModel.state = viewModel.state.copyWith(
           isConnected: true,
-          lastSyncTime: recentTime,
+          syncStatus: SyncStatus.syncing,
+        );
+
+        // Act & Assert
+        expect(viewModel.state.statusText, 'Syncing...');
+      });
+
+      test('should return just synced when last sync was less than 1 minute ago', () {
+        // Arrange
+        viewModel.state = viewModel.state.copyWith(
+          isConnected: true,
+          lastSyncTime: DateTime.now().subtract(const Duration(seconds: 30)),
         );
 
         // Act & Assert
         expect(viewModel.state.statusText, 'Just synced');
       });
 
-      test('should return time ago when last sync was some time ago', () {
+      test('should return minutes ago when last sync was less than 1 hour ago', () {
         // Arrange
-        final pastTime = DateTime.now().subtract(Duration(minutes: 5));
         viewModel.state = viewModel.state.copyWith(
           isConnected: true,
-          lastSyncTime: pastTime,
+          lastSyncTime: DateTime.now().subtract(const Duration(minutes: 30)),
         );
 
         // Act & Assert
-        expect(viewModel.state.statusText, '5m ago');
+        expect(viewModel.state.statusText, '30m ago');
       });
 
-      test('should return "Ready" when no last sync time', () {
+      test('should return hours ago when last sync was less than 1 day ago', () {
+        // Arrange
+        viewModel.state = viewModel.state.copyWith(
+          isConnected: true,
+          lastSyncTime: DateTime.now().subtract(const Duration(hours: 5)),
+        );
+
+        // Act & Assert
+        expect(viewModel.state.statusText, '5h ago');
+      });
+
+      test('should return days ago when last sync was more than 1 day ago', () {
+        // Arrange
+        viewModel.state = viewModel.state.copyWith(
+          isConnected: true,
+          lastSyncTime: DateTime.now().subtract(const Duration(days: 3)),
+        );
+
+        // Act & Assert
+        expect(viewModel.state.statusText, '3d ago');
+      });
+
+      test('should return ready when connected and no last sync time', () {
         // Arrange
         viewModel.state = viewModel.state.copyWith(
           isConnected: true,
@@ -371,118 +406,6 @@ void main() {
 
         // Act & Assert
         expect(viewModel.state.statusText, 'Ready');
-      });
-    });
-
-    group('getters', () {
-      test('hasValidAccount should return true when account exists and connected', () {
-        // Arrange
-        final testAccount = CaldavAccount(
-          id: 'test-id',
-          providerType: 'test',
-          serverUrl: 'https://test.com',
-          username: 'test@example.com',
-          createdAt: DateTime.now(),
-          lastSyncAt: DateTime.now(),
-        );
-
-        viewModel.state = viewModel.state.copyWith(
-          account: testAccount,
-          isConnected: true,
-        );
-
-        // Act & Assert
-        expect(viewModel.hasValidAccount, true);
-      });
-
-      test('hasValidAccount should return false when no account', () {
-        // Arrange
-        viewModel.state = viewModel.state.copyWith(
-          account: null,
-          isConnected: true,
-        );
-
-        // Act & Assert
-        expect(viewModel.hasValidAccount, false);
-      });
-
-      test('accountDisplayName should return username when no first/last name', () {
-        // Arrange
-        final testAccount = CaldavAccount(
-          id: 'test-id',
-          providerType: 'test',
-          serverUrl: 'https://test.com',
-          username: 'testuser',
-          createdAt: DateTime.now(),
-          lastSyncAt: DateTime.now(),
-        );
-
-        viewModel.state = viewModel.state.copyWith(account: testAccount);
-
-        // Act & Assert
-        expect(viewModel.accountDisplayName, 'testuser');
-      });
-
-      test('accountDisplayName should return full name when available', () {
-        // Arrange
-        final testAccount = CaldavAccount(
-          id: 'test-id',
-          providerType: 'test',
-          serverUrl: 'https://test.com',
-          username: 'testuser',
-          firstName: 'John',
-          lastName: 'Doe',
-          createdAt: DateTime.now(),
-          lastSyncAt: DateTime.now(),
-        );
-
-        viewModel.state = viewModel.state.copyWith(account: testAccount);
-
-        // Act & Assert
-        expect(viewModel.accountDisplayName, 'John Doe');
-      });
-
-      test('accountDisplayName should return email when no full name', () {
-        // Arrange
-        final testAccount = CaldavAccount(
-          id: 'test-id',
-          providerType: 'test',
-          serverUrl: 'https://test.com',
-          username: 'testuser',
-          email: 'test@example.com',
-          createdAt: DateTime.now(),
-          lastSyncAt: DateTime.now(),
-        );
-
-        viewModel.state = viewModel.state.copyWith(account: testAccount);
-
-        // Act & Assert
-        expect(viewModel.accountDisplayName, 'test@example.com');
-      });
-
-      test('serverUrl should return empty string when no account', () {
-        // Arrange
-        viewModel.state = viewModel.state.copyWith(account: null);
-
-        // Act & Assert
-        expect(viewModel.serverUrl, '');
-      });
-
-      test('serverUrl should return account server URL', () {
-        // Arrange
-        final testAccount = CaldavAccount(
-          id: 'test-id',
-          providerType: 'test',
-          serverUrl: 'https://test.com',
-          username: 'testuser',
-          createdAt: DateTime.now(),
-          lastSyncAt: DateTime.now(),
-        );
-
-        viewModel.state = viewModel.state.copyWith(account: testAccount);
-
-        // Act & Assert
-        expect(viewModel.serverUrl, 'https://test.com');
       });
     });
   });

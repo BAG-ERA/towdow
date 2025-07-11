@@ -242,6 +242,30 @@ class SyncService {
         AppLogger.warning('SyncService: No calendars selected for sync. Please configure calendar selection.');
         errors.add('No calendars selected for synchronization. Please go to Settings > CalDAV Connection to select calendars.');
         failedItems++;
+
+        // Attempt to load the sync queue and handle errors
+        final queueResult = await _localStorage.getAll<Map<String, dynamic>>(syncQueueBoxName);
+        await queueResult.when(
+          success: (_) async {
+            // No-op: nothing to process if no calendars
+          },
+          failure: (failure) async {
+            errors.add('Failed to load sync queue: ${failure.message}');
+            failedItems++;
+          },
+        );
+
+        _progressController.add(1.0);
+        _lastSyncTime = DateTime.now();
+        final result = SyncResult(
+          success: errors.isEmpty,
+          syncedItems: syncedItems,
+          failedItems: failedItems,
+          errors: errors,
+          syncTime: _lastSyncTime!,
+        );
+        _updateStatus(errors.isEmpty ? SyncStatus.idle : SyncStatus.error);
+        return Result.success(result);
       } else {
         //AppLogger.debug('🔄 SyncService: Starting sync for ${selectedCalendars.length} calendars');
         

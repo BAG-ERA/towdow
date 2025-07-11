@@ -88,11 +88,17 @@ class LocalTaskRepository implements TaskRepository {
     final result = await getAll();
     return result.when(
       success: (tasks) {
-        // TODO: In Calendar = Project model, unregistered tasks would be tasks
-        // not properly synced or belonging to unknown/deleted calendars
-        // For now, return empty list during transition
-        final unregisteredTasks = <Task>[];
-        return Result.success(unregisteredTasks);
+        // Unregistered tasks (tasks with null sourceCalendarUid) should be deleted
+        // as they represent corrupted or orphaned data
+        final unregisteredTasks = tasks.where((task) => task.sourceCalendarUid == null).toList();
+        
+        // Delete unregistered tasks as they are considered errors
+        for (final task in unregisteredTasks) {
+          delete(task.uid);
+        }
+        
+        // Return empty list since unregistered tasks should not exist
+        return Result.success(<Task>[]);
       },
       failure: (failure) => Result.failure(failure),
     );

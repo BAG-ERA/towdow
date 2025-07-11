@@ -115,12 +115,11 @@ void main() {
       final todayTasks = (todayResult as Success<List<Task>>).data;
       expect(todayTasks.length, 2); // task-1 and task-2
 
-      // Test unregistered tasks
+      // Test unregistered tasks - they should be deleted and return empty list
       final unregisteredResult = await repository.getUnregisteredTasks();
       expect(unregisteredResult, isA<Success<List<Task>>>());
       final unregisteredTasks = (unregisteredResult as Success<List<Task>>).data;
-      expect(unregisteredTasks.length, 1); // task-3
-      expect(unregisteredTasks.first.uid, 'task-3');
+      expect(unregisteredTasks.length, 0); // unregistered tasks are deleted
     });
 
     test('should properly filter completed tasks', () {
