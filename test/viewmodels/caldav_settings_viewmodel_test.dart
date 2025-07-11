@@ -51,7 +51,7 @@ void main() {
           id: 'test-id',
           providerType: 'test',
           serverUrl: 'https://test.com',
-          username: 'test@example.com',
+          username: 'testuser',
           createdAt: DateTime.now(),
           lastSyncAt: DateTime.now(),
         );
@@ -64,14 +64,13 @@ void main() {
             dtstamp: DateTime.now(),
             created: DateTime.now(),
             lastModified: DateTime.now(),
-            summary: 'Test Calendar 1',
             status: 'NEEDS-ACTION',
           ),
         ];
 
-        when(() => mockAccountRepository.getActiveAccount())
+        when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.success(testAccount));
-        when(() => mockCalendarRepository.getProjectCalendars())
+        when(mockCalendarRepository.getProjectCalendars())
             .thenAnswer((_) async => Result.success(testCalendars));
 
         // Act
@@ -86,7 +85,7 @@ void main() {
 
       test('should handle account loading failure', () async {
         // Arrange
-        when(() => mockAccountRepository.getActiveAccount())
+        when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.failure(
                 Failure(exception: Exception('Test error'), message: 'Test error')));
 
@@ -100,7 +99,7 @@ void main() {
 
       test('should handle no active account', () async {
         // Arrange
-        when(() => mockAccountRepository.getActiveAccount())
+        when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.success(null));
 
         // Act
@@ -123,11 +122,10 @@ void main() {
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
-          summary: 'Test Calendar 1',
           status: 'NEEDS-ACTION',
         );
 
-        when(() => mockCalendarRepository.save(any()))
+        when(mockCalendarRepository.save(any))
             .thenAnswer((_) async => Result.success(null));
 
         // Act
@@ -135,7 +133,7 @@ void main() {
 
         // Assert
         expect(viewModel.state.selectedCalendars, contains(testCalendar));
-        verify(() => mockCalendarRepository.save(testCalendar)).called(1);
+        verify(mockCalendarRepository.save(testCalendar)).called(1);
       });
 
       test('should remove calendar from selection when already selected', () async {
@@ -147,7 +145,6 @@ void main() {
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
-          summary: 'Test Calendar 1',
           status: 'NEEDS-ACTION',
         );
 
@@ -156,7 +153,7 @@ void main() {
           selectedCalendars: [testCalendar],
         );
 
-        when(() => mockCalendarRepository.delete(any()))
+        when(mockCalendarRepository.delete(any))
             .thenAnswer((_) async => Result.success(null));
 
         // Act
@@ -164,7 +161,7 @@ void main() {
 
         // Assert
         expect(viewModel.state.selectedCalendars, isEmpty);
-        verify(() => mockCalendarRepository.delete(testCalendar.uid)).called(1);
+        verify(mockCalendarRepository.delete(testCalendar.uid)).called(1);
       });
 
       test('should handle save failure', () async {
@@ -176,11 +173,10 @@ void main() {
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
-          summary: 'Test Calendar 1',
           status: 'NEEDS-ACTION',
         );
 
-        when(() => mockCalendarRepository.save(any()))
+        when(mockCalendarRepository.save(any))
             .thenAnswer((_) async => Result.failure(
                 Failure(exception: Exception('Save error'), message: 'Save failed')));
 
@@ -207,7 +203,7 @@ void main() {
 
         viewModel.state = viewModel.state.copyWith(currentAccount: testAccount);
 
-        when(() => mockCalendarRepository.save(any()))
+        when(mockCalendarRepository.save(any))
             .thenAnswer((_) async => Result.success(null));
 
         // Act
@@ -226,7 +222,7 @@ void main() {
         expect(createdCalendar.displayName, 'New Calendar');
         expect(createdCalendar.description, 'Test description');
         
-        verify(() => mockCalendarRepository.save(any())).called(1);
+        verify(mockCalendarRepository.save(any)).called(1);
       });
 
       test('should handle no active account', () async {
@@ -238,7 +234,7 @@ void main() {
 
         // Assert
         expect(viewModel.state.error, 'No active account configured');
-        verifyNever(() => mockCalendarRepository.save(any()));
+        verifyNever(mockCalendarRepository.save(any));
       });
 
       test('should handle creation failure', () async {
@@ -254,7 +250,7 @@ void main() {
 
         viewModel.state = viewModel.state.copyWith(currentAccount: testAccount);
 
-        when(() => mockCalendarRepository.save(any()))
+        when(mockCalendarRepository.save(any))
             .thenAnswer((_) async => Result.failure(
                 Failure(exception: Exception('Create error'), message: 'Creation failed')));
 
@@ -280,7 +276,6 @@ void main() {
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
-          summary: 'Test Calendar 1',
           status: 'NEEDS-ACTION',
         );
 
@@ -301,7 +296,6 @@ void main() {
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
-          summary: 'Test Calendar 1',
           status: 'NEEDS-ACTION',
         );
 
@@ -334,7 +328,6 @@ void main() {
             dtstamp: DateTime.now(),
             created: DateTime.now(),
             lastModified: DateTime.now(),
-            summary: 'Test Calendar $index',
             status: 'NEEDS-ACTION',
           )
         );
@@ -356,7 +349,6 @@ void main() {
             dtstamp: DateTime.now(),
             created: DateTime.now(),
             lastModified: DateTime.now(),
-            summary: 'Test Calendar 1',
             status: 'NEEDS-ACTION',
           ),
           TaskCalendar(
@@ -367,7 +359,6 @@ void main() {
             dtstamp: DateTime.now(),
             created: DateTime.now(),
             lastModified: DateTime.now(),
-            summary: 'Test Calendar 2',
             status: 'NEEDS-ACTION',
           ),
           TaskCalendar(
@@ -378,7 +369,6 @@ void main() {
             dtstamp: DateTime.now(),
             created: DateTime.now(),
             lastModified: DateTime.now(),
-            summary: 'Test Calendar 3',
             status: 'NEEDS-ACTION',
           ),
         ];

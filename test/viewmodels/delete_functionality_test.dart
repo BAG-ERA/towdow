@@ -6,10 +6,14 @@ import 'package:towdow_app/presentation/viewmodels/project_list_viewmodel.dart';
 import 'package:towdow_app/presentation/viewmodels/task_viewmodel.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
+import 'package:towdow_app/data/repositories/account_repository.dart';
+import 'package:towdow_app/data/repositories/user_repository.dart';
 import 'package:towdow_app/data/services/sync_service.dart';
+import 'package:towdow_app/data/services/domain_service.dart';
 import 'package:towdow_app/data/services/local_storage_service.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/models/task.dart';
+import 'package:towdow_app/data/models/flowit_item.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
@@ -18,7 +22,10 @@ import 'package:mockito/annotations.dart';
   MockSpec<LocalStorageService>(),
   MockSpec<CalendarRepository>(),
   MockSpec<TaskRepository>(),
+  MockSpec<AccountRepository>(),
+  MockSpec<UserRepository>(),
   MockSpec<SyncService>(),
+  MockSpec<DomainService>(),
 ])
 import 'delete_functionality_test.mocks.dart';
 
@@ -27,11 +34,20 @@ void main() {
     late MockCalendarRepository mockCalendarRepository;
     late MockTaskRepository mockTaskRepository;
     late MockSyncService mockSyncService;
+    late MockAccountRepository mockAccountRepository;
+    late MockUserRepository mockUserRepository;
+    late MockDomainService mockDomainService;
 
     setUp(() {
       mockCalendarRepository = MockCalendarRepository();
       mockTaskRepository = MockTaskRepository();
       mockSyncService = MockSyncService();
+      mockAccountRepository = MockAccountRepository();
+      mockUserRepository = MockUserRepository();
+      mockDomainService = MockDomainService();
+
+      // Add this stub for user repository
+      when(mockUserRepository.removeProjectFromOrder(any)).thenAnswer((_) async => const Result.success(null));
     });
 
     group('ProjectListViewModel Delete', () {
@@ -55,15 +71,26 @@ void main() {
           mockCalendarRepository,
           mockTaskRepository,
           mockSyncService,
+          mockDomainService,
+          mockAccountRepository,
+          mockUserRepository,
         );
 
         // Set initial state with the project
         viewModel.state = viewModel.state.copyWith(projects: [testProject]);
         expect(viewModel.state.projects.length, 1);
 
+        // Mock getById to return the test project
+        when(mockCalendarRepository.getById('project1'))
+            .thenAnswer((_) async => Result.success(testProject.project));
+
         // Mock successful deletion
         when(mockCalendarRepository.delete('project1'))
             .thenAnswer((_) async => const Result.success(null));
+
+        // Mock account repository
+        when(mockAccountRepository.getActiveAccount())
+            .thenAnswer((_) async => Result.failure(Failure(exception: Exception('No account'), message: 'No active account')));
 
         // Act
         await viewModel.deleteProject('project1');
@@ -94,15 +121,26 @@ void main() {
           mockCalendarRepository,
           mockTaskRepository,
           mockSyncService,
+          mockDomainService,
+          mockAccountRepository,
+          mockUserRepository,
         );
 
         // Set initial state with the project
         viewModel.state = viewModel.state.copyWith(projects: [testProject]);
 
+        // Mock getById to return the test project
+        when(mockCalendarRepository.getById('project1'))
+            .thenAnswer((_) async => Result.success(testProject.project));
+
         // Mock failed deletion
         when(mockCalendarRepository.delete('project1'))
             .thenAnswer((_) async => Result.failure(
                 Failure(exception: Exception('Server error'), message: 'Failed to delete on server')));
+
+        // Mock account repository
+        when(mockAccountRepository.getActiveAccount())
+            .thenAnswer((_) async => Result.failure(Failure(exception: Exception('No account'), message: 'No active account')));
 
         // Act
         await viewModel.deleteProject('project1');
@@ -119,7 +157,14 @@ void main() {
           mockCalendarRepository,
           mockTaskRepository,
           mockSyncService,
+          mockDomainService,
+          mockAccountRepository,
+          mockUserRepository,
         );
+
+        // Mock getById to return null (project not found)
+        when(mockCalendarRepository.getById('nonexistent'))
+            .thenAnswer((_) async => const Result.success(null));
 
         // Mock deletion (won't be called for non-existent project)
         when(mockCalendarRepository.delete('nonexistent'))
@@ -131,14 +176,23 @@ void main() {
         // Assert
         expect(viewModel.state.projects.length, 0);
         expect(viewModel.state.error, null);
-        verify(mockCalendarRepository.delete('nonexistent')).called(1);
+        verifyNever(mockCalendarRepository.delete('nonexistent'));
       });
     });
 
     group('TaskViewModel Delete', () {
       test('should delete task successfully', () async {
         // Arrange
-        final viewModel = TaskViewModel(mockTaskRepository);
+        final testTask = TaskFactory.createNew(
+          summary: 'Test Task',
+          sourceCalendarUid: 'project1',
+        ).copyWith(uid: 'task1');
+
+        final viewModel = TaskViewModel(mockTaskRepository, mockAccountRepository);
+
+        // Mock getById to return the test task
+        when(mockTaskRepository.getById('task1'))
+            .thenAnswer((_) async => Result.success(testTask));
 
         // Mock successful deletion
         when(mockTaskRepository.delete('task1'))
@@ -155,7 +209,16 @@ void main() {
 
       test('should handle delete failure and show error', () async {
         // Arrange
-        final viewModel = TaskViewModel(mockTaskRepository);
+        final testTask = TaskFactory.createNew(
+          summary: 'Test Task',
+          sourceCalendarUid: 'project1',
+        ).copyWith(uid: 'task1');
+
+        final viewModel = TaskViewModel(mockTaskRepository, mockAccountRepository);
+
+        // Mock getById to return the test task
+        when(mockTaskRepository.getById('task1'))
+            .thenAnswer((_) async => Result.success(testTask));
 
         // Mock failed deletion
         when(mockTaskRepository.delete('task1'))
@@ -173,7 +236,16 @@ void main() {
 
       test('should handle exception during deletion', () async {
         // Arrange
-        final viewModel = TaskViewModel(mockTaskRepository);
+        final testTask = TaskFactory.createNew(
+          summary: 'Test Task',
+          sourceCalendarUid: 'project1',
+        ).copyWith(uid: 'task1');
+
+        final viewModel = TaskViewModel(mockTaskRepository, mockAccountRepository);
+
+        // Mock getById to return the test task
+        when(mockTaskRepository.getById('task1'))
+            .thenAnswer((_) async => Result.success(testTask));
 
         // Mock exception
         when(mockTaskRepository.delete('task1'))
@@ -230,9 +302,9 @@ void main() {
         final result = await calendarRepo.delete('calendar1');
 
         // Assert
-        expect(result, isA<Failure>());
-        final failure = result as Failure;
-        expect(failure.message, contains('Storage is locked'));
+        expect(result, isA<Error>());
+        final error = result as Error;
+        expect(error.failure.message, contains('Storage is locked'));
         verify(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1')).called(1);
       });
     });

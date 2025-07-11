@@ -5,17 +5,18 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'dart:async' as _i4;
 
-import 'package:hive_flutter/hive_flutter.dart' as _i5;
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:towdow_app/core/result.dart' as _i2;
-import 'package:towdow_app/data/models/caldav_account.dart' as _i7;
-import 'package:towdow_app/data/models/task.dart' as _i11;
-import 'package:towdow_app/data/models/task_calendar.dart' as _i9;
-import 'package:towdow_app/data/repositories/account_repository.dart' as _i6;
-import 'package:towdow_app/data/repositories/calendar_repository.dart' as _i8;
-import 'package:towdow_app/data/repositories/task_repository.dart' as _i10;
-import 'package:towdow_app/data/services/local_storage_service.dart' as _i3;
-import 'package:towdow_app/data/services/sync_service.dart' as _i12;
+import 'package:towdow_app/data/models/caldav_account.dart' as _i11;
+import 'package:towdow_app/data/models/task.dart' as _i7;
+import 'package:towdow_app/data/models/task_calendar.dart' as _i5;
+import 'package:towdow_app/data/models/user_preferences.dart' as _i13;
+import 'package:towdow_app/data/repositories/account_repository.dart' as _i10;
+import 'package:towdow_app/data/repositories/calendar_repository.dart' as _i3;
+import 'package:towdow_app/data/repositories/task_repository.dart' as _i6;
+import 'package:towdow_app/data/repositories/user_repository.dart' as _i12;
+import 'package:towdow_app/data/services/domain_service.dart' as _i9;
+import 'package:towdow_app/data/services/sync_service.dart' as _i8;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -41,806 +42,74 @@ class _FakeResult_0<T> extends _i1.SmartFake implements _i2.Result<T> {
         );
 }
 
-/// A class which mocks [LocalStorageService].
-///
-/// See the documentation for Mockito's code generation for more information.
-class MockLocalStorageService extends _i1.Mock
-    implements _i3.LocalStorageService {
-  @override
-  _i4.Future<_i2.Result<void>> initialize() => (super.noSuchMethod(
-        Invocation.method(
-          #initialize,
-          [],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #initialize,
-            [],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #initialize,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<List<T>>> getAll<T>(String? boxName) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getAll,
-          [boxName],
-        ),
-        returnValue:
-            _i4.Future<_i2.Result<List<T>>>.value(_FakeResult_0<List<T>>(
-          this,
-          Invocation.method(
-            #getAll,
-            [boxName],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<T>>>.value(_FakeResult_0<List<T>>(
-          this,
-          Invocation.method(
-            #getAll,
-            [boxName],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<T>>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> put<T>(
-    String? boxName,
-    String? key,
-    T? item,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #put,
-          [
-            boxName,
-            key,
-            item,
-          ],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #put,
-            [
-              boxName,
-              key,
-              item,
-            ],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #put,
-            [
-              boxName,
-              key,
-              item,
-            ],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<T?>> get<T>(
-    String? boxName,
-    String? key,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #get,
-          [
-            boxName,
-            key,
-          ],
-        ),
-        returnValue: _i4.Future<_i2.Result<T?>>.value(_FakeResult_0<T?>(
-          this,
-          Invocation.method(
-            #get,
-            [
-              boxName,
-              key,
-            ],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<T?>>.value(_FakeResult_0<T?>(
-          this,
-          Invocation.method(
-            #get,
-            [
-              boxName,
-              key,
-            ],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<T?>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> delete(
-    String? boxName,
-    String? key,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #delete,
-          [
-            boxName,
-            key,
-          ],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #delete,
-            [
-              boxName,
-              key,
-            ],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #delete,
-            [
-              boxName,
-              key,
-            ],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Stream<_i5.BoxEvent> getStream(String? boxName) => (super.noSuchMethod(
-        Invocation.method(
-          #getStream,
-          [boxName],
-        ),
-        returnValue: _i4.Stream<_i5.BoxEvent>.empty(),
-        returnValueForMissingStub: _i4.Stream<_i5.BoxEvent>.empty(),
-      ) as _i4.Stream<_i5.BoxEvent>);
-
-  @override
-  _i4.Future<_i2.Result<void>> clear(String? boxName) => (super.noSuchMethod(
-        Invocation.method(
-          #clear,
-          [boxName],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #clear,
-            [boxName],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #clear,
-            [boxName],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> fixCorruptedData() => (super.noSuchMethod(
-        Invocation.method(
-          #fixCorruptedData,
-          [],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #fixCorruptedData,
-            [],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #fixCorruptedData,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> clearAllData() => (super.noSuchMethod(
-        Invocation.method(
-          #clearAllData,
-          [],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #clearAllData,
-            [],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #clearAllData,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> emergencyReset() => (super.noSuchMethod(
-        Invocation.method(
-          #emergencyReset,
-          [],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #emergencyReset,
-            [],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #emergencyReset,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<void> close() => (super.noSuchMethod(
-        Invocation.method(
-          #close,
-          [],
-        ),
-        returnValue: _i4.Future<void>.value(),
-        returnValueForMissingStub: _i4.Future<void>.value(),
-      ) as _i4.Future<void>);
-
-  @override
-  _i4.Future<void> debugAllBoxes() => (super.noSuchMethod(
-        Invocation.method(
-          #debugAllBoxes,
-          [],
-        ),
-        returnValue: _i4.Future<void>.value(),
-        returnValueForMissingStub: _i4.Future<void>.value(),
-      ) as _i4.Future<void>);
-
-  @override
-  _i4.Future<_i2.Result<List<String>>> getAllDomains() => (super.noSuchMethod(
-        Invocation.method(
-          #getAllDomains,
-          [],
-        ),
-        returnValue: _i4.Future<_i2.Result<List<String>>>.value(
-            _FakeResult_0<List<String>>(
-          this,
-          Invocation.method(
-            #getAllDomains,
-            [],
-          ),
-        )),
-        returnValueForMissingStub: _i4.Future<_i2.Result<List<String>>>.value(
-            _FakeResult_0<List<String>>(
-          this,
-          Invocation.method(
-            #getAllDomains,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<String>>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> addDomain(String? domain) => (super.noSuchMethod(
-        Invocation.method(
-          #addDomain,
-          [domain],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #addDomain,
-            [domain],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #addDomain,
-            [domain],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> removeDomain(String? domain) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #removeDomain,
-          [domain],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #removeDomain,
-            [domain],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #removeDomain,
-            [domain],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<bool>> domainExists(String? domain) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #domainExists,
-          [domain],
-        ),
-        returnValue: _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
-          this,
-          Invocation.method(
-            #domainExists,
-            [domain],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
-          this,
-          Invocation.method(
-            #domainExists,
-            [domain],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<bool>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> renameDomain(
-    String? oldDomain,
-    String? newDomain,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #renameDomain,
-          [
-            oldDomain,
-            newDomain,
-          ],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #renameDomain,
-            [
-              oldDomain,
-              newDomain,
-            ],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #renameDomain,
-            [
-              oldDomain,
-              newDomain,
-            ],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<List<String>>> getAllStatuses() => (super.noSuchMethod(
-        Invocation.method(
-          #getAllStatuses,
-          [],
-        ),
-        returnValue: _i4.Future<_i2.Result<List<String>>>.value(
-            _FakeResult_0<List<String>>(
-          this,
-          Invocation.method(
-            #getAllStatuses,
-            [],
-          ),
-        )),
-        returnValueForMissingStub: _i4.Future<_i2.Result<List<String>>>.value(
-            _FakeResult_0<List<String>>(
-          this,
-          Invocation.method(
-            #getAllStatuses,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<String>>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> addStatus(String? status) => (super.noSuchMethod(
-        Invocation.method(
-          #addStatus,
-          [status],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #addStatus,
-            [status],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #addStatus,
-            [status],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> removeStatus(String? status) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #removeStatus,
-          [status],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #removeStatus,
-            [status],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #removeStatus,
-            [status],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<bool>> statusExists(String? status) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #statusExists,
-          [status],
-        ),
-        returnValue: _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
-          this,
-          Invocation.method(
-            #statusExists,
-            [status],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
-          this,
-          Invocation.method(
-            #statusExists,
-            [status],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<bool>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> renameStatus(
-    String? oldStatus,
-    String? newStatus,
-  ) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #renameStatus,
-          [
-            oldStatus,
-            newStatus,
-          ],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #renameStatus,
-            [
-              oldStatus,
-              newStatus,
-            ],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #renameStatus,
-            [
-              oldStatus,
-              newStatus,
-            ],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-}
-
-/// A class which mocks [AccountRepository].
-///
-/// See the documentation for Mockito's code generation for more information.
-class MockAccountRepository extends _i1.Mock implements _i6.AccountRepository {
-  @override
-  _i4.Future<_i2.Result<List<_i7.CaldavAccount>>> getAll() =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getAll,
-          [],
-        ),
-        returnValue: _i4.Future<_i2.Result<List<_i7.CaldavAccount>>>.value(
-            _FakeResult_0<List<_i7.CaldavAccount>>(
-          this,
-          Invocation.method(
-            #getAll,
-            [],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i7.CaldavAccount>>>.value(
-                _FakeResult_0<List<_i7.CaldavAccount>>(
-          this,
-          Invocation.method(
-            #getAll,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i7.CaldavAccount>>>);
-
-  @override
-  _i4.Future<_i2.Result<_i7.CaldavAccount?>> getActiveAccount() =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #getActiveAccount,
-          [],
-        ),
-        returnValue: _i4.Future<_i2.Result<_i7.CaldavAccount?>>.value(
-            _FakeResult_0<_i7.CaldavAccount?>(
-          this,
-          Invocation.method(
-            #getActiveAccount,
-            [],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<_i7.CaldavAccount?>>.value(
-                _FakeResult_0<_i7.CaldavAccount?>(
-          this,
-          Invocation.method(
-            #getActiveAccount,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<_i7.CaldavAccount?>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> save(_i7.CaldavAccount? account) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #save,
-          [account],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #save,
-            [account],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #save,
-            [account],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> delete(String? accountId) => (super.noSuchMethod(
-        Invocation.method(
-          #delete,
-          [accountId],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #delete,
-            [accountId],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #delete,
-            [accountId],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<void>> setActiveAccount(String? accountId) =>
-      (super.noSuchMethod(
-        Invocation.method(
-          #setActiveAccount,
-          [accountId],
-        ),
-        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #setActiveAccount,
-            [accountId],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #setActiveAccount,
-            [accountId],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<void>>);
-
-  @override
-  _i4.Future<_i2.Result<bool>> hasActiveAccount() => (super.noSuchMethod(
-        Invocation.method(
-          #hasActiveAccount,
-          [],
-        ),
-        returnValue: _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
-          this,
-          Invocation.method(
-            #hasActiveAccount,
-            [],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
-          this,
-          Invocation.method(
-            #hasActiveAccount,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<bool>>);
-}
-
 /// A class which mocks [CalendarRepository].
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockCalendarRepository extends _i1.Mock
-    implements _i8.CalendarRepository {
+    implements _i3.CalendarRepository {
+  MockCalendarRepository() {
+    _i1.throwOnMissingStub(this);
+  }
+
   @override
-  _i4.Future<_i2.Result<List<_i9.TaskCalendar>>> getAll() =>
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getAll() =>
       (super.noSuchMethod(
         Invocation.method(
           #getAll,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-            _FakeResult_0<List<_i9.TaskCalendar>>(
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
           this,
           Invocation.method(
             #getAll,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-                _FakeResult_0<List<_i9.TaskCalendar>>(
-          this,
-          Invocation.method(
-            #getAll,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>);
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
 
   @override
-  _i4.Future<_i2.Result<_i9.TaskCalendar?>> getById(String? uid) =>
+  _i4.Future<_i2.Result<_i5.TaskCalendar?>> getById(String? uid) =>
       (super.noSuchMethod(
         Invocation.method(
           #getById,
           [uid],
         ),
-        returnValue: _i4.Future<_i2.Result<_i9.TaskCalendar?>>.value(
-            _FakeResult_0<_i9.TaskCalendar?>(
+        returnValue: _i4.Future<_i2.Result<_i5.TaskCalendar?>>.value(
+            _FakeResult_0<_i5.TaskCalendar?>(
           this,
           Invocation.method(
             #getById,
             [uid],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<_i9.TaskCalendar?>>.value(
-                _FakeResult_0<_i9.TaskCalendar?>(
-          this,
-          Invocation.method(
-            #getById,
-            [uid],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<_i9.TaskCalendar?>>);
+      ) as _i4.Future<_i2.Result<_i5.TaskCalendar?>>);
 
   @override
-  _i4.Future<_i2.Result<_i9.TaskCalendar?>> getByPath(String? path) =>
+  _i4.Future<_i2.Result<_i5.TaskCalendar?>> getByPath(String? path) =>
       (super.noSuchMethod(
         Invocation.method(
           #getByPath,
           [path],
         ),
-        returnValue: _i4.Future<_i2.Result<_i9.TaskCalendar?>>.value(
-            _FakeResult_0<_i9.TaskCalendar?>(
+        returnValue: _i4.Future<_i2.Result<_i5.TaskCalendar?>>.value(
+            _FakeResult_0<_i5.TaskCalendar?>(
           this,
           Invocation.method(
             #getByPath,
             [path],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<_i9.TaskCalendar?>>.value(
-                _FakeResult_0<_i9.TaskCalendar?>(
-          this,
-          Invocation.method(
-            #getByPath,
-            [path],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<_i9.TaskCalendar?>>);
+      ) as _i4.Future<_i2.Result<_i5.TaskCalendar?>>);
 
   @override
-  _i4.Future<_i2.Result<void>> save(_i9.TaskCalendar? calendar) =>
+  _i4.Future<_i2.Result<void>> save(_i5.TaskCalendar? calendar) =>
       (super.noSuchMethod(
         Invocation.method(
           #save,
           [calendar],
         ),
         returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #save,
-            [calendar],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
           this,
           Invocation.method(
             #save,
@@ -862,78 +131,51 @@ class MockCalendarRepository extends _i1.Mock
             [uid],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #delete,
-            [uid],
-          ),
-        )),
       ) as _i4.Future<_i2.Result<void>>);
 
   @override
-  _i4.Stream<List<_i9.TaskCalendar>> watchCalendars() => (super.noSuchMethod(
+  _i4.Stream<List<_i5.TaskCalendar>> watchCalendars() => (super.noSuchMethod(
         Invocation.method(
           #watchCalendars,
           [],
         ),
-        returnValue: _i4.Stream<List<_i9.TaskCalendar>>.empty(),
-        returnValueForMissingStub: _i4.Stream<List<_i9.TaskCalendar>>.empty(),
-      ) as _i4.Stream<List<_i9.TaskCalendar>>);
+        returnValue: _i4.Stream<List<_i5.TaskCalendar>>.empty(),
+      ) as _i4.Stream<List<_i5.TaskCalendar>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i9.TaskCalendar>>> getProjectCalendars() =>
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getProjectCalendars() =>
       (super.noSuchMethod(
         Invocation.method(
           #getProjectCalendars,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-            _FakeResult_0<List<_i9.TaskCalendar>>(
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
           this,
           Invocation.method(
             #getProjectCalendars,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-                _FakeResult_0<List<_i9.TaskCalendar>>(
-          this,
-          Invocation.method(
-            #getProjectCalendars,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>);
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i9.TaskCalendar>>> getCalendarsByDomain(
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getCalendarsByDomain(
           String? domain) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCalendarsByDomain,
           [domain],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-            _FakeResult_0<List<_i9.TaskCalendar>>(
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
           this,
           Invocation.method(
             #getCalendarsByDomain,
             [domain],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-                _FakeResult_0<List<_i9.TaskCalendar>>(
-          this,
-          Invocation.method(
-            #getCalendarsByDomain,
-            [domain],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>);
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
 
   @override
   _i4.Future<_i2.Result<List<String>>> getUniqueDomains() =>
@@ -943,14 +185,6 @@ class MockCalendarRepository extends _i1.Mock
           [],
         ),
         returnValue: _i4.Future<_i2.Result<List<String>>>.value(
-            _FakeResult_0<List<String>>(
-          this,
-          Invocation.method(
-            #getUniqueDomains,
-            [],
-          ),
-        )),
-        returnValueForMissingStub: _i4.Future<_i2.Result<List<String>>>.value(
             _FakeResult_0<List<String>>(
           this,
           Invocation.method(
@@ -974,17 +208,6 @@ class MockCalendarRepository extends _i1.Mock
           ],
         ),
         returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #renameDomain,
-            [
-              oldDomain,
-              newDomain,
-            ],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
           this,
           Invocation.method(
             #renameDomain,
@@ -1011,69 +234,42 @@ class MockCalendarRepository extends _i1.Mock
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<Map<String, int>>>.value(
-                _FakeResult_0<Map<String, int>>(
-          this,
-          Invocation.method(
-            #getDomainStatistics,
-            [],
-          ),
-        )),
       ) as _i4.Future<_i2.Result<Map<String, int>>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i9.TaskCalendar>>> getCalendarsWithoutDomain() =>
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getCalendarsWithoutDomain() =>
       (super.noSuchMethod(
         Invocation.method(
           #getCalendarsWithoutDomain,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-            _FakeResult_0<List<_i9.TaskCalendar>>(
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
           this,
           Invocation.method(
             #getCalendarsWithoutDomain,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-                _FakeResult_0<List<_i9.TaskCalendar>>(
-          this,
-          Invocation.method(
-            #getCalendarsWithoutDomain,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>);
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i9.TaskCalendar>>> getCalendarsByStatus(
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getCalendarsByStatus(
           String? status) =>
       (super.noSuchMethod(
         Invocation.method(
           #getCalendarsByStatus,
           [status],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-            _FakeResult_0<List<_i9.TaskCalendar>>(
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
           this,
           Invocation.method(
             #getCalendarsByStatus,
             [status],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-                _FakeResult_0<List<_i9.TaskCalendar>>(
-          this,
-          Invocation.method(
-            #getCalendarsByStatus,
-            [status],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>);
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
 
   @override
   _i4.Future<_i2.Result<List<String>>> getUniqueStatuses() =>
@@ -1083,14 +279,6 @@ class MockCalendarRepository extends _i1.Mock
           [],
         ),
         returnValue: _i4.Future<_i2.Result<List<String>>>.value(
-            _FakeResult_0<List<String>>(
-          this,
-          Invocation.method(
-            #getUniqueStatuses,
-            [],
-          ),
-        )),
-        returnValueForMissingStub: _i4.Future<_i2.Result<List<String>>>.value(
             _FakeResult_0<List<String>>(
           this,
           Invocation.method(
@@ -1123,17 +311,6 @@ class MockCalendarRepository extends _i1.Mock
             ],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #changeStatus,
-            [
-              oldStatus,
-              newStatus,
-            ],
-          ),
-        )),
       ) as _i4.Future<_i2.Result<void>>);
 
   @override
@@ -1151,269 +328,175 @@ class MockCalendarRepository extends _i1.Mock
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<Map<String, int>>>.value(
-                _FakeResult_0<Map<String, int>>(
-          this,
-          Invocation.method(
-            #getStatusStatistics,
-            [],
-          ),
-        )),
       ) as _i4.Future<_i2.Result<Map<String, int>>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i9.TaskCalendar>>> getCalendarsWithoutStatus() =>
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getCalendarsWithoutStatus() =>
       (super.noSuchMethod(
         Invocation.method(
           #getCalendarsWithoutStatus,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-            _FakeResult_0<List<_i9.TaskCalendar>>(
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
           this,
           Invocation.method(
             #getCalendarsWithoutStatus,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-                _FakeResult_0<List<_i9.TaskCalendar>>(
-          this,
-          Invocation.method(
-            #getCalendarsWithoutStatus,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>);
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i9.TaskCalendar>>> getArchivedCalendars() =>
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getArchivedCalendars() =>
       (super.noSuchMethod(
         Invocation.method(
           #getArchivedCalendars,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-            _FakeResult_0<List<_i9.TaskCalendar>>(
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
           this,
           Invocation.method(
             #getArchivedCalendars,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-                _FakeResult_0<List<_i9.TaskCalendar>>(
-          this,
-          Invocation.method(
-            #getArchivedCalendars,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>);
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i9.TaskCalendar>>> getActiveCalendars() =>
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getActiveCalendars() =>
       (super.noSuchMethod(
         Invocation.method(
           #getActiveCalendars,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-            _FakeResult_0<List<_i9.TaskCalendar>>(
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
           this,
           Invocation.method(
             #getActiveCalendars,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>.value(
-                _FakeResult_0<List<_i9.TaskCalendar>>(
-          this,
-          Invocation.method(
-            #getActiveCalendars,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i9.TaskCalendar>>>);
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
 }
 
 /// A class which mocks [TaskRepository].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockTaskRepository extends _i1.Mock implements _i10.TaskRepository {
+class MockTaskRepository extends _i1.Mock implements _i6.TaskRepository {
+  MockTaskRepository() {
+    _i1.throwOnMissingStub(this);
+  }
+
   @override
-  _i4.Future<_i2.Result<List<_i11.Task>>> getAll() => (super.noSuchMethod(
+  _i4.Future<_i2.Result<List<_i7.Task>>> getAll() => (super.noSuchMethod(
         Invocation.method(
           #getAll,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i11.Task>>>.value(
-            _FakeResult_0<List<_i11.Task>>(
+        returnValue: _i4.Future<_i2.Result<List<_i7.Task>>>.value(
+            _FakeResult_0<List<_i7.Task>>(
           this,
           Invocation.method(
             #getAll,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i11.Task>>>.value(
-                _FakeResult_0<List<_i11.Task>>(
-          this,
-          Invocation.method(
-            #getAll,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i11.Task>>>);
+      ) as _i4.Future<_i2.Result<List<_i7.Task>>>);
 
   @override
-  _i4.Future<_i2.Result<_i11.Task?>> getById(String? uid) =>
-      (super.noSuchMethod(
+  _i4.Future<_i2.Result<_i7.Task?>> getById(String? uid) => (super.noSuchMethod(
         Invocation.method(
           #getById,
           [uid],
         ),
         returnValue:
-            _i4.Future<_i2.Result<_i11.Task?>>.value(_FakeResult_0<_i11.Task?>(
+            _i4.Future<_i2.Result<_i7.Task?>>.value(_FakeResult_0<_i7.Task?>(
           this,
           Invocation.method(
             #getById,
             [uid],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<_i11.Task?>>.value(_FakeResult_0<_i11.Task?>(
-          this,
-          Invocation.method(
-            #getById,
-            [uid],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<_i11.Task?>>);
+      ) as _i4.Future<_i2.Result<_i7.Task?>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i11.Task>>> getByProject(String? projectUid) =>
+  _i4.Future<_i2.Result<List<_i7.Task>>> getByProject(String? projectUid) =>
       (super.noSuchMethod(
         Invocation.method(
           #getByProject,
           [projectUid],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i11.Task>>>.value(
-            _FakeResult_0<List<_i11.Task>>(
+        returnValue: _i4.Future<_i2.Result<List<_i7.Task>>>.value(
+            _FakeResult_0<List<_i7.Task>>(
           this,
           Invocation.method(
             #getByProject,
             [projectUid],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i11.Task>>>.value(
-                _FakeResult_0<List<_i11.Task>>(
-          this,
-          Invocation.method(
-            #getByProject,
-            [projectUid],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i11.Task>>>);
+      ) as _i4.Future<_i2.Result<List<_i7.Task>>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i11.Task>>> getTasksWithDueDate(DateTime? date) =>
+  _i4.Future<_i2.Result<List<_i7.Task>>> getTasksWithDueDate(DateTime? date) =>
       (super.noSuchMethod(
         Invocation.method(
           #getTasksWithDueDate,
           [date],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i11.Task>>>.value(
-            _FakeResult_0<List<_i11.Task>>(
+        returnValue: _i4.Future<_i2.Result<List<_i7.Task>>>.value(
+            _FakeResult_0<List<_i7.Task>>(
           this,
           Invocation.method(
             #getTasksWithDueDate,
             [date],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i11.Task>>>.value(
-                _FakeResult_0<List<_i11.Task>>(
-          this,
-          Invocation.method(
-            #getTasksWithDueDate,
-            [date],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i11.Task>>>);
+      ) as _i4.Future<_i2.Result<List<_i7.Task>>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i11.Task>>> getTasksWithoutDueDate() =>
+  _i4.Future<_i2.Result<List<_i7.Task>>> getTasksWithoutDueDate() =>
       (super.noSuchMethod(
         Invocation.method(
           #getTasksWithoutDueDate,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i11.Task>>>.value(
-            _FakeResult_0<List<_i11.Task>>(
+        returnValue: _i4.Future<_i2.Result<List<_i7.Task>>>.value(
+            _FakeResult_0<List<_i7.Task>>(
           this,
           Invocation.method(
             #getTasksWithoutDueDate,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i11.Task>>>.value(
-                _FakeResult_0<List<_i11.Task>>(
-          this,
-          Invocation.method(
-            #getTasksWithoutDueDate,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i11.Task>>>);
+      ) as _i4.Future<_i2.Result<List<_i7.Task>>>);
 
   @override
-  _i4.Future<_i2.Result<List<_i11.Task>>> getUnregisteredTasks() =>
+  _i4.Future<_i2.Result<List<_i7.Task>>> getUnregisteredTasks() =>
       (super.noSuchMethod(
         Invocation.method(
           #getUnregisteredTasks,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<List<_i11.Task>>>.value(
-            _FakeResult_0<List<_i11.Task>>(
+        returnValue: _i4.Future<_i2.Result<List<_i7.Task>>>.value(
+            _FakeResult_0<List<_i7.Task>>(
           this,
           Invocation.method(
             #getUnregisteredTasks,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<List<_i11.Task>>>.value(
-                _FakeResult_0<List<_i11.Task>>(
-          this,
-          Invocation.method(
-            #getUnregisteredTasks,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<List<_i11.Task>>>);
+      ) as _i4.Future<_i2.Result<List<_i7.Task>>>);
 
   @override
-  _i4.Future<_i2.Result<void>> save(_i11.Task? task) => (super.noSuchMethod(
+  _i4.Future<_i2.Result<void>> save(_i7.Task? task) => (super.noSuchMethod(
         Invocation.method(
           #save,
           [task],
         ),
         returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #save,
-            [task],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
           this,
           Invocation.method(
             #save,
@@ -1435,64 +518,54 @@ class MockTaskRepository extends _i1.Mock implements _i10.TaskRepository {
             [uid],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #delete,
-            [uid],
-          ),
-        )),
       ) as _i4.Future<_i2.Result<void>>);
 
   @override
-  _i4.Stream<List<_i11.Task>> watchTasks() => (super.noSuchMethod(
+  _i4.Stream<List<_i7.Task>> watchTasks() => (super.noSuchMethod(
         Invocation.method(
           #watchTasks,
           [],
         ),
-        returnValue: _i4.Stream<List<_i11.Task>>.empty(),
-        returnValueForMissingStub: _i4.Stream<List<_i11.Task>>.empty(),
-      ) as _i4.Stream<List<_i11.Task>>);
+        returnValue: _i4.Stream<List<_i7.Task>>.empty(),
+      ) as _i4.Stream<List<_i7.Task>>);
 }
 
 /// A class which mocks [SyncService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockSyncService extends _i1.Mock implements _i12.SyncService {
+class MockSyncService extends _i1.Mock implements _i8.SyncService {
+  MockSyncService() {
+    _i1.throwOnMissingStub(this);
+  }
+
   @override
-  _i4.Stream<_i12.SyncStatus> get statusStream => (super.noSuchMethod(
+  _i4.Stream<_i8.SyncStatus> get statusStream => (super.noSuchMethod(
         Invocation.getter(#statusStream),
-        returnValue: _i4.Stream<_i12.SyncStatus>.empty(),
-        returnValueForMissingStub: _i4.Stream<_i12.SyncStatus>.empty(),
-      ) as _i4.Stream<_i12.SyncStatus>);
+        returnValue: _i4.Stream<_i8.SyncStatus>.empty(),
+      ) as _i4.Stream<_i8.SyncStatus>);
 
   @override
   _i4.Stream<double> get progressStream => (super.noSuchMethod(
         Invocation.getter(#progressStream),
         returnValue: _i4.Stream<double>.empty(),
-        returnValueForMissingStub: _i4.Stream<double>.empty(),
       ) as _i4.Stream<double>);
 
   @override
-  _i12.SyncStatus get status => (super.noSuchMethod(
+  _i8.SyncStatus get status => (super.noSuchMethod(
         Invocation.getter(#status),
-        returnValue: _i12.SyncStatus.idle,
-        returnValueForMissingStub: _i12.SyncStatus.idle,
-      ) as _i12.SyncStatus);
+        returnValue: _i8.SyncStatus.idle,
+      ) as _i8.SyncStatus);
 
   @override
   bool get isBackgroundSyncRunning => (super.noSuchMethod(
         Invocation.getter(#isBackgroundSyncRunning),
         returnValue: false,
-        returnValueForMissingStub: false,
       ) as bool);
 
   @override
   bool get isBackgroundSyncing => (super.noSuchMethod(
         Invocation.getter(#isBackgroundSyncing),
         returnValue: false,
-        returnValueForMissingStub: false,
       ) as bool);
 
   @override
@@ -1502,14 +575,6 @@ class MockSyncService extends _i1.Mock implements _i12.SyncService {
           [],
         ),
         returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #initialize,
-            [],
-          ),
-        )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
           this,
           Invocation.method(
             #initialize,
@@ -1537,33 +602,24 @@ class MockSyncService extends _i1.Mock implements _i12.SyncService {
       );
 
   @override
-  _i4.Future<_i2.Result<_i12.SyncResult>> syncNow() => (super.noSuchMethod(
+  _i4.Future<_i2.Result<_i8.SyncResult>> syncNow() => (super.noSuchMethod(
         Invocation.method(
           #syncNow,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<_i12.SyncResult>>.value(
-            _FakeResult_0<_i12.SyncResult>(
+        returnValue: _i4.Future<_i2.Result<_i8.SyncResult>>.value(
+            _FakeResult_0<_i8.SyncResult>(
           this,
           Invocation.method(
             #syncNow,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<_i12.SyncResult>>.value(
-                _FakeResult_0<_i12.SyncResult>(
-          this,
-          Invocation.method(
-            #syncNow,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<_i12.SyncResult>>);
+      ) as _i4.Future<_i2.Result<_i8.SyncResult>>);
 
   @override
   _i4.Future<_i2.Result<void>> queueSyncOperation(
-    _i12.SyncOperation? operation,
+    _i8.SyncOperation? operation,
     String? itemId,
     Map<String, dynamic>? data,
   ) =>
@@ -1587,45 +643,24 @@ class MockSyncService extends _i1.Mock implements _i12.SyncService {
             ],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
-          this,
-          Invocation.method(
-            #queueSyncOperation,
-            [
-              operation,
-              itemId,
-              data,
-            ],
-          ),
-        )),
       ) as _i4.Future<_i2.Result<void>>);
 
   @override
-  _i4.Future<_i2.Result<_i12.SyncResult>> processQueueOnly() =>
+  _i4.Future<_i2.Result<_i8.SyncResult>> processQueueOnly() =>
       (super.noSuchMethod(
         Invocation.method(
           #processQueueOnly,
           [],
         ),
-        returnValue: _i4.Future<_i2.Result<_i12.SyncResult>>.value(
-            _FakeResult_0<_i12.SyncResult>(
+        returnValue: _i4.Future<_i2.Result<_i8.SyncResult>>.value(
+            _FakeResult_0<_i8.SyncResult>(
           this,
           Invocation.method(
             #processQueueOnly,
             [],
           ),
         )),
-        returnValueForMissingStub:
-            _i4.Future<_i2.Result<_i12.SyncResult>>.value(
-                _FakeResult_0<_i12.SyncResult>(
-          this,
-          Invocation.method(
-            #processQueueOnly,
-            [],
-          ),
-        )),
-      ) as _i4.Future<_i2.Result<_i12.SyncResult>>);
+      ) as _i4.Future<_i2.Result<_i8.SyncResult>>);
 
   @override
   _i4.Future<void> forceQueueProcessing() => (super.noSuchMethod(
@@ -1645,4 +680,485 @@ class MockSyncService extends _i1.Mock implements _i12.SyncService {
         ),
         returnValueForMissingStub: null,
       );
+}
+
+/// A class which mocks [DomainService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockDomainService extends _i1.Mock implements _i9.DomainService {
+  MockDomainService() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  _i4.Future<_i2.Result<void>> createDomain(String? domain) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #createDomain,
+          [domain],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #createDomain,
+            [domain],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<List<String>>> getAvailableDomains() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getAvailableDomains,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<String>>>.value(
+            _FakeResult_0<List<String>>(
+          this,
+          Invocation.method(
+            #getAvailableDomains,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<String>>>);
+
+  @override
+  _i4.Future<_i2.Result<Map<String, List<_i5.TaskCalendar>>>>
+      getCalendarsGroupedByDomain() => (super.noSuchMethod(
+            Invocation.method(
+              #getCalendarsGroupedByDomain,
+              [],
+            ),
+            returnValue: _i4
+                .Future<_i2.Result<Map<String, List<_i5.TaskCalendar>>>>.value(
+                _FakeResult_0<Map<String, List<_i5.TaskCalendar>>>(
+              this,
+              Invocation.method(
+                #getCalendarsGroupedByDomain,
+                [],
+              ),
+            )),
+          ) as _i4.Future<_i2.Result<Map<String, List<_i5.TaskCalendar>>>>);
+
+  @override
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getCalendarsByDomain(
+          String? domain) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getCalendarsByDomain,
+          [domain],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
+          this,
+          Invocation.method(
+            #getCalendarsByDomain,
+            [domain],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> assignDomainToCalendar(
+    String? calendarUid,
+    String? domain,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #assignDomainToCalendar,
+          [
+            calendarUid,
+            domain,
+          ],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #assignDomainToCalendar,
+            [
+              calendarUid,
+              domain,
+            ],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> removeDomainFromCalendar(String? calendarUid) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #removeDomainFromCalendar,
+          [calendarUid],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #removeDomainFromCalendar,
+            [calendarUid],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> renameDomain(
+    String? oldDomain,
+    String? newDomain,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #renameDomain,
+          [
+            oldDomain,
+            newDomain,
+          ],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #renameDomain,
+            [
+              oldDomain,
+              newDomain,
+            ],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> bulkAssignDomain(
+    List<String>? calendarUids,
+    String? domain,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #bulkAssignDomain,
+          [
+            calendarUids,
+            domain,
+          ],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #bulkAssignDomain,
+            [
+              calendarUids,
+              domain,
+            ],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<Map<String, int>>> getDomainStatistics() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getDomainStatistics,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<Map<String, int>>>.value(
+            _FakeResult_0<Map<String, int>>(
+          this,
+          Invocation.method(
+            #getDomainStatistics,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<Map<String, int>>>);
+
+  @override
+  _i4.Future<_i2.Result<List<_i5.TaskCalendar>>> getCalendarsWithoutDomain() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getCalendarsWithoutDomain,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>.value(
+            _FakeResult_0<List<_i5.TaskCalendar>>(
+          this,
+          Invocation.method(
+            #getCalendarsWithoutDomain,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<_i5.TaskCalendar>>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> removeDomainFromStorage(String? domain) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #removeDomainFromStorage,
+          [domain],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #removeDomainFromStorage,
+            [domain],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i2.Result<void> validateDomainName(String? domain) => (super.noSuchMethod(
+        Invocation.method(
+          #validateDomainName,
+          [domain],
+        ),
+        returnValue: _FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #validateDomainName,
+            [domain],
+          ),
+        ),
+      ) as _i2.Result<void>);
+
+  @override
+  _i4.Future<_i2.Result<bool>> domainExists(String? domain) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #domainExists,
+          [domain],
+        ),
+        returnValue: _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
+          this,
+          Invocation.method(
+            #domainExists,
+            [domain],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<bool>>);
+}
+
+/// A class which mocks [AccountRepository].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockAccountRepository extends _i1.Mock implements _i10.AccountRepository {
+  MockAccountRepository() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  _i4.Future<_i2.Result<List<_i11.CaldavAccount>>> getAll() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getAll,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<List<_i11.CaldavAccount>>>.value(
+            _FakeResult_0<List<_i11.CaldavAccount>>(
+          this,
+          Invocation.method(
+            #getAll,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<List<_i11.CaldavAccount>>>);
+
+  @override
+  _i4.Future<_i2.Result<_i11.CaldavAccount?>> getActiveAccount() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getActiveAccount,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<_i11.CaldavAccount?>>.value(
+            _FakeResult_0<_i11.CaldavAccount?>(
+          this,
+          Invocation.method(
+            #getActiveAccount,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<_i11.CaldavAccount?>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> save(_i11.CaldavAccount? account) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #save,
+          [account],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #save,
+            [account],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> delete(String? accountId) => (super.noSuchMethod(
+        Invocation.method(
+          #delete,
+          [accountId],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #delete,
+            [accountId],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> setActiveAccount(String? accountId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setActiveAccount,
+          [accountId],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #setActiveAccount,
+            [accountId],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<bool>> hasActiveAccount() => (super.noSuchMethod(
+        Invocation.method(
+          #hasActiveAccount,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<bool>>.value(_FakeResult_0<bool>(
+          this,
+          Invocation.method(
+            #hasActiveAccount,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<bool>>);
+}
+
+/// A class which mocks [UserRepository].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockUserRepository extends _i1.Mock implements _i12.UserRepository {
+  MockUserRepository() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  _i4.Future<_i2.Result<_i13.UserPreferences>> getUserPreferences() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getUserPreferences,
+          [],
+        ),
+        returnValue: _i4.Future<_i2.Result<_i13.UserPreferences>>.value(
+            _FakeResult_0<_i13.UserPreferences>(
+          this,
+          Invocation.method(
+            #getUserPreferences,
+            [],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<_i13.UserPreferences>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> saveUserPreferences(
+          _i13.UserPreferences? preferences) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #saveUserPreferences,
+          [preferences],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #saveUserPreferences,
+            [preferences],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> updateProjectOrder(List<String>? projectOrder) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #updateProjectOrder,
+          [projectOrder],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #updateProjectOrder,
+            [projectOrder],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> addProjectToOrder(String? projectUid) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #addProjectToOrder,
+          [projectUid],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #addProjectToOrder,
+            [projectUid],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> removeProjectFromOrder(String? projectUid) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #removeProjectFromOrder,
+          [projectUid],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #removeProjectFromOrder,
+            [projectUid],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Future<_i2.Result<void>> reorderProject(
+    String? projectUid,
+    int? newIndex,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #reorderProject,
+          [
+            projectUid,
+            newIndex,
+          ],
+        ),
+        returnValue: _i4.Future<_i2.Result<void>>.value(_FakeResult_0<void>(
+          this,
+          Invocation.method(
+            #reorderProject,
+            [
+              projectUid,
+              newIndex,
+            ],
+          ),
+        )),
+      ) as _i4.Future<_i2.Result<void>>);
+
+  @override
+  _i4.Stream<_i13.UserPreferences> watchUserPreferences() =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #watchUserPreferences,
+          [],
+        ),
+        returnValue: _i4.Stream<_i13.UserPreferences>.empty(),
+      ) as _i4.Stream<_i13.UserPreferences>);
 }

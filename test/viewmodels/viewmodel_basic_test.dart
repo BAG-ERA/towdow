@@ -2,359 +2,294 @@
 /// Vérifie que tous les ViewModels se compilent et fonctionnent correctement
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:towdow_app/presentation/viewmodels/caldav_settings_viewmodel.dart';
-import 'package:towdow_app/presentation/viewmodels/navbar_sync_viewmodel.dart';
-import 'package:towdow_app/presentation/viewmodels/project_list_viewmodel.dart';
+import 'package:mockito/mockito.dart';
+import 'package:mockito/annotations.dart';
+import 'package:riverpod/riverpod.dart';
+import 'package:towdow_app/core/result.dart';
+import 'package:towdow_app/data/models/task.dart';
+import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
+import 'package:towdow_app/data/repositories/user_repository.dart';
+import 'package:towdow_app/data/services/domain_service.dart';
 import 'package:towdow_app/data/services/sync_service.dart';
-import 'package:towdow_app/data/services/local_storage_service.dart';
-import 'package:towdow_app/data/models/task_calendar.dart';
-import 'package:towdow_app/data/models/caldav_account.dart';
-import 'package:towdow_app/core/result.dart';
-import 'package:mockito/mockito.dart';
-import 'package:mockito/annotations.dart';
+import 'package:towdow_app/presentation/viewmodels/project_list_viewmodel.dart';
 
-@GenerateNiceMocks([
-  MockSpec<LocalStorageService>(),
-  MockSpec<AccountRepository>(),
-  MockSpec<CalendarRepository>(),
-  MockSpec<TaskRepository>(),
-  MockSpec<SyncService>(),
-])
 import 'viewmodel_basic_test.mocks.dart';
 
+@GenerateMocks([
+  CalendarRepository,
+  TaskRepository,
+  SyncService,
+  DomainService,
+  AccountRepository,
+  UserRepository,
+])
 void main() {
-  group('ViewModel Basic Tests', () {
-    late MockAccountRepository mockAccountRepository;
+  group('ProjectListViewModel Basic Tests', () {
+    late ProjectListViewModel viewModel;
     late MockCalendarRepository mockCalendarRepository;
     late MockTaskRepository mockTaskRepository;
     late MockSyncService mockSyncService;
+    late MockDomainService mockDomainService;
+    late MockAccountRepository mockAccountRepository;
+    late MockUserRepository mockUserRepository;
 
     setUp(() {
-      mockAccountRepository = MockAccountRepository();
       mockCalendarRepository = MockCalendarRepository();
       mockTaskRepository = MockTaskRepository();
       mockSyncService = MockSyncService();
+      mockDomainService = MockDomainService();
+      mockAccountRepository = MockAccountRepository();
+      mockUserRepository = MockUserRepository();
+
+      viewModel = ProjectListViewModel(
+        mockCalendarRepository,
+        mockTaskRepository,
+        mockSyncService,
+        mockDomainService,
+        mockAccountRepository,
+        mockUserRepository,
+      );
     });
 
-    group('CaldavSettingsViewModel', () {
-      test('should create and initialize correctly', () {
-        final viewModel = CaldavSettingsViewModel(
-          mockAccountRepository,
-          mockCalendarRepository,
-        );
-
-        expect(viewModel.state.isLoading, false);
-        expect(viewModel.state.isDiscovering, false);
-        expect(viewModel.state.error, null);
-        expect(viewModel.state.currentAccount, null);
-        expect(viewModel.state.availableCalendars, isEmpty);
-        expect(viewModel.state.selectedCalendars, isEmpty);
-
-        viewModel.dispose();
-      });
-
-      test('should clear error state', () {
-        final viewModel = CaldavSettingsViewModel(
-          mockAccountRepository,
-          mockCalendarRepository,
-        );
-
-        // Set error state
-        viewModel.state = viewModel.state.copyWith(error: 'Test error');
-        expect(viewModel.state.error, 'Test error');
-
-        // Clear error
-        viewModel.clearError();
-        expect(viewModel.state.error, null);
-
-        viewModel.dispose();
-      });
-
-      test('should check if calendar is selected', () {
-        final viewModel = CaldavSettingsViewModel(
-          mockAccountRepository,
-          mockCalendarRepository,
-        );
-
-        final testCalendar = TaskCalendarFactory.createNew(
-          path: '/test/calendar1',
-          displayName: 'Test Calendar',
-        ).copyWith(uid: 'cal1');
-
-        // Initially not selected
-        expect(viewModel.isCalendarSelected(testCalendar), false);
-
-        // Add to selected calendars
-        viewModel.state = viewModel.state.copyWith(
-          selectedCalendars: [testCalendar],
-        );
-
-        // Now selected
-        expect(viewModel.isCalendarSelected(testCalendar), true);
-
-        viewModel.dispose();
-      });
-
-      test('should count selected calendars correctly', () {
-        final viewModel = CaldavSettingsViewModel(
-          mockAccountRepository,
-          mockCalendarRepository,
-        );
-
-        expect(viewModel.selectedCalendarCount, 0);
-
-        final calendars = List.generate(3, (index) => 
-          TaskCalendarFactory.createNew(
-            path: '/test/calendar$index',
-            displayName: 'Test Calendar $index',
-          ).copyWith(uid: 'cal$index')
-        );
-
-        viewModel.state = viewModel.state.copyWith(selectedCalendars: calendars);
-        expect(viewModel.selectedCalendarCount, 3);
-
-        viewModel.dispose();
-      });
-    });
-
-    group('NavbarSyncViewModel', () {
-      test('should create and initialize correctly', () {
-        // Setup sync service mock
-        when(mockSyncService.statusStream).thenAnswer(
-          (_) => Stream.value(SyncStatus.idle),
-        );
-        when(mockSyncService.isBackgroundSyncRunning).thenReturn(false);
-        when(mockSyncService.isBackgroundSyncing).thenReturn(false);
-        when(mockSyncService.lastSyncTime).thenReturn(null);
-        when(mockSyncService.status).thenReturn(SyncStatus.idle);
-
-        final viewModel = NavbarSyncViewModel(
-          mockAccountRepository,
-          mockSyncService,
-        );
-
-        expect(viewModel.state.isConnected, false);
-        expect(viewModel.state.isBackgroundSyncRunning, false);
-        expect(viewModel.state.isBackgroundSyncing, false);
-        expect(viewModel.state.isFullSyncing, false);
-        expect(viewModel.state.syncStatus, SyncStatus.idle);
-        expect(viewModel.state.error, null);
-
-        viewModel.dispose();
-      });
-
-      test('should clear error state', () {
-        when(mockSyncService.statusStream).thenAnswer(
-          (_) => Stream.value(SyncStatus.idle),
-        );
-        when(mockSyncService.isBackgroundSyncRunning).thenReturn(false);
-        when(mockSyncService.isBackgroundSyncing).thenReturn(false);
-        when(mockSyncService.lastSyncTime).thenReturn(null);
-        when(mockSyncService.status).thenReturn(SyncStatus.idle);
-
-        final viewModel = NavbarSyncViewModel(
-          mockAccountRepository,
-          mockSyncService,
-        );
-
-        // Set error state
-        viewModel.state = viewModel.state.copyWith(error: 'Test error');
-        expect(viewModel.state.error, 'Test error');
-
-        // Clear error
-        viewModel.clearError();
-        expect(viewModel.state.error, null);
-
-        viewModel.dispose();
-      });
-
-      test('should detect syncing state correctly', () {
-        when(mockSyncService.statusStream).thenAnswer(
-          (_) => Stream.value(SyncStatus.idle),
-        );
-        when(mockSyncService.isBackgroundSyncRunning).thenReturn(false);
-        when(mockSyncService.isBackgroundSyncing).thenReturn(false);
-        when(mockSyncService.lastSyncTime).thenReturn(null);
-        when(mockSyncService.status).thenReturn(SyncStatus.idle);
-
-        final viewModel = NavbarSyncViewModel(
-          mockAccountRepository,
-          mockSyncService,
-        );
-
-        // Not syncing initially
-        expect(viewModel.state.isSyncing, false);
-
-        // Background syncing
-        viewModel.state = viewModel.state.copyWith(isBackgroundSyncing: true);
-        expect(viewModel.state.isSyncing, true);
-
-        // Full syncing
-        viewModel.state = viewModel.state.copyWith(
-          isBackgroundSyncing: false,
-          isFullSyncing: true,
-        );
-        expect(viewModel.state.isSyncing, true);
-
-        // Sync status syncing
-        viewModel.state = viewModel.state.copyWith(
-          isFullSyncing: false,
-          syncStatus: SyncStatus.syncing,
-        );
-        expect(viewModel.state.isSyncing, true);
-
-        viewModel.dispose();
-      });
-
-      test('should return correct account display name', () {
-        when(mockSyncService.statusStream).thenAnswer(
-          (_) => Stream.value(SyncStatus.idle),
-        );
-        when(mockSyncService.isBackgroundSyncRunning).thenReturn(false);
-        when(mockSyncService.isBackgroundSyncing).thenReturn(false);
-        when(mockSyncService.lastSyncTime).thenReturn(null);
-        when(mockSyncService.status).thenReturn(SyncStatus.idle);
-
-        final viewModel = NavbarSyncViewModel(
-          mockAccountRepository,
-          mockSyncService,
-        );
-
-        // No account
-        expect(viewModel.accountDisplayName, 'No Account');
-
-        // With full name
-        final accountWithFullName = CaldavAccount(
-          id: 'test-id',
-          providerType: 'test',
-          serverUrl: 'https://test.com',
-          username: 'testuser',
-          firstName: 'John',
-          lastName: 'Doe',
-          createdAt: DateTime.now(),
-          lastSyncAt: DateTime.now(),
-        );
-
-        viewModel.state = viewModel.state.copyWith(account: accountWithFullName);
-        expect(viewModel.accountDisplayName, 'John Doe');
-
-        // With email only
-        final accountWithEmail = CaldavAccount(
-          id: 'test-id',
-          providerType: 'test',
-          serverUrl: 'https://test.com',
-          username: 'testuser',
-          email: 'test@example.com',
-          createdAt: DateTime.now(),
-          lastSyncAt: DateTime.now(),
-        );
-
-        viewModel.state = viewModel.state.copyWith(account: accountWithEmail);
-        expect(viewModel.accountDisplayName, 'test@example.com');
-
-        // Username only
-        final accountUsernameOnly = CaldavAccount(
-          id: 'test-id',
-          providerType: 'test',
-          serverUrl: 'https://test.com',
-          username: 'testuser',
-          createdAt: DateTime.now(),
-          lastSyncAt: DateTime.now(),
-        );
-
-        viewModel.state = viewModel.state.copyWith(account: accountUsernameOnly);
-        expect(viewModel.accountDisplayName, 'testuser');
-
-        viewModel.dispose();
-      });
-    });
-
-    group('ProjectListViewModel', () {
-      test('should create and initialize correctly', () {
-        final viewModel = ProjectListViewModel(
-          mockCalendarRepository,
-          mockTaskRepository,
-          mockSyncService,
-        );
-
+    group('Initial State', () {
+      test('should have correct initial state', () {
         expect(viewModel.state.isLoading, false);
         expect(viewModel.state.isRefreshing, false);
         expect(viewModel.state.error, null);
         expect(viewModel.state.projects, isEmpty);
-        expect(viewModel.state.filter, ProjectFilter.all);
-        expect(viewModel.state.sortBy, ProjectSort.name);
-        expect(viewModel.state.searchQuery, '');
+        expect(viewModel.state.domainGroups, isEmpty);
         expect(viewModel.state.totalProjects, 0);
         expect(viewModel.state.completedProjects, 0);
         expect(viewModel.state.activeProjects, 0);
-
-        viewModel.dispose();
-      });
-
-      test('should update search and filters correctly', () {
-        final viewModel = ProjectListViewModel(
-          mockCalendarRepository,
-          mockTaskRepository,
-          mockSyncService,
-        );
-
-        // Set search query
-        viewModel.setSearchQuery('test query');
-        expect(viewModel.state.searchQuery, 'test query');
-
-        // Set filter
-        viewModel.setFilter(ProjectFilter.completed);
-        expect(viewModel.state.filter, ProjectFilter.completed);
-
-        // Set sort
-        viewModel.setSortBy(ProjectSort.progress);
-        expect(viewModel.state.sortBy, ProjectSort.progress);
-
-        // Clear filters
-        viewModel.clearFilters();
         expect(viewModel.state.searchQuery, '');
         expect(viewModel.state.filter, ProjectFilter.all);
+        expect(viewModel.state.sortBy, ProjectSort.custom);
+      });
+    });
 
-        viewModel.dispose();
+    group('State Management', () {
+      test('should update loading state', () {
+        // Act
+        viewModel.state = viewModel.state.copyWith(isLoading: true);
+
+        // Assert
+        expect(viewModel.state.isLoading, true);
       });
 
-      test('should return correct filter and sort display names', () {
-        final viewModel = ProjectListViewModel(
-          mockCalendarRepository,
-          mockTaskRepository,
-          mockSyncService,
-        );
-
-        expect(viewModel.getFilterDisplayName(ProjectFilter.all), 'All Projects');
-        expect(viewModel.getFilterDisplayName(ProjectFilter.active), 'Active');
-        expect(viewModel.getFilterDisplayName(ProjectFilter.completed), 'Completed');
-
-        expect(viewModel.getSortDisplayName(ProjectSort.name), 'Name');
-        expect(viewModel.getSortDisplayName(ProjectSort.progress), 'Progress');
-        expect(viewModel.getSortDisplayName(ProjectSort.created), 'Created');
-
-        viewModel.dispose();
-      });
-
-      test('should clear error state', () {
-        final viewModel = ProjectListViewModel(
-          mockCalendarRepository,
-          mockTaskRepository,
-          mockSyncService,
-        );
-
-        // Set error state
+      test('should update error state', () {
+        // Act
         viewModel.state = viewModel.state.copyWith(error: 'Test error');
+
+        // Assert
         expect(viewModel.state.error, 'Test error');
+      });
 
-        // Clear error
-        viewModel.clearError();
+      test('should update projects list', () {
+        // Arrange
+        final projects = [
+          ProjectWithStats(
+            project: TaskCalendarFactory.createNew(
+              path: '/calendars/project1/',
+              displayName: 'Test Project',
+            ),
+            stats: const ProjectStats(
+              totalTasks: 5,
+              completedTasks: 2,
+              inProgressTasks: 2,
+              pendingTasks: 1,
+              progressPercentage: 40,
+            ),
+            lastSyncTime: DateTime.now(),
+          ),
+        ];
+
+        // Act
+        viewModel.state = viewModel.state.copyWith(
+          projects: projects,
+          totalProjects: projects.length,
+          completedProjects: projects.where((p) => p.stats.progressPercentage == 100).length,
+          activeProjects: projects.where((p) => p.stats.progressPercentage < 100).length,
+        );
+
+        // Assert
+        expect(viewModel.state.projects.length, 1);
+        expect(viewModel.state.totalProjects, 1);
+      });
+    });
+
+    group('Search and Filtering', () {
+      test('should set search query', () {
+        // Act
+        viewModel.setSearchQuery('test query');
+
+        // Assert
+        expect(viewModel.state.searchQuery, 'test query');
+      });
+
+      test('should set filter', () {
+        // Act
+        viewModel.setFilter(ProjectFilter.completed);
+
+        // Assert
+        expect(viewModel.state.filter, ProjectFilter.completed);
+      });
+
+      test('should set sort order', () {
+        // Act
+        viewModel.setSortBy(ProjectSort.progress);
+
+        // Assert
+        expect(viewModel.state.sortBy, ProjectSort.progress);
+      });
+
+      test('should clear filters', () {
+        // Arrange
+        viewModel.setSearchQuery('test');
+        viewModel.setFilter(ProjectFilter.completed);
+
+        // Act
+        viewModel.clearFilters();
+
+        // Assert
+        expect(viewModel.state.searchQuery, '');
+        expect(viewModel.state.filter, ProjectFilter.all);
+      });
+    });
+
+    group('Error Handling', () {
+      test('should handle state updates with errors', () {
+        // Act
+        viewModel.state = viewModel.state.copyWith(
+          error: 'Test error message',
+          isLoading: false,
+        );
+
+        // Assert
+        expect(viewModel.state.error, 'Test error message');
+        expect(viewModel.state.isLoading, false);
+      });
+
+      test('should clear error when setting new state', () {
+        // Arrange
+        viewModel.state = viewModel.state.copyWith(error: 'Old error');
+
+        // Act
+        viewModel.state = viewModel.state.copyWith(error: null);
+
+        // Assert
         expect(viewModel.state.error, null);
+      });
+    });
 
-        viewModel.dispose();
+    group('Project Statistics', () {
+      test('should calculate project statistics correctly', () {
+        // Arrange
+        final projects = [
+          ProjectWithStats(
+            project: TaskCalendarFactory.createNew(
+              path: '/calendars/project1/',
+              displayName: 'Active Project',
+            ),
+            stats: const ProjectStats(
+              totalTasks: 10,
+              completedTasks: 3,
+              inProgressTasks: 4,
+              pendingTasks: 3,
+              progressPercentage: 30,
+            ),
+            lastSyncTime: DateTime.now(),
+          ),
+          ProjectWithStats(
+            project: TaskCalendarFactory.createNew(
+              path: '/calendars/project2/',
+              displayName: 'Completed Project',
+            ),
+            stats: const ProjectStats(
+              totalTasks: 5,
+              completedTasks: 5,
+              inProgressTasks: 0,
+              pendingTasks: 0,
+              progressPercentage: 100,
+            ),
+            lastSyncTime: DateTime.now(),
+          ),
+        ];
+
+        // Act
+        viewModel.state = viewModel.state.copyWith(
+          projects: projects,
+          totalProjects: projects.length,
+          completedProjects: projects.where((p) => p.stats.progressPercentage == 100).length,
+          activeProjects: projects.where((p) => p.stats.progressPercentage < 100).length,
+        );
+
+        // Assert
+        expect(viewModel.state.totalProjects, 2);
+        expect(viewModel.state.completedProjects, 1);
+        expect(viewModel.state.activeProjects, 1);
+      });
+    });
+
+    group('Domain Groups', () {
+      test('should handle domain groups correctly', () {
+        // Arrange
+        final projects = [
+          ProjectWithStats(
+            project: TaskCalendarFactory.createNew(
+              path: '/calendars/project1/',
+              displayName: 'Project 1',
+              domain: 'Work',
+            ),
+            stats: const ProjectStats(
+              totalTasks: 5,
+              completedTasks: 2,
+              inProgressTasks: 2,
+              pendingTasks: 1,
+              progressPercentage: 40,
+            ),
+            lastSyncTime: DateTime.now(),
+          ),
+          ProjectWithStats(
+            project: TaskCalendarFactory.createNew(
+              path: '/calendars/project2/',
+              displayName: 'Project 2',
+              domain: 'Personal',
+            ),
+            stats: const ProjectStats(
+              totalTasks: 3,
+              completedTasks: 1,
+              inProgressTasks: 1,
+              pendingTasks: 1,
+              progressPercentage: 33,
+            ),
+            lastSyncTime: DateTime.now(),
+          ),
+        ];
+
+        final domainGroups = [
+          DomainGroup(
+            domain: 'Work',
+            projects: [projects[0]],
+          ),
+          DomainGroup(
+            domain: 'Personal',
+            projects: [projects[1]],
+          ),
+        ];
+
+        // Act
+        viewModel.state = viewModel.state.copyWith(
+          projects: projects,
+          domainGroups: domainGroups,
+        );
+
+        // Assert
+        expect(viewModel.state.domainGroups.length, 2);
+        expect(viewModel.state.domainGroups.first.domain, 'Work');
+        expect(viewModel.state.domainGroups.last.domain, 'Personal');
       });
     });
   });

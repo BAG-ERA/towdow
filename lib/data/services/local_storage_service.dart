@@ -46,8 +46,11 @@ class LocalStorageService {
       // AppLogger.info('LocalStorageService: Initializing Hive boxes');
 
       // Initialize Hive with a platform-specific path
-      final appDocumentDir = await getApplicationDocumentsDirectory();
-      Hive.init(appDocumentDir.path);
+      // In test environment, Hive is already initialized
+      if (!Hive.isBoxOpen(tasksBoxName)) {
+        final appDocumentDir = await getApplicationDocumentsDirectory();
+        Hive.init(appDocumentDir.path);
+      }
       
       // Try to open boxes, but handle corrupted data gracefully
       await _initializeBoxSafely(tasksBoxName, 'tasks');

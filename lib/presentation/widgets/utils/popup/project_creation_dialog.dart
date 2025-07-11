@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
 import '../../../../core/theme/chart_theme_usage.dart';
 import '../../../../data/providers/providers.dart';
-import '../../../../data/services/caldav_service.dart';
 import 'domain_creation_dialog.dart';
 import '../enhanced_text_field.dart';
+import '../../../viewmodels/project_creation_viewmodel.dart';
 
 class ProjectCreationDialog extends ConsumerStatefulWidget {
   final String? initialDomain;
@@ -242,150 +242,32 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
   void _createProject() async {
     final projectName = nameController.text.trim();
     final projectDescription = descriptionController.text.trim();
-    
-    if (projectName.isEmpty) {
-      return;
-    }
+    if (projectName.isEmpty) return;
 
     setState(() => isLoading = true);
 
-    try {
-      AppLogger.info('ProjectCreation: Creating project "$projectName" with domain "${selectedDomain ?? 'none'}"');
-      
-      // Get current account for CalDAV operations
-      final accountRepository = ref.read(accountRepositoryProvider);
-      final accountResult = await accountRepository.getActiveAccount();
-      
-      await accountResult.when(
-        success: (account) async {
-          if (account == null) {
-            throw Exception('No active CalDAV account found');
-          }
-          
-          AppLogger.info('ProjectCreation: Using account: ${account.username}@${account.serverUrl}');
-          
-          // Create CalDAV service instance
-          final caldavService = CalDAVService(account: account);
-          
-          // Generate unique UID first to ensure path uniqueness
-          final now = DateTime.now();
-          final projectUid = 'project-${now.millisecondsSinceEpoch}-${projectName.hashCode}';
-          
-          // Generate a safe path name from the display name and include UID for uniqueness
-          final safeName = projectName.toLowerCase()
-              .replaceAll(RegExp(r'[^a-z0-9\s]'), '')
-              .replaceAll(RegExp(r'\s+'), '-')
-              .replaceAll(RegExp(r'-+'), '-')
-              .replaceAll(RegExp(r'^-|-$'), '');
-          
-          // Use UID suffix to ensure path uniqueness
-          final uidSuffix = projectUid.split('-').last; // Get the hash part
-          final pathName = safeName.isEmpty ? 'flowit-project' : safeName;
-          final uniquePathName = '${pathName}-${uidSuffix}';
-          
-          // Get server capabilities to determine calendar home
-          final capabilitiesResult = await caldavService.testConnection();
-          
-          await capabilitiesResult.when(
-            success: (capabilities) async {
-              final calendarPath = '${capabilities.calendarHome}${uniquePathName}/';
-              AppLogger.info('ProjectCreation: Creating calendar at path: $calendarPath with UID: $projectUid');
-              
-              // Create calendar on CalDAV server
-              final createResult = await caldavService.createCalendar(
-                calendarPath: calendarPath,
-                displayName: projectName,
-                description: projectDescription.isEmpty ? 'Project created by FlowIt' : projectDescription,
-                uid: projectUid,
-              );
-              
-              await createResult.when(
-                success: (newCalendar) async {
-                  AppLogger.info('ProjectCreation: Calendar created on server successfully');
-                  
-                  // Save the calendar locally
-                  final calendarRepository = ref.read(calendarRepositoryProvider);
-                  final saveResult = await calendarRepository.save(newCalendar);
-                  
-                  await saveResult.when(
-                    success: (_) async {
-                      AppLogger.info('ProjectCreation: Calendar saved locally successfully');
-                      
-                      // Assign domain if one was selected
-                      if (selectedDomain != null) {
-                        AppLogger.info('ProjectCreation: Assigning domain "$selectedDomain" to project');
-                        final domainService = ref.read(domainServiceProvider);
-                        final domainResult = await domainService.assignDomainToCalendar(newCalendar.uid, selectedDomain);
-                        
-                        await domainResult.when(
-                          success: (_) {
-                            AppLogger.info('ProjectCreation: Domain assigned successfully');
-                          },
-                          failure: (failure) {
-                            AppLogger.warning('ProjectCreation: Failed to assign domain, but project was created: ${failure.message}');
-                            // Don't fail the creation, just log the warning
-                          },
-                        );
-                      }
-                      
-                      // Refresh the project list to show the new project
-                      ref.invalidate(projectListProvider);
-                      ref.invalidate(calendarListProvider);
-                      ref.invalidate(activeCalendarListProvider);
-                      
-                      if (mounted) {
-                        Navigator.of(context).pop(projectName);
-                        
-                        final message = selectedDomain != null 
-                            ? 'Project "$projectName" created in domain "$selectedDomain"'
-                            : 'Project "$projectName" created successfully';
-                        
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(message),
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                          ),
-                        );
-                      }
-                    },
-                    failure: (failure) async {
-                      AppLogger.error('ProjectCreation: Failed to save calendar locally: ${failure.message}');
-                      throw Exception('Failed to save project locally: ${failure.message}');
-                    },
-                  );
-                },
-                failure: (failure) async {
-                  AppLogger.error('ProjectCreation: Failed to create calendar on server: ${failure.message}');
-                  throw Exception('Failed to create project on server: ${failure.message}');
-                },
-              );
-            },
-            failure: (failure) async {
-              AppLogger.error('ProjectCreation: Failed to get server capabilities: ${failure.message}');
-              throw Exception('Failed to connect to server: ${failure.message}');
-            },
-          );
-        },
-        failure: (failure) async {
-          AppLogger.error('ProjectCreation: Failed to get active account: ${failure.message}');
-          throw Exception('No CalDAV account configured. Please set up your account first.');
-        },
+    final vm = ref.read(projectCreationViewModelProvider.notifier);
+    await vm.createProject(
+      name: projectName,
+      description: projectDescription.isEmpty ? 'Project created by FlowIt' : projectDescription,
+      domain: selectedDomain,
+    );
+
+    final state = ref.read(projectCreationViewModelProvider);
+    if (state.error == null && mounted) {
+      Navigator.of(context).pop(projectName);
+      final msg = selectedDomain != null
+          ? 'Project "$projectName" created in domain "$selectedDomain"'
+          : 'Project "$projectName" created successfully';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Theme.of(context).colorScheme.primary),
       );
-    } catch (e) {
-      AppLogger.error('ProjectCreation: Exception creating project: $e');
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create project: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+    } else if (state.error != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: ${state.error}'), backgroundColor: Theme.of(context).colorScheme.error),
+      );
     }
+
+    if (mounted) setState(() => isLoading = false);
   }
 } 

@@ -170,9 +170,12 @@ class NavbarSyncViewModel extends StateNotifier<NavbarSyncState> {
         lastSyncTime: _syncService.lastSyncTime,
         syncStatus: _syncService.status,
         isFullSyncing: _syncService.status == SyncStatus.syncing,
+        // Preserve existing error state
+        error: state.error,
       );
     } catch (e, stackTrace) {
       AppLogger.error('NavbarSyncViewModel: Failed to update sync state', e, stackTrace);
+      state = state.copyWith(error: 'Failed to update sync state: $e');
     }
   }
 
@@ -222,8 +225,8 @@ class NavbarSyncViewModel extends StateNotifier<NavbarSyncState> {
     // AppLogger.info('NavbarSyncViewModel: Stopping background sync');
     
     try {
-      // Note: SyncService no longer has periodic sync - BackgroundSyncService handles this
-      // The background sync service should be stopped through the app lifecycle manager
+      // Call the sync service to stop periodic sync
+      _syncService.stopPeriodicSync();
       _updateSyncState();
       
       // AppLogger.info('NavbarSyncViewModel: Background sync stop requested');

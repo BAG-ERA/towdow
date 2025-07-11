@@ -41,11 +41,9 @@ void main() {
           print('Supports tasks: ${capabilities.supportsTasks}');
           
           // Test calendar creation
-          final calendarPath = '${capabilities.calendarHome}test-flowit-${DateTime.now().millisecondsSinceEpoch}/';
-          print('\nCreating test calendar at: $calendarPath');
+          print('\nCreating test calendar');
           
           final createResult = await service.createCalendar(
-            calendarPath: calendarPath,
             displayName: 'FlowIt Integration Test',
             description: 'Test calendar created by FlowIt integration test',
           );

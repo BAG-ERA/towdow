@@ -3,11 +3,12 @@
  * Tests the MKCALENDAR method implementation and error handling
  */
 
-import 'package:test/test.dart';
-import '../lib/data/services/caldav_service.dart';
-import '../lib/data/services/webdav_client.dart';
-import '../lib/data/models/caldav_account.dart';
-import '../lib/core/result.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:towdow_app/data/services/caldav_service.dart';
+import 'package:towdow_app/data/services/webdav_client.dart';
+import 'package:towdow_app/data/models/caldav_account.dart';
+import 'package:towdow_app/data/models/task_calendar.dart';
+import 'package:towdow_app/core/result.dart';
 
 void main() {
   group('Calendar Creation Tests', () {
@@ -16,7 +17,7 @@ void main() {
     setUp(() {
       testAccount = CaldavAccount(
         id: 'test-account',
-        providerType: 'test',
+        providerType: 'custom',
         serverUrl: 'https://test.example.com',
         username: 'testuser',
         password: 'testpass',
@@ -109,12 +110,17 @@ void main() {
     });
 
     test('TaskCalendar object should be created with correct properties', () {
-      // Test TaskCalendar creation
-      const testCalendar = TaskCalendar(
+      // Test TaskCalendar creation using the real model
+      final testCalendar = TaskCalendar(
+        uid: 'test-calendar-uid',
         path: '/calendar/home/test/',
         displayName: 'Test Calendar',
         description: 'Test Description',
         supportsTodos: true,
+        lastModified: DateTime.now(),
+        created: DateTime.now(),
+        dtstamp: DateTime.now(),
+        status: 'NEEDS-ACTION',
       );
       
       expect(testCalendar.path, equals('/calendar/home/test/'));
@@ -133,20 +139,5 @@ void main() {
       expect(expectedPath, endsWith('/'));
       expect(expectedPath, contains(calendarName));
     });
-  });
-}
-
-/// Mock TaskCalendar class for testing
-class TaskCalendar {
-  final String path;
-  final String displayName;
-  final String description;
-  final bool supportsTodos;
-
-  const TaskCalendar({
-    required this.path,
-    required this.displayName,
-    required this.description,
-    required this.supportsTodos,
   });
 } 
