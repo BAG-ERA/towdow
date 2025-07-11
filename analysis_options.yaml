@@ -10,6 +10,8 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
+  plugins:
+    - import_lint
   exclude:
     - lib.old/**
     - test/**
@@ -28,6 +30,12 @@ linter:
   rules:
     # avoid_print: false  # Uncomment to disable the `avoid_print` rule
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+
+import_lint:
+  rules:
+    presentation_no_service_import:
+      target: "lib/presentation/**"
+      from: "lib/data/services/**"
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options
