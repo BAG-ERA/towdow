@@ -7,6 +7,8 @@ import '../../../data/providers/providers.dart';
 import 'caldav_management_screen.dart';
 import 'connection_info_screen.dart';
 import 'external_calendar_management_screen.dart';
+import '../../widgets/utils/popup/export_dialog.dart';
+import '../../widgets/utils/popup/import_dialog.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -54,6 +56,18 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: 'Connect external CalDAV calendars',
                 icon: Icons.calendar_view_month_rounded,
                 onTap: () => _showExternalCalendars(context, ref),
+              ),
+              _SettingsItem(
+                title: 'Export Data',
+                subtitle: 'Export all local data to a file',
+                icon: Icons.download_rounded,
+                onTap: () => _showExportData(context, ref),
+              ),
+              _SettingsItem(
+                title: 'Import Data',
+                subtitle: 'Import data from a file',
+                icon: Icons.upload_rounded,
+                onTap: () => _showImportData(context, ref),
               ),
             ],
           ),
@@ -243,6 +257,20 @@ class SettingsScreen extends ConsumerWidget {
       MaterialPageRoute(
         builder: (context) => const ExternalCalendarManagementScreen(),
       ),
+    );
+  }
+
+  Future<void> _showExportData(BuildContext context, WidgetRef ref) async {
+    showDialog(
+      context: context,
+      builder: (context) => const ExportDialog(),
+    );
+  }
+
+  Future<void> _showImportData(BuildContext context, WidgetRef ref) async {
+    showDialog(
+      context: context,
+      builder: (context) => const ImportDialog(),
     );
   }
 

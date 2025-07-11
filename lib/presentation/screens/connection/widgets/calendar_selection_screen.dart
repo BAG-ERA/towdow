@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/caldav_account.dart';
 import '../../../../data/models/task_calendar.dart';
 import '../../../../data/services/caldav_service.dart';
-import '../../../../data/services/local_storage_service.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../core/logger.dart';
+import '../../../viewmodels/calendar_selection_viewmodel.dart';
 // Result type is imported via caldav_service.dart
 
 class CalendarSelectionScreen extends ConsumerStatefulWidget {
@@ -26,9 +26,6 @@ class CalendarSelectionScreen extends ConsumerStatefulWidget {
 }
 
 class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScreen> {
-  final Set<TaskCalendar> _selectedCalendars = {};
-  bool _isLoading = true; // Start with loading true
-  String? _errorMessage;
   CalDAVCapabilities? _discoveredCapabilities;
 
   @override
@@ -38,11 +35,6 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
   }
 
   Future<void> _discoverRealCapabilities() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
     try {
       // AppLogger.info('CalendarSelectionScreen: Starting calendar discovery for account: ${widget.account.serverUrl}');
       final caldavService = CalDAVService(account: widget.account);
@@ -57,26 +49,14 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
           
           setState(() {
             _discoveredCapabilities = capabilities;
-            _isLoading = false;
-            
-            // Don't pre-select calendars - let user choose
-            // AppLogger.info('CalendarSelectionScreen: Discovered ${capabilities.taskCalendars.length} calendars, user can select which ones to sync');
           });
         },
         failure: (failure) {
           AppLogger.error('CalendarSelectionScreen: Discovery failed: ${failure.message}');
-          setState(() {
-            _errorMessage = 'Failed to discover calendars: ${failure.message}';
-            _isLoading = false;
-          });
         },
       );
     } catch (e, stackTrace) {
       AppLogger.error('CalendarSelectionScreen: Unexpected error during discovery', e, stackTrace);
-      setState(() {
-        _errorMessage = 'Unexpected error during discovery: $e';
-        _isLoading = false;
-      });
     }
   }
 
@@ -87,6 +67,10 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
     final availableCalendars = capabilities.taskCalendars;
     final hasExistingCalendars = availableCalendars.any((cal) => 
       !cal.path.contains('flowit-tasks') && !cal.path.contains('tasks/'));
+
+    // Get ViewModel state
+    final selState = ref.watch(calendarSelectionViewModelProvider(widget.account));
+    final vm = ref.read(calendarSelectionViewModelProvider(widget.account).notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -150,13 +134,13 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
 
             // Project Portfolio list and create option
             Expanded(
-              child: _isLoading 
+              child: _discoveredCapabilities == null 
                 ? _buildLoadingState()
-                : _buildCalendarContent(availableCalendars, hasExistingCalendars),
+                : _buildCalendarContent(availableCalendars, hasExistingCalendars, selState, vm),
             ),
 
             // Error message
-            if (_errorMessage != null) ...[
+            if (selState.error != null) ...[
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -171,7 +155,7 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _errorMessage!,
+                        selState.error!,
                         style: TextStyle(color: Colors.red.shade700, fontSize: 14),
                       ),
                     ),
@@ -186,20 +170,20 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
             Row(
               children: [
                 TextButton(
-                  onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                  onPressed: selState.isLoading ? null : () => Navigator.of(context).pop(),
                   child: const Text('Cancel'),
                 ),
                 const Spacer(),
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _finishSetup,
-                  child: _isLoading
+                  onPressed: selState.isLoading ? null : () => _finishSetup(selState, vm),
+                  child: selState.isLoading
                       ? const SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(hasExistingCalendars && _selectedCalendars.isNotEmpty 
-                          ? 'Start Syncing (${_selectedCalendars.length} portfolios)'
+                      : Text(hasExistingCalendars && selState.selectedCalendars.isNotEmpty 
+                          ? 'Start Syncing (${selState.selectedCalendars.length} portfolios)'
                           : 'Continue'),
                 ),
               ],
@@ -210,24 +194,22 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
     );
   }
 
-  Widget _buildCalendarList(List<TaskCalendar> calendars) {
+  Widget _buildCalendarList(List<TaskCalendar> calendars, CalendarSelectionState selState, CalendarSelectionViewModel vm) {
     return ListView.builder(
       itemCount: calendars.length,
       itemBuilder: (context, index) {
         final calendar = calendars[index];
-        final isSelected = _selectedCalendars.contains(calendar);
+        final isSelected = selState.selectedCalendars.contains(calendar);
         
         return Card(
           child: CheckboxListTile(
             value: isSelected,
             onChanged: calendar.supportsTodos ? (bool? value) {
-              setState(() {
-                if (value == true) {
-                  _selectedCalendars.add(calendar);
-                } else {
-                  _selectedCalendars.remove(calendar);
-                }
-              });
+              if (value == true) {
+                vm.addCalendar(calendar);
+              } else {
+                vm.removeCalendar(calendar);
+              }
             } : null,
             title: Text(calendar.displayName),
             subtitle: Column(
@@ -253,24 +235,24 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
     );
   }
 
-  Widget _buildCalendarContent(List<TaskCalendar> calendars, bool hasExistingCalendars) {
+  Widget _buildCalendarContent(List<TaskCalendar> calendars, bool hasExistingCalendars, CalendarSelectionState selState, CalendarSelectionViewModel vm) {
     if (hasExistingCalendars) {
       return Column(
         children: [
           // List of existing calendars
           Expanded(
-            child: _buildCalendarList(calendars),
+            child: _buildCalendarList(calendars, selState, vm),
           ),
           const SizedBox(height: 16),
           const Divider(),
           const SizedBox(height: 8),
           // Option to create new calendar
-          _buildCreateNewCalendarCard(),
+          _buildCreateNewCalendarCard(vm),
         ],
       );
     } else {
       // No existing calendars, show create option
-      return _buildCreateCalendarOption();
+      return _buildCreateCalendarOption(vm);
     }
   }
 
@@ -293,7 +275,7 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
     );
   }
 
-  Widget _buildCreateNewCalendarCard() {
+  Widget _buildCreateNewCalendarCard(CalendarSelectionViewModel vm) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -323,7 +305,7 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
             ),
             const SizedBox(width: 16),
             ElevatedButton.icon(
-              onPressed: _showCreateCalendarDialog,
+              onPressed: () => _showCreateCalendarDialog(vm),
               icon: const Icon(Icons.add_rounded, size: 18),
               label: const Text('Create'),
             ),
@@ -333,7 +315,7 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
     );
   }
 
-  Widget _buildCreateCalendarOption() {
+  Widget _buildCreateCalendarOption(CalendarSelectionViewModel vm) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -355,7 +337,7 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: _showCreateCalendarDialog,
+            onPressed: () => _showCreateCalendarDialog(vm),
             icon: const Icon(Icons.add_rounded),
             label: const Text('Create Portfolio'),
           ),
@@ -364,7 +346,7 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
     );
   }
 
-  Future<void> _showCreateCalendarDialog() async {
+  Future<void> _showCreateCalendarDialog(CalendarSelectionViewModel vm) async {
     final nameController = TextEditingController(text: 'FlowIt Portfolio');
     final descriptionController = TextEditingController(text: 'Project portfolio created by FlowIt');
     
@@ -419,134 +401,27 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
     );
     
     if (result != null) {
-      await _createCalendar(
+      await vm.createCalendar(
         name: result['name']!,
         description: result['description']?.isEmpty == true ? null : result['description'],
       );
     }
   }
 
-  Future<void> _createCalendar({required String name, String? description}) async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final caldavService = CalDAVService(account: widget.account);
+  Future<void> _finishSetup(CalendarSelectionState selState, CalendarSelectionViewModel vm) async {
+    await vm.finishSetup(widget.account);
+    
+    if (mounted) {
+      // Close this screen first - go back to ConnectionScreen
+      Navigator.of(context).pop();
       
-      final createResult = await caldavService.createCalendar(
-        displayName: name,
-        description: description ?? 'Project portfolio created by FlowIt',
-      );
-
-      await createResult.when(
-        success: (newCalendar) async {
-          setState(() {
-            _selectedCalendars.add(newCalendar);
-          });
-          await _finishSetup();
-        },
-        failure: (failure) {
-          setState(() {
-            _errorMessage = 'Failed to create portfolio: ${failure.message}';
-          });
-        },
-      );
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Unexpected error: $e';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _finishSetup() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Save the account (without selectedCalendars)
-      final accountRepository = ref.read(accountRepositoryProvider);
-      final saveResult = await accountRepository.save(widget.account);
+      // Wait a moment for the pop to complete
+      await Future.delayed(const Duration(milliseconds: 100));
       
-      await saveResult.when(
-        success: (_) async {
-          // Clear existing calendars and save only selected ones
-          await _saveCalendarsAsProjects();
-          
-          if (mounted) {
-            // Close this screen first - go back to ConnectionScreen
-            Navigator.of(context).pop();
-            
-            // Wait a moment for the pop to complete
-            await Future.delayed(const Duration(milliseconds: 100));
-            
-            // Invalidate providers - this will trigger _AppShell to detect the account
-            // and automatically navigate to HomeScreen
-            ref.invalidate(hasActiveAccountProvider);
-            ref.invalidate(activeAccountProvider);
-          }
-        },
-        failure: (failure) {
-          setState(() {
-            _errorMessage = 'Failed to save setup: ${failure.message}';
-          });
-        },
-      );
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Unexpected error: $e';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      // Invalidate providers - this will trigger _AppShell to detect the account
+      // and automatically navigate to HomeScreen
+      ref.invalidate(hasActiveAccountProvider);
+      ref.invalidate(activeAccountProvider);
     }
-  }
-
-  /// Clear existing calendars and save selected calendars as local projects/portfolios
-  Future<void> _saveCalendarsAsProjects() async {
-    final calendarRepository = ref.read(calendarRepositoryProvider);
-    
-    // First, clear all existing calendars (repository is now source of truth)
-    // AppLogger.info('CalendarSelection: Clearing existing calendars from repository');
-    final localStorage = ref.read(localStorageServiceProvider);
-    final clearResult = await localStorage.clear(LocalStorageService.calendarsBoxName);
-    
-    clearResult.when(
-      success: (_) {
-        // AppLogger.info('CalendarSelection: Successfully cleared existing calendars');
-      },
-      failure: (failure) {
-        AppLogger.warning('CalendarSelection: Failed to clear calendars: ${failure.message}');
-      },
-    );
-    
-    // Now save only the selected calendars
-    // AppLogger.info('CalendarSelection: Saving ${_selectedCalendars.length} selected calendars');
-    for (final calendar in _selectedCalendars) {
-      final saveResult = await calendarRepository.save(calendar);
-      saveResult.when(
-        success: (_) {
-          // AppLogger.info('CalendarSelection: Saved calendar ${calendar.displayName} as project');
-        },
-        failure: (failure) {
-          AppLogger.error('CalendarSelection: Failed to save calendar as project', failure.exception, failure.stackTrace);
-        },
-      );
-    }
-    
-    // Invalidate project list provider to refresh the UI
-    ref.invalidate(projectListProvider);
   }
 } 

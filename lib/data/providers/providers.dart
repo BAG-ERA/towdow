@@ -23,6 +23,7 @@ import '../models/calendar_event.dart';
 import '../services/caldav_service.dart';
 import '../services/external_caldav_service.dart';
 import '../services/external_sync_service.dart';
+import '../services/export_import_service.dart';
 import '../../core/app_lifecycle_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -176,6 +177,20 @@ final statusServiceProvider = Provider<StatusService>((ref) {
   final localStorageService = ref.watch(localStorageServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   return StatusService(calendarRepository, localStorageService, accountRepository);
+});
+
+// Export/Import service provider
+final exportImportServiceProvider = Provider<ExportImportService>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final localStorage = ref.watch(localStorageServiceProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return ExportImportService(
+    calendarRepository: calendarRepository,
+    taskRepository: taskRepository,
+    localStorage: localStorage,
+    accountRepository: accountRepository,
+  );
 });
 
 // App Lifecycle Manager provider
