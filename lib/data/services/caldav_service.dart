@@ -3,6 +3,8 @@
 
 import 'dart:math' as math;
 
+import 'package:uuid/uuid.dart';
+
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/caldav_account.dart';
@@ -472,15 +474,16 @@ class CalDAVService {
 
   /// Create a new calendar on the server using MKCALENDAR
   Future<Result<TaskCalendar>> createCalendar({
-    required String calendarPath,
     required String displayName,
     String? description,
     String? uid,
   }) async {
     try {
-      // Normalize calendar path to ensure it ends with /
+      // Generate UUID for unique calendar path
+      final calendarUuid = const Uuid().v4();
+      final calendarPath = '/${account.username}/$calendarUuid/';
       final normalizedPath = calendarPath.endsWith('/') ? calendarPath : '$calendarPath/';
-      // AppLogger.debug('CalDAVService: Creating calendar $displayName at $normalizedPath (original: $calendarPath)');
+      AppLogger.info('CalDAVService: Creating calendar $displayName at $normalizedPath');
       
       // Build MKCALENDAR request body (RFC 4791 Section 5.3.1)
       final mkCalendarBody = '''<?xml version="1.0" encoding="utf-8"?>

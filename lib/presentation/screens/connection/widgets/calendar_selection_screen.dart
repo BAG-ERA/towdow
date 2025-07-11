@@ -434,19 +434,8 @@ class _CalendarSelectionScreenState extends ConsumerState<CalendarSelectionScree
 
     try {
       final caldavService = CalDAVService(account: widget.account);
-      final capabilities = _discoveredCapabilities ?? widget.capabilities;
-      
-      // Generate a safe path name from the display name
-      final safeName = name.toLowerCase()
-          .replaceAll(RegExp(r'[^a-z0-9\s]'), '')
-          .replaceAll(RegExp(r'\s+'), '-')
-          .replaceAll(RegExp(r'-+'), '-')
-          .replaceAll(RegExp(r'^-|-$'), '');
-      
-      final calendarPath = '${capabilities.calendarHome}${safeName.isEmpty ? 'flowit-tasks' : safeName}/';
       
       final createResult = await caldavService.createCalendar(
-        calendarPath: calendarPath,
         displayName: name,
         description: description ?? 'Project portfolio created by FlowIt',
       );
