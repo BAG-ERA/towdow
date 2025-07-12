@@ -12,6 +12,8 @@ import 'dart:io';
 import 'package:openid_client/openid_client_io.dart';
 import '../../../../data/services/webdav_client.dart';
 import '../../../../core/logger.dart';
+import 'package:hive/hive.dart';
+import '../../../../data/models/storage_config.dart';
 
 class TowdowSelfHostedDialog extends ConsumerStatefulWidget {
   const TowdowSelfHostedDialog({super.key});
@@ -35,11 +37,14 @@ class _TowdowSelfHostedDialogState
   String? _refreshToken;
   DateTime? _tokenExpiry;
 
+  final TextEditingController _s3EndpointController = TextEditingController();
+
   @override
   void dispose() {
+    _radicaleServerUrlController.dispose();
     _issuerUrlController.dispose();
     _clientIdController.dispose();
-    _radicaleServerUrlController.dispose();
+    _s3EndpointController.dispose();
     super.dispose();
   }
 
@@ -116,6 +121,15 @@ class _TowdowSelfHostedDialogState
         lastSyncAt: DateTime.now(),
         isActive: true,
       );
+
+      // Persist S3 endpoint configuration linked to this account
+      final storageConfig = StorageConfig(
+        accountId: account.id,
+        s3Endpoint: _s3EndpointController.text.trim(),
+      );
+      final box = await Hive.openBox<StorageConfig>('storage_configs');
+      await box.put(account.id, storageConfig);
+
       final caldavService = CalDAVService(account: account);
       final testResult = await caldavService.testConnection();
       await testResult.when(
@@ -231,6 +245,23 @@ class _TowdowSelfHostedDialogState
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _s3EndpointController,
+                  decoration: const InputDecoration(
+                    labelText: 'S3 Endpoint *',
+                    hintText: 'https://minio.your-server.com',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.cloud_rounded),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'S3 endpoint is required';
+                    }
+                    return null;
+                  },
+                  keyboardType: TextInputType.url,
                 ),
                 const SizedBox(height: 24),
                 if (_isLoading) const CircularProgressIndicator(),

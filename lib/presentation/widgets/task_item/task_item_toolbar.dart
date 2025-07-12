@@ -220,6 +220,24 @@ class TaskItemToolbar extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
           ),
         ),
+        const PopupMenuItem(
+          value: 'file_upload',
+          child: ListTile(
+            leading: Icon(Icons.attach_file),
+            title: Text('File Upload'),
+            subtitle: Text('Attach any file'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'media_upload',
+          child: ListTile(
+            leading: Icon(Icons.photo),
+            title: Text('Media Upload'),
+            subtitle: Text('Photo or video'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
       ],
     );
   }
@@ -297,6 +315,29 @@ class TaskItemToolbar extends StatelessWidget {
           'title': 'Text field',
           'value': '',
           'helper': '',
+        };
+        break;
+      case 'file_upload':
+        defaultValidator = {
+          'id': _generateId(),
+          'type': 'file',
+          'required': true,
+          'title': 'File',
+          'fileName': '',
+          'mime': '',
+          'size': 0,
+        };
+        break;
+      case 'media_upload':
+        defaultValidator = {
+          'id': _generateId(),
+          'type': 'media',
+          'required': true,
+          'title': 'Media',
+          'fileName': '',
+          'mime': '',
+          'size': 0,
+          'thumbnailKey': '',
         };
         break;
       default:

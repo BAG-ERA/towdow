@@ -314,6 +314,9 @@ class LocalStorageService {
       await clear(externalCalendarsBoxName);
       await clear(externalEventsBoxName);
       
+      // Clear S3-related data
+      await _clearS3Data();
+      
       // AppLogger.info('LocalStorageService: Successfully cleared ALL data');
       return const Result.success(null);
     } catch (e, stackTrace) {
@@ -323,6 +326,38 @@ class LocalStorageService {
         exception: e is Exception ? e : Exception(e.toString()),
         stackTrace: stackTrace,
       ));
+    }
+  }
+
+  /// Clear S3-related data including file caches and storage configs
+  Future<void> _clearS3Data() async {
+    try {
+      AppLogger.warning('LocalStorageService: Clearing S3-related data');
+      
+      // Clear storage configs
+      if (Hive.isBoxOpen('storage_configs')) {
+        await Hive.box('storage_configs').clear();
+        AppLogger.debug('LocalStorageService: Cleared storage_configs box');
+      }
+      
+      // Clear file cache boxes for all accounts
+      final accountsBox = Hive.box('accounts');
+      for (final accountId in accountsBox.keys) {
+        final cacheBoxName = 'file_cache_$accountId';
+        if (Hive.isBoxOpen(cacheBoxName)) {
+          await Hive.box(cacheBoxName).clear();
+          AppLogger.debug('LocalStorageService: Cleared file cache box: $cacheBoxName');
+        }
+      }
+      
+      // Also try to clear any orphaned file cache boxes (in case accounts were already cleared)
+      // Note: Hive doesn't provide a direct way to list all box names, so we'll rely on the account-based cleanup above
+      // If there are orphaned boxes, they will be cleaned up during the next app startup or when accounts are recreated
+      
+      AppLogger.info('LocalStorageService: Successfully cleared S3-related data');
+    } catch (e, stackTrace) {
+      AppLogger.error('LocalStorageService: Failed to clear S3 data', e, stackTrace);
+      // Don't fail the entire operation if S3 cleanup fails
     }
   }
 
@@ -344,6 +379,7 @@ class LocalStorageService {
         externalAccountsBoxName,
         externalCalendarsBoxName,
         externalEventsBoxName,
+        'storage_configs', // S3 storage configs
       ];
       
       // Close all boxes first
@@ -356,6 +392,19 @@ class LocalStorageService {
         } catch (e) {
           AppLogger.warning('LocalStorageService: Failed to close $boxName during emergency reset', e);
         }
+      }
+      
+      // Close file cache boxes for all accounts
+      try {
+        final accountsBox = Hive.box('accounts');
+        for (final accountId in accountsBox.keys) {
+          final cacheBoxName = 'file_cache_$accountId';
+          if (Hive.isBoxOpen(cacheBoxName)) {
+            await Hive.box(cacheBoxName).close();
+          }
+        }
+      } catch (e) {
+        AppLogger.warning('LocalStorageService: Failed to close file cache boxes during emergency reset', e);
       }
       
       // Wait for handles to be released
@@ -371,6 +420,21 @@ class LocalStorageService {
           AppLogger.warning('LocalStorageService: Failed to delete $boxName during emergency reset', e);
           // Continue with other boxes even if one fails
         }
+      }
+      
+      // Delete file cache boxes from disk
+      try {
+        final accountsBox = Hive.box('accounts');
+        for (final accountId in accountsBox.keys) {
+          final cacheBoxName = 'file_cache_$accountId';
+          try {
+            await Hive.deleteBoxFromDisk(cacheBoxName);
+          } catch (e) {
+            AppLogger.warning('LocalStorageService: Failed to delete $cacheBoxName during emergency reset', e);
+          }
+        }
+      } catch (e) {
+        AppLogger.warning('LocalStorageService: Failed to delete file cache boxes during emergency reset', e);
       }
       
       // AppLogger.info('LocalStorageService: Emergency reset completed');

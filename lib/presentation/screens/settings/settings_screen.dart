@@ -9,6 +9,7 @@ import 'connection_info_screen.dart';
 import 'external_calendar_management_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
+import 's3_debug_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -114,6 +115,12 @@ class SettingsScreen extends ConsumerWidget {
                 subtitle: 'Debug local storage contents',
                 icon: Icons.bug_report_rounded,
                 onTap: () => _debugStorage(context, ref),
+              ),
+              _SettingsItem(
+                title: 'S3 Debug',
+                subtitle: 'Test S3 list & uploads',
+                icon: Icons.cloud_upload,
+                onTap: () => _showS3Debug(context, ref),
               ),
             ],
           ),
@@ -240,6 +247,12 @@ class SettingsScreen extends ConsumerWidget {
         );
       }
     }
+  }
+
+  Future<void> _showS3Debug(BuildContext context, WidgetRef ref) async {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const S3DebugScreen()),
+    );
   }
 
   Future<void> _showSyncSettings(BuildContext context, WidgetRef ref) async {

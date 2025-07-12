@@ -6,9 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/task.dart';
 import '../../data/providers/providers.dart';
+import '../../data/services/auth_token_provider.dart';
 import '../../data/services/validator_service.dart';
 import '../viewmodels/validator_viewmodel.dart';
 import 'dart:convert';
+import 'task_item/validators/validator_file.dart';
 
 /// Widget that displays validators in the expanded task state
 class ValidatorWidget extends ConsumerStatefulWidget {
@@ -186,6 +188,28 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
         return _buildSingleSelectValidator(validator);
       case 'free_field':
         return _buildFreeFieldValidator(validator);
+      case 'file':
+      case 'media':
+        return Consumer(
+          builder: (context, ref, _) {
+            final accountAsync = ref.watch(activeAccountProvider);
+            return accountAsync.when(
+              data: (account) {
+                final accId = account?.id ?? '';
+                return ValidatorFileWidget(
+                  validator: validator,
+                  accountId: accId,
+                  jwtProvider: account != null
+                      ? () => AuthTokenProvider.getValidToken(account)
+                      : () async => '',
+                  onValidatorChanged: (val) {},
+                );
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            );
+          },
+        );
       default:
         return Text('Unknown validator type: $type');
     }
