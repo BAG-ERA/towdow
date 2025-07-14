@@ -316,6 +316,35 @@ class ValidatorService {
     final type = validator['type'] as String?;
     final updated = Map<String, dynamic>.from(validator);
     
+    // Handle complex update operations with structured commands
+    if (newState is Map<String, dynamic> && newState.containsKey('type')) {
+      final updateType = newState['type'] as String;
+      
+      switch (updateType) {
+        case 'checklist_item':
+          return _updateChecklistItem(updated, newState);
+        case 'selection':
+          return _updateSelection(updated, newState);
+        case 'free_field':
+          return _updateFreeField(updated, newState);
+        case 'edit_title':
+          return _updateTitle(updated, newState);
+        case 'add_checklist_item':
+          return _addChecklistItem(updated);
+        case 'remove_checklist_item':
+          return _removeChecklistItem(updated, newState);
+        case 'edit_checklist_item':
+          return _editChecklistItem(updated, newState);
+        case 'add_select_option':
+          return _addSelectOption(updated);
+        case 'remove_select_option':
+          return _removeSelectOption(updated, newState);
+        case 'edit_select_option':
+          return _editSelectOption(updated, newState);
+      }
+    }
+    
+    // Legacy simple updates for backward compatibility
     switch (type) {
       case 'checklist':
         if (newState is Map<String, dynamic> && newState.containsKey('itemId')) {
@@ -345,5 +374,95 @@ class ValidatorService {
     }
     
     return updated;
+  }
+  
+  // Helper methods for specific validator update operations
+  
+  static Map<String, dynamic> _updateChecklistItem(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final itemId = newState['itemId'] as String;
+    final checked = newState['checked'] as bool;
+    final items = (validator['items'] as List? ?? []).map((item) {
+      if (item['id'] == itemId) {
+        return {...item, 'checked': checked};
+      }
+      return item;
+    }).toList();
+    return {...validator, 'items': items};
+  }
+  
+  static Map<String, dynamic> _updateSelection(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final selected = newState['selected'] as String;
+    return {...validator, 'selected': selected};
+  }
+  
+  static Map<String, dynamic> _updateFreeField(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final value = newState['value'] as String;
+    return {...validator, 'value': value};
+  }
+  
+  static Map<String, dynamic> _updateTitle(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final title = newState['title'] as String;
+    return {...validator, 'title': title};
+  }
+  
+  static Map<String, dynamic> _addChecklistItem(Map<String, dynamic> validator) {
+    const uuid = Uuid();
+    final items = List<Map<String, dynamic>>.from(validator['items'] as List? ?? []);
+    items.add({
+      'id': uuid.v4(),
+      'text': 'New item',
+      'checked': false,
+    });
+    return {...validator, 'items': items};
+  }
+  
+  static Map<String, dynamic> _removeChecklistItem(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final itemId = newState['itemId'] as String;
+    final items = (validator['items'] as List? ?? [])
+        .where((item) => item['id'] != itemId)
+        .toList();
+    return {...validator, 'items': items};
+  }
+  
+  static Map<String, dynamic> _editChecklistItem(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final itemId = newState['itemId'] as String;
+    final text = newState['text'] as String;
+    final items = (validator['items'] as List? ?? []).map((item) {
+      if (item['id'] == itemId) {
+        return {...item, 'text': text};
+      }
+      return item;
+    }).toList();
+    return {...validator, 'items': items};
+  }
+  
+  static Map<String, dynamic> _addSelectOption(Map<String, dynamic> validator) {
+    const uuid = Uuid();
+    final options = List<Map<String, dynamic>>.from(validator['options'] as List? ?? []);
+    options.add({
+      'id': uuid.v4(),
+      'text': 'New option',
+    });
+    return {...validator, 'options': options};
+  }
+  
+  static Map<String, dynamic> _removeSelectOption(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final optionId = newState['optionId'] as String;
+    final options = (validator['options'] as List? ?? [])
+        .where((option) => option['id'] != optionId)
+        .toList();
+    return {...validator, 'options': options};
+  }
+  
+  static Map<String, dynamic> _editSelectOption(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final optionId = newState['optionId'] as String;
+    final text = newState['text'] as String;
+    final options = (validator['options'] as List? ?? []).map((option) {
+      if (option['id'] == optionId) {
+        return {...option, 'text': text};
+      }
+      return option;
+    }).toList();
+    return {...validator, 'options': options};
   }
 } 

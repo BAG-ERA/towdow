@@ -3,12 +3,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import '../../data/models/task.dart';
 import '../../data/providers/providers.dart';
-import '../../data/services/validator_service.dart';
 import '../viewmodels/validator_viewmodel.dart';
-import 'dart:convert';
 
 /// Widget that displays validators in the expanded task state
 class ValidatorWidget extends ConsumerStatefulWidget {
@@ -30,54 +27,66 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(validatorViewModelProvider.notifier).loadValidatorsForTask(widget.task);
+      ref.read(validatorViewModelProvider(widget.task.uid).notifier).loadValidatorsForTask(widget.task);
     });
   }
 
   @override
   void didUpdateWidget(ValidatorWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.task.uid != widget.task.uid || 
-        oldWidget.task.flowitValidator != widget.task.flowitValidator) {
-      ref.read(validatorViewModelProvider.notifier).loadValidatorsForTask(widget.task);
-    }
+    // With family provider, each task UID gets its own ViewModel instance
+    // No need to reload validators - the ViewModel manages its own state
+    // Task content updates are handled automatically by validator operations
   }
+
+
 
   @override
   Widget build(BuildContext context) {
-    final validatorState = ref.watch(validatorViewModelProvider);
+    final validatorState = ref.watch(validatorViewModelProvider(widget.task.uid));
     
-    // Parse validators directly from task
-    final validators = ValidatorService.parseValidators(widget.task.flowitValidator);
-    
-    if (validators.isEmpty) {
-      return const SizedBox.shrink();
+    if (validatorState.isLoading) {
+      return const Center(child: CircularProgressIndicator());
     }
 
-    // Flatten all validators from all lists
-    final allValidators = <Map<String, dynamic>>[];
-    for (final validatorList in validators) {
-      allValidators.addAll(validatorList.cast<Map<String, dynamic>>());
+    if (validatorState.error != null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.error, color: Theme.of(context).colorScheme.error),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  validatorState.error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
-    if (allValidators.isEmpty) {
+    if (!validatorState.hasValidators) {
       return const SizedBox.shrink();
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: allValidators.asMap().entries.map((entry) {
+      children: validatorState.allValidators.asMap().entries.map((entry) {
         final index = entry.key;
         final validator = entry.value;
         return Padding(
-          padding: EdgeInsets.only(bottom: index < allValidators.length - 1 ? 12 : 0),
-          child: _buildValidatorCard(validator),
+          padding: EdgeInsets.only(bottom: index < validatorState.allValidators.length - 1 ? 12 : 0),
+          child: _buildValidatorCard(validator, validatorState),
         );
       }).toList(),
     );
   }
 
-  Widget _buildValidatorCard(Map<String, dynamic> validator) {
+  Widget _buildValidatorCard(Map<String, dynamic> validator, ValidatorViewModelState validatorState) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final type = validator['type'] as String;
@@ -88,10 +97,10 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withOpacity(0.7),
+        color: colorScheme.surface.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: colorScheme.outline.withOpacity(0.3),
+          color: colorScheme.outline.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -102,7 +111,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
           Row(
             children: [
               Expanded(
-                child: _isOrganizer()
+                child: validatorState.canEdit
                     ? _buildEditableTitle(validatorId, title)
                     : Text(
                         title,
@@ -121,7 +130,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              if (_isOrganizer()) ...[
+              if (validatorState.canEdit) ...[
                 const SizedBox(width: 8),
                 InkWell(
                   onTap: () => _removeValidator(validatorId),
@@ -131,7 +140,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
                     child: Icon(
                       Icons.close,
                       size: 16,
-                      color: colorScheme.onSurface.withOpacity(0.6),
+                      color: colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -142,7 +151,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
           const SizedBox(height: 8),
           
           // Validator content
-          _buildValidatorContent(validator),
+          _buildValidatorContent(validator, validatorState),
           
           // Helper text
           if (validator['helper'] != null && (validator['helper'] as String).isNotEmpty) ...[
@@ -151,7 +160,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
               validator['helper'] as String,
               style: TextStyle(
                 fontSize: 11,
-                color: colorScheme.onSurface.withOpacity(0.7),
+                color: colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -176,22 +185,22 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
     );
   }
 
-  Widget _buildValidatorContent(Map<String, dynamic> validator) {
+  Widget _buildValidatorContent(Map<String, dynamic> validator, ValidatorViewModelState validatorState) {
     final type = validator['type'] as String;
     
     switch (type) {
       case 'checklist':
-        return _buildChecklistValidator(validator);
+        return _buildChecklistValidator(validator, validatorState);
       case 'single_select':
-        return _buildSingleSelectValidator(validator);
+        return _buildSingleSelectValidator(validator, validatorState);
       case 'free_field':
-        return _buildFreeFieldValidator(validator);
+        return _buildFreeFieldValidator(validator, validatorState);
       default:
         return Text('Unknown validator type: $type');
     }
   }
 
-  Widget _buildChecklistValidator(Map<String, dynamic> validator) {
+  Widget _buildChecklistValidator(Map<String, dynamic> validator, ValidatorViewModelState validatorState) {
     final items = validator['items'] as List<dynamic>? ?? [];
     final validatorId = validator['id'] as String;
     
@@ -213,14 +222,16 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
                   width: 20,
                   child: Checkbox(
                     value: checked,
-                    onChanged: (value) => _updateChecklistItem(validatorId, itemId, value ?? false),
+                    onChanged: validatorState.canInteract 
+                        ? (value) => _updateChecklistItem(validatorId, itemId, value ?? false)
+                        : null,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _isOrganizer()
+                  child: validatorState.canEdit
                       ? InkWell(
                           onTap: () => _editChecklistItem(validatorId, itemId, text),
                           child: Text(
@@ -234,7 +245,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
                                   ? TextDecorationStyle.solid 
                                   : TextDecorationStyle.dotted,
                               color: checked 
-                                  ? Theme.of(context).colorScheme.onSurface.withOpacity(0.6)
+                                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
                                   : Theme.of(context).colorScheme.primary,
                             ),
                           ),
@@ -245,12 +256,12 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
                             fontSize: 13,
                             decoration: checked ? TextDecoration.lineThrough : null,
                             color: checked 
-                                ? Theme.of(context).colorScheme.onSurface.withOpacity(0.6)
+                                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
                                 : Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                 ),
-                if (_isOrganizer()) ...[
+                if (validatorState.canEdit) ...[
                   const SizedBox(width: 8),
                   InkWell(
                     onTap: () => _removeChecklistItem(validatorId, itemId),
@@ -269,7 +280,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
             ),
           );
         }),
-        if (_isOrganizer()) ...[
+        if (validatorState.canEdit) ...[
           const SizedBox(height: 4),
           InkWell(
             onTap: () => _addChecklistItem(validatorId),
@@ -297,7 +308,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
     );
   }
 
-  Widget _buildSingleSelectValidator(Map<String, dynamic> validator) {
+  Widget _buildSingleSelectValidator(Map<String, dynamic> validator, ValidatorViewModelState validatorState) {
     final options = validator['options'] as List<dynamic>? ?? [];
     final selected = validator['selected'] as String? ?? '';
     final validatorId = validator['id'] as String;
@@ -316,7 +327,9 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
             child: Row(
               children: [
                 InkWell(
-                  onTap: () => _updateSelection(validatorId, optionId),
+                  onTap: validatorState.canInteract 
+                      ? () => _updateSelection(validatorId, optionId)
+                      : null,
                   borderRadius: BorderRadius.circular(4),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
@@ -327,13 +340,13 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
                       size: 20,
                       color: isSelected
                           ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _isOrganizer()
+                  child: validatorState.canEdit
                       ? InkWell(
                           onTap: () => _editSelectOption(validatorId, optionId, text),
                           child: Text(
@@ -345,7 +358,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
                               decorationStyle: TextDecorationStyle.dotted,
                               color: isSelected
                                   ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                  : Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
                             ),
                           ),
                         )
@@ -360,7 +373,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
                           ),
                         ),
                 ),
-                if (_isOrganizer()) ...[
+                if (validatorState.canEdit) ...[
                   const SizedBox(width: 8),
                   InkWell(
                     onTap: () => _removeSelectOption(validatorId, optionId),
@@ -379,7 +392,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
             ),
           );
         }),
-        if (_isOrganizer()) ...[
+        if (validatorState.canEdit) ...[
           const SizedBox(height: 4),
           InkWell(
             onTap: () => _addSelectOption(validatorId),
@@ -407,13 +420,16 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
     );
   }
 
-  Widget _buildFreeFieldValidator(Map<String, dynamic> validator) {
+  Widget _buildFreeFieldValidator(Map<String, dynamic> validator, ValidatorViewModelState validatorState) {
     final value = validator['value'] as String? ?? '';
     final validatorId = validator['id'] as String;
     
     return TextField(
       controller: TextEditingController(text: value),
-      onChanged: (newValue) => _updateFreeField(validatorId, newValue),
+      onChanged: validatorState.canInteract 
+          ? (newValue) => _updateFreeField(validatorId, newValue)
+          : null,
+      enabled: validatorState.canInteract,
       decoration: InputDecoration(
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -427,102 +443,70 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
     );
   }
 
-  // Helper methods
-  bool _isOrganizer() {
-    // TODO: Implement organizer check based on current user and task.organizer
-    // For now, return true to allow testing
-    return true;
-  }
-
-  String _generateId() {
-    return const Uuid().v4();
-  }
-
-  // State update methods
+  // Action methods - delegate to ViewModel
   void _updateChecklistItem(String validatorId, String itemId, bool checked) {
-    _updateValidatorInTask((validators) {
-      for (final validatorList in validators) {
-        for (final validator in validatorList) {
-          if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-            final items = validator['items'] as List<dynamic>? ?? [];
-            for (final item in items) {
-              if (item is Map<String, dynamic> && item['id'] == itemId) {
-                item['checked'] = checked;
-                return true; // Found and updated
-              }
-            }
-          }
-        }
-      }
-      return false;
-    });
+    ref.read(validatorViewModelProvider(widget.task.uid).notifier).updateValidatorState(
+      validatorId, 
+      {'type': 'checklist_item', 'itemId': itemId, 'checked': checked}
+    );
   }
 
   void _updateSelection(String validatorId, String selectedId) {
-    _updateValidatorInTask((validators) {
-      for (final validatorList in validators) {
-        for (final validator in validatorList) {
-          if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-            validator['selected'] = selectedId;
-            return true; // Found and updated
-          }
-        }
-      }
-      return false;
-    });
+    ref.read(validatorViewModelProvider(widget.task.uid).notifier).updateValidatorState(
+      validatorId, 
+      {'type': 'selection', 'selected': selectedId}
+    );
   }
 
   void _updateFreeField(String validatorId, String newValue) {
-    _updateValidatorInTask((validators) {
-      for (final validatorList in validators) {
-        for (final validator in validatorList) {
-          if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-            validator['value'] = newValue;
-            return true; // Found and updated
-          }
-        }
-      }
-      return false;
-    });
+    ref.read(validatorViewModelProvider(widget.task.uid).notifier).updateValidatorState(
+      validatorId, 
+      {'type': 'free_field', 'value': newValue}
+    );
   }
 
   void _removeValidator(String validatorId) {
-    _updateValidatorInTask((validators) {
-      for (int i = 0; i < validators.length; i++) {
-        final validatorList = validators[i];
-        for (int j = 0; j < validatorList.length; j++) {
-          final validator = validatorList[j];
-          if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-            validatorList.removeAt(j);
-            // Remove empty lists
-            if (validatorList.isEmpty) {
-              validators.removeAt(i);
-            }
-            return true; // Found and removed
-          }
-        }
-      }
-      return false;
-    });
+    ref.read(validatorViewModelProvider(widget.task.uid).notifier).removeValidator(validatorId);
   }
 
-  // Edit methods for organizers
+  void _addChecklistItem(String validatorId) {
+    ref.read(validatorViewModelProvider(widget.task.uid).notifier).updateValidatorState(
+      validatorId, 
+      {'type': 'add_checklist_item'}
+    );
+  }
+
+  void _removeChecklistItem(String validatorId, String itemId) {
+    ref.read(validatorViewModelProvider(widget.task.uid).notifier).updateValidatorState(
+      validatorId, 
+      {'type': 'remove_checklist_item', 'itemId': itemId}
+    );
+  }
+
+  void _addSelectOption(String validatorId) {
+    ref.read(validatorViewModelProvider(widget.task.uid).notifier).updateValidatorState(
+      validatorId, 
+      {'type': 'add_select_option'}
+    );
+  }
+
+  void _removeSelectOption(String validatorId, String optionId) {
+    ref.read(validatorViewModelProvider(widget.task.uid).notifier).updateValidatorState(
+      validatorId, 
+      {'type': 'remove_select_option', 'optionId': optionId}
+    );
+  }
+
+  // Edit methods using simple dialogs
   void _editValidatorTitle(String validatorId, String currentTitle) {
     _showEditDialog(
       title: 'Edit Title',
       initialValue: currentTitle,
       onSave: (newTitle) {
-        _updateValidatorInTask((validators) {
-          for (final validatorList in validators) {
-            for (final validator in validatorList) {
-              if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-                validator['title'] = newTitle;
-                return true;
-              }
-            }
-          }
-          return false;
-        });
+        ref.read(validatorViewModelProvider(widget.task.uid).notifier).updateValidatorState(
+          validatorId, 
+          {'type': 'edit_title', 'title': newTitle}
+        );
       },
     );
   }
@@ -532,22 +516,10 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
       title: 'Edit Item',
       initialValue: currentText,
       onSave: (newText) {
-        _updateValidatorInTask((validators) {
-          for (final validatorList in validators) {
-            for (final validator in validatorList) {
-              if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-                final items = validator['items'] as List<dynamic>? ?? [];
-                for (final item in items) {
-                  if (item is Map<String, dynamic> && item['id'] == itemId) {
-                    item['text'] = newText;
-                    return true;
-                  }
-                }
-              }
-            }
-          }
-          return false;
-        });
+        ref.read(validatorViewModelProvider(widget.task.uid).notifier).updateValidatorState(
+          validatorId, 
+          {'type': 'edit_checklist_item', 'itemId': itemId, 'text': newText}
+        );
       },
     );
   }
@@ -557,117 +529,12 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
       title: 'Edit Option',
       initialValue: currentText,
       onSave: (newText) {
-        _updateValidatorInTask((validators) {
-          for (final validatorList in validators) {
-            for (final validator in validatorList) {
-              if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-                final options = validator['options'] as List<dynamic>? ?? [];
-                for (final option in options) {
-                  if (option is Map<String, dynamic> && option['id'] == optionId) {
-                    option['text'] = newText;
-                    return true;
-                  }
-                }
-              }
-            }
-          }
-          return false;
-        });
+        ref.read(validatorViewModelProvider(widget.task.uid).notifier).updateValidatorState(
+          validatorId, 
+          {'type': 'edit_select_option', 'optionId': optionId, 'text': newText}
+        );
       },
     );
-  }
-
-  void _addChecklistItem(String validatorId) {
-    _updateValidatorInTask((validators) {
-      for (final validatorList in validators) {
-        for (final validator in validatorList) {
-          if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-            final items = validator['items'] as List<dynamic>? ?? [];
-            items.add({
-              'id': _generateId(),
-              'text': 'New item',
-              'checked': false,
-            });
-            return true;
-          }
-        }
-      }
-      return false;
-    });
-  }
-
-  void _removeChecklistItem(String validatorId, String itemId) {
-    _updateValidatorInTask((validators) {
-      for (final validatorList in validators) {
-        for (final validator in validatorList) {
-          if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-            final items = validator['items'] as List<dynamic>? ?? [];
-            for (int i = 0; i < items.length; i++) {
-              final item = items[i];
-              if (item is Map<String, dynamic> && item['id'] == itemId) {
-                items.removeAt(i);
-                return true;
-              }
-            }
-          }
-        }
-      }
-      return false;
-    });
-  }
-
-  void _removeSelectOption(String validatorId, String optionId) {
-    _updateValidatorInTask((validators) {
-      for (final validatorList in validators) {
-        for (final validator in validatorList) {
-          if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-            final options = validator['options'] as List<dynamic>? ?? [];
-            for (int i = 0; i < options.length; i++) {
-              final option = options[i];
-              if (option is Map<String, dynamic> && option['id'] == optionId) {
-                options.removeAt(i);
-                return true;
-              }
-            }
-          }
-        }
-      }
-      return false;
-    });
-  }
-
-  void _addSelectOption(String validatorId) {
-    _updateValidatorInTask((validators) {
-      for (final validatorList in validators) {
-        for (final validator in validatorList) {
-          if (validator is Map<String, dynamic> && validator['id'] == validatorId) {
-            final options = validator['options'] as List<dynamic>? ?? [];
-            options.add({
-              'id': _generateId(),
-              'text': 'New option',
-            });
-            return true;
-          }
-        }
-      }
-      return false;
-    });
-  }
-
-  // Generic validator update method
-  void _updateValidatorInTask(bool Function(List<dynamic>) updateFunction) {
-    final validators = ValidatorService.parseValidators(widget.task.flowitValidator);
-    
-    if (updateFunction(validators)) {
-      final updatedTask = widget.task.copyWith(
-        flowitValidator: json.encode(validators),
-        lastModified: DateTime.now(),
-      );
-      
-      if (widget.onTaskUpdated != null) {
-        widget.onTaskUpdated!(updatedTask);
-      }
-    }
   }
 
   void _showEditDialog({
