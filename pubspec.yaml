@@ -73,6 +73,10 @@ dependencies:
 
   # File handling
   file_picker: ^8.3.7
+  
+  # S3 & Cloud Storage
+  aws_s3_api: ^2.0.0
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:

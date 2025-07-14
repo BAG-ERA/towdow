@@ -7,6 +7,7 @@ import '../../../data/providers/providers.dart';
 import 'caldav_management_screen.dart';
 import 'connection_info_screen.dart';
 import 'external_calendar_management_screen.dart';
+import 's3_debug_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
 
@@ -102,6 +103,12 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsSection(
             title: 'Debug',
             children: [
+              _SettingsItem(
+                title: 'S3 Storage Debug',
+                subtitle: 'Test S3 file storage operations',
+                icon: Icons.cloud_queue_rounded,
+                onTap: () => _showS3Debug(context, ref),
+              ),
               _SettingsItem(
                 title: 'Clear All Data',
                 subtitle: 'Delete all local data without disconnecting',
@@ -256,6 +263,15 @@ class SettingsScreen extends ConsumerWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const ExternalCalendarManagementScreen(),
+      ),
+    );
+  }
+
+  Future<void> _showS3Debug(BuildContext context, WidgetRef ref) async {
+    // Navigate to S3 debug screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const S3DebugScreen(),
       ),
     );
   }
