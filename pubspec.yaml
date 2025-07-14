@@ -73,9 +73,6 @@ dependencies:
 
   # File handling
   file_picker: ^8.3.7
-  open_file: ^3.3.2
-  # S3 client
-  aws_s3_api: ^2.0.0
 
 dev_dependencies:
   flutter_test:

@@ -23,7 +23,6 @@ import 'data/models/external_caldav_account.dart';
 import 'data/models/calendar_event.dart';
 import 'data/services/local_storage_service.dart';
 import 'data/providers/providers.dart';
-import 'data/models/hive_adapters_extra.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,10 +56,6 @@ void main() async {
   Hive.registerAdapter(ExternalCalendarAuthTypeAdapter());
   Hive.registerAdapter(ExternalCaldavAccountAdapter());
   Hive.registerAdapter(CalendarEventAdapter());
-  // S3 Storage related adapters
-  Hive.registerAdapter(CachedFileStatusAdapter());
-  Hive.registerAdapter(CachedFileAdapter());
-  Hive.registerAdapter(StorageConfigAdapter());
   
   // Initialize local storage service
   final storageService = LocalStorageService();

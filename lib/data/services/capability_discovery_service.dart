@@ -21,12 +21,6 @@ class ServerCapabilities {
   final String? addressBookHome;
   final String serverInfo;
 
-  // S3 storage capabilities (optional)
-  final bool supportsS3;
-  final String? s3Endpoint;
-  final String? privateBucket;
-  final String? sharedBucket;
-
   const ServerCapabilities({
     required this.supportsCalDAV,
     required this.supportsCardDAV,
@@ -39,10 +33,6 @@ class ServerCapabilities {
     this.calendarHome,
     this.addressBookHome,
     required this.serverInfo,
-    this.supportsS3 = false,
-    this.s3Endpoint,
-    this.privateBucket,
-    this.sharedBucket,
   });
 
   /// Create capabilities from server response headers
@@ -81,8 +71,6 @@ class ServerCapabilities {
       calendarHome: calendarHome,
       addressBookHome: addressBookHome,
       serverInfo: 'DAV: $davHeader | Allow: $allowHeader',
-      // S3 capability will be filled later by server-specific code
-      supportsS3: false,
     );
   }
 
@@ -164,8 +152,6 @@ class CapabilityDiscoveryService {
                         principal: principal,
                         calendarHome: calendarHome,
                         serverInfo: serverCaps.serverInfo,
-                        // S3 capability will be filled later by server-specific code
-                        supportsS3: false,
                       );
 
                       final hasExisting = calendars.isNotEmpty;
