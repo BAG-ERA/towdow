@@ -203,35 +203,26 @@ class ValidatorService {
       if (helper != null) 'helper': helper,
     };
   }
+
+  static Map<String, dynamic> createFileValidator({
+    required String title,
+    String? helper,
+    bool required = true,
+  }) {
+    const uuid = Uuid();
+    return {
+      'id': uuid.v4(),
+      'type': 'file',
+      'required': required,
+      'title': title,
+      'files': <Map<String, dynamic>>[], // Array of file attachments
+      if (helper != null) 'helper': helper,
+    };
+  }
   
   /// Private helper methods
   
-  static List<List<Map<String, dynamic>>> _migrateLegacyValidator(String legacyJson) {
-    try {
-      final legacy = jsonDecode(legacyJson);
-      
-      if (legacy['type'] == 'default') {
-        return []; // No validators for default type
-      }
-      
-      if (legacy['type'] == 'form' && legacy['form'] is List) {
-        final validators = <Map<String, dynamic>>[];
-        
-        for (final question in legacy['form']) {
-          if (question is Map<String, dynamic>) {
-            validators.add(_migrateFormQuestion(question));
-          }
-        }
-        
-        return validators.isNotEmpty ? [validators] : [];
-      }
-      
-      return [];
-    } catch (e, stackTrace) {
-      AppLogger.error('ValidatorService: Failed to migrate legacy validator', e, stackTrace);
-      return [];
-    }
-  }
+
   
   static Map<String, dynamic> _migrateFormQuestion(Map<String, dynamic> question) {
     final type = question['questiontype'] as String?;
@@ -304,6 +295,10 @@ class ValidatorService {
         final value = validator['value'] as String? ?? '';
         return value.trim().isNotEmpty;
         
+      case 'file':
+        final files = validator['files'] as List? ?? [];
+        return files.isNotEmpty;
+        
       default:
         return false;
     }
@@ -341,6 +336,10 @@ class ValidatorService {
           return _removeSelectOption(updated, newState);
         case 'edit_select_option':
           return _editSelectOption(updated, newState);
+        case 'add_file':
+          return _addFile(updated, newState);
+        case 'remove_file':
+          return _removeFile(updated, newState);
       }
     }
     
@@ -464,5 +463,20 @@ class ValidatorService {
       return option;
     }).toList();
     return {...validator, 'options': options};
+  }
+  
+  static Map<String, dynamic> _addFile(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final fileInfo = newState['fileInfo'] as Map<String, dynamic>;
+    final files = List<Map<String, dynamic>>.from(validator['files'] as List? ?? []);
+    files.add(fileInfo);
+    return {...validator, 'files': files};
+  }
+  
+  static Map<String, dynamic> _removeFile(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final fileId = newState['fileId'] as String;
+    final files = (validator['files'] as List? ?? [])
+        .where((file) => file['id'] != fileId)
+        .toList();
+    return {...validator, 'files': files};
   }
 } 

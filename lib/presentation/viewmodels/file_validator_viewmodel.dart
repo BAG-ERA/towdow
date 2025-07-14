@@ -119,13 +119,20 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
       const uuid = Uuid();
       final fileId = uuid.v4();
       final userPrefix = s3Service.getUserPrefix();
-      final s3Key = '${userPrefix}task_attachments/$fileId/$fileName';
+      
+      // Sanitize fileName to avoid S3 signature issues with special characters
+      final sanitizedFileName = _sanitizeFileName(fileName);
+      AppLogger.debug('FileValidatorViewModel.uploadFile: Original filename: $fileName');
+      AppLogger.debug('FileValidatorViewModel.uploadFile: Sanitized filename: $sanitizedFileName');
+      
+      // Build S3 path: {userPrefix}{taskUid}/{sanitizedFileName}
+      final s3Key = '$userPrefix$taskUid/$sanitizedFileName';
       
       // Upload to S3
       final uploadResult = await s3Service.uploadFile(
         key: s3Key,
         data: fileData,
-        isPrivate: true,
+        isPrivate: false, // Use shared bucket
         contentType: contentType,
       );
 
@@ -195,6 +202,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
     required String fileId,
     required String fileName,
     required String s3Key,
+    String? savePath,
   }) async {
     state = state.copyWith(
       isDownloading: true,
@@ -216,30 +224,35 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
       // Download from S3
       final downloadResult = await s3Service.downloadFile(
         key: s3Key,
-        isPrivate: true,
+        isPrivate: false, // Use shared bucket
       );
 
       final filePath = await downloadResult.when(
         success: (data) async {
-          // Save to Downloads directory
-          try {
+          // Use provided save path or default to Downloads directory
+          String finalPath;
+          if (savePath != null) {
+            finalPath = savePath;
+          } else {
             final downloadsDir = Directory('${Platform.environment['HOME']}/Downloads');
-            
             if (!await downloadsDir.exists()) {
               await downloadsDir.create(recursive: true);
             }
-            
-            final filePath = '${downloadsDir.path}/task_attachment_$fileName';
-            final localFile = File(filePath);
+            finalPath = '${downloadsDir.path}/task_attachment_$fileName';
+          }
+          
+          // Save file to chosen location
+          try {
+            final localFile = File(finalPath);
             await localFile.writeAsBytes(data);
             
             state = state.copyWith(
               isDownloading: false,
               downloadingFileId: null,
-              successMessage: 'File downloaded to: $filePath',
+              successMessage: 'File downloaded to: $finalPath',
             );
             
-            return filePath;
+            return finalPath;
           } catch (e) {
             throw Exception('Could not save file: $e');
           }
@@ -363,6 +376,22 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
         },
       );
     }
+  }
+
+  /// Sanitize filename to avoid S3 signature issues with special characters
+  String _sanitizeFileName(String fileName) {
+    // Replace problematic characters that can cause S3 signature mismatches
+    return fileName
+        // Replace em dash and en dash with regular hyphen
+        .replaceAll('–', '-')
+        .replaceAll('—', '-')
+        // Replace other Unicode spaces and dashes
+        .replaceAll(RegExp(r'[\u2000-\u206F\u2E00-\u2E7F\u3000]'), '-')
+        // Replace multiple consecutive spaces/dashes with single dash
+        .replaceAll(RegExp(r'[-\s]+'), '-')
+        // Remove leading/trailing dashes and spaces
+        .trim()
+        .replaceAll(RegExp(r'^-+|-+$'), '');
   }
 }
 

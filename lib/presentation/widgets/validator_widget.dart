@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task.dart';
 import '../../data/providers/providers.dart';
 import '../viewmodels/validator_viewmodel.dart';
+import 'task_item/validators/validator_file.dart';
 
 /// Widget that displays validators in the expanded task state
 class ValidatorWidget extends ConsumerStatefulWidget {
@@ -191,6 +192,8 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
     switch (type) {
       case 'checklist':
         return _buildChecklistValidator(validator, validatorState);
+      case 'file':
+        return _buildFileValidator(validator, validatorState);
       case 'single_select':
         return _buildSingleSelectValidator(validator, validatorState);
       case 'free_field':
@@ -572,6 +575,19 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFileValidator(Map<String, dynamic> validator, ValidatorViewModelState validatorState) {
+    // Import and use the ValidatorFile widget
+    return ValidatorFile(
+      validator: validator,
+      taskUid: widget.task.uid,
+      isOrganizer: validatorState.canEdit,
+      onValidatorUpdated: (validatorId, updateData) {
+        ref.read(validatorViewModelProvider(widget.task.uid).notifier)
+            .updateValidatorState(validatorId, updateData);
+      },
     );
   }
 } 

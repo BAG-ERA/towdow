@@ -361,19 +361,30 @@ class S3StorageService {
     final initResult = await _ensureInitialized();
     return initResult.when(
       success: (_) async {
-        try {
-          // Check file size limit
-          if (data.length > _maxFileSize) {
-            return Result.failure(Failure(message: 'File size ${data.length} exceeds limit ${_maxFileSize}'));
-          }
+        // Check file size limit
+        if (data.length > _maxFileSize) {
+          return Result.failure(Failure(message: 'File size ${data.length} exceeds limit ${_maxFileSize}'));
+        }
 
-          final bucket = isPrivate ? _bucketPrivate : _bucketShared;
+        final bucket = isPrivate ? _bucketPrivate : _bucketShared;
+        
+        // Ensure we have a content type - fallback to octet-stream if none provided
+        final finalContentType = contentType?.isNotEmpty == true ? contentType : 'application/octet-stream';
+        
+        try {
+          // Add debug logging for troubleshooting
+          AppLogger.debug('S3StorageService.uploadFile: Uploading file');
+          AppLogger.debug('S3StorageService.uploadFile: Key: $key');
+          AppLogger.debug('S3StorageService.uploadFile: Bucket: $bucket');
+          AppLogger.debug('S3StorageService.uploadFile: Content-Type: $contentType');
+          AppLogger.debug('S3StorageService.uploadFile: Data length: ${data.length} bytes');
+          AppLogger.debug('S3StorageService.uploadFile: Final Content-Type: $finalContentType');
           
           await _s3Client!.putObject(
             bucket: bucket,
             key: key,
             body: data,
-            contentType: contentType,
+            contentType: finalContentType,
           );
           
           final fileUrl = '$_s3Endpoint/$bucket/$key';
@@ -381,7 +392,20 @@ class S3StorageService {
           return Result.success(fileUrl);
         } catch (e, stackTrace) {
           AppLogger.error('S3StorageService.uploadFile: Failed to upload file $key', e, stackTrace);
-          return Result.failure(Failure(message: 'Failed to upload file: $e'));
+          AppLogger.error('S3StorageService.uploadFile: Upload parameters - Bucket: $bucket, Key: $key, ContentType: $finalContentType, DataLength: ${data.length}');
+          AppLogger.error('S3StorageService.uploadFile: S3 Endpoint: $_s3Endpoint');
+          
+          // Provide more specific error information
+          String errorMessage = 'Failed to upload file: $e';
+          if (e.toString().contains('SignatureDoesNotMatch')) {
+            errorMessage += '\n\nThis error often occurs due to:'
+                '\n- Special characters in filename (em dashes, Unicode characters)'
+                '\n- Incorrect content type for binary files'
+                '\n- Clock synchronization issues'
+                '\n- Invalid S3 credentials or configuration';
+          }
+          
+          return Result.failure(Failure(message: errorMessage));
         }
       },
       failure: (failure) => Result.failure(failure),
