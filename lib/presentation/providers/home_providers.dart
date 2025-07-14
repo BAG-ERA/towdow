@@ -4,7 +4,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers/providers.dart';
 import '../../data/models/calendar_event.dart';
-import '../../core/logger.dart';
 
 /// Provider for current selected tab index
 final selectedTabIndexProvider = StateProvider<int>((ref) => 0);
