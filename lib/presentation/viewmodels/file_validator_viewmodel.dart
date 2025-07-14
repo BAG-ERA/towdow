@@ -197,7 +197,63 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
     }
   }
 
-  /// Download a file from a validator
+  /// Download file bytes for platform-specific saving (Android/iOS compatibility)
+  Future<Uint8List?> downloadFileBytes({
+    required String fileId,
+    required String fileName,
+    required String s3Key,
+  }) async {
+    state = state.copyWith(
+      isDownloading: true,
+      downloadingFileId: fileId,
+      error: null,
+    );
+
+    try {
+      // Get account for S3 service
+      final accountResult = await _accountRepository.getActiveAccount();
+      final account = await accountResult.when(
+        success: (acc) async => acc!,
+        failure: (_) async => throw Exception('No active account found'),
+      );
+
+      // Create S3 service and download file
+      final s3Service = S3StorageService(account: account);
+      
+      // Download from S3
+      final downloadResult = await s3Service.downloadFile(
+        key: s3Key,
+        isPrivate: false, // Use shared bucket
+      );
+
+      final fileBytes = await downloadResult.when(
+        success: (data) async {
+          state = state.copyWith(
+            isDownloading: false,
+            downloadingFileId: null,
+            successMessage: 'File ready for download',
+          );
+          
+          return data;
+        },
+        failure: (failure) async {
+          throw Exception('Download failed: ${failure.message}');
+        },
+      );
+
+      return fileBytes;
+    } catch (e) {
+      AppLogger.error('FileValidatorViewModel: Download failed', e);
+      state = state.copyWith(
+        isDownloading: false,
+        downloadingFileId: null,
+        error: 'Download failed: $e',
+      );
+      return null;
+    }
+  }
+
+  /// Download a file from a validator (legacy method for desktop platforms)
   Future<String?> downloadFile({
     required String fileId,
     required String fileName,

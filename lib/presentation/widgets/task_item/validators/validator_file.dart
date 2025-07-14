@@ -281,26 +281,30 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
       return;
     }
 
-    // Show file picker dialog to choose save location
+    // Call ViewModel to handle download and get file bytes
+    final downloadResult = await ref.read(fileValidatorViewModelProvider(widget.taskUid).notifier)
+        .downloadFileBytes(
+          fileId: fileId,
+          fileName: fileName,
+          s3Key: s3Key,
+        );
+
+    if (downloadResult == null) {
+      _showErrorSnackbar('Download failed');
+      return;
+    }
+
+    // Show file picker dialog to choose save location with bytes for Android/iOS
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Save File',
       fileName: fileName,
       type: FileType.any,
+      bytes: downloadResult, // Provide bytes for Android/iOS compatibility
     );
 
-    if (savePath == null) {
-      // User cancelled the save dialog
-      return;
+    if (savePath != null) {
+      _showSuccessSnackbar('File saved successfully');
     }
-
-    // Call ViewModel to handle download with chosen path
-    await ref.read(fileValidatorViewModelProvider(widget.taskUid).notifier)
-        .downloadFile(
-          fileId: fileId,
-          fileName: fileName,
-          s3Key: s3Key,
-          savePath: savePath,
-        );
   }
 
   Future<void> _removeFile(String validatorId, String fileId) async {
