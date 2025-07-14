@@ -13,7 +13,6 @@ import 'package:towdow_app/data/services/domain_service.dart';
 import 'package:towdow_app/data/services/local_storage_service.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/models/task.dart';
-import 'package:towdow_app/data/models/flowit_item.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
