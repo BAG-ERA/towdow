@@ -162,17 +162,12 @@ class CreateTaskButton extends StatelessWidget {
   }
 
   Future<void> _showCreateTaskDialog(BuildContext context) async {
-    final result = await showDialog<String>(
+    await showDialog<void>(
       context: context,
       builder: (context) => TaskCreationDialog(
-        sourceCalendarUid: projectCalendarUid,
+        projectPath: projectCalendarUid,
       ),
     );
-    
-    // If task was created successfully and we have a callback, call it
-    if (result != null && onTaskCreated != null) {
-      onTaskCreated!(result);
-    }
   }
 }
 

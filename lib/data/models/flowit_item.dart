@@ -25,7 +25,6 @@ class FlowitItem with _$FlowitItem {
     
     // FlowIt-specific fields
     @HiveField(11) required String flowitType, // project, task, automated-task
-    @HiveField(12) String? flowitProcess, // UID of parent project/flow
     @HiveField(13) String? flowitTemplate, // UID of template
     @HiveField(14) String? flowitReversalTask, // UID of reversal task
     @HiveField(15) @Default('{}') String flowitValidator, // JSON string

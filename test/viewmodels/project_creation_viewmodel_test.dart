@@ -54,7 +54,6 @@ void main() {
       );
 
       testCalendar = TaskCalendar(
-        uid: 'test-calendar-uid',
         path: '/test/calendar/',
         displayName: 'Test Project',
         description: 'Test Description',
@@ -158,7 +157,7 @@ void main() {
         domain: 'Test Domain',
       );
       
-      verify(mockDomainService.assignDomainToCalendar(testCalendar.uid, 'Test Domain')).called(1);
+      verify(mockDomainService.assignDomainToCalendar(testCalendar.path, 'Test Domain')).called(1);
       verify(mockCalDAVService.createCalendar(
         displayName: 'Test Project',
         description: 'Test Description',

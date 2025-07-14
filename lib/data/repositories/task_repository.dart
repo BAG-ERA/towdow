@@ -46,8 +46,8 @@ class LocalTaskRepository implements TaskRepository {
     final result = await getAll();
     return result.when(
       success: (tasks) {
-        // Filter tasks by their source calendar (Calendar = Project model)
-        final projectTasks = tasks.where((task) => task.sourceCalendarUid == projectUid).toList();
+        // Filter tasks by their project path (Calendar = Project model)
+        final projectTasks = tasks.where((task) => task.projectPath == projectUid).toList();
         return Result.success(projectTasks);
       },
       failure: (failure) => Result.failure(failure),
@@ -88,9 +88,9 @@ class LocalTaskRepository implements TaskRepository {
     final result = await getAll();
     return result.when(
       success: (tasks) {
-        // Unregistered tasks (tasks with null sourceCalendarUid) should be deleted
-        // as they represent corrupted or orphaned data
-        final unregisteredTasks = tasks.where((task) => task.sourceCalendarUid == null).toList();
+        // Unregistered tasks (tasks with null projectPath) should be deleted
+        AppLogger.warning('TaskRepository: getUnregisteredTasks() found ${tasks.where((task) => task.projectPath == null).length} unregistered tasks');
+        final unregisteredTasks = tasks.where((task) => task.projectPath == null).toList();
         
         // Delete unregistered tasks as they are considered errors
         for (final task in unregisteredTasks) {

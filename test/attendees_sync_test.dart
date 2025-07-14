@@ -32,7 +32,7 @@ void main() {
         lastModified: now,
         dtstamp: now,
         due: now.add(const Duration(days: 1)),
-        sourceCalendarUid: 'work-calendar-uid',
+        projectPath: 'work-calendar-uid',
         attendees: [
           Attendee(email: 'john.doe@company.com', displayName: 'John Doe'),
           Attendee(email: 'jane.smith@company.com', displayName: 'Jane Smith'),
@@ -104,7 +104,7 @@ void main() {
         lastModified: now,
         dtstamp: now,
         due: now.add(const Duration(hours: 2)),
-        sourceCalendarUid: 'personal-calendar-uid',
+        projectPath: 'personal-calendar-uid',
         attendees: [], // Empty attendees list
       );
 
@@ -132,7 +132,7 @@ void main() {
         created: now,
         lastModified: now,
         dtstamp: now,
-        sourceCalendarUid: 'project-a-calendar',
+        projectPath: 'project-a-calendar',
         attendees: [
           Attendee(email: 'team-a@company.com', displayName: 'Team A'),
           Attendee(email: 'lead-a@company.com', displayName: 'Lead A', role: AttendeeRole.chair),
@@ -147,7 +147,7 @@ void main() {
         created: now,
         lastModified: now,
         dtstamp: now,
-        sourceCalendarUid: 'project-b-calendar',
+        projectPath: 'project-b-calendar',
         attendees: [
           Attendee(email: 'team-b@company.com', displayName: 'Team B'),
         ],

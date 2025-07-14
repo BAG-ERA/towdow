@@ -334,7 +334,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           
           for (final calendar in calendars) {
             try {
-              final tasksResult = await _taskRepository.getByProject(calendar.uid);
+              final tasksResult = await _taskRepository.getByProject(calendar.path);
               
               await tasksResult.when(
                 success: (tasks) async {
@@ -495,14 +495,14 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         categories: categories,
       );
       
-      AppLogger.info('ProjectListViewModel: Created project object with UID: ${newProject.uid}');
+      AppLogger.info('ProjectListViewModel: Created project object with UID: ${newProject.path}');
       
       final result = await _calendarRepository.save(newProject);
       await result.when(
         success: (_) async {
           // AppLogger.info('ProjectListViewModel: Project created successfully: $name');
           // Add to user ordering
-          await _addProjectToUserOrder(newProject.uid);
+          await _addProjectToUserOrder(newProject.path);
           // Reload projects to show the new one
           await loadProjects();
         },
@@ -518,18 +518,18 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   }
 
   /// Delete a project
-  Future<void> deleteProject(String projectUid) async {
-    AppLogger.info('ProjectListViewModel: Deleting project: $projectUid');
+  Future<void> deleteProject(String projectPath) async {
+    AppLogger.info('ProjectListViewModel: Deleting project: $projectPath');
     
     try {
       state = state.copyWith(error: null);
       
       // First get the project to obtain its path for server deletion
-      final calendarResult = await _calendarRepository.getById(projectUid);
+      final calendarResult = await _calendarRepository.getById(projectPath);
       await calendarResult.when(
         success: (calendar) async {
           if (calendar == null) {
-            AppLogger.warning('ProjectListViewModel: Project $projectUid not found for deletion');
+            AppLogger.warning('ProjectListViewModel: Project $projectPath not found for deletion');
             return; // Already deleted
           }
 
@@ -562,14 +562,14 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           }
 
           // Delete locally
-          final result = await _calendarRepository.delete(projectUid);
+          final result = await _calendarRepository.delete(projectPath);
           await result.when(
             success: (_) async {
-              AppLogger.info('ProjectListViewModel: Project deleted successfully: $projectUid');
+              AppLogger.info('ProjectListViewModel: Project deleted successfully: $projectPath');
               // Remove from user ordering
-              await _removeProjectFromUserOrder(projectUid);
+              await _removeProjectFromUserOrder(projectPath);
               // Remove from local state
-              final updatedProjects = state.projects.where((p) => p.project.uid != projectUid).toList();
+              final updatedProjects = state.projects.where((p) => p.project.path != projectPath).toList();
               state = state.copyWith(projects: updatedProjects);
             },
             failure: (failure) async {
@@ -595,9 +595,9 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   }
 
   /// Get project by ID
-  ProjectWithStats? getProjectById(String projectUid) {
+  ProjectWithStats? getProjectById(String projectPath) {
     return state.projects.cast<ProjectWithStats?>().firstWhere(
-      (p) => p?.project.uid == projectUid,
+      (p) => p?.project.path == projectPath,
       orElse: () => null,
     );
   }
@@ -666,13 +666,13 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   }
 
   /// Assign domain to project
-  Future<void> assignDomainToProject(String projectUid, String? domain) async {
-    // AppLogger.info('ProjectListViewModel: Assigning domain "$domain" to project $projectUid');
+  Future<void> assignDomainToProject(String projectPath, String? domain) async {
+    // AppLogger.info('ProjectListViewModel: Assigning domain "$domain" to project $projectPath');
     
     try {
       state = state.copyWith(error: null);
       
-      final result = await _domainService.assignDomainToCalendar(projectUid, domain);
+      final result = await _domainService.assignDomainToCalendar(projectPath, domain);
       await result.when(
         success: (_) async {
           // AppLogger.info('ProjectListViewModel: Domain assigned successfully');
@@ -691,13 +691,13 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   }
 
   /// Reorder project to a new position in the user's custom ordering
-  Future<void> reorderProject(String projectUid, int newIndex) async {
-    AppLogger.info('ProjectListViewModel: Reordering project $projectUid to index $newIndex');
+  Future<void> reorderProject(String projectPath, int newIndex) async {
+    AppLogger.info('ProjectListViewModel: Reordering project $projectPath to index $newIndex');
     
     try {
       state = state.copyWith(error: null);
       
-      final result = await _userRepository.reorderProject(projectUid, newIndex);
+      final result = await _userRepository.reorderProject(projectPath, newIndex);
       await result.when(
         success: (_) async {
           AppLogger.info('ProjectListViewModel: Project reordered successfully');
@@ -744,9 +744,9 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         final unorderedProjects = <ProjectWithStats>[];
         
         // Add projects in user-defined order
-        for (final projectUid in projectOrder) {
+        for (final projectPath in projectOrder) {
           final project = allProjects.cast<ProjectWithStats?>().firstWhere(
-            (p) => p?.project.uid == projectUid,
+            (p) => p?.project.path == projectPath,
             orElse: () => null,
           );
           if (project != null) {
@@ -756,7 +756,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         
         // Add any projects that aren't in the user order (new projects)
         for (final project in allProjects) {
-          if (!projectOrder.contains(project.project.uid)) {
+          if (!projectOrder.contains(project.project.path)) {
             unorderedProjects.add(project);
           }
         }
@@ -825,12 +825,12 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   }
 
   /// Initialize project ordering for a new project
-  Future<void> _addProjectToUserOrder(String projectUid) async {
+  Future<void> _addProjectToUserOrder(String projectPath) async {
     try {
-      final result = await _userRepository.addProjectToOrder(projectUid);
+      final result = await _userRepository.addProjectToOrder(projectPath);
       result.when(
         success: (_) {
-          AppLogger.info('ProjectListViewModel: Added project $projectUid to user order');
+          AppLogger.info('ProjectListViewModel: Added project $projectPath to user order');
         },
         failure: (failure) {
           AppLogger.warning('ProjectListViewModel: Failed to add project to user order: ${failure.message}');
@@ -842,12 +842,12 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   }
 
   /// Clean up deleted projects from user ordering
-  Future<void> _removeProjectFromUserOrder(String projectUid) async {
+  Future<void> _removeProjectFromUserOrder(String projectPath) async {
     try {
-      final result = await _userRepository.removeProjectFromOrder(projectUid);
+      final result = await _userRepository.removeProjectFromOrder(projectPath);
       result.when(
         success: (_) {
-          AppLogger.info('ProjectListViewModel: Removed project $projectUid from user order');
+          AppLogger.info('ProjectListViewModel: Removed project $projectPath from user order');
         },
         failure: (failure) {
           AppLogger.warning('ProjectListViewModel: Failed to remove project from user order: ${failure.message}');

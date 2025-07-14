@@ -47,7 +47,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
     String description = '',
     DateTime? due,
     List<String> categories = const [],
-    String? sourceCalendarUid,
+    String? projectPath,
   }) async {
     AppLogger.debug('🔄 TaskViewModel: Creating task with summary: $summary');
     AppLogger.debug('🔄 TaskViewModel: SyncService available: ${_syncService != null}');
@@ -77,7 +77,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
         description: description,
         due: due,
         categories: categories,
-        sourceCalendarUid: sourceCalendarUid,
+        projectPath: projectPath,
         organizer: organizer,
       );
 
@@ -89,11 +89,11 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
           
           // Queue sync operation to create on server
           if (_syncService != null) {
-            // Only queue sync if task has a valid sourceCalendarUid
-            if (task.sourceCalendarUid != null && task.sourceCalendarUid!.isNotEmpty) {
+            // Only queue sync if task has a valid projectPath
+            if (task.projectPath != null && task.projectPath!.isNotEmpty) {
               AppLogger.debug('🔄 TaskViewModel: Queuing CREATE operation for ${task.uid}');
               final syncData = <String, dynamic>{
-                'calendarUid': task.sourceCalendarUid,
+                'calendarUid': task.projectPath,
                 'taskUid': task.uid,
               };
               
@@ -112,7 +112,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
                 },
               );
             } else {
-              AppLogger.warning('🔄 TaskViewModel: Task ${task.uid} has no sourceCalendarUid - will not be synchronized');
+              AppLogger.warning('🔄 TaskViewModel: Task ${task.uid} has no projectPath - will not be synchronized');
             }
           } else {
             AppLogger.warning('🔄 TaskViewModel: No sync service available - creation will be local only');
@@ -157,11 +157,11 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
           
           // Queue sync operation to update on server
           if (_syncService != null) {
-            // Only queue sync if task has a valid sourceCalendarUid
-            if (updatedTask.sourceCalendarUid != null && updatedTask.sourceCalendarUid!.isNotEmpty) {
+            // Only queue sync if task has a valid projectPath
+            if (updatedTask.projectPath != null && updatedTask.projectPath!.isNotEmpty) {
               AppLogger.debug('🔄 TaskViewModel: Queuing UPDATE operation for ${updatedTask.uid}');
               final syncData = <String, dynamic>{
-                'calendarUid': updatedTask.sourceCalendarUid,
+                'calendarUid': updatedTask.projectPath,
                 'taskUid': updatedTask.uid,
               };
               
@@ -180,7 +180,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
                 },
               );
             } else {
-              AppLogger.warning('🔄 TaskViewModel: Task ${updatedTask.uid} has no sourceCalendarUid - will not be synchronized');
+              AppLogger.warning('🔄 TaskViewModel: Task ${updatedTask.uid} has no projectPath - will not be synchronized');
             }
           } else {
             AppLogger.warning('🔄 TaskViewModel: No sync service available - update will be local only');
@@ -248,12 +248,12 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
           
           // Queue sync operation to delete from server
           if (_syncService != null && taskToDelete != null) {
-            // Only queue sync if task has a valid sourceCalendarUid
-            if (taskToDelete.sourceCalendarUid != null && taskToDelete.sourceCalendarUid!.isNotEmpty) {
+            // Only queue sync if task has a valid projectPath
+            if (taskToDelete.projectPath != null && taskToDelete.projectPath!.isNotEmpty) {
               AppLogger.debug('🔄 TaskViewModel: Queuing DELETE operation for $taskUid');
               final syncData = <String, dynamic>{
                 '_serverUrl': null, // Server URL will be resolved during sync
-                'calendarUid': taskToDelete.sourceCalendarUid,
+                'calendarUid': taskToDelete.projectPath,
                 'taskUid': taskUid,
               };
               
@@ -273,7 +273,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
                 },
               );
             } else {
-              AppLogger.warning('🔄 TaskViewModel: Task $taskUid has no sourceCalendarUid - will not be synchronized');
+              AppLogger.warning('🔄 TaskViewModel: Task $taskUid has no projectPath - will not be synchronized');
             }
           } else {
             AppLogger.warning('🔄 TaskViewModel: No sync service available or task not found - deletion will be local only');
@@ -346,17 +346,17 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
 
     try {
       // Check if task is already in the target calendar
-      if (task.sourceCalendarUid == targetCalendarUid) {
+      if (task.projectPath == targetCalendarUid) {
         AppLogger.warning('TaskViewModel: Task ${task.uid} is already in calendar $targetCalendarUid');
         state = state.copyWith(isLoading: false);
         return;
       }
 
-      final oldCalendarUid = task.sourceCalendarUid;
+      final oldCalendarUid = task.projectPath;
       
       // Create updated task with new source calendar
       final movedTask = task.copyWith(
-        sourceCalendarUid: targetCalendarUid,
+        projectPath: targetCalendarUid,
         lastModified: DateTime.now(),
       );
 

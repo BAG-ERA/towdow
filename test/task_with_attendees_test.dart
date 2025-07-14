@@ -40,7 +40,7 @@ void main() {
             Attendee(email: 'john@example.com', displayName: 'John'),
             Attendee(email: 'jane@example.com', displayName: 'Jane'),
           ],
-          sourceCalendarUid: 'project-1',
+          projectPath: 'project-1',
         ),
         Task(
           uid: 'task-2',
@@ -54,7 +54,7 @@ void main() {
           attendees: [
             Attendee(email: 'alice@example.com', displayName: 'Alice', role: AttendeeRole.chair),
           ],
-          sourceCalendarUid: 'project-1',
+          projectPath: 'project-1',
         ),
         Task(
           uid: 'task-3',
@@ -68,7 +68,7 @@ void main() {
           attendees: [
             Attendee(email: 'bob@example.com', displayName: 'Bob', status: AttendeeStatus.tentative),
           ],
-          sourceCalendarUid: null, // Unregistered
+          projectPath: null, // Unregistered
         ),
         Task(
           uid: 'task-4',
@@ -80,7 +80,7 @@ void main() {
           dtstamp: now,
           due: tomorrow,
           attendees: [], // No attendees
-          sourceCalendarUid: 'project-2',
+          projectPath: 'project-2',
         ),
       ];
 

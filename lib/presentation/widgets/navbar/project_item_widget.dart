@@ -46,14 +46,16 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
   @override
   Widget build(BuildContext context) {
     // Only show selected state on desktop, not on mobile
-    final isSelected = widget.isDesktop && GoRouterState.of(context).uri.path == '/project/${widget.project.uid}';
+    final isSelected = widget.isDesktop && GoRouterState.of(context).uri.path == '/project/${Uri.encodeComponent(widget.project.path)}';
     
     // Calculate percentage completed for this project
     final taskListAsync = ref.watch(taskListProvider);
     final completionData = taskListAsync.when(
       data: (tasks) {
+        // Encode project path to match task storage format
+        final encodedProjectPath = widget.project.path.replaceAll('@', '%40');
         final projectTasks = tasks.where((task) {
-          return task.sourceCalendarUid == widget.project.uid;
+          return task.projectPath == encodedProjectPath;
         });
         final totalTasks = projectTasks.length;
         final completedTasks = projectTasks.where((task) => task.status == 'COMPLETED').length;
@@ -79,8 +81,8 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
             child: InkWell(
               borderRadius: widget.isDesktop ? BorderRadius.circular(8) : BorderRadius.zero,
               onTap: () {
-                AppLogger.info('ProjectItem: Navigating to project ${widget.project.uid} (${widget.project.displayName})');
-                context.go('/project/${widget.project.uid}');
+                AppLogger.info('ProjectItem: Navigating to project ${widget.project.path} (${widget.project.displayName})');
+                context.go('/project/${Uri.encodeComponent(widget.project.path)}');
                 // Close drawer on mobile using provided controller
                 if (!widget.isDesktop) {
                   final closeDrawer = ref.read(drawerControllerProvider);
@@ -323,7 +325,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       final statusService = ref.read(statusServiceProvider);
       
       // Archive the project
-      final result = await statusService.archiveCalendar(widget.project.uid);
+      final result = await statusService.archiveCalendar(widget.project.path);
       
       result.when(
         success: (_) {
@@ -371,7 +373,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       final statusService = ref.read(statusServiceProvider);
       
       // Unarchive the project
-      final result = await statusService.unarchiveCalendar(widget.project.uid);
+      final result = await statusService.unarchiveCalendar(widget.project.path);
       
       result.when(
         success: (_) {
@@ -431,14 +433,14 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
 
   void _deleteProject(BuildContext context) async {
     try {
-      AppLogger.info('ProjectItem: Deleting project ${widget.project.uid} (${widget.project.displayName})');
+      AppLogger.info('ProjectItem: Deleting project ${widget.project.path} (${widget.project.displayName})');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
-      await projectListViewModel.deleteProject(widget.project.uid);
+      await projectListViewModel.deleteProject(widget.project.path);
       
       // Navigate away from project if currently viewing it
       final currentRoute = GoRouterState.of(context).uri.path;
-      if (currentRoute == '/project/${widget.project.uid}') {
+      if (currentRoute == '/project/${Uri.encodeComponent(widget.project.path)}') {
         AppLogger.info('ProjectItem: Navigating away from deleted project');
         context.go('/');
       }
@@ -451,9 +453,9 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
         ),
       );
       
-      AppLogger.info('ProjectItem: Successfully deleted project ${widget.project.uid}');
+      AppLogger.info('ProjectItem: Successfully deleted project ${widget.project.path}');
     } catch (e) {
-      AppLogger.error('ProjectItem: Failed to delete project ${widget.project.uid}: $e');
+      AppLogger.error('ProjectItem: Failed to delete project ${widget.project.path}: $e');
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -472,8 +474,11 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
   /// Build drag feedback widget that follows the cursor during drag
   /// Handle dropping a task onto this project to move it
   void _handleTaskDrop(BuildContext context, Task task) async {
+    // Encode project path to match task storage format
+    final encodedProjectPath = widget.project.path.replaceAll('@', '%40');
+    
     // Don't move if task is already in this project
-    if (task.sourceCalendarUid == widget.project.uid) {
+    if (task.projectPath == encodedProjectPath) {
       AppLogger.info('ProjectItem: Task ${task.summary} is already in project ${widget.project.displayName}');
       return;
     }
@@ -483,7 +488,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       
       // Use the existing TaskViewModel moveTask functionality
       final taskViewModel = ref.read(taskViewModelProvider.notifier);
-      await taskViewModel.moveTask(task, widget.project.uid);
+      await taskViewModel.moveTask(task, widget.project.path);
       
       // Show success feedback
       ScaffoldMessenger.of(context).showSnackBar(
@@ -494,7 +499,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
           action: SnackBarAction(
             label: 'View Project',
             onPressed: () {
-              context.go('/project/${widget.project.uid}');
+                              context.go('/project/${Uri.encodeComponent(widget.project.path)}');
             },
           ),
         ),

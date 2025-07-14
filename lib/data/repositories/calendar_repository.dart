@@ -74,7 +74,7 @@ class LocalCalendarRepository implements CalendarRepository {
 
   @override
   Future<Result<void>> save(TaskCalendar calendar) async {
-    return await _storageService.put(LocalStorageService.calendarsBoxName, calendar.uid, calendar);
+    return await _storageService.put(LocalStorageService.calendarsBoxName, calendar.path, calendar);
   }
 
   @override
@@ -171,7 +171,7 @@ class LocalCalendarRepository implements CalendarRepository {
           final updatedCalendar = calendar.withDomain(newDomain);
           final saveResult = await save(updatedCalendar);
           if (saveResult is Error<void>) {
-            AppLogger.error('LocalCalendarRepository: Failed to rename domain for calendar ${calendar.uid}: ${saveResult.failure.message}');
+            AppLogger.error('LocalCalendarRepository: Failed to rename domain for calendar ${calendar.path}: ${saveResult.failure.message}');
             return saveResult;
           }
         }
@@ -269,7 +269,7 @@ class LocalCalendarRepository implements CalendarRepository {
           final updatedCalendar = calendar.withStatus(newStatus);
           final saveResult = await save(updatedCalendar);
           if (saveResult is Error<void>) {
-            AppLogger.error('LocalCalendarRepository: Failed to change status for calendar ${calendar.uid}: ${saveResult.failure.message}');
+            AppLogger.error('LocalCalendarRepository: Failed to change status for calendar ${calendar.path}: ${saveResult.failure.message}');
             return saveResult;
           }
         }

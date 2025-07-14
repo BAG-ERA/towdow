@@ -99,7 +99,6 @@ A single actionable item that represents work to be completed.
   - DESCRIPTION (required, can be empty)
   - STATUS (required, default: NEEDS-ACTION)
 - **x-flowit-type**: `"task"` (required)
-- **x-flowit-process**: UID of parent project/flow (required)
 - **x-flowit-validator**: Array of validator lists (required, can be empty array for simple checkbox completion)
 - **x-flowit-requirement**: Dependency specification (required, can be empty object)
 
@@ -129,7 +128,6 @@ STATUS:NEEDS-ACTION
 DUE:20250115T170000Z
 PERCENT-COMPLETE:0
 x-flowit-type:task
-x-flowit-process:project-1234-5678-ef00-1111
 x-flowit-validator:[]
 x-flowit-requirement:{}
 x-flowit-kanban-column:[{"uid":"board1","column":"In Progress"}]
@@ -158,7 +156,6 @@ A task that runs automatically based on triggers or schedules.
 ### Optional Properties
 - CATEGORIES
 - ATTENDEE
-- x-flowit-process (UID of parent project or flow)
 
 ### Relationships
 - Can be part of a project or flow
@@ -175,7 +172,6 @@ DESCRIPTION:Automatically post content to social media
 STATUS:NEEDS-ACTION
 PERCENT-COMPLETE:0
 x-flowit-type:automated-task
-x-flowit-process:project-1234-5678-ef00-1111
 x-flowit-validator:[]
 x-flowit-requirement:{}
 x-flowit-automate:{"trigger":"webhook","endpoint":"https://api.social.com/post","method":"POST","headers":{"Authorization":"Bearer token123"},"body":{"platform":"twitter","content":"{{content}}","scheduledTime":"{{due}}"}}
@@ -232,7 +228,6 @@ x-flowit-type:task
 x-flowit-validator:[[{"id":"8b5ffa24-1b20-4672-9d23-d54693821eba","type":"single_select","required":true,"title":"Choose a region","options":[{"id":"emea","text":"EMEA"},{"id":"apac","text":"APAC"},{"id":"americas","text":"Americas"}],"selected":"emea"}]]
 x-flowit-requirement:{"requires":["otheruid-1111-2222-3333"]}
 x-flowit-template:templateuid-aaaa-bbbb-cccc
-x-flowit-process:processuid-pppp-qqqq-rrrr
 x-flowit-reversaltask:reversaluid-zzzz-yyyy-xxxx
 x-flowit-context:{"priority":"high","department":"finance"}
 x-flowit-kanban-column:[{"uid":"board1","column":"In Progress"}]
@@ -252,7 +247,6 @@ END:VTODO
 - UIDs are immutable once created
 
 ### Relationship Integrity
-- x-flowit-process must reference existing project/flow
 - x-flowit-requirement UIDs must reference valid tasks
 - x-flowit-template UIDs should reference existing templates
 

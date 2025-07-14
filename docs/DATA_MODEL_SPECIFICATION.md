@@ -92,9 +92,6 @@ JSON specifying prerequisites or resources.
 ### x-flowit-template (Required)
 A UID pointing to a "template" VTODO for this item. Allows FlowIt to replicate consistent fields, forms, or structures across tasks.
 
-### x-flowit-process (Required)
-A UID referencing the overarching "flow" (another VTODO where x-flowit-type = flow). Ties the current task to a parent flow or process pipeline.
-
 ### x-flowit-reversaltask (Optional)
 A UID referencing a "reversal" or "undo" task. If the current task triggers irreversible changes, the reversal task is how to revert it.
 
@@ -181,8 +178,7 @@ Domains provide hierarchical organization for projects, implemented as WebDAV pr
 - UIDs are immutable once created
 
 ### Relationship Integrity
-- x-flowit-process must reference existing project/flow
-- x-flowit-requirement UIDs must be valid task references
+- x-flowit-requirement UIDs must reference valid tasks
 - x-flowit-template UIDs should reference existing templates
 
 ## Example Complete VTODO
@@ -204,7 +200,6 @@ x-flowit-type:task
 x-flowit-validator:[[{"id":"8b5ffa24","type":"single_select","required":true,"title":"Choose a region","options":[{"id":"emea","text":"EMEA"},{"id":"apac","text":"APAC"},{"id":"americas","text":"Americas"}],"selected":"emea"}]]
 x-flowit-requirement:{"requires":["otheruid-1111-2222-3333"]}
 x-flowit-template:templateuid-aaaa-bbbb-cccc
-x-flowit-process:processuid-pppp-qqqq-rrrr
 x-flowit-reversaltask:reversaluid-zzzz-yyyy-xxxx
 x-flowit-context:{"priority":"high","department":"finance"}
 x-flowit-kanban-column:[{"uid":"board1","column":"In Progress"}]

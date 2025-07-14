@@ -176,7 +176,7 @@ class StatusService {
   Future<Result<void>> _syncStatusToServer(TaskCalendar calendar) async {
     try {
       AppLogger.info('StatusService: *** Starting status sync to server ***');
-      AppLogger.info('StatusService: Calendar UID: ${calendar.uid}');
+      AppLogger.info('StatusService: Calendar UID: ${calendar.path}');
       AppLogger.info('StatusService: Calendar path: ${calendar.path}');
       AppLogger.info('StatusService: Status value: ${calendar.flowitStatus ?? "(null)"}');
       

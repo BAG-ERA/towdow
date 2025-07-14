@@ -219,6 +219,15 @@ class TaskItemToolbar extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
           ),
         ),
+        const PopupMenuItem(
+          value: 'file',
+          child: ListTile(
+            leading: Icon(Icons.attach_file),
+            title: Text('File'),
+            subtitle: Text('File attachments'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
       ],
     );
   }
@@ -275,6 +284,10 @@ class TaskItemToolbar extends ConsumerWidget {
         defaultOptions = [];
         title = 'Text field';
         break;
+      case 'file':
+        defaultOptions = [];
+        title = 'File attachment';
+        break;
       default:
         return;
     }
@@ -308,7 +321,7 @@ class TaskItemToolbar extends ConsumerWidget {
       context: context,
       builder: (context) => CategoryDialog(
         task: task,
-        projectUid: task.sourceCalendarUid,
+        projectPath: task.projectPath,
         onTaskUpdated: (updatedTask) {
           if (onTaskUpdated != null) {
             onTaskUpdated!(updatedTask);

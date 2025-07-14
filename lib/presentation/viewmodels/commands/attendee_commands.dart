@@ -49,7 +49,7 @@ class AddAttendeeCommand extends ParameterizedCommand<Task, AddAttendeeParams> {
       AppLogger.info('AddAttendeeCommand: Successfully saved task with attendee ${params.task.uid}');
       
       // Queue sync operation if sync service is available
-      if (_syncService != null && updatedTask.sourceCalendarUid != null) {
+      if (_syncService != null && updatedTask.projectPath != null) {
         await _queueUpdateOperation(updatedTask);
       }
       
@@ -65,7 +65,7 @@ class AddAttendeeCommand extends ParameterizedCommand<Task, AddAttendeeParams> {
   Future<void> _queueUpdateOperation(Task task) async {
     try {
       final updateData = <String, dynamic>{
-        'calendarUid': task.sourceCalendarUid!,
+        'calendarUid': task.projectPath!,
         'taskUid': task.uid,
       };
       
@@ -122,7 +122,7 @@ class RemoveAttendeeCommand extends ParameterizedCommand<Task, RemoveAttendeePar
       AppLogger.info('RemoveAttendeeCommand: Successfully removed attendee from task ${params.task.uid}');
       
       // Queue sync operation if sync service is available
-      if (_syncService != null && updatedTask.sourceCalendarUid != null) {
+      if (_syncService != null && updatedTask.projectPath != null) {
         await _queueUpdateOperation(updatedTask);
       }
       
@@ -138,7 +138,7 @@ class RemoveAttendeeCommand extends ParameterizedCommand<Task, RemoveAttendeePar
   Future<void> _queueUpdateOperation(Task task) async {
     try {
       final updateData = <String, dynamic>{
-        'calendarUid': task.sourceCalendarUid!,
+        'calendarUid': task.projectPath!,
         'taskUid': task.uid,
       };
       
@@ -196,7 +196,7 @@ class UpdateAttendeeCommand extends ParameterizedCommand<Task, UpdateAttendeePar
       AppLogger.info('UpdateAttendeeCommand: Successfully updated attendee in task ${params.task.uid}');
       
       // Queue sync operation if sync service is available
-      if (_syncService != null && updatedTask.sourceCalendarUid != null) {
+      if (_syncService != null && updatedTask.projectPath != null) {
         await _queueUpdateOperation(updatedTask);
       }
       
@@ -212,7 +212,7 @@ class UpdateAttendeeCommand extends ParameterizedCommand<Task, UpdateAttendeePar
   Future<void> _queueUpdateOperation(Task task) async {
     try {
       final updateData = <String, dynamic>{
-        'calendarUid': task.sourceCalendarUid!,
+        'calendarUid': task.projectPath!,
         'taskUid': task.uid,
       };
       
@@ -273,7 +273,7 @@ class UpdateAttendeeStatusCommand extends ParameterizedCommand<Task, UpdateAtten
       AppLogger.info('UpdateAttendeeStatusCommand: Successfully updated attendee status in task ${params.task.uid}');
       
       // Queue sync operation if sync service is available
-      if (_syncService != null && updatedTask.sourceCalendarUid != null) {
+      if (_syncService != null && updatedTask.projectPath != null) {
         await _queueUpdateOperation(updatedTask);
       }
       
@@ -289,7 +289,7 @@ class UpdateAttendeeStatusCommand extends ParameterizedCommand<Task, UpdateAtten
   Future<void> _queueUpdateOperation(Task task) async {
     try {
       final updateData = <String, dynamic>{
-        'calendarUid': task.sourceCalendarUid!,
+        'calendarUid': task.projectPath!,
         'taskUid': task.uid,
       };
       
@@ -410,7 +410,7 @@ class AssignAttendeeToTaskCommand extends ParameterizedCommand<Task, AssignAtten
       AppLogger.info('AssignAttendeeToTaskCommand: Successfully assigned attendee to task ${params.task.uid}');
       
       // Queue sync operation if sync service is available
-      if (_syncService != null && updatedTask.sourceCalendarUid != null) {
+      if (_syncService != null && updatedTask.projectPath != null) {
         await _queueUpdateOperation(updatedTask);
       }
       
@@ -441,7 +441,7 @@ class AssignAttendeeToTaskCommand extends ParameterizedCommand<Task, AssignAtten
   Future<void> _queueUpdateOperation(Task task) async {
     try {
       final updateData = <String, dynamic>{
-        'calendarUid': task.sourceCalendarUid!,
+        'calendarUid': task.projectPath!,
         'taskUid': task.uid,
       };
       
@@ -487,7 +487,7 @@ class UnassignAllAttendeesCommand extends ParameterizedCommand<Task, UnassignAll
       AppLogger.info('UnassignAllAttendeesCommand: Successfully unassigned all attendees from task ${params.task.uid}');
       
       // Queue sync operation if sync service is available
-      if (_syncService != null && updatedTask.sourceCalendarUid != null) {
+      if (_syncService != null && updatedTask.projectPath != null) {
         await _queueUpdateOperation(updatedTask);
       }
       
@@ -503,7 +503,7 @@ class UnassignAllAttendeesCommand extends ParameterizedCommand<Task, UnassignAll
   Future<void> _queueUpdateOperation(Task task) async {
     try {
       final updateData = <String, dynamic>{
-        'calendarUid': task.sourceCalendarUid!,
+        'calendarUid': task.projectPath!,
         'taskUid': task.uid,
       };
       

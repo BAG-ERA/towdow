@@ -11,11 +11,11 @@ import 'due_date_dialog.dart';
 import '../enhanced_text_field.dart';
 
 class TaskCreationDialog extends ConsumerStatefulWidget {
-  final String? sourceCalendarUid; // Optional project to assign the task to
+  final String? projectPath; // Optional project to assign the task to
 
   const TaskCreationDialog({
     super.key,
-    this.sourceCalendarUid,
+    this.projectPath,
   });
 
   @override
@@ -171,7 +171,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
       description: '',
       due: selectedDue,
       categories: const [],
-      sourceCalendarUid: widget.sourceCalendarUid,
+      projectPath: widget.projectPath,
     );
 
     DueDateDialog.show(
@@ -205,7 +205,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         description: taskDescription.isEmpty ? '' : taskDescription,
         due: selectedDue,
         categories: const [],
-        sourceCalendarUid: widget.sourceCalendarUid,
+        projectPath: widget.projectPath,
       );
 
       // Check if there was an error during creation

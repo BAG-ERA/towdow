@@ -26,7 +26,6 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(24) String? syncToken,
     
     // Required VCALENDAR properties for FlowIt projects
-    @HiveField(8) required String uid,
     @HiveField(9) required DateTime dtstamp,
     @HiveField(10) required DateTime created,
     @HiveField(11) required DateTime lastModified,
@@ -66,7 +65,6 @@ extension TaskCalendarFactory on TaskCalendar {
       path: path,
       displayName: displayName,
       description: description,
-      uid: 'project-${now.millisecondsSinceEpoch}-${displayName.hashCode}',
       dtstamp: now,
       created: now,
       lastModified: now,
@@ -91,7 +89,6 @@ extension TaskCalendarFactory on TaskCalendar {
     bool? flowitAsFlow,
     String? flowitOwner,
     String? flowitTemplate,
-    String? uid,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -101,7 +98,6 @@ extension TaskCalendarFactory on TaskCalendar {
       etag: etag,
       color: color,
       isReadOnly: isReadOnly,
-      uid: uid ?? 'discovered-${path.hashCode}',
       dtstamp: now,
       created: now,
       lastModified: now,

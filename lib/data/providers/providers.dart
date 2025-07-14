@@ -8,6 +8,7 @@ import '../services/background_sync_service.dart';
 import '../services/domain_service.dart';
 import '../services/status_service.dart';
 import '../repositories/task_repository.dart';
+import '../../core/logger.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/user_repository.dart';
@@ -418,6 +419,24 @@ final anytimeTasksProvider = StreamProvider<List<Task>>((ref) {
   });
 });
 
+// Unified project-specific tasks provider
+final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, projectPath) {
+  final taskRepository = ref.read(taskRepositoryProvider);
+  return taskRepository.watchTasks().map((allTasks) {
+    // Encode special characters in the project path to match encoded storage format
+    final encodedProjectPath = projectPath.replaceAll('@', '%40');
+    
+    // Filter tasks by their project path (Calendar = Project model)
+    final projectTasks = allTasks
+        .where((task) => task.projectPath == encodedProjectPath)
+        .toList();
+    
+
+    
+    return projectTasks;
+  });
+});
+
 // Deprecated: Keep for backward compatibility
 final unregisteredTasksProvider = anytimeTasksProvider;
 
@@ -530,4 +549,37 @@ final tasksWithAttendeesProvider = FutureProvider<Map<String, int>>((ref) async 
     },
     failure: (failure) => throw Exception(failure.message),
   );
+});
+
+// Simple search state for project task filtering
+final projectSearchQueryProvider = StateProvider.family<String, String>((ref, projectPath) => '');
+
+// Provider for filtered tasks within a specific project based on search query
+final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, projectPath) {
+  final projectTasksAsync = ref.watch(projectTasksProvider(projectPath));
+  final searchQuery = ref.watch(projectSearchQueryProvider(projectPath));
+  
+  final allTasks = projectTasksAsync.when(
+    data: (tasks) => tasks,
+    loading: () => <Task>[],
+    error: (_, __) => <Task>[],
+  );
+  
+  if (searchQuery.trim().isEmpty) {
+    return allTasks;
+  }
+
+  final searchLower = searchQuery.toLowerCase();
+  
+  final filteredTasks = allTasks.where((task) {
+    final summaryMatch = task.summary.toLowerCase().contains(searchLower);
+    final descriptionMatch = task.description != null && task.description!.toLowerCase().contains(searchLower);
+    final categoriesMatch = task.categories.any(
+      (category) => category.toLowerCase().contains(searchLower),
+    );
+    
+    return summaryMatch || descriptionMatch || categoriesMatch;
+  }).toList();
+  
+  return filteredTasks;
 });

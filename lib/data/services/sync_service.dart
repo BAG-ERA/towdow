@@ -289,10 +289,10 @@ class SyncService {
               }
               
               // TEST 2: queue non vide → pousser modifications vers serveur
-              final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.uid);
+              final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
               if (hasQueuedOperations) {
                 //AppLogger.debug('🔄 SyncService: Queue has operations - pushing to server');
-                await _processSyncQueueForCalendar(caldavService, calendar.uid, errors);
+                await _processSyncQueueForCalendar(caldavService, calendar.path, errors);
                 
                 // Récupérer le nouveau sync-token après push
                 final newServerSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
@@ -323,10 +323,10 @@ class SyncService {
             failure: (failure) async {
               AppLogger.warning('🔄 SyncService: Could not get server sync token for ${calendar.path}: ${failure.message}');
               // Fallback: traiter la queue si elle existe
-              final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.uid);
+              final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
               if (hasQueuedOperations) {
                 //AppLogger.debug('🔄 SyncService: Fallback - processing queue without sync token verification');
-                await _processSyncQueueForCalendar(caldavService, calendar.uid, errors);
+                await _processSyncQueueForCalendar(caldavService, calendar.path, errors);
               }
               errors.add('Could not verify sync state for ${calendar.path}: ${failure.message}');
               failedItems++;
@@ -673,7 +673,7 @@ class SyncService {
         await tasksResult.when(
           success: (remoteTasks) async {
             for (final task in remoteTasks) {
-              final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
+              final taskWithCalendar = task.copyWith(projectPath: calendar.path);
               await _taskRepository.save(taskWithCalendar);
             }
             //AppLogger.debug('🔄 SyncService: Full sync completed - ${remoteTasks.length} tasks from ${calendar.path}');
@@ -698,13 +698,13 @@ class SyncService {
               
               if (changeType == 'deleted') {
                 // Delete task from local storage
-                await _deleteTaskByHref(href, calendar.uid);
+                await _deleteTaskByHref(href, calendar.path);
                 //AppLogger.debug('🔄 SyncService: Deleted task $href');
               } else if (changeType == 'updated') {
                 // Create or update task in local storage
                 final taskData = changeMap['task'] as Map<String, dynamic>;
                 final task = Task.fromJson(taskData);
-                final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
+                final taskWithCalendar = task.copyWith(projectPath: calendar.path);
                 await _taskRepository.save(taskWithCalendar);
                 //AppLogger.debug('🔄 SyncService: Updated task ${task.uid}');
               }
@@ -1044,7 +1044,7 @@ class SyncService {
       final taskResult = await _taskRepository.getById(uid);
       await taskResult.when(
         success: (task) async {
-          if (task != null && task.sourceCalendarUid == calendarUid) {
+          if (task != null && task.projectPath == calendarUid) {
             await _taskRepository.delete(uid);
             //AppLogger.debug('🔄 SyncService: Deleted local task $uid');
           }
@@ -1118,13 +1118,13 @@ class SyncService {
         
         for (final calendar in selectedCalendars) {
           // Check if there are queued operations for this calendar
-          final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.uid);
+          final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
           if (hasQueuedOperations) {
-            AppLogger.debug('SyncService: Found queued operations for calendar ${calendar.uid}');
-            await _processSyncQueueForCalendar(caldavService, calendar.uid, errors);
+            AppLogger.debug('SyncService: Found queued operations for calendar ${calendar.path}');
+            await _processSyncQueueForCalendar(caldavService, calendar.path, errors);
             syncedItems++;
           } else {
-            AppLogger.debug('SyncService: No queued operations for calendar ${calendar.uid}');
+            AppLogger.debug('SyncService: No queued operations for calendar ${calendar.path}');
           }
         }
       }
@@ -1185,10 +1185,10 @@ class SyncService {
           final errors = <String>[];
           
           for (final calendar in selectedCalendars) {
-            final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.uid);
+            final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
             if (hasQueuedOperations) {
-              AppLogger.debug('SyncService: Processing queue for calendar ${calendar.uid}');
-              await _processSyncQueueForCalendar(caldavService, calendar.uid, errors);
+              AppLogger.debug('SyncService: Processing queue for calendar ${calendar.path}');
+              await _processSyncQueueForCalendar(caldavService, calendar.path, errors);
             }
           }
           

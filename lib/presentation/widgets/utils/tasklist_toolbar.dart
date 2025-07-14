@@ -5,17 +5,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../viewmodels/project_task_search_viewmodel.dart';
+import '../../../data/providers/providers.dart';
 import 'buttons/create_task_button.dart';
 import 'enhanced_text_field.dart';
 
 class TaskListToolbar extends ConsumerStatefulWidget {
-  final String projectUid;
+  final String projectPath;
   final String? projectName;
   
   const TaskListToolbar({
     super.key,
-    required this.projectUid,
+    required this.projectPath,
     this.projectName,
   });
 
@@ -41,8 +41,8 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
       // Create new timer for debounced search
       _debounceTimer = Timer(const Duration(milliseconds: 300), () {
         if (mounted) {
-          ref.read(projectTaskSearchProvider(widget.projectUid).notifier)
-              .setSearchQuery(_searchController.text);
+          ref.read(projectSearchQueryProvider(widget.projectPath).notifier)
+              .state = _searchController.text;
         }
       });
     });
@@ -53,12 +53,12 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
     super.didUpdateWidget(oldWidget);
     
     // If project changed, sync controller with new project's search state
-    if (oldWidget.projectUid != widget.projectUid) {
+    if (oldWidget.projectPath != widget.projectPath) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          final searchState = ref.read(projectTaskSearchProvider(widget.projectUid));
-          if (_searchController.text != searchState.searchQuery) {
-            _searchController.text = searchState.searchQuery;
+          final searchQuery = ref.read(projectSearchQueryProvider(widget.projectPath));
+          if (_searchController.text != searchQuery) {
+            _searchController.text = searchQuery;
           }
         }
       });
@@ -76,14 +76,14 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final searchState = ref.watch(projectTaskSearchProvider(widget.projectUid));
-    final searchViewModel = ref.read(projectTaskSearchProvider(widget.projectUid).notifier);
+    final searchQuery = ref.watch(projectSearchQueryProvider(widget.projectPath));
+    final isSearchActive = searchQuery.trim().isNotEmpty;
     
     // Sync search controller with search state
-    if (_searchController.text != searchState.searchQuery) {
+    if (_searchController.text != searchQuery) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _searchController.text = searchState.searchQuery;
+          _searchController.text = searchQuery;
         }
       });
     }
@@ -104,11 +104,11 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
         builder: (context, constraints) {
           final isDesktop = constraints.maxWidth >= 800;
           
-          if (isDesktop) {
-            return _buildDesktopLayout(context, searchState, searchViewModel);
-          } else {
-            return _buildMobileLayout(context, searchState, searchViewModel);
-          }
+                  if (isDesktop) {
+          return _buildDesktopLayout(context, searchQuery, isSearchActive);
+        } else {
+          return _buildMobileLayout(context, searchQuery, isSearchActive);
+        }
         },
       ),
     );
@@ -116,21 +116,21 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
 
   Widget _buildDesktopLayout(
     BuildContext context,
-    ProjectTaskSearchState searchState,
-    ProjectTaskSearchViewModel searchViewModel,
+    String searchQuery,
+    bool isSearchActive,
   ) {
     return Row(
       children: [
         // Search section
         Expanded(
-          child: _buildSearchBar(context, searchState, searchViewModel),
+          child: _buildSearchBar(context, searchQuery, isSearchActive),
         ),
         
         const SizedBox(width: 16),
         
         // Create task button
         CreateTaskButton.compact(
-          projectCalendarUid: widget.projectUid,
+          projectCalendarUid: widget.projectPath,
         ),
       ],
     );
@@ -138,14 +138,14 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
 
   Widget _buildMobileLayout(
     BuildContext context,
-    ProjectTaskSearchState searchState,
-    ProjectTaskSearchViewModel searchViewModel,
+    String searchQuery,
+    bool isSearchActive,
   ) {
     if (_isSearchExpanded) {
       return Row(
         children: [
           Expanded(
-            child: _buildSearchBar(context, searchState, searchViewModel),
+            child: _buildSearchBar(context, searchQuery, isSearchActive),
           ),
           IconButton(
             icon: const Icon(Icons.close),
@@ -154,7 +154,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
                 _isSearchExpanded = false;
               });
               _searchController.clear();
-              searchViewModel.clearSearch();
+              ref.read(projectSearchQueryProvider(widget.projectPath).notifier).state = '';
             },
           ),
         ],
@@ -199,7 +199,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
         
         // Create task button
         CreateTaskButton.compact(
-          projectCalendarUid: widget.projectUid,
+          projectCalendarUid: widget.projectPath,
         ),
       ],
     );
@@ -207,8 +207,8 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
 
   Widget _buildSearchBar(
     BuildContext context,
-    ProjectTaskSearchState searchState,
-    ProjectTaskSearchViewModel searchViewModel,
+    String searchQuery,
+    bool isSearchActive,
   ) {
     final theme = Theme.of(context);
     
@@ -232,7 +232,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
             color: theme.colorScheme.onSurfaceVariant,
             size: 20,
           ),
-          suffixIcon: searchState.isSearchActive
+          suffixIcon: isSearchActive
               ? IconButton(
                   icon: Icon(
                     Icons.clear,
@@ -241,7 +241,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
                   ),
                   onPressed: () {
                     _searchController.clear();
-                    searchViewModel.clearSearch();
+                    ref.read(projectSearchQueryProvider(widget.projectPath).notifier).state = '';
                   },
                 )
               : null,

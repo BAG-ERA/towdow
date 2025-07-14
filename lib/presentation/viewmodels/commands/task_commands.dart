@@ -14,12 +14,13 @@ import '../../../core/result.dart';
 class AddTaskCommand extends ParameterizedCommand<Task, AddTaskParams> {
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
+  final SyncService? _syncService;
 
-  AddTaskCommand(this._taskRepository, this._accountRepository);
+  AddTaskCommand(this._taskRepository, this._accountRepository, [this._syncService]);
 
   @override
   Future<Task> runWith(AddTaskParams params) async {
-    // AppLogger.info('AddTaskCommand: Creating task with summary: ${params.summary}');
+    AppLogger.info('AddTaskCommand: Creating task with summary "${params.summary}"');
 
     // Get current user's email to set as organizer
     String? organizer;
@@ -29,7 +30,6 @@ class AddTaskCommand extends ParameterizedCommand<Task, AddTaskParams> {
         if (account?.email != null) {
           organizer = account!.email;
         } else if (account?.username != null) {
-          // Fallback: use username as organizer if no email is set
           organizer = account!.username;
         }
       },
@@ -43,19 +43,56 @@ class AddTaskCommand extends ParameterizedCommand<Task, AddTaskParams> {
       description: params.description ?? '',
       due: params.due,
       categories: params.categories,
-      sourceCalendarUid: params.sourceCalendarUid,
+      projectPath: params.projectPath,
       organizer: organizer,
     );
 
     final result = await _taskRepository.save(task);
     
     if (result is Success) {
-      // AppLogger.info('AddTaskCommand: Task created successfully: ${task.uid}');
+      AppLogger.info('AddTaskCommand: Task created successfully - ${task.uid}');
+      
+      // Queue sync operation if sync service is available
+      if (_syncService != null) {
+        await _queueCreateSyncOperation(task);
+      } else {
+        AppLogger.warning('AddTaskCommand: No sync service available - creation will be local only');
+      }
+      
       return task;
     } else {
       final failure = (result as Error<void>).failure;
       AppLogger.error('AddTaskCommand: Failed to create task', failure.message);
       throw Exception(failure.message);
+    }
+  }
+
+  /// Queue sync operation for creating a task
+  Future<void> _queueCreateSyncOperation(Task task) async {
+    try {
+      AppLogger.debug('AddTaskCommand: Queuing create operation for ${task.uid}');
+      
+      final createData = <String, dynamic>{
+        'calendarUid': task.projectPath,
+        'taskUid': task.uid,
+      };
+      
+      final createResult = await _syncService!.queueSyncOperation(
+        SyncOperation.create,
+        task.uid,
+        createData,
+      );
+      
+      await createResult.when(
+        success: (_) async {
+          AppLogger.debug('AddTaskCommand: Successfully queued CREATE operation for ${task.uid} in ${task.projectPath}');
+        },
+        failure: (failure) async {
+          AppLogger.warning('AddTaskCommand: Failed to queue CREATE operation for ${task.uid}: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('AddTaskCommand: Exception during create sync operation', e, stackTrace);
     }
   }
 }
@@ -150,19 +187,19 @@ class MoveTaskCommand extends ParameterizedCommand<Task, MoveTaskParams> {
 
   @override
   Future<Task> runWith(MoveTaskParams params) async {
-    AppLogger.info('MoveTaskCommand: Moving task ${params.task.uid} from ${params.task.sourceCalendarUid} to ${params.targetCalendarUid}');
+    AppLogger.info('MoveTaskCommand: Moving task ${params.task.uid} from ${params.task.projectPath} to ${params.targetCalendarUid}');
 
     // Check if task is already in the target calendar
-    if (params.task.sourceCalendarUid == params.targetCalendarUid) {
+    if (params.task.projectPath == params.targetCalendarUid) {
       AppLogger.warning('MoveTaskCommand: Task ${params.task.uid} is already in calendar ${params.targetCalendarUid}');
       return params.task;
     }
 
-    final oldCalendarUid = params.task.sourceCalendarUid;
+    final oldCalendarUid = params.task.projectPath;
     
     // Create updated task with new source calendar
     final movedTask = params.task.copyWith(
-      sourceCalendarUid: params.targetCalendarUid,
+      projectPath: params.targetCalendarUid,
       lastModified: DateTime.now(),
     );
 
@@ -250,14 +287,14 @@ class AddTaskParams {
   final String? description;
   final DateTime? due;
   final List<String> categories;
-  final String? sourceCalendarUid;
+  final String? projectPath;
 
   AddTaskParams({
     required this.summary,
     this.description,
     this.due,
     this.categories = const [],
-    this.sourceCalendarUid,
+    this.projectPath,
   });
 }
 

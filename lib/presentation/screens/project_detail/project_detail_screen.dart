@@ -16,7 +16,7 @@ import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../viewmodels/commands/attendee_commands.dart';
-import '../../viewmodels/project_task_search_viewmodel.dart';
+
 import '../../../core/theme/chart_theme.dart';
 import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_info_card.dart';
@@ -25,44 +25,32 @@ import '../../../data/services/caldav_service.dart';
 import '../../../data/services/webdav_client.dart';
 
 // Provider for a specific project/calendar
-final projectProvider = FutureProvider.family<TaskCalendar?, String>((ref, projectUid) async {
-  final calendarRepository = ref.watch(calendarRepositoryProvider);
-  final result = await calendarRepository.getById(projectUid);
+final projectProvider = FutureProvider.family<TaskCalendar?, String>((ref, projectPath) async {
+  final calendarRepository = ref.read(calendarRepositoryProvider);
+  
+  // Encode special characters in the project path to match storage format
+  final encodedProjectPath = projectPath.replaceAll('@', '%40');
+  
+  // Try to get by path since projectPath is the actual path, not ID
+  final result = await calendarRepository.getByPath(encodedProjectPath);
   return result.when(
-    success: (calendar) => calendar,
+    success: (calendar) {
+      AppLogger.debug('ProjectDetailScreen: Loaded project for path $projectPath (encoded: $encodedProjectPath): ${calendar?.displayName}');
+      return calendar;
+    },
     failure: (failure) {
-      AppLogger.error('ProjectDetailScreen: Failed to load project $projectUid: ${failure.message}');
+      AppLogger.error('ProjectDetailScreen: Failed to load project $projectPath (encoded: $encodedProjectPath): ${failure.message}');
       return null;
     },
   );
 });
 
-// Provider for tasks in a specific project
-final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, projectUid) {
-  final taskRepository = ref.watch(taskRepositoryProvider);
-  return taskRepository.watchTasks().map((allTasks) {
-    // AppLogger.info('ProjectDetailScreen: Loaded ${allTasks.length} total tasks');
-    
-    // Filter tasks by their source calendar (Calendar = Project model)
-    final projectTasks = allTasks
-        .where((task) => task.sourceCalendarUid == projectUid)
-        .toList();
-    // AppLogger.info('ProjectDetailScreen: Found ${projectTasks.length} tasks for project $projectUid');
-    
-    if (projectTasks.isEmpty && allTasks.isNotEmpty) {
-      AppLogger.warning('ProjectDetailScreen: No tasks found for project $projectUid. Available sourceCalendarUids: ${allTasks.map((t) => t.sourceCalendarUid).toSet()}');
-    }
-    
-    return projectTasks;
-  });
-});
-
 class ProjectDetailScreen extends ConsumerStatefulWidget {
-  final String projectUid;
+  final String projectPath;
 
   const ProjectDetailScreen({
     super.key,
-    required this.projectUid,
+    required this.projectPath,
   });
 
   @override
@@ -83,9 +71,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // AppLogger.info('ProjectDetailScreen: Building screen for project UID: ${widget.projectUid}');
-    final projectAsync = ref.watch(projectProvider(widget.projectUid));
-    final tasksAsync = ref.watch(projectTasksProvider(widget.projectUid));
+    // AppLogger.info('ProjectDetailScreen: Building screen for project path: ${widget.projectPath}');
+    final projectAsync = ref.watch(projectProvider(widget.projectPath));
+    final tasksAsync = ref.watch(projectTasksProvider(widget.projectPath));
 
     // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
@@ -126,7 +114,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             data: (project) => ProjectInfoCard(
               project: project,
               tasksAsync: tasksAsync,
-              projectUid: widget.projectUid,
+              projectPath: widget.projectPath,
               onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
             ),
             loading: () => Container(
@@ -181,7 +169,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           
           // Bottom toolbar with search and create task button
           TaskListToolbar(
-            projectUid: widget.projectUid,
+            projectPath: widget.projectPath,
             projectName: projectAsync.asData?.value?.displayName,
           ),
         ],
@@ -230,7 +218,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   Widget _buildTabContent(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
     return switch (_selectedTabIndex) {
       0 => ProjectTaskListView(
-        projectUid: widget.projectUid,
+        projectPath: widget.projectPath,
         tasksAsync: tasksAsync,
         onTasksRefresh: () => _refreshProjectTasks(ref),
       ),
@@ -239,7 +227,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       3 => _buildKanbanView(context, ref, tasksAsync),
       4 => _buildAgendaView(context, ref, tasksAsync),
       _ => ProjectTaskListView(
-        projectUid: widget.projectUid,
+        projectPath: widget.projectPath,
         tasksAsync: tasksAsync,
         onTasksRefresh: () => _refreshProjectTasks(ref),
       ),
@@ -450,10 +438,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       final taskViewModel = ref.read(taskViewModelProvider.notifier);
       await taskViewModel.createTask(
         summary: result,
-        sourceCalendarUid: widget.projectUid,
+        projectPath: widget.projectPath,
       );
       
-      ref.invalidate(projectTasksProvider(widget.projectUid));
+      ref.invalidate(projectTasksProvider(widget.projectPath));
       
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -467,7 +455,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   // Attendee View - Kanban organized by attendees
   Widget _buildAttendeeView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
-    final projectAsync = ref.watch(projectProvider(widget.projectUid));
+    final projectAsync = ref.watch(projectProvider(widget.projectPath));
     
     return projectAsync.when(
       data: (project) {
@@ -636,10 +624,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       final taskViewModel = ref.read(taskViewModelProvider.notifier);
       await taskViewModel.createTask(
         summary: result,
-        sourceCalendarUid: widget.projectUid,
+        projectPath: widget.projectPath,
       );
       
-      ref.invalidate(projectTasksProvider(widget.projectUid));
+      ref.invalidate(projectTasksProvider(widget.projectPath));
       
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -661,7 +649,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         await command.executeWith(params);
         
         // Refresh the UI
-        ref.invalidate(projectTasksProvider(widget.projectUid));
+        ref.invalidate(projectTasksProvider(widget.projectPath));
         
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -681,7 +669,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         await command.executeWith(params);
         
         // Refresh the UI
-        ref.invalidate(projectTasksProvider(widget.projectUid));
+        ref.invalidate(projectTasksProvider(widget.projectPath));
         
         final attendeeName = _formatAttendeeEmail(columnId);
         if (context.mounted) {
@@ -864,13 +852,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       final taskViewModel = ref.read(taskViewModelProvider.notifier);
       await taskViewModel.createTask(
         summary: result,
-        sourceCalendarUid: widget.projectUid,
+        projectPath: widget.projectPath,
       );
       
       // TODO: After creation, we would need to update the task with the category
       // This would require additional API to update task categories
       
-      ref.invalidate(projectTasksProvider(widget.projectUid));
+      ref.invalidate(projectTasksProvider(widget.projectPath));
       
       if (context.mounted) {
         final categoryText = category != null ? ' in "$category"' : ' (uncategorized)';
@@ -948,7 +936,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   void _refreshProjectTasks(WidgetRef ref) {
     // Refresh the project tasks list
-    ref.invalidate(projectTasksProvider(widget.projectUid));
+    ref.invalidate(projectTasksProvider(widget.projectPath));
   }
 
 
@@ -968,7 +956,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       await result.when(
         success: (data) async {
           // Refresh the project data immediately
-          ref.invalidate(projectProvider(widget.projectUid));
+          ref.invalidate(projectProvider(widget.projectPath));
           
           // Also invalidate the project list provider so navbar updates
           ref.invalidate(projectListProvider);
@@ -1140,7 +1128,7 @@ class _EditableProjectTitleState extends State<_EditableProjectTitle> {
     super.didUpdateWidget(oldWidget);
     
     // If the project changed while we were editing, we need to handle it
-    if (oldWidget.project.uid != widget.project.uid) {
+    if (oldWidget.project.path != widget.project.path) {
       // Different project - reset editing state and update controller
       setState(() {
         _isEditing = false;

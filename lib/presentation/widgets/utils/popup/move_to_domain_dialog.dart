@@ -164,12 +164,12 @@ class _MoveToDomainDialogState extends ConsumerState<MoveToDomainDialog> {
       
       if (selectedDomain == null) {
         // Remove domain
-        projectListViewModel.assignDomainToProject(widget.project.uid, null);
-        AppLogger.info('MoveToDomain: Removed domain from project ${widget.project.uid}');
+        projectListViewModel.assignDomainToProject(widget.project.path, null);
+        AppLogger.info('MoveToDomain: Removed domain from project ${widget.project.path}');
       } else {
         // Assign domain
-        projectListViewModel.assignDomainToProject(widget.project.uid, selectedDomain!);
-        AppLogger.info('MoveToDomain: Assigned domain "$selectedDomain" to project ${widget.project.uid}');
+        projectListViewModel.assignDomainToProject(widget.project.path, selectedDomain!);
+        AppLogger.info('MoveToDomain: Assigned domain "$selectedDomain" to project ${widget.project.path}');
       }
       
       Navigator.of(context).pop();

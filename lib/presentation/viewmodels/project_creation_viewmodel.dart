@@ -70,7 +70,7 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
               // Assign domain if provided
               if (domain != null && domain.isNotEmpty) {
                 final domainService = _ref.read(domainServiceProvider);
-                final res = await domainService.assignDomainToCalendar(calendar.uid, domain);
+                final res = await domainService.assignDomainToCalendar(calendar.path, domain);
                 res.when(
                   success: (_) {},
                   failure: (f) => throw Exception('Domain assign failed: ${f.message}'),
@@ -90,7 +90,7 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
       AppLogger.error('ProjectCreationViewModel: createProject exception', e, st);
       state = state.copyWith(error: e.toString());
     } finally {
-      state = state.copyWith(isLoading: false);
+      state = state.copyWith(isLoading: false, error: state.error);
     }
   }
 }

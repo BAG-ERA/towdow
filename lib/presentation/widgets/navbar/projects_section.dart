@@ -316,7 +316,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
 
         // Move all projects in this domain to "no domain"
         for (final project in widget.projects) {
-          await projectListViewModel.assignDomainToProject(project.uid, null);
+          await projectListViewModel.assignDomainToProject(project.path, null);
         }
 
         // Delete the domain from storage
@@ -447,7 +447,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
       AppLogger.info('DomainSection: Reordering project ${dragData.project.displayName} to index $insertIndex in domain ${widget.domain}');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
-      await projectListViewModel.reorderProject(dragData.project.uid, insertIndex);
+      await projectListViewModel.reorderProject(dragData.project.path, insertIndex);
       
       AppLogger.info('DomainSection: Successfully reordered project ${dragData.project.displayName}');
     } catch (e) {
@@ -486,9 +486,9 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
         final unorderedProjects = <TaskCalendar>[];
         
         // Add projects in user-defined order (only those in this domain)
-        for (final projectUid in projectOrder) {
+        for (final projectPath in projectOrder) {
           final project = domainProjects.cast<TaskCalendar?>().firstWhere(
-            (p) => p?.uid == projectUid,
+            (p) => p?.path == projectPath,
             orElse: () => null,
           );
           if (project != null) {
@@ -498,7 +498,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
         
         // Add any projects in this domain that aren't in the user order
         for (final project in domainProjects) {
-          if (!projectOrder.contains(project.uid)) {
+          if (!projectOrder.contains(project.path)) {
             unorderedProjects.add(project);
           }
         }
@@ -530,7 +530,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
       AppLogger.info('DomainSection: Moving project ${dragData.project.displayName} to domain ${widget.domain}');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
-      await projectListViewModel.assignDomainToProject(dragData.project.uid, widget.domain);
+      await projectListViewModel.assignDomainToProject(dragData.project.path, widget.domain);
       
       // Show success feedback
       ScaffoldMessenger.of(context).showSnackBar(
@@ -825,7 +825,7 @@ class _NoDomainSection extends ConsumerWidget {
       AppLogger.info('NoDomainSection: Reordering project ${dragData.project.displayName} to index $insertIndex');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
-      await projectListViewModel.reorderProject(dragData.project.uid, insertIndex);
+      await projectListViewModel.reorderProject(dragData.project.path, insertIndex);
       
       AppLogger.info('NoDomainSection: Successfully reordered project ${dragData.project.displayName}');
     } catch (e) {
@@ -864,9 +864,9 @@ class _NoDomainSection extends ConsumerWidget {
         final unorderedProjects = <TaskCalendar>[];
         
         // Add projects in user-defined order (only those without domain)
-        for (final projectUid in projectOrder) {
+        for (final projectPath in projectOrder) {
           final project = noDomainProjects.cast<TaskCalendar?>().firstWhere(
-            (p) => p?.uid == projectUid,
+            (p) => p?.path == projectPath,
             orElse: () => null,
           );
           if (project != null) {
@@ -876,7 +876,7 @@ class _NoDomainSection extends ConsumerWidget {
         
         // Add any projects without domain that aren't in the user order
         for (final project in noDomainProjects) {
-          if (!projectOrder.contains(project.uid)) {
+          if (!projectOrder.contains(project.path)) {
             unorderedProjects.add(project);
           }
         }
@@ -973,7 +973,7 @@ class _NoDomainSection extends ConsumerWidget {
       AppLogger.info('NoDomainSection: Removing project ${dragData.project.displayName} from domain ${dragData.currentDomain}');
       
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
-      await projectListViewModel.assignDomainToProject(dragData.project.uid, null);
+      await projectListViewModel.assignDomainToProject(dragData.project.path, null);
       
       // Show success feedback
       ScaffoldMessenger.of(context).showSnackBar(

@@ -110,7 +110,7 @@ class ExportImportService {
     AppLogger.info('ExportImportService: Exporting calendar ${calendar.displayName}');
     
     // Get all tasks for this calendar
-    final tasksResult = await _taskRepository.getByProject(calendar.uid);
+    final tasksResult = await _taskRepository.getByProject(calendar.path);
     final tasks = tasksResult.when(
       success: (tasks) => tasks,
       failure: (failure) {
@@ -510,7 +510,7 @@ class ExportImportService {
       final result = await caldavService.createCalendar(
         displayName: calendar.displayName,
         description: calendar.description,
-        uid: calendar.uid,
+        uid: calendar.path,
       );
 
       // Simply propagate the Result coming from caldavService so that

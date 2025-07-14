@@ -190,7 +190,7 @@ class BackgroundSyncService {
         success: (remoteTasks) async {
           // Save all remote tasks to local storage
           for (final task in remoteTasks) {
-            final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
+            final taskWithCalendar = task.copyWith(projectPath: calendar.path);
             await _taskRepository.save(taskWithCalendar);
           }
           
@@ -365,7 +365,7 @@ class BackgroundSyncService {
       switch (change.type) {
         case SyncChangeType.deleted:
           // Find task by href and delete from local storage
-          await _deleteTaskByHref(change.href, calendar.uid);
+          await _deleteTaskByHref(change.href, calendar.path);
           // AppLogger.debug('BackgroundSyncService: Deleted task ${change.href}');
           break;
           
@@ -381,14 +381,14 @@ class BackgroundSyncService {
                 success: (localTask) async {
                   if (localTask == null) {
                     // New task - save with calendar UID
-                    final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
+                    final taskWithCalendar = task.copyWith(projectPath: calendar.path);
                     await _taskRepository.save(taskWithCalendar);
                     // AppLogger.debug('BackgroundSyncService: Created task ${task.uid}');
                   } else {
                     // Check if remote task is newer than local
                     if (task.lastModified.isAfter(localTask.lastModified)) {
                       // Update local task
-                      final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
+                      final taskWithCalendar = task.copyWith(projectPath: calendar.path);
                       await _taskRepository.save(taskWithCalendar);
                       // AppLogger.debug('BackgroundSyncService: Updated task ${task.uid}');
                     } else {
@@ -419,7 +419,7 @@ class BackgroundSyncService {
       final taskResult = await _taskRepository.getById(uid);
       await taskResult.when(
         success: (task) async {
-          if (task != null && task.sourceCalendarUid == calendarUid) {
+          if (task != null && task.projectPath == calendarUid) {
             await _taskRepository.delete(uid);
             // AppLogger.debug('BackgroundSyncService: Deleted local task $uid');
           }

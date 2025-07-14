@@ -26,7 +26,7 @@ class Task with _$Task {
     @HiveField(11) @Default(0) int percentComplete,
     
     // Task-specific FlowIt fields
-    @HiveField(12) String? sourceCalendarUid, // UID of source calendar (project)
+    @HiveField(12) String? projectPath, // Path of source project calendar
     @HiveField(13) String? flowitTemplate, // UID of template
     @HiveField(14) String? flowitReversalTask, // UID of reversal task
     @HiveField(15) @Default('{"type":"default"}') String flowitValidator, // JSON string
@@ -44,12 +44,20 @@ extension TaskFactory on Task {
     String description = '',
     DateTime? due,
     List<String> categories = const [],
-    String? sourceCalendarUid,
+    String? projectPath,
     String? organizer,
+    List<Attendee> attendees = const [],
+    String? flowitTemplate,
+    String? flowitReversalTask,
+    String flowitValidator = '{"type":"default"}',
+    String flowitRequirement = '{}',
+    String flowitKanbanColumn = '[]',
   }) {
     final now = DateTime.now();
+    final uid = 'task-${now.millisecondsSinceEpoch}-${(summary.hashCode % 10000).abs()}';
+    
     return Task(
-      uid: 'task-${now.millisecondsSinceEpoch}-${summary.hashCode}',
+      uid: uid,
       summary: summary,
       description: description,
       status: 'NEEDS-ACTION',
@@ -58,8 +66,14 @@ extension TaskFactory on Task {
       dtstamp: now,
       due: due,
       categories: categories,
-      sourceCalendarUid: sourceCalendarUid,
+      projectPath: projectPath,
       organizer: organizer,
+      attendees: attendees,
+      flowitTemplate: flowitTemplate,
+      flowitReversalTask: flowitReversalTask,
+      flowitValidator: flowitValidator,
+      flowitRequirement: flowitRequirement,
+      flowitKanbanColumn: flowitKanbanColumn,
     );
   }
 } 

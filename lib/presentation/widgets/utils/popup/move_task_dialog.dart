@@ -89,7 +89,7 @@ class MoveTaskDialog extends ConsumerWidget {
     final availableCalendars = calendars
         .where((calendar) => 
             calendar.supportsTodos && 
-            calendar.uid != task.sourceCalendarUid)
+            calendar.path != task.projectPath)
         .toList();
 
     if (availableCalendars.isEmpty) {
@@ -160,7 +160,7 @@ class MoveTaskDialog extends ConsumerWidget {
 
   void _onCalendarSelected(BuildContext context, WidgetRef ref, TaskCalendar targetCalendar) async {
     try {
-      AppLogger.info('MoveTaskDialog: Moving task ${task.uid} to calendar ${targetCalendar.uid}');
+      AppLogger.info('MoveTaskDialog: Moving task ${task.uid} to calendar ${targetCalendar.path}');
       
       // Close the dialog first
       Navigator.of(context).pop();
@@ -187,7 +187,7 @@ class MoveTaskDialog extends ConsumerWidget {
       
       // Execute the move operation via TaskViewModel
       final taskViewModel = ref.read(taskViewModelProvider.notifier);
-      await taskViewModel.moveTask(task, targetCalendar.uid);
+      await taskViewModel.moveTask(task, targetCalendar.path);
       
       // Show success message
       if (context.mounted) {

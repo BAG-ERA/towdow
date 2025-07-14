@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../task_item/task_item.dart';
 import '../utils/overlay_draggable_task.dart';
-import '../../viewmodels/project_task_search_viewmodel.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
@@ -14,13 +13,13 @@ import '../../../core/theme/chart_theme.dart';
 import '../../viewmodels/task_viewmodel.dart';
 
 class ProjectTaskListView extends ConsumerStatefulWidget {
-  final String projectUid;
+  final String projectPath;
   final AsyncValue<List<Task>> tasksAsync;
   final VoidCallback? onTasksRefresh;
 
   const ProjectTaskListView({
     super.key,
-    required this.projectUid,
+    required this.projectPath,
     required this.tasksAsync,
     this.onTasksRefresh,
   });
@@ -38,39 +37,40 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
     return widget.tasksAsync.when(
       data: (allTasks) {
         // Use filtered and sorted tasks instead of all tasks
-        final filteredTasks = ref.watch(filteredProjectTasksProvider(widget.projectUid));
-        final searchState = ref.watch(projectTaskSearchProvider(widget.projectUid));
+        final filteredTasks = ref.watch(filteredProjectTasksProvider(widget.projectPath));
+        final searchQuery = ref.watch(projectSearchQueryProvider(widget.projectPath));
         
-        if (filteredTasks.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  searchState.isSearchActive ? Icons.search_off : Icons.task_alt_rounded,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  searchState.isSearchActive ? 'No Matching Tasks' : 'No Tasks Yet',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  if (filteredTasks.isEmpty) {
+            final isSearchActive = searchQuery.trim().isNotEmpty;
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isSearchActive ? Icons.search_off : Icons.task_alt_rounded,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  searchState.isSearchActive 
-                    ? 'Try adjusting your search or filters'
-                    : 'Add your first task to get started',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  const SizedBox(height: 16),
+                  Text(
+                    isSearchActive ? 'No Matching Tasks' : 'No Tasks Yet',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        }
+                  const SizedBox(height: 8),
+                  Text(
+                    isSearchActive 
+                      ? 'Try adjusting your search or filters'
+                      : 'Add your first task to get started',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
 
         // Tasks are already filtered and sorted by the provider
         final tasks = filteredTasks;

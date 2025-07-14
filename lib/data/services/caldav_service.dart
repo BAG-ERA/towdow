@@ -524,7 +524,6 @@ class CalDAVService {
                path: normalizedPath,
                displayName: displayName,
                description: description ?? 'Created by FlowIt',
-               uid: uid,
              ));
                      } else if (webDavResponse.statusCode == 409) {
              // 409 Conflict - calendar already exists
@@ -569,7 +568,7 @@ class CalDAVService {
     try {
       AppLogger.info('CalDAVService: Starting calendar properties PROPPATCH for ${calendar.displayName}');
       AppLogger.info('CalDAVService: Calendar path: ${calendar.path}');
-      AppLogger.info('CalDAVService: Calendar UID: ${calendar.uid}');
+      AppLogger.info('CalDAVService: Calendar UID: ${calendar.path}');
       AppLogger.info('CalDAVService: Description: ${calendar.description.isNotEmpty ? calendar.description.substring(0, math.min(50, calendar.description.length)) + "..." : "(empty)"}');
       AppLogger.info('CalDAVService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
       AppLogger.info('CalDAVService: Status value: ${calendar.flowitStatus ?? "(null)"}');
@@ -694,7 +693,7 @@ class CalDAVService {
     vcalendar.writeln('PRODID:-//FlowIt//FlowIt v1.0//EN');
     
     // Standard calendar properties
-    vcalendar.writeln('UID:${calendar.uid}');
+    vcalendar.writeln('UID:${calendar.path}');
     vcalendar.writeln('DTSTAMP:${_formatDateTime(calendar.dtstamp)}');
     vcalendar.writeln('CREATED:${_formatDateTime(calendar.created)}');
     vcalendar.writeln('LAST-MODIFIED:${_formatDateTime(calendar.lastModified)}');
@@ -791,7 +790,6 @@ class CalDAVService {
         path: path,
         displayName: displayName,
         description: description,
-        uid: uid,
         dtstamp: dtstamp,
         created: created,
         lastModified: lastModified,

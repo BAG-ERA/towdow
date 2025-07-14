@@ -141,9 +141,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
 
           GoRoute(
-            path: '/project/:uid',
+            path: '/project/:path',
             builder: (context, state) => ProjectDetailScreen(
-              projectUid: state.pathParameters['uid']!,
+              projectPath: Uri.decodeComponent(state.pathParameters['path']!),
             ),
           ),
           GoRoute(

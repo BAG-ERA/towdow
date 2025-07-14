@@ -8,34 +8,17 @@ import '../../../../data/models/task.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../core/logger.dart';
 
-// Provider for tasks in a specific project (copied from ProjectDetailScreen)
-final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, projectUid) {
-  final taskRepository = ref.watch(taskRepositoryProvider);
-  return taskRepository.watchTasks().map((allTasks) {
-    // Filter tasks by their source calendar (Calendar = Project model)
-    final projectTasks = allTasks
-        .where((task) => task.sourceCalendarUid == projectUid)
-        .toList();
-    
-    if (projectTasks.isEmpty && allTasks.isNotEmpty) {
-      AppLogger.warning('CategoryDialog: No tasks found for project $projectUid. Available sourceCalendarUids: ${allTasks.map((t) => t.sourceCalendarUid).toSet()}');
-    }
-    
-    return projectTasks;
-  });
-});
-
 /// Dialog for managing task categories
 class CategoryDialog extends ConsumerStatefulWidget {
   final Task task;
   final Function(Task) onTaskUpdated;
-  final String? projectUid; // Optional project UID to get all categories from the project
+  final String? projectPath; // Optional project path to get all categories from the project
 
   const CategoryDialog({
     super.key,
     required this.task,
     required this.onTaskUpdated,
-    this.projectUid,
+    this.projectPath,
   });
 
   @override
@@ -112,8 +95,8 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                 
                 const SizedBox(height: 16),
                 
-                // Project categories section (if projectUid is provided)
-                if (widget.projectUid != null) ...[
+                // Project categories section (if projectPath is provided)
+                if (widget.projectPath != null) ...[
                   _buildProjectCategoriesSection(),
                 ],
               ],
@@ -159,7 +142,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
   Widget _buildProjectCategoriesSection() {
     return Consumer(
       builder: (context, ref, child) {
-        final tasksAsync = ref.watch(projectTasksProvider(widget.projectUid!));
+        final tasksAsync = ref.watch(projectTasksProvider(widget.projectPath!));
         
         return tasksAsync.when(
           data: (tasks) {

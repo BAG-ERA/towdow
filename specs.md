@@ -216,11 +216,6 @@ All these fields store JSON or string values.
     A UID pointing to a "template" VTODO for this item.
     Allows FlowIt to replicate consistent fields, forms, or structures across tasks.
 
-6.5 x-flowit-process (Required)
-
-    A UID referencing the overarching "flow" (another VTODO where x-flowit-type = flow).
-    Ties the current task to a parent flow or process pipeline.
-
 6.6 x-flowit-reversaltask (Optional)
 
     A UID referencing a "reversal" or "undo" task.
@@ -391,7 +386,6 @@ Required Properties:
   - DESCRIPTION (required, can be empty)
   - STATUS (required, default: NEEDS-ACTION)
 - x-flowit-type: "task" (required)
-- x-flowit-process: UID of parent project/flow (required)
 - x-flowit-validator: [[...]] (required, can be empty array for simple checkbox completion)
 - x-flowit-requirement: {"requires":["step-1234-5678-ef00-3333"]} (required)
 
@@ -401,7 +395,6 @@ Optional Properties:
 - DUE
 - CATEGORIES (optional)
 - ATTENDEE (optional)
-- x-flowit-process (optional, UID of parent project or flow)
 
 Relationships:
 - Can be part of a project or flow
@@ -430,7 +423,6 @@ Required Properties:
 Optional Properties:
 - CATEGORIES (optional)
 - ATTENDEE (optional)
-- x-flowit-process (optional, UID of parent project or flow)
 
 Relationships:
 - Can be part of a project or flow
@@ -482,7 +474,6 @@ STATUS:NEEDS-ACTION
 DUE:20250115T170000Z
 PERCENT-COMPLETE:0
 x-flowit-type:task
-x-flowit-process:project-1234-5678-ef00-1111
 x-flowit-validator:[]
 x-flowit-requirement:{}
 x-flowit-kanban-column:[{"uid":"board1","column":"In Progress"}]
@@ -498,7 +489,6 @@ DESCRIPTION:Automatically post content to social media
 STATUS:NEEDS-ACTION
 PERCENT-COMPLETE:0
 x-flowit-type:automated-task
-x-flowit-process:project-1234-5678-ef00-1111
 x-flowit-validator:[]
 x-flowit-requirement:{}
 x-flowit-automate:{"trigger":"webhook","endpoint":"https://api.social.com/post","method":"POST","headers":{"Authorization":"Bearer token123"},"body":{"platform":"twitter","content":"{{content}}","scheduledTime":"{{due}}"}}
@@ -784,7 +774,6 @@ x-flowit-type:task
 x-flowit-validator:[[{"id":"8b5ffa24-1b20-4672-9d23-d54693821eba","type":"single_select","required":true,"title":"Choose a region","options":[{"id":"emea","text":"EMEA"},{"id":"apac","text":"APAC"},{"id":"americas","text":"Americas"}],"selected":"emea"}]]
 x-flowit-requirement:{"requires":["otheruid-1111-2222-3333"]}
 x-flowit-template:templateuid-aaaa-bbbb-cccc
-x-flowit-process:processuid-pppp-qqqq-rrrr
 x-flowit-reversaltask:reversaluid-zzzz-yyyy-xxxx
 x-flowit-context:{"priority":"high","department":"finance"}
 END:VTODO
