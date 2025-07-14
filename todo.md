@@ -44,7 +44,7 @@ main.dart
 ## 2. Domain Models  
 _All generated with `freezed` + `hive_type` annotations._
 
-- [x] **Base model** `FlowitItem` (common fields: uid, summary, description, status, lastModified, created, due, categories)
+- [x] **Domain models** (Task, AutomatedTask, TaskCalendar with common iCalendar fields)
 - [x] **Project** (`x-flowit-type: project`)
 - [x] **Task** (`x-flowit-type: task`)
 - [x] **AutomatedTask** (`x-flowit-type: automated-task`)
