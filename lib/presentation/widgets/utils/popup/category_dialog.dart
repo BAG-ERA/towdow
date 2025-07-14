@@ -67,59 +67,76 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.label_rounded),
-          SizedBox(width: 12),
-          Text('Manage Categories'),
-        ],
-      ),
-      content: SizedBox(
-        width: MediaQuery.of(context).size.width > 600 ? 400 : MediaQuery.of(context).size.width * 0.9,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Task: ${widget.task.summary}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontStyle: FontStyle.italic,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent) {
+          // Handle Escape to close dialog
+          if (event.logicalKey == LogicalKeyboardKey.escape && !_isLoading) {
+            Navigator.of(context).pop();
+          }
+          // Handle Ctrl+Enter or Cmd+Enter to save
+          else if (event.logicalKey == LogicalKeyboardKey.enter && 
+                   (HardwareKeyboard.instance.isControlPressed || 
+                    HardwareKeyboard.instance.isMetaPressed) && !_isLoading) {
+            _saveCategories();
+          }
+        }
+      },
+      child: AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.label_rounded),
+            SizedBox(width: 12),
+            Text('Manage Categories'),
+          ],
+        ),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width > 600 ? 400 : MediaQuery.of(context).size.width * 0.9,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Task: ${widget.task.summary}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontStyle: FontStyle.italic,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Create category form at the top
-              _buildAddCategoryForm(),
-              
-              const SizedBox(height: 16),
-              
-              // Project categories section (if projectUid is provided)
-              if (widget.projectUid != null) ...[
-                _buildProjectCategoriesSection(),
+                const SizedBox(height: 16),
+                
+                // Create category form at the top
+                _buildAddCategoryForm(),
+                
+                const SizedBox(height: 16),
+                
+                // Project categories section (if projectUid is provided)
+                if (widget.projectUid != null) ...[
+                  _buildProjectCategoriesSection(),
+                ],
               ],
-            ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: _isLoading ? null : _saveCategories,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Save'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _saveCategories,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Save'),
-        ),
-      ],
     );
   }
 

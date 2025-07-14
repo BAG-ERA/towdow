@@ -2,6 +2,7 @@
 // Used across the app for creating new projects
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
 import '../../../../core/theme/chart_theme_usage.dart';
@@ -46,97 +47,115 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Create New Project'),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Projects help organize and track tasks towards specific goals.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent) {
+          // Handle Escape to close dialog
+          if (event.logicalKey == LogicalKeyboardKey.escape && !isLoading) {
+            Navigator.of(context).pop();
+          }
+          // Handle Ctrl+Enter or Cmd+Enter to submit
+          else if (event.logicalKey == LogicalKeyboardKey.enter && 
+                   (HardwareKeyboard.instance.isControlPressed || 
+                    HardwareKeyboard.instance.isMetaPressed) &&
+                   _canCreate() && !isLoading) {
+            _createProject();
+          }
+        }
+      },
+      child: AlertDialog(
+        title: const Text('Create New Project'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Projects help organize and track tasks towards specific goals.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            
-            EnhancedTextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Project name *',
-                hintText: 'e.g., Website Redesign, Marketing Campaign',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16),
+              
+              EnhancedTextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Project name *',
+                  hintText: 'e.g., Website Redesign, Marketing Campaign',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _canCreate() ? _createProject() : null,
               ),
-              autofocus: true,
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => _canCreate() ? _createProject() : null,
-            ),
-            
-            const SizedBox(height: 16),
-            
-            EnhancedTextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                hintText: 'Describe the project goals and objectives',
-                border: OutlineInputBorder(),
+              
+              const SizedBox(height: 16),
+              
+              EnhancedTextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description (optional)',
+                  hintText: 'Describe the project goals and objectives',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                onChanged: (_) => setState(() {}),
               ),
-              maxLines: 3,
-              onChanged: (_) => setState(() {}),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Domain selection section
-            ExpansionTile(
-              title: Row(
+              
+              const SizedBox(height: 16),
+              
+              // Domain selection section
+              ExpansionTile(
+                title: Row(
+                  children: [
+                    const Icon(Icons.folder_outlined, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Domain (optional)',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ],
+                ),
+                subtitle: selectedDomain != null 
+                    ? Text(
+                        'Selected: $selectedDomain',
+                        style: context.domainNameStyle?.copyWith(
+                          fontSize: 12,
+                        ),
+                      )
+                    : const Text('No domain selected'),
+                initiallyExpanded: isDomainSectionExpanded,
+                onExpansionChanged: (expanded) => setState(() => isDomainSectionExpanded = expanded),
                 children: [
-                  const Icon(Icons.folder_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Domain (optional)',
-                    style: Theme.of(context).textTheme.titleSmall,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: _buildDomainSelection(),
                   ),
                 ],
               ),
-              subtitle: selectedDomain != null 
-                  ? Text(
-                      'Selected: $selectedDomain',
-                      style: context.domainNameStyle?.copyWith(
-                        fontSize: 12,
-                      ),
-                    )
-                  : const Text('No domain selected'),
-              initiallyExpanded: isDomainSectionExpanded,
-              onExpansionChanged: (expanded) => setState(() => isDomainSectionExpanded = expanded),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: _buildDomainSelection(),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: isLoading || !_canCreate() ? null : _createProject,
+            child: isLoading 
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Create'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: isLoading || !_canCreate() ? null : _createProject,
-          child: isLoading 
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Create'),
-        ),
-      ],
     );
   }
 

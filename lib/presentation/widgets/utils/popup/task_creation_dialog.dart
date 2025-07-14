@@ -2,6 +2,7 @@
 // Used across the app for creating new tasks
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
 import '../../../../data/models/task.dart';
@@ -37,101 +38,119 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Create Task'),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Create a new task to track work and progress.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            EnhancedTextField(
-              controller: summaryController,
-              decoration: const InputDecoration(
-                labelText: 'Task summary *',
-                hintText: 'e.g., Review client proposal, Write documentation',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => _canCreate() ? _createTask() : null,
-            ),
-            
-            const SizedBox(height: 16),
-            
-            EnhancedTextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (optional)',
-                hintText: 'Add details about what needs to be done',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              onChanged: (_) => setState(() {}),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.calendar_today_rounded),
-              title: Text(selectedDue == null 
-                ? 'No due date' 
-                : 'Due: ${selectedDue!.day}/${selectedDue!.month}/${selectedDue!.year}'
-              ),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded),
-              onTap: () => _showDueDateDialog(),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Keep dialog open checkbox
-            Row(
-              children: [
-                Checkbox(
-                  value: keepDialogOpen,
-                  onChanged: (value) {
-                    setState(() {
-                      keepDialogOpen = value ?? false;
-                    });
-                  },
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent) {
+          // Handle Escape to close dialog
+          if (event.logicalKey == LogicalKeyboardKey.escape && !isLoading) {
+            Navigator.of(context).pop();
+          }
+          // Handle Ctrl+Enter or Cmd+Enter to submit
+          else if (event.logicalKey == LogicalKeyboardKey.enter && 
+                   (HardwareKeyboard.instance.isControlPressed || 
+                    HardwareKeyboard.instance.isMetaPressed) &&
+                   _canCreate() && !isLoading) {
+            _createTask();
+          }
+        }
+      },
+      child: AlertDialog(
+        title: const Text('Create Task'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Create a new task to track work and progress.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Keep dialog open for creating multiple tasks',
-                    style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              
+              EnhancedTextField(
+                controller: summaryController,
+                decoration: const InputDecoration(
+                  labelText: 'Task summary *',
+                  hintText: 'e.g., Review client proposal, Write documentation',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _canCreate() ? _createTask() : null,
+              ),
+              
+              const SizedBox(height: 16),
+              
+              EnhancedTextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description (optional)',
+                  hintText: 'Add details about what needs to be done',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                onChanged: (_) => setState(() {}),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_today_rounded),
+                title: Text(selectedDue == null 
+                  ? 'No due date' 
+                  : 'Due: ${selectedDue!.day}/${selectedDue!.month}/${selectedDue!.year}'
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded),
+                onTap: () => _showDueDateDialog(),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Keep dialog open checkbox
+              Row(
+                children: [
+                  Checkbox(
+                    value: keepDialogOpen,
+                    onChanged: (value) {
+                      setState(() {
+                        keepDialogOpen = value ?? false;
+                      });
+                    },
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Keep dialog open for creating multiple tasks',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: isLoading || !_canCreate() ? null : _createTask,
+            child: isLoading 
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Create'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: isLoading || !_canCreate() ? null : _createTask,
-          child: isLoading 
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Create'),
-        ),
-      ],
     );
   }
 

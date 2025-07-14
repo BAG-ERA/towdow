@@ -2,6 +2,7 @@
 // Used across the app for creating new domains
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
 import '../../../../data/providers/providers.dart';
@@ -26,52 +27,70 @@ class _DomainCreationDialogState extends ConsumerState<DomainCreationDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Create New Domain'),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Domains help organize projects into logical groups.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent) {
+          // Handle Escape to close dialog
+          if (event.logicalKey == LogicalKeyboardKey.escape && !isLoading) {
+            Navigator.of(context).pop();
+          }
+          // Handle Ctrl+Enter or Cmd+Enter to submit
+          else if (event.logicalKey == LogicalKeyboardKey.enter && 
+                   (HardwareKeyboard.instance.isControlPressed || 
+                    HardwareKeyboard.instance.isMetaPressed) &&
+                   _canCreate() && !isLoading) {
+            _createDomain();
+          }
+        }
+      },
+      child: AlertDialog(
+        title: const Text('Create New Domain'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Domains help organize projects into logical groups.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            
-            EnhancedTextField(
-              controller: domainController,
-              decoration: const InputDecoration(
-                labelText: 'Domain name *',
-                hintText: 'e.g., Work, Personal, Client Projects',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16),
+              
+              EnhancedTextField(
+                controller: domainController,
+                decoration: const InputDecoration(
+                  labelText: 'Domain name *',
+                  hintText: 'e.g., Work, Personal, Client Projects',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _canCreate() ? _createDomain() : null,
               ),
-              autofocus: true,
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => _canCreate() ? _createDomain() : null,
-            ),
-          ],
+            ],
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: isLoading || !_canCreate() ? null : _createDomain,
+            child: isLoading 
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Create'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: isLoading || !_canCreate() ? null : _createDomain,
-          child: isLoading 
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Create'),
-        ),
-      ],
     );
   }
 
