@@ -72,12 +72,15 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
         },
       );
 
+      // Encode project path to match storage format (especially for @ characters)
+      final encodedProjectPath = projectPath?.replaceAll('@', '%40');
+      
       final task = TaskFactory.createNew(
         summary: summary,
         description: description,
         due: due,
         categories: categories,
-        projectPath: projectPath,
+        projectPath: encodedProjectPath,
         organizer: organizer,
       );
 

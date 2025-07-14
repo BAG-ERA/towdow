@@ -241,6 +241,11 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         ref.invalidate(laterTasksProvider);
         ref.invalidate(anytimeTasksProvider);
         
+        // Refresh project tasks provider if task was created in a project
+        if (widget.projectPath != null) {
+          ref.invalidate(projectTasksProvider(widget.projectPath!));
+        }
+        
         // Handle dialog behavior based on checkbox
         if (keepDialogOpen) {
           // Clear form for next task but keep dialog open
