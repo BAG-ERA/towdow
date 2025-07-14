@@ -5,6 +5,7 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../../core/logger.dart';
+import 'encryption_service.dart';
 
 /// Service for managing validator logic
 class ValidatorService {
@@ -210,12 +211,14 @@ class ValidatorService {
     bool required = true,
   }) {
     const uuid = Uuid();
+    final encryptionService = EncryptionService();
     return {
       'id': uuid.v4(),
       'type': 'file',
       'required': required,
       'title': title,
       'files': <Map<String, dynamic>>[], // Array of file attachments
+      'encryptionKey': encryptionService.generateEncryptionKey(), // Automatically generated encryption key
       if (helper != null) 'helper': helper,
     };
   }

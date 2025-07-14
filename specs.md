@@ -632,6 +632,43 @@ FlowIt's x-flowit-validator is an array of validator lists. Each validator list 
           },
           "required": ["id", "type", "required", "title", "value"],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for this validator (UUID recommended)"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["file"]
+            },
+            "required": {
+              "type": "boolean",
+              "description": "Whether this validator must be completed to validate the task"
+            },
+            "title": {
+              "type": "string",
+              "description": "Display title for this validator"
+            },
+            "files": {
+              "type": "array",
+              "description": "Array of file attachment objects",
+              "default": []
+            },
+            "encryptionKey": {
+              "type": "string",
+              "description": "Automatically generated encryption key for file security"
+            },
+            "helper": {
+              "type": "string",
+              "description": "Optional helper text to guide the user",
+              "default": ""
+            }
+          },
+          "required": ["id", "type", "required", "title", "files", "encryptionKey"],
+          "additionalProperties": false
         }
       ]
     }
@@ -645,6 +682,7 @@ FlowIt's x-flowit-validator is an array of validator lists. Each validator list 
   - **Checklist**: All items with `checked: true` (if `required: true`)
   - **Single Select**: Must have a `selected` value that matches one of the option IDs (if `required: true`)
   - **Free Field**: Must have non-empty `value` (if `required: true`)
+  - **File**: Must have at least one file in the `files` array (if `required: true`)
 
 ### Validator State Management
 
