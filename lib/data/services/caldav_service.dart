@@ -479,11 +479,41 @@ class CalDAVService {
     String? uid,
   }) async {
     try {
-      // Generate UUID for unique calendar path
-      final calendarUuid = const Uuid().v4();
-      final calendarPath = '/${account.username}/$calendarUuid/';
-      final normalizedPath = calendarPath.endsWith('/') ? calendarPath : '$calendarPath/';
-      AppLogger.info('CalDAVService: Creating calendar $displayName at $normalizedPath');
+      // First discover the proper calendar home for this account
+      final capabilitiesResult = await discoverCapabilities();
+      return await capabilitiesResult.when(
+        success: (capabilities) async {
+          // Generate UUID for unique calendar path
+          final calendarUuid = const Uuid().v4();
+          final calendarHome = capabilities.calendarHome;
+          final calendarPath = '$calendarHome$calendarUuid/';
+          final normalizedPath = calendarPath.endsWith('/') ? calendarPath : '$calendarPath/';
+          AppLogger.info('CalDAVService: Creating calendar $displayName at $normalizedPath using calendar home: $calendarHome');
+          
+          return await _performCalendarCreation(normalizedPath, displayName, description);
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: Failed to discover capabilities for calendar creation', failure.exception, failure.stackTrace);
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Failed to create calendar', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to create calendar: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Perform the actual calendar creation after path discovery
+  Future<Result<TaskCalendar>> _performCalendarCreation(
+    String normalizedPath,
+    String displayName,
+    String? description,
+  ) async {
+    try {
       
       // Build MKCALENDAR request body (RFC 4791 Section 5.3.1)
       final mkCalendarBody = '''<?xml version="1.0" encoding="utf-8"?>

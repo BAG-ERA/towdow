@@ -274,13 +274,31 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
 
     final state = ref.read(projectCreationViewModelProvider);
     if (state.error == null && mounted) {
-      Navigator.of(context).pop(projectName);
-      final msg = selectedDomain != null
-          ? 'Project "$projectName" created in domain "$selectedDomain"'
-          : 'Project "$projectName" created successfully';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: Theme.of(context).colorScheme.primary),
-      );
+      // Give the providers a moment to refresh before closing the dialog
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      if (mounted) {
+        Navigator.of(context).pop(projectName);
+        
+        String msg;
+        if (state.wasCreatedLocally) {
+          msg = selectedDomain != null
+              ? 'Project "$projectName" created locally in domain "$selectedDomain" (will sync when connection improves)'
+              : 'Project "$projectName" created locally (will sync when connection improves)';
+        } else {
+          msg = selectedDomain != null
+              ? 'Project "$projectName" created in domain "$selectedDomain"'
+              : 'Project "$projectName" created successfully';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg), 
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: state.wasCreatedLocally ? const Duration(seconds: 4) : const Duration(seconds: 2),
+          ),
+        );
+      }
     } else if (state.error != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed: ${state.error}'), backgroundColor: Theme.of(context).colorScheme.error),
