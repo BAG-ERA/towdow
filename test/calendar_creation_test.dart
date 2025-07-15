@@ -112,7 +112,6 @@ void main() {
     test('TaskCalendar object should be created with correct properties', () {
       // Test TaskCalendar creation using the real model
       final testCalendar = TaskCalendar(
-        uid: 'test-calendar-uid',
         path: '/calendar/home/test/',
         displayName: 'Test Calendar',
         description: 'Test Description',

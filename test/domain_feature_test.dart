@@ -171,9 +171,9 @@ void main() {
             .thenAnswer((_) async => Result.success(null));
         when(mockCalendarRepository.getCalendarsByDomain('Marketing'))
             .thenAnswer((_) async => Result.success([testCalendars[0], testCalendars[3]]));
-        when(mockCalendarRepository.getById('cal-1'))
+        when(mockCalendarRepository.getById('/calendars/project1/'))
             .thenAnswer((_) async => Result.success(testCalendars[0]));
-        when(mockCalendarRepository.getById('cal-4'))
+        when(mockCalendarRepository.getById('/calendars/project4/'))
             .thenAnswer((_) async => Result.success(testCalendars[3]));
 
         final result = await domainService.renameDomain('Marketing', 'Brand Management');
@@ -252,19 +252,19 @@ void main() {
       });
 
       test('assignDomainToCalendar uses repository getById', () async {
-        final calendar = testCalendars.firstWhere((c) => c.path == 'cal-1');
+        final calendar = testCalendars.firstWhere((c) => c.path == '/calendars/project1/');
         
-        when(mockCalendarRepository.getById('cal-1'))
+        when(mockCalendarRepository.getById('/calendars/project1/'))
             .thenAnswer((_) async => Result.success(calendar));
         when(mockCalendarRepository.save(any))
             .thenAnswer((_) async => Result.success(null));
         when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.success(null));
 
-        final result = await domainService.assignDomainToCalendar('cal-1', 'Finance');
+        final result = await domainService.assignDomainToCalendar('/calendars/project1/', 'Finance');
         
         expect(result, isA<Success<void>>());
-        verify(mockCalendarRepository.getById('cal-1')).called(1);
+        verify(mockCalendarRepository.getById('/calendars/project1/')).called(1);
         verify(mockCalendarRepository.save(any)).called(1);
       });
 
