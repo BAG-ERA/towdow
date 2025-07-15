@@ -57,6 +57,7 @@ class FileValidatorState {
 
 /// File Validator ViewModel
 class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
+  final String _taskUid;
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
   final SyncService? _syncService;
@@ -64,12 +65,43 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
   final FileUploadQueueService _fileUploadQueueService;
 
   FileValidatorViewModel(
+    this._taskUid,
     this._taskRepository,
     this._accountRepository,
     this._offlineFileService,
     this._fileUploadQueueService, [
     this._syncService,
   ]) : super(const FileValidatorState());
+
+  /// Get encryption key for a specific validator
+  Future<String> _getValidatorEncryptionKey(String validatorId) async {
+    final taskResult = await _taskRepository.getById(_taskUid);
+    final task = await taskResult.when(
+      success: (task) async {
+        if (task == null) {
+          throw Exception('Task not found: $_taskUid');
+        }
+        return task;
+      },
+      failure: (failure) async => throw Exception('Failed to get task: ${failure.message}'),
+    );
+    
+    // Extract encryption key from validator
+    final validators = ValidatorService.parseValidators(task.flowitValidator);
+    
+    for (final validatorList in validators) {
+      for (final validator in validatorList) {
+        if (validator['id'] == validatorId && validator['type'] == 'file') {
+          final encryptionKey = validator['encryptionKey'] as String?;
+          if (encryptionKey != null) {
+            return encryptionKey;
+          }
+        }
+      }
+    }
+    
+    throw Exception('Encryption key not found for validator $validatorId');
+  }
 
   /// Upload a file to a validator (offline-first)
   Future<bool> uploadFile({
@@ -208,6 +240,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
   Future<Uint8List?> downloadFileBytes({
     required String fileId,
     required String fileName,
+    required String validatorId,
     String? s3Key,
   }) async {
     state = state.copyWith(
@@ -233,7 +266,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
           // If local file not found, try to download from S3
           if (s3Key != null) {
             AppLogger.debug('FileValidatorViewModel: Local file not found, trying S3 download');
-            return await _downloadFromS3(s3Key);
+            return await _downloadFromS3(s3Key, validatorId);
           } else {
             throw Exception('File not available locally and no S3 key provided');
           }
@@ -253,7 +286,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
   }
 
   /// Download file from S3 (fallback when local file not available)
-  Future<Uint8List> _downloadFromS3(String s3Key) async {
+  Future<Uint8List> _downloadFromS3(String s3Key, String validatorId) async {
     // Get account for S3 service
     final accountResult = await _accountRepository.getActiveAccount();
     final account = await accountResult.when(
@@ -261,13 +294,17 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
       failure: (_) async => throw Exception('No active account found'),
     );
 
+    // Get encryption key for the validator
+    final encryptionKey = await _getValidatorEncryptionKey(validatorId);
+
     // Create S3 service and download file
     final s3Service = S3StorageService(account: account);
     
-    // Download from S3
+    // Download from S3 with decryption
     final downloadResult = await s3Service.downloadFile(
       key: s3Key,
       isPrivate: false, // Use shared bucket
+      symmetricKey: encryptionKey, // Use validator's encryption key
     );
 
     return await downloadResult.when(
@@ -289,6 +326,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
   Future<String?> downloadFile({
     required String fileId,
     required String fileName,
+    required String validatorId,
     required String s3Key,
     String? savePath,
   }) async {
@@ -306,13 +344,17 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
         failure: (_) async => throw Exception('No active account found'),
       );
 
+      // Get encryption key for the validator
+      final encryptionKey = await _getValidatorEncryptionKey(validatorId);
+
       // Create S3 service and download file
       final s3Service = S3StorageService(account: account);
       
-      // Download from S3
+      // Download from S3 with decryption
       final downloadResult = await s3Service.downloadFile(
         key: s3Key,
         isPrivate: false, // Use shared bucket
+        symmetricKey: encryptionKey, // Use validator's encryption key
       );
 
       final filePath = await downloadResult.when(
@@ -492,6 +534,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
 /// Provider for file validator view model
 final fileValidatorViewModelProvider = StateNotifierProvider.family<FileValidatorViewModel, FileValidatorState, String>(
   (ref, taskUid) => FileValidatorViewModel(
+    taskUid,
     ref.watch(taskRepositoryProvider),
     ref.watch(accountRepositoryProvider),
     ref.watch(offlineFileServiceProvider),

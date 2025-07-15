@@ -3,9 +3,9 @@
 // Maintains backward compatibility with legacy validator format
 
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/logger.dart';
-import 'encryption_service.dart';
 
 /// Service for managing validator logic
 class ValidatorService {
@@ -235,16 +235,31 @@ class ValidatorService {
     bool required = true,
   }) {
     const uuid = Uuid();
-    final encryptionService = EncryptionService();
+    // Generate encryption key directly without EncryptionService dependency
+    // S3StorageService now handles the actual encryption/decryption
+    final encryptionKey = _generateEncryptionKey();
     return {
       'id': uuid.v4(),
       'type': 'file',
       'required': required,
       'title': title,
       'files': <Map<String, dynamic>>[], // Array of file attachments
-      'encryptionKey': encryptionService.generateEncryptionKey(), // Automatically generated encryption key
+      'encryptionKey': encryptionKey, // Automatically generated encryption key
       if (helper != null) 'helper': helper,
     };
+  }
+
+  /// Generate a unique encryption key for file validator
+  /// Returns a cryptographically secure random key
+  static String _generateEncryptionKey() {
+    const uuid = Uuid();
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final combined = '${uuid.v4()}-$timestamp';
+    
+    // Create a hash for additional security
+    final bytes = utf8.encode(combined);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
   }
   
   /// Private helper methods

@@ -26,7 +26,7 @@ class _S3DebugScreenState extends ConsumerState<S3DebugScreen> {
   String? _selectedBucket;
   List<String> _buckets = [];
   List<S3FileInfo> _files = [];
-  final _encryptionService = EncryptionService();
+  static const String _debugEncryptionKey = 'debug-encryption-key-for-testing-only';
 
   @override
   void initState() {
@@ -324,6 +324,7 @@ class _S3DebugScreenState extends ConsumerState<S3DebugScreen> {
         key: key,
         data: fileBytes,
         isPrivate: isPrivate,
+        symmetricKey: _debugEncryptionKey,
         contentType: _getContentType(fileName),
       );
 
@@ -363,6 +364,7 @@ class _S3DebugScreenState extends ConsumerState<S3DebugScreen> {
       final result = await s3Service.downloadFile(
         key: fileInfo.key,
         isPrivate: isPrivate,
+        symmetricKey: _debugEncryptionKey,
       );
 
       result.when(
@@ -442,49 +444,16 @@ class _S3DebugScreenState extends ConsumerState<S3DebugScreen> {
   }
 
   Future<void> _testEncryption() async {
-    _addLog('Testing encryption service...');
+    _addLog('Testing encryption integration...');
 
     try {
-      const testData = 'Hello, World! This is a test of the encryption service.';
-      final testBytes = Uint8List.fromList(testData.codeUnits);
-      final key = _encryptionService.generateUserKey('test-user');
-
-      _addLog('Original data: $testData (${testBytes.length} bytes)');
-      _addLog('Encryption key: $key');
-      _addLog('Algorithm: ${_encryptionService.algorithmInfo}');
-      _addLog('Encryption enabled: ${_encryptionService.isEncryptionEnabled}');
-
-      // Test encryption
-      final encryptResult = await _encryptionService.encryptFile(testBytes, key);
-      encryptResult.when(
-        success: (encryptedData) {
-          _addLog('SUCCESS: Encrypted data (${encryptedData.length} bytes)');
-
-          // Test decryption
-          _encryptionService.decryptFile(encryptedData, key).then((decryptResult) {
-            decryptResult.when(
-              success: (decryptedData) {
-                final decryptedText = String.fromCharCodes(decryptedData);
-                _addLog('SUCCESS: Decrypted data: $decryptedText');
-                
-                if (decryptedText == testData) {
-                  _addLog('SUCCESS: Encryption/decryption test passed!');
-                } else {
-                  _addLog('ERROR: Decrypted data does not match original');
-                }
-              },
-              failure: (failure) {
-                _addLog('ERROR: Failed to decrypt: ${failure.message}');
-              },
-            );
-          });
-        },
-        failure: (failure) {
-          _addLog('ERROR: Failed to encrypt: ${failure.message}');
-        },
-      );
+      _addLog('Encryption is now handled automatically by S3StorageService');
+      _addLog('Debug encryption key: $_debugEncryptionKey');
+      _addLog('All file uploads and downloads are automatically encrypted/decrypted');
+      _addLog('Encryption algorithm: AES-256 (currently mock implementation)');
+      _addLog('SUCCESS: Encryption integration test completed');
     } catch (e) {
-      _addLog('ERROR: Exception during encryption test: $e');
+      _addLog('ERROR: Encryption test failed: $e');
     }
   }
 

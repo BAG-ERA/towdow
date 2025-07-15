@@ -414,6 +414,36 @@ class FileUploadQueueService {
         failure: (failure) async => throw Exception('Failed to get account: ${failure.message}'),
       );
       
+      // Get task to extract encryption key from validator
+      final taskResult = await _taskRepository.getById(offlineFile.taskUid);
+      final task = await taskResult.when(
+        success: (task) async {
+          if (task == null) {
+            throw Exception('Task not found: ${offlineFile.taskUid}');
+          }
+          return task;
+        },
+        failure: (failure) async => throw Exception('Failed to get task: ${failure.message}'),
+      );
+      
+      // Extract encryption key from validator
+      final validators = ValidatorService.parseValidators(task.flowitValidator);
+      String? encryptionKey;
+      
+      for (final validatorList in validators) {
+        for (final validator in validatorList) {
+          if (validator['id'] == offlineFile.validatorId && validator['type'] == 'file') {
+            encryptionKey = validator['encryptionKey'] as String?;
+            break;
+          }
+        }
+        if (encryptionKey != null) break;
+      }
+      
+      if (encryptionKey == null) {
+        throw Exception('Encryption key not found for validator ${offlineFile.validatorId}');
+      }
+      
       // Read file data
       final fileDataResult = await _offlineFileService.readLocalFile(offlineFile.id);
       final fileData = await fileDataResult.when(
@@ -429,11 +459,12 @@ class FileUploadQueueService {
       final sanitizedFileName = _sanitizeFileName(offlineFile.fileName);
       final s3Key = '$userPrefix${offlineFile.taskUid}/$sanitizedFileName';
       
-      // Upload to S3
+      // Upload to S3 with encryption
       final uploadResult = await s3Service.uploadFile(
         key: s3Key,
         data: fileData,
         isPrivate: false, // Use shared bucket
+        symmetricKey: encryptionKey, // Use validator's encryption key
         contentType: offlineFile.contentType,
       );
       

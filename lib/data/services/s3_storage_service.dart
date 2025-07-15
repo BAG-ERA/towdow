@@ -11,6 +11,7 @@ import '../models/caldav_account.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import 'webdav_client.dart';
+import 'encryption_service.dart';
 
 /// S3 credentials obtained from JWT token
 class S3Credentials {
@@ -54,11 +55,12 @@ class S3FileInfo {
 class S3StorageService {
   CaldavAccount account;
   final void Function(String accessToken, String? refreshToken, DateTime? tokenExpiry)? onTokenRefresh;
+  final EncryptionService _encryptionService;
   
   // Fixed bucket names and constants
   static const String _bucketPrivate = 'towdow-private';
   static const String _bucketShared = 'towdow-shared';
-  static const String _s3Region = 'us-east-1';
+  static const String _s3Region = 'eu-central-1';
   static const int _defaultMaxFileSize = 20 * 1024 * 1024; // 20MB
   
   S3? _s3Client;
@@ -67,7 +69,8 @@ class S3StorageService {
   S3StorageService({
     required this.account,
     this.onTokenRefresh,
-  });
+    EncryptionService? encryptionService,
+  }) : _encryptionService = encryptionService ?? EncryptionService();
 
   /// Get S3 endpoint URL from account configuration
   String get _s3Endpoint {
@@ -351,11 +354,12 @@ class S3StorageService {
     );
   }
 
-  /// Upload a file to S3
+  /// Upload a file to S3 with encryption
   Future<Result<String>> uploadFile({
     required String key,
     required Uint8List data,
     required bool isPrivate,
+    required String symmetricKey,
     String? contentType,
   }) async {
     final initResult = await _ensureInitialized();
@@ -366,56 +370,65 @@ class S3StorageService {
           return Result.failure(Failure(message: 'File size ${data.length} exceeds limit ${_maxFileSize}'));
         }
 
-        final bucket = isPrivate ? _bucketPrivate : _bucketShared;
-        
-        // Ensure we have a content type - fallback to octet-stream if none provided
-        final finalContentType = contentType?.isNotEmpty == true ? contentType : 'application/octet-stream';
-        
-        try {
-          // Add debug logging for troubleshooting
-          AppLogger.debug('S3StorageService.uploadFile: Uploading file');
-          AppLogger.debug('S3StorageService.uploadFile: Key: $key');
-          AppLogger.debug('S3StorageService.uploadFile: Bucket: $bucket');
-          AppLogger.debug('S3StorageService.uploadFile: Content-Type: $contentType');
-          AppLogger.debug('S3StorageService.uploadFile: Data length: ${data.length} bytes');
-          AppLogger.debug('S3StorageService.uploadFile: Final Content-Type: $finalContentType');
-          
-          await _s3Client!.putObject(
-            bucket: bucket,
-            key: key,
-            body: data,
-            contentType: finalContentType,
-          );
-          
-          final fileUrl = '$_s3Endpoint/$bucket/$key';
-          AppLogger.debug('S3StorageService.uploadFile: Uploaded file $key to $bucket');
-          return Result.success(fileUrl);
-        } catch (e, stackTrace) {
-          AppLogger.error('S3StorageService.uploadFile: Failed to upload file $key', e, stackTrace);
-          AppLogger.error('S3StorageService.uploadFile: Upload parameters - Bucket: $bucket, Key: $key, ContentType: $finalContentType, DataLength: ${data.length}');
-          AppLogger.error('S3StorageService.uploadFile: S3 Endpoint: $_s3Endpoint');
-          
-          // Provide more specific error information
-          String errorMessage = 'Failed to upload file: $e';
-          if (e.toString().contains('SignatureDoesNotMatch')) {
-            errorMessage += '\n\nThis error often occurs due to:'
-                '\n- Special characters in filename (em dashes, Unicode characters)'
-                '\n- Incorrect content type for binary files'
-                '\n- Clock synchronization issues'
-                '\n- Invalid S3 credentials or configuration';
-          }
-          
-          return Result.failure(Failure(message: errorMessage));
-        }
+        // Encrypt the data before uploading
+        final encryptionResult = await _encryptionService.encryptFile(data, symmetricKey);
+        return encryptionResult.when(
+          success: (encryptedData) async {
+            final bucket = isPrivate ? _bucketPrivate : _bucketShared;
+            
+            // Ensure we have a content type - fallback to octet-stream if none provided
+            final finalContentType = contentType?.isNotEmpty == true ? contentType : 'application/octet-stream';
+            
+            try {
+              // Add debug logging for troubleshooting
+              AppLogger.debug('S3StorageService.uploadFile: Uploading encrypted file');
+              AppLogger.debug('S3StorageService.uploadFile: Key: $key');
+              AppLogger.debug('S3StorageService.uploadFile: Bucket: $bucket');
+              AppLogger.debug('S3StorageService.uploadFile: Content-Type: $contentType');
+              AppLogger.debug('S3StorageService.uploadFile: Original data length: ${data.length} bytes');
+              AppLogger.debug('S3StorageService.uploadFile: Encrypted data length: ${encryptedData.length} bytes');
+              AppLogger.debug('S3StorageService.uploadFile: Final Content-Type: $finalContentType');
+              
+              await _s3Client!.putObject(
+                bucket: bucket,
+                key: key,
+                body: encryptedData,
+                contentType: finalContentType,
+              );
+              
+              final fileUrl = '$_s3Endpoint/$bucket/$key';
+              AppLogger.debug('S3StorageService.uploadFile: Uploaded encrypted file $key to $bucket');
+              return Result.success(fileUrl);
+            } catch (e, stackTrace) {
+              AppLogger.error('S3StorageService.uploadFile: Failed to upload encrypted file $key', e, stackTrace);
+              AppLogger.error('S3StorageService.uploadFile: Upload parameters - Bucket: $bucket, Key: $key, ContentType: $finalContentType, EncryptedDataLength: ${encryptedData.length}');
+              AppLogger.error('S3StorageService.uploadFile: S3 Endpoint: $_s3Endpoint');
+              
+              // Provide more specific error information
+              String errorMessage = 'Failed to upload encrypted file: $e';
+              if (e.toString().contains('SignatureDoesNotMatch')) {
+                errorMessage += '\n\nThis error often occurs due to:'
+                    '\n- Special characters in filename (em dashes, Unicode characters)'
+                    '\n- Incorrect content type for binary files'
+                    '\n- Clock synchronization issues'
+                    '\n- Invalid S3 credentials or configuration';
+              }
+              
+              return Result.failure(Failure(message: errorMessage));
+            }
+          },
+          failure: (failure) => Result.failure(failure),
+        );
       },
       failure: (failure) => Result.failure(failure),
     );
   }
 
-  /// Download a file from S3
+  /// Download a file from S3 with decryption
   Future<Result<Uint8List>> downloadFile({
     required String key,
     required bool isPrivate,
+    required String symmetricKey,
   }) async {
     final initResult = await _ensureInitialized();
     return initResult.when(
@@ -429,9 +442,18 @@ class S3StorageService {
           );
           
           // Response body is already Uint8List for S3 GetObject
-          final data = response.body!;
-          AppLogger.debug('S3StorageService.downloadFile: Downloaded file $key from $bucket (${data.length} bytes)');
-          return Result.success(data);
+          final encryptedData = response.body!;
+          AppLogger.debug('S3StorageService.downloadFile: Downloaded encrypted file $key from $bucket (${encryptedData.length} bytes)');
+          
+          // Decrypt the data before returning
+          final decryptionResult = await _encryptionService.decryptFile(encryptedData, symmetricKey);
+          return decryptionResult.when(
+            success: (decryptedData) {
+              AppLogger.debug('S3StorageService.downloadFile: Decrypted file $key, original size: ${decryptedData.length} bytes');
+              return Result.success(decryptedData);
+            },
+            failure: (failure) => Result.failure(failure),
+          );
         } catch (e, stackTrace) {
           AppLogger.error('S3StorageService.downloadFile: Failed to download file $key', e, stackTrace);
           return Result.failure(Failure(message: 'Failed to download file: $e'));

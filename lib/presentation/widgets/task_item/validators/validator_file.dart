@@ -202,7 +202,7 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
           // Action buttons
           // Download button
           IconButton(
-            onPressed: isDownloadingThis ? null : () => _downloadFile(file),
+            onPressed: isDownloadingThis ? null : () => _downloadFile(file, validatorId),
             icon: isDownloadingThis
                 ? const SizedBox(
                     width: 16,
@@ -288,7 +288,7 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
     }
   }
 
-  Future<void> _downloadFile(Map<String, dynamic> file) async {
+  Future<void> _downloadFile(Map<String, dynamic> file, String validatorId) async {
     final fileId = file['id'] as String;
     final fileName = file['name'] as String? ?? 'download';
     final s3Key = file['s3Key'] as String?; // May be null for offline files
@@ -298,6 +298,7 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
         .downloadFileBytes(
           fileId: fileId,
           fileName: fileName,
+          validatorId: validatorId,
           s3Key: s3Key, // Optional for offline files
         );
 
@@ -335,7 +336,7 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
     }
   }
 
-  Future<void> _downloadAllFiles(List<dynamic> files) async {
+  Future<void> _downloadAllFiles(List<dynamic> files, String validatorId) async {
     // For bulk download, ask user to choose a directory
     final directory = await FilePicker.platform.getDirectoryPath(
       dialogTitle: 'Choose Download Directory',
@@ -358,6 +359,7 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
             .downloadFile(
               fileId: fileId,
               fileName: fileName,
+              validatorId: validatorId,
               s3Key: s3Key,
               savePath: savePath,
             );
