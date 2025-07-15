@@ -52,6 +52,7 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
   final LocalStorageService _localStorageService;
+  final UserSyncService _userSyncService;
   final void Function()? onInvalidateProjectList;
 
   CalendarSelectionViewModel({
@@ -61,6 +62,7 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
     required LocalStorageService localStorageService,
+    required UserSyncService userSyncService,
     this.onInvalidateProjectList,
   })  : _account = account,
         _caldavService = caldavService,
@@ -68,6 +70,7 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
         _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
         _localStorageService = localStorageService,
+        _userSyncService = userSyncService,
         super(const CalendarSelectionState());
 
   Future<void> loadAccount() async {
@@ -245,23 +248,9 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
   /// Trigger user sync upload for cloud/self-hosted users
   Future<void> _triggerUserSyncUpload() async {
     try {
-      // Create a temporary UserSyncService to trigger upload
-      final userRepository = LocalUserRepository(_localStorageService);
-      final externalAccountRepository = LocalExternalAccountRepository(_localStorageService);
-      final externalCalendarRepository = LocalExternalCalendarRepository(_localStorageService);
-      final calendarRepository = LocalCalendarRepository(_localStorageService);
-      
-      final userSyncService = UserSyncService(
-        userRepository: userRepository,
-        externalAccountRepository: externalAccountRepository,
-        externalCalendarRepository: externalCalendarRepository,
-        accountRepository: _accountRepository,
-        calendarRepository: calendarRepository,
-      );
-      
-      final syncAvailable = await userSyncService.isSyncAvailable();
+      final syncAvailable = await _userSyncService.isSyncAvailable();
       if (syncAvailable) {
-        final uploadResult = await userSyncService.uploadUserData();
+        final uploadResult = await _userSyncService.uploadUserData();
         uploadResult.when(
           success: (_) {
             AppLogger.info('CalendarSelection: Successfully uploaded user data to S3');
@@ -286,6 +275,7 @@ final calendarSelectionViewModelProvider = StateNotifierProvider.autoDispose.fam
     accountRepository: ref.read(accountRepositoryProvider),
     calendarRepository: ref.read(calendarRepositoryProvider),
     localStorageService: ref.read(localStorageServiceProvider),
+    userSyncService: ref.read(userSyncServiceProvider),
     onInvalidateProjectList: () => ref.invalidate(projectListProvider),
   ),
 ); 
