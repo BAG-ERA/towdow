@@ -529,7 +529,7 @@ class S3StorageService {
   String getUserPrefix() {
     // Use JWT 'sub' claim as user identifier (matches bucket permissions: {jwt_sub}/)
     final jwtPayload = _parseJwtPayload(account.accessToken ?? '');
-    final userId = jwtPayload['sub'] ?? account.username; // Fallback to username if no sub
+    final userId = jwtPayload['sub'];
     AppLogger.debug('S3StorageService.getUserPrefix: Using userId=$userId from JWT sub=${jwtPayload['sub']}');
     return '$userId/';
   }
@@ -538,7 +538,7 @@ class S3StorageService {
   String getSharedPrefix(String context) {
     // For shared bucket, use JWT 'sub' as folder name (matches bucket permissions: {jwt_sub}/)
     final jwtPayload = _parseJwtPayload(account.accessToken ?? '');
-    final userId = jwtPayload['sub'] ?? account.username; // Fallback to username if no sub
+    final userId = jwtPayload['sub']; 
     return '$userId/';
   }
 
