@@ -3,14 +3,22 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../data/providers/providers.dart';
 import '../../../../data/models/caldav_account.dart';
 import '../../../../data/services/caldav_service.dart';
+import '../../../../data/services/user_sync_service.dart';
+import '../../../../data/services/local_storage_service.dart';
+import '../../../../data/repositories/user_repository.dart';
+import '../../../../data/repositories/external_account_repository.dart';
+import '../../../../data/repositories/account_repository.dart';
+import '../../../../data/repositories/calendar_repository.dart';
+import '../../../../data/providers/providers.dart';
+import '../../../../core/logger.dart';
 import 'calendar_selection_screen.dart';
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:io';
 import 'package:openid_client/openid_client_io.dart';
-import '../../../../data/services/webdav_client.dart';
 
 const String TOWDOW_ISSUER_URL = "https://auth.towdow.app/realms/towdow";
 const String CLIENT_ID = "radicale-api";
@@ -132,7 +140,49 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
         isActive: true,
       );
 
-      // Test the CalDAV connection
+      // Check for existing user sync data first (before capability discovery)
+      // Create minimal service instances for this check (we need to set the account first)
+      final localStorage = LocalStorageService();
+      await localStorage.initialize();
+      
+      final userRepository = LocalUserRepository(localStorage);
+      final externalAccountRepository = LocalExternalAccountRepository(localStorage);
+      final accountRepository = LocalAccountRepository(localStorage);
+      final calendarRepository = LocalCalendarRepository(localStorage);
+      
+      final userSyncService = UserSyncService(
+        userRepository: userRepository,
+        externalAccountRepository: externalAccountRepository,
+        accountRepository: accountRepository,
+        calendarRepository: calendarRepository,
+      );
+      
+      // Temporarily save the test account so userSyncService can access it
+      await accountRepository.save(testAccount);
+      
+      final syncDownloadResult = await userSyncService.downloadUserData();
+      final hasExistingData = syncDownloadResult.when(
+        success: (hasData) => hasData,
+        failure: (failure) {
+          AppLogger.warning('TowDow Cloud login: Failed to check for existing user data: ${failure.message}');
+          return false;
+        },
+      );
+      
+      if (hasExistingData) {
+        // User data found, go directly to home screen (account already saved)
+        if (mounted) {
+          // Invalidate the account status provider to ensure router recognizes the account
+          ref.invalidate(hasActiveAccountProvider);
+          
+          Navigator.of(context).pop(); // Close dialog
+          // Navigate to home screen using GoRouter
+          GoRouter.of(context).go('/today');
+        }
+        return;
+      }
+      
+      // No existing user data, proceed with normal flow (test connection and calendar selection)
       final caldavService = CalDAVService(account: testAccount);
       final testResult = await caldavService.testConnection();
 

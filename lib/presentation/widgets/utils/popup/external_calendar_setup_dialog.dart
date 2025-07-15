@@ -632,6 +632,14 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
       final externalSyncService = ref.read(externalCalendarSyncServiceProvider);
       await externalSyncService.syncAccount(account.id);
       
+      // Trigger user sync upload (only for cloud/self-hosted users)
+      final userSyncService = ref.read(userSyncServiceProvider);
+      final uploadResult = await userSyncService.uploadUserData();
+      uploadResult.when(
+        success: (_) => AppLogger.info('ExternalCalendarSetupDialog: User data synced to cloud after adding external calendar'),
+        failure: (failure) => AppLogger.warning('ExternalCalendarSetupDialog: Failed to sync user data: ${failure.message}'),
+      );
+      
       if (mounted) {
         Navigator.of(context).pop(account);
       }

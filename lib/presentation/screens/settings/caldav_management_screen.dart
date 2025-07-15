@@ -7,6 +7,7 @@ import '../../../data/models/caldav_account.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/services/caldav_service.dart';
 import '../../../data/services/local_storage_service.dart';
+import '../../../data/services/user_sync_service.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../../data/services/webdav_client.dart';
@@ -34,6 +35,9 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
 
   Future<void> _loadSelectedCalendars() async {
     final calendarRepository = ref.read(calendarRepositoryProvider);
+    final userRepository = ref.read(userRepositoryProvider);
+    
+    // First try to load from repository (existing calendars)
     final result = await calendarRepository.getProjectCalendars();
     
     result.when(
@@ -48,6 +52,40 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
         setState(() {
           _selectedCalendars = {};
         });
+      },
+    );
+    
+    // Also check user preferences for project order (in case of sync from cloud)
+    final preferencesResult = await userRepository.getUserPreferences();
+    await preferencesResult.when(
+      success: (preferences) async {
+        if (preferences.projectOrder.isNotEmpty) {
+          AppLogger.info('CalDAVManagement: Found ${preferences.projectOrder.length} projects in user preferences order');
+          
+          // If we have project order but no selected calendars, we might need to discover and select those calendars
+          if (_selectedCalendars.isEmpty && _capabilities != null) {
+            final discoveredCalendars = _capabilities!.taskCalendars;
+            final calendarsToSelect = <TaskCalendar>[];
+            
+            for (final projectPath in preferences.projectOrder) {
+              final matchingCalendar = discoveredCalendars.where((cal) => cal.path == projectPath).firstOrNull;
+              if (matchingCalendar != null) {
+                calendarsToSelect.add(matchingCalendar);
+              }
+            }
+            
+            if (calendarsToSelect.isNotEmpty) {
+              setState(() {
+                _selectedCalendars = Set.from(calendarsToSelect);
+                _hasChanges = true; // Mark as having changes to trigger save
+              });
+              AppLogger.info('CalDAVManagement: Auto-selected ${calendarsToSelect.length} calendars from user preferences');
+            }
+          }
+        }
+      },
+      failure: (failure) {
+        AppLogger.debug('CalDAVManagement: No user preferences found or failed to load: ${failure.message}');
       },
     );
   }
@@ -176,10 +214,78 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
       }
       _hasChanges = true;
     });
+    
+    // Update user preferences with new project order
+    _updateUserPreferencesProjectOrder();
   }
 
   bool _isCalendarSelected(TaskCalendar calendar) {
     return _selectedCalendars.any((c) => c.path == calendar.path);
+  }
+
+  /// Update user preferences with current project order and sync status
+  Future<void> _updateUserPreferencesProjectOrder() async {
+    try {
+      final userRepository = ref.read(userRepositoryProvider);
+      
+      // Get current preferences
+      final preferencesResult = await userRepository.getUserPreferences();
+      await preferencesResult.when(
+        success: (preferences) async {
+          // Create project order from selected calendars (using calendar path as project UID)
+          final projectOrder = _selectedCalendars.map((c) => c.path).toList();
+          
+          // Update preferences with new project order
+          final updatedPreferences = preferences.copyWith(
+            projectOrder: projectOrder,
+            syncedProjects: projectOrder, // Also update synced projects list
+          );
+          
+          // Save updated preferences
+          await userRepository.saveUserPreferences(updatedPreferences);
+          AppLogger.info('CalDAVManagement: Updated user preferences with ${projectOrder.length} projects');
+        },
+        failure: (failure) {
+          AppLogger.warning('CalDAVManagement: Failed to update user preferences: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVManagement: Error updating user preferences', e, stackTrace);
+    }
+  }
+
+  /// Trigger user sync upload for cloud/self-hosted users
+  Future<void> _triggerUserSyncUpload() async {
+    try {
+      if (_currentAccount == null) return;
+      
+      final userRepository = ref.read(userRepositoryProvider);
+      final externalAccountRepository = ref.read(externalAccountRepositoryProvider);
+      final accountRepository = ref.read(accountRepositoryProvider);
+      final calendarRepository = ref.read(calendarRepositoryProvider);
+      
+      final userSyncService = UserSyncService(
+        userRepository: userRepository,
+        externalAccountRepository: externalAccountRepository,
+        accountRepository: accountRepository,
+        calendarRepository: calendarRepository,
+      );
+      
+      final syncAvailable = await userSyncService.isSyncAvailable();
+      if (syncAvailable) {
+        final uploadResult = await userSyncService.uploadUserData();
+        uploadResult.when(
+          success: (_) {
+            AppLogger.info('CalDAVManagement: Successfully uploaded user data to S3');
+          },
+          failure: (failure) {
+            AppLogger.warning('CalDAVManagement: Failed to sync user data: ${failure.message}');
+          },
+        );
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVManagement: Error triggering user sync upload', e, stackTrace);
+    }
   }
 
   /// Clear existing calendars and save selected calendars as local projects
@@ -254,6 +360,9 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
             _currentAccount = updatedAccount;
             _hasChanges = false;
           });
+
+          // Trigger user sync upload after saving changes
+          _triggerUserSyncUpload();
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

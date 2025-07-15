@@ -28,6 +28,7 @@ import '../services/export_import_service.dart';
 import '../services/offline_file_service.dart';
 import '../services/file_upload_queue_service.dart';
 import '../services/connection_monitor_service.dart';
+import '../services/user_sync_service.dart';
 import '../../core/app_lifecycle_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -115,6 +116,16 @@ final fileUploadQueueServiceProvider = Provider<FileUploadQueueService>((ref) {
 // Connection monitor service provider
 final connectionMonitorServiceProvider = Provider<ConnectionMonitorService>((ref) {
   return ConnectionMonitorService();
+});
+
+// User sync service provider
+final userSyncServiceProvider = Provider<UserSyncService>((ref) {
+  return UserSyncService(
+    userRepository: ref.watch(userRepositoryProvider),
+    externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
+    accountRepository: ref.watch(accountRepositoryProvider),
+    calendarRepository: ref.watch(calendarRepositoryProvider),
+  );
 });
 
 // External calendar sync service provider
@@ -233,6 +244,7 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final externalSyncService = ref.watch(externalCalendarSyncServiceProvider);
   final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
+  final userSyncService = ref.watch(userSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
 
   final result = await lifecycleManager.initialize(
@@ -241,6 +253,7 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
     externalSyncService: externalSyncService,
     fileUploadQueueService: fileUploadQueueService,
     connectionMonitorService: connectionMonitorService,
+    userSyncService: userSyncService,
     accountRepository: accountRepository,
   );
 

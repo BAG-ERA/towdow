@@ -178,16 +178,7 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
                 ],
               ),
             ),
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit),
-                  SizedBox(width: 8),
-                  Text('Edit'),
-                ],
-              ),
-            ),
+
             const PopupMenuItem(
               value: 'sync',
               child: Row(
@@ -393,9 +384,7 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       case 'toggle':
         await _toggleAccount(account);
         break;
-      case 'edit':
-        await _editAccount(account);
-        break;
+
       case 'sync':
         await _syncAccount(account);
         break;
@@ -413,7 +402,15 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       final result = await repository.setActive(account.id, !account.isActive);
       
       result.when(
-        success: (_) {
+        success: (_) async {
+          // Trigger user sync upload after toggling (only for cloud/self-hosted users)
+          final userSyncService = ref.read(userSyncServiceProvider);
+          final uploadResult = await userSyncService.uploadUserData();
+          uploadResult.when(
+            success: (_) => AppLogger.info('ExternalCalendarManagement: User data synced to cloud after toggling external calendar'),
+            failure: (failure) => AppLogger.warning('ExternalCalendarManagement: Failed to sync user data: ${failure.message}'),
+          );
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -445,12 +442,6 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
     }
   }
 
-  Future<void> _editAccount(ExternalCaldavAccount account) async {
-    // TODO: Implement account editing
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account editing coming soon!')),
-    );
-  }
 
   Future<void> _syncAccount(ExternalCaldavAccount account) async {
     setState(() => _isLoading = true);
@@ -546,6 +537,14 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       deleteAccountResult.when(
         success: (_) => AppLogger.info('ExternalCalendarManagement: Deleted account ${account.id}'),
         failure: (failure) => throw Exception('Failed to delete account: ${failure.message}'),
+      );
+      
+      // Trigger user sync upload after deletion (only for cloud/self-hosted users)
+      final userSyncService = ref.read(userSyncServiceProvider);
+      final uploadResult = await userSyncService.uploadUserData();
+      uploadResult.when(
+        success: (_) => AppLogger.info('ExternalCalendarManagement: User data synced to cloud after deleting external calendar'),
+        failure: (failure) => AppLogger.warning('ExternalCalendarManagement: Failed to sync user data: ${failure.message}'),
       );
       
       // Success
