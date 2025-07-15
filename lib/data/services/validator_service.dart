@@ -103,6 +103,29 @@ class ValidatorService {
               final updatedValidator = _updateFileS3(updated, newState);
               AppLogger.debug('ValidatorService: After update_file_s3: $updatedValidator');
               return updatedValidator;
+            case 'checklist_item':
+              return _updateChecklistItem(updated, newState);
+            case 'selection':
+              updated['selected'] = newState['selected'];
+              break;
+            case 'free_field':
+              updated['value'] = newState['value'];
+              break;
+            case 'add_checklist_item':
+              return _addChecklistItem(updated);
+            case 'remove_checklist_item':
+              return _removeChecklistItem(updated, newState);
+            case 'add_select_option':
+              return _addSelectOption(updated);
+            case 'remove_select_option':
+              return _removeSelectOption(updated, newState);
+            case 'edit_title':
+              updated['title'] = newState['title'];
+              break;
+            case 'edit_checklist_item':
+              return _editChecklistItem(updated, newState);
+            case 'edit_select_option':
+              return _editSelectOption(updated, newState);
           }
           
           AppLogger.debug('ValidatorService: Updated validator: $updated');
@@ -494,7 +517,14 @@ class ValidatorService {
     final options = (validator['options'] as List? ?? [])
         .where((option) => option['id'] != optionId)
         .toList();
-    return {...validator, 'options': options};
+    
+    // Clear selection if removed option was selected
+    String selected = validator['selected'] as String? ?? '';
+    if (selected == optionId) {
+      selected = '';
+    }
+    
+    return {...validator, 'options': options, 'selected': selected};
   }
   
   static Map<String, dynamic> _editSelectOption(Map<String, dynamic> validator, Map<String, dynamic> newState) {
