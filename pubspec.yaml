@@ -77,6 +77,7 @@ dependencies:
   # S3 & Cloud Storage
   aws_s3_api: ^2.0.0
   crypto: ^3.0.3
+  pointycastle: ^3.9.1
 
 dev_dependencies:
   flutter_test:
