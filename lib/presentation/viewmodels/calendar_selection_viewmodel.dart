@@ -8,6 +8,7 @@ import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../data/repositories/external_account_repository.dart';
+import '../../data/repositories/external_calendar_repository.dart';
 import '../../data/services/local_storage_service.dart';
 import '../../data/services/user_sync_service.dart';
 import '../../data/providers/providers.dart';
@@ -247,11 +248,13 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
       // Create a temporary UserSyncService to trigger upload
       final userRepository = LocalUserRepository(_localStorageService);
       final externalAccountRepository = LocalExternalAccountRepository(_localStorageService);
+      final externalCalendarRepository = LocalExternalCalendarRepository(_localStorageService);
       final calendarRepository = LocalCalendarRepository(_localStorageService);
       
       final userSyncService = UserSyncService(
         userRepository: userRepository,
         externalAccountRepository: externalAccountRepository,
+        externalCalendarRepository: externalCalendarRepository,
         accountRepository: _accountRepository,
         calendarRepository: calendarRepository,
       );

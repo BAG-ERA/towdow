@@ -11,6 +11,7 @@ import '../../../../data/services/user_sync_service.dart';
 import '../../../../data/services/local_storage_service.dart';
 import '../../../../data/repositories/user_repository.dart';
 import '../../../../data/repositories/external_account_repository.dart';
+import '../../../../data/repositories/external_calendar_repository.dart';
 import '../../../../data/repositories/account_repository.dart';
 import '../../../../data/repositories/calendar_repository.dart';
 import 'calendar_selection_screen.dart';
@@ -129,12 +130,14 @@ class _TowdowSelfHostedDialogState
       
       final userRepository = LocalUserRepository(localStorage);
       final externalAccountRepository = LocalExternalAccountRepository(localStorage);
+      final externalCalendarRepository = LocalExternalCalendarRepository(localStorage);
       final accountRepository = LocalAccountRepository(localStorage);
       final calendarRepository = LocalCalendarRepository(localStorage);
       
       final userSyncService = UserSyncService(
         userRepository: userRepository,
         externalAccountRepository: externalAccountRepository,
+        externalCalendarRepository: externalCalendarRepository,
         accountRepository: accountRepository,
         calendarRepository: calendarRepository,
       );
@@ -150,6 +153,21 @@ class _TowdowSelfHostedDialogState
           return false;
         },
       );
+      
+      // If we downloaded user data, trigger external calendar sync
+      if (hasExistingData) {
+        try {
+          final externalSyncService = ref.read(externalCalendarSyncServiceProvider);
+          final syncResult = await externalSyncService.syncAllAccounts();
+          syncResult.when(
+            success: (_) => AppLogger.info('TowDow self-hosted login: External calendar sync completed successfully'),
+            failure: (failure) => AppLogger.warning('TowDow self-hosted login: External calendar sync failed: ${failure.message}'),
+          );
+        } catch (e, stackTrace) {
+          AppLogger.error('TowDow self-hosted login: Failed to trigger external calendar sync', e, stackTrace);
+          // Don't fail the login process if external sync fails
+        }
+      }
       
       if (hasExistingData) {
         // User data found, go directly to home screen (account already saved)

@@ -12,9 +12,11 @@ import '../models/user_preferences.dart';
 import '../models/external_caldav_account.dart';
 import '../repositories/user_repository.dart';
 import '../repositories/external_account_repository.dart';
+import '../repositories/external_calendar_repository.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/calendar_repository.dart';
 import '../models/task_calendar.dart';
+import '../models/external_calendar.dart';
 import 'caldav_service.dart';
 import 's3_storage_service.dart';
 
@@ -22,6 +24,7 @@ import 's3_storage_service.dart';
 class UserSyncService {
   final UserRepository _userRepository;
   final ExternalAccountRepository _externalAccountRepository;
+  final ExternalCalendarRepository _externalCalendarRepository;
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
   
@@ -31,10 +34,12 @@ class UserSyncService {
   UserSyncService({
     required UserRepository userRepository,
     required ExternalAccountRepository externalAccountRepository,
+    required ExternalCalendarRepository externalCalendarRepository,
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
   }) : _userRepository = userRepository,
        _externalAccountRepository = externalAccountRepository,
+       _externalCalendarRepository = externalCalendarRepository,
        _accountRepository = accountRepository,
        _calendarRepository = calendarRepository;
 
@@ -377,17 +382,24 @@ class UserSyncService {
   Future<Result<void>> _uploadExternalCredentials(S3StorageService s3Service) async {
     try {
       final accountsResult = await _externalAccountRepository.getAll();
+      final calendarsResult = await _externalCalendarRepository.getAll();
+      
       return await accountsResult.when(
         success: (accounts) async {
-          final data = _serializeExternalCredentials(accounts);
-          final dataBytes = Uint8List.fromList(utf8.encode(data));
-          
-          return await s3Service.uploadFile(
-            key: _getExternalCredentialsPath(s3Service),
-            data: dataBytes,
-            isPrivate: true, // External credentials are always private
-            symmetricKey: 'dummy-key', // TODO: Use proper encryption key when encryption is implemented
-            contentType: 'application/json',
+          return await calendarsResult.when(
+            success: (calendars) async {
+              final data = _serializeExternalCredentials(accounts, calendars);
+              final dataBytes = Uint8List.fromList(utf8.encode(data));
+              
+              return await s3Service.uploadFile(
+                key: _getExternalCredentialsPath(s3Service),
+                data: dataBytes,
+                isPrivate: true, // External credentials are always private
+                symmetricKey: 'dummy-key', // TODO: Use proper encryption key when encryption is implemented
+                contentType: 'application/json',
+              );
+            },
+            failure: (failure) async => Result.failure(failure),
           );
         },
         failure: (failure) async => Result.failure(failure),
@@ -414,14 +426,19 @@ class UserSyncService {
         success: (data) async {
           try {
             final jsonString = utf8.decode(data);
-            final accounts = _deserializeExternalCredentials(jsonString);
+            final (accounts, calendars) = _deserializeExternalCredentials(jsonString);
             
             // Save each account
             for (final account in accounts) {
               await _externalAccountRepository.save(account);
             }
             
-            AppLogger.info('UserSyncService: Downloaded and saved ${accounts.length} external credentials');
+            // Save each calendar
+            for (final calendar in calendars) {
+              await _externalCalendarRepository.save(calendar);
+            }
+            
+            AppLogger.info('UserSyncService: Downloaded and saved ${accounts.length} external accounts and ${calendars.length} calendars');
             return Result.success(true);
           } catch (e, stackTrace) {
             AppLogger.error('UserSyncService: Failed to parse downloaded credentials', e, stackTrace);
@@ -480,22 +497,31 @@ class UserSyncService {
   }
 
   /// Serialize external credentials to JSON
-  String _serializeExternalCredentials(List<ExternalCaldavAccount> accounts) {
+  String _serializeExternalCredentials(List<ExternalCaldavAccount> accounts, List<ExternalCalendar> calendars) {
     final json = {
       'version': 1,
       'lastUpdated': DateTime.now().toIso8601String(),
       'accounts': accounts.map((account) => account.toJson()).toList(),
+      'calendars': calendars.map((calendar) => calendar.toJson()).toList(),
     };
     return jsonEncode(json);
   }
 
   /// Deserialize external credentials from JSON
-  List<ExternalCaldavAccount> _deserializeExternalCredentials(String jsonString) {
+  (List<ExternalCaldavAccount>, List<ExternalCalendar>) _deserializeExternalCredentials(String jsonString) {
     final json = jsonDecode(jsonString) as Map<String, dynamic>;
     final accountsJson = json['accounts'] as List<dynamic>? ?? [];
-    return accountsJson
+    final calendarsJson = json['calendars'] as List<dynamic>? ?? [];
+    
+    final accounts = accountsJson
         .map((account) => ExternalCaldavAccount.fromJson(account as Map<String, dynamic>))
         .toList();
+        
+    final calendars = calendarsJson
+        .map((calendar) => ExternalCalendar.fromJson(calendar as Map<String, dynamic>))
+        .toList();
+        
+    return (accounts, calendars);
   }
 
   /// Get last sync time

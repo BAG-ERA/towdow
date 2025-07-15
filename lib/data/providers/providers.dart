@@ -123,6 +123,7 @@ final userSyncServiceProvider = Provider<UserSyncService>((ref) {
   return UserSyncService(
     userRepository: ref.watch(userRepositoryProvider),
     externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
+    externalCalendarRepository: ref.watch(externalCalendarRepositoryProvider),
     accountRepository: ref.watch(accountRepositoryProvider),
     calendarRepository: ref.watch(calendarRepositoryProvider),
   );

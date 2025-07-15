@@ -261,12 +261,14 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
       
       final userRepository = ref.read(userRepositoryProvider);
       final externalAccountRepository = ref.read(externalAccountRepositoryProvider);
+      final externalCalendarRepository = ref.read(externalCalendarRepositoryProvider);
       final accountRepository = ref.read(accountRepositoryProvider);
       final calendarRepository = ref.read(calendarRepositoryProvider);
       
       final userSyncService = UserSyncService(
         userRepository: userRepository,
         externalAccountRepository: externalAccountRepository,
+        externalCalendarRepository: externalCalendarRepository,
         accountRepository: accountRepository,
         calendarRepository: calendarRepository,
       );
