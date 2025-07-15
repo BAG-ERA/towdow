@@ -9,6 +9,7 @@ import '../../data/services/domain_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/providers/providers.dart';
+import '../../data/services/capability_discovery_service.dart';
 
 // ----- STATE -----
 class ProjectCreationState {
@@ -79,9 +80,27 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
         failure: (failure) async {
           AppLogger.warning('ProjectCreationViewModel: Server creation failed, creating locally: ${failure.message}');
           wasCreatedLocally = true;
-          // Create local calendar with generated path
-          final timestamp = DateTime.now().millisecondsSinceEpoch;
-          final localPath = '/calendars/project_${timestamp}_${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}/';
+          
+          // Create local calendar using the same path structure the server would use
+          // First try to discover the calendar home to match server structure exactly
+          String localPath;
+          try {
+            final discoveryService = CapabilityDiscoveryService(account: account!);
+            final discoveryResult = await discoveryService.discoverCapabilities();
+            
+            final calendarHome = await discoveryResult.when(
+              success: (discoveryResult) async => discoveryResult.capabilities.calendarHome,
+              failure: (_) async => '/calendars/${account!.username}/', // Fallback
+            );
+            
+            localPath = '$calendarHome$uid/';
+            AppLogger.info('ProjectCreationViewModel: Using discovered calendar home for local calendar: $localPath');
+          } catch (e) {
+            // If discovery fails, use server-compatible fallback
+            localPath = '/calendars/${account!.username}/$uid/';
+            AppLogger.warning('ProjectCreationViewModel: Discovery failed, using fallback local path: $localPath');
+          }
+          
           createdCalendar = TaskCalendarFactory.createNew(
             path: localPath,
             displayName: name,
