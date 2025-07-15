@@ -25,6 +25,9 @@ import '../services/caldav_service.dart';
 import '../services/external_caldav_service.dart';
 import '../services/external_sync_service.dart';
 import '../services/export_import_service.dart';
+import '../services/offline_file_service.dart';
+import '../services/file_upload_queue_service.dart';
+import '../services/connection_monitor_service.dart';
 import '../../core/app_lifecycle_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -89,6 +92,29 @@ final caldavServiceProvider = Provider.family<CalDAVService, CaldavAccount>((ref
 // External CalDAV service provider
 final externalCalDAVServiceProvider = Provider.family<ExternalCalDAVService, ExternalCaldavAccount>((ref, account) {
   return ExternalCalDAVService(account: account);
+});
+
+// Offline file service provider
+final offlineFileServiceProvider = Provider<OfflineFileService>((ref) {
+  final storageService = ref.watch(localStorageServiceProvider);
+  return OfflineFileService(storageService);
+});
+
+/// File upload queue service provider
+final fileUploadQueueServiceProvider = Provider<FileUploadQueueService>((ref) {
+  return FileUploadQueueService(
+    localStorage: ref.watch(localStorageServiceProvider),
+    offlineFileService: ref.watch(offlineFileServiceProvider),
+    accountRepository: ref.watch(accountRepositoryProvider),
+    connectionMonitorService: ref.watch(connectionMonitorServiceProvider),
+    taskRepository: ref.watch(taskRepositoryProvider),
+    syncService: ref.watch(syncServiceProvider),
+  );
+});
+
+// Connection monitor service provider
+final connectionMonitorServiceProvider = Provider<ConnectionMonitorService>((ref) {
+  return ConnectionMonitorService();
 });
 
 // External calendar sync service provider
@@ -205,12 +231,16 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final syncService = ref.watch(syncServiceProvider);
   final backgroundSyncService = ref.watch(backgroundSyncServiceProvider);
   final externalSyncService = ref.watch(externalCalendarSyncServiceProvider);
+  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
+  final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
 
   final result = await lifecycleManager.initialize(
     syncService: syncService,
     backgroundSyncService: backgroundSyncService,
     externalSyncService: externalSyncService,
+    fileUploadQueueService: fileUploadQueueService,
+    connectionMonitorService: connectionMonitorService,
     accountRepository: accountRepository,
   );
 

@@ -11,7 +11,10 @@ import '../../data/repositories/account_repository.dart';
 import '../../data/services/s3_storage_service.dart';
 import '../../data/services/validator_service.dart';
 import '../../data/services/sync_service.dart';
+import '../../data/services/offline_file_service.dart';
+import '../../data/services/file_upload_queue_service.dart';
 import '../../data/providers/providers.dart';
+import '../../data/models/offline_file.dart';
 import '../../core/logger.dart';
 import '../../core/result.dart';
 
@@ -57,14 +60,18 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
   final SyncService? _syncService;
+  final OfflineFileService _offlineFileService;
+  final FileUploadQueueService _fileUploadQueueService;
 
   FileValidatorViewModel(
     this._taskRepository,
-    this._accountRepository, [
+    this._accountRepository,
+    this._offlineFileService,
+    this._fileUploadQueueService, [
     this._syncService,
   ]) : super(const FileValidatorState());
 
-  /// Upload a file to a validator
+  /// Upload a file to a validator (offline-first)
   Future<bool> uploadFile({
     required String taskUid,
     required String validatorId,
@@ -75,12 +82,15 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
     state = state.copyWith(isUploading: true, error: null);
 
     try {
+      AppLogger.info('FileValidatorViewModel: Starting file upload for $fileName');
+      
       // Get current user for permission check
       String? currentUserEmail;
       final accountResult = await _accountRepository.getActiveAccount();
       await accountResult.when(
         success: (account) async {
           currentUserEmail = account?.email ?? account?.username;
+          AppLogger.debug('FileValidatorViewModel: Current user: $currentUserEmail');
         },
         failure: (_) async {
           throw Exception('No active account found');
@@ -106,45 +116,29 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
         },
       );
 
-      // Get account for S3 service
-      final account = await accountResult.when(
-        success: (acc) async => acc!,
-        failure: (_) async => throw Exception('No active account found'),
-      );
-
-      // Create S3 service and upload file
-      final s3Service = S3StorageService(account: account);
+      AppLogger.info('FileValidatorViewModel: Storing file locally for task $taskUid');
       
-      // Generate file metadata
-      const uuid = Uuid();
-      final fileId = uuid.v4();
-      final userPrefix = s3Service.getUserPrefix();
-      
-      // Sanitize fileName to avoid S3 signature issues with special characters
-      final sanitizedFileName = _sanitizeFileName(fileName);
-      AppLogger.debug('FileValidatorViewModel.uploadFile: Original filename: $fileName');
-      AppLogger.debug('FileValidatorViewModel.uploadFile: Sanitized filename: $sanitizedFileName');
-      
-      // Build S3 path: {userPrefix}{taskUid}/{sanitizedFileName}
-      final s3Key = '$userPrefix$taskUid/$sanitizedFileName';
-      
-      // Upload to S3
-      final uploadResult = await s3Service.uploadFile(
-        key: s3Key,
-        data: fileData,
-        isPrivate: false, // Use shared bucket
+      // Store file locally first (offline-first approach)
+      final offlineFileResult = await _offlineFileService.storeFileLocally(
+        taskUid: taskUid,
+        validatorId: validatorId,
+        fileName: fileName,
+        fileData: fileData,
         contentType: contentType,
       );
 
-      final success = await uploadResult.when(
-        success: (fileUrl) async {
-          // Create file info
+      final success = await offlineFileResult.when(
+        success: (offlineFile) async {
+          AppLogger.info('FileValidatorViewModel: File stored locally with ID: ${offlineFile.id}');
+          
+          // Create file info for validator (using offline file ID)
           final fileInfo = {
-            'id': fileId,
+            'id': offlineFile.id,
             'name': fileName,
             'size': fileData.length,
             'contentType': contentType,
-            's3Key': s3Key,
+            'offlineFileId': offlineFile.id,
+            'status': 'local', // Indicates file is stored locally
             'uploadedAt': DateTime.now().toIso8601String(),
           };
 
@@ -168,6 +162,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
           final saveResult = await _taskRepository.save(updatedTask);
           await saveResult.when(
             success: (_) async {
+              AppLogger.info('FileValidatorViewModel: Task updated successfully');
               await _queueSyncOperation(updatedTask);
             },
             failure: (failure) async {
@@ -175,14 +170,26 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
             },
           );
 
+          // Queue file for upload
+          AppLogger.info('FileValidatorViewModel: Queueing file for upload: ${offlineFile.id}');
+          final queueResult = await _fileUploadQueueService.queueFileUpload(offlineFile.id);
+          await queueResult.when(
+            success: (_) async {
+              AppLogger.info('FileValidatorViewModel: File successfully queued for upload');
+            },
+            failure: (failure) async {
+              AppLogger.error('FileValidatorViewModel: Failed to queue file for upload: ${failure.message}');
+            },
+          );
+
           state = state.copyWith(
             isUploading: false,
-            successMessage: 'File uploaded successfully',
+            successMessage: 'File added successfully (will upload when online)',
           );
           return true;
         },
         failure: (failure) async {
-          throw Exception('File upload failed: ${failure.message}');
+          throw Exception('Failed to store file locally: ${failure.message}');
         },
       );
 
@@ -201,7 +208,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
   Future<Uint8List?> downloadFileBytes({
     required String fileId,
     required String fileName,
-    required String s3Key,
+    String? s3Key,
   }) async {
     state = state.copyWith(
       isDownloading: true,
@@ -210,34 +217,26 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
     );
 
     try {
-      // Get account for S3 service
-      final accountResult = await _accountRepository.getActiveAccount();
-      final account = await accountResult.when(
-        success: (acc) async => acc!,
-        failure: (_) async => throw Exception('No active account found'),
-      );
-
-      // Create S3 service and download file
-      final s3Service = S3StorageService(account: account);
+      // First try to get file from local storage (offline-first)
+      final localFileResult = await _offlineFileService.readLocalFile(fileId);
       
-      // Download from S3
-      final downloadResult = await s3Service.downloadFile(
-        key: s3Key,
-        isPrivate: false, // Use shared bucket
-      );
-
-      final fileBytes = await downloadResult.when(
+      final fileBytes = await localFileResult.when(
         success: (data) async {
           state = state.copyWith(
             isDownloading: false,
             downloadingFileId: null,
             successMessage: 'File ready for download',
           );
-          
           return data;
         },
         failure: (failure) async {
-          throw Exception('Download failed: ${failure.message}');
+          // If local file not found, try to download from S3
+          if (s3Key != null) {
+            AppLogger.debug('FileValidatorViewModel: Local file not found, trying S3 download');
+            return await _downloadFromS3(s3Key);
+          } else {
+            throw Exception('File not available locally and no S3 key provided');
+          }
         },
       );
 
@@ -251,6 +250,39 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
       );
       return null;
     }
+  }
+
+  /// Download file from S3 (fallback when local file not available)
+  Future<Uint8List> _downloadFromS3(String s3Key) async {
+    // Get account for S3 service
+    final accountResult = await _accountRepository.getActiveAccount();
+    final account = await accountResult.when(
+      success: (acc) async => acc!,
+      failure: (_) async => throw Exception('No active account found'),
+    );
+
+    // Create S3 service and download file
+    final s3Service = S3StorageService(account: account);
+    
+    // Download from S3
+    final downloadResult = await s3Service.downloadFile(
+      key: s3Key,
+      isPrivate: false, // Use shared bucket
+    );
+
+    return await downloadResult.when(
+      success: (data) async {
+        state = state.copyWith(
+          isDownloading: false,
+          downloadingFileId: null,
+          successMessage: 'File downloaded from server',
+        );
+        return data;
+      },
+      failure: (failure) async {
+        throw Exception('S3 download failed: ${failure.message}');
+      },
+    );
   }
 
   /// Download a file from a validator (legacy method for desktop platforms)
@@ -368,6 +400,12 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
         },
       );
 
+      // Remove offline file if it exists
+      await _offlineFileService.deleteOfflineFile(fileId);
+      
+      // Remove from upload queue if it exists
+      await _fileUploadQueueService.removeFromQueue(fileId);
+
       // Update validator by removing file
       final validatorLists = ValidatorService.parseValidators(task.flowitValidator);
       final updatedValidatorLists = ValidatorService.updateValidatorState(
@@ -456,6 +494,8 @@ final fileValidatorViewModelProvider = StateNotifierProvider.family<FileValidato
   (ref, taskUid) => FileValidatorViewModel(
     ref.watch(taskRepositoryProvider),
     ref.watch(accountRepositoryProvider),
+    ref.watch(offlineFileServiceProvider),
+    ref.watch(fileUploadQueueServiceProvider),
     ref.watch(syncServiceProvider),
   ),
 ); 

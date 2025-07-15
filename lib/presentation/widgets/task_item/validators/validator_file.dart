@@ -117,6 +117,7 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
     final fileSize = file['size'] as int? ?? 0;
     final uploadedAt = file['uploadedAt'] as String?;
     final fileId = file['id'] as String;
+    final fileStatus = file['status'] as String? ?? 'uploaded'; // 'local', 'uploading', 'uploaded', 'failed'
     
     final isDownloadingThis = fileValidatorState.isDownloading && 
                              fileValidatorState.downloadingFileId == fileId;
@@ -159,7 +160,23 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
-                    if (uploadedAt != null) ...[
+                    Text(
+                      ' • ',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    // Show file status
+                    Text(
+                      _getStatusText(fileStatus),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: _getStatusColor(fileStatus, context),
+                        fontWeight: fileStatus == 'local' ? FontWeight.w500 : FontWeight.normal,
+                      ),
+                    ),
+                    if (uploadedAt != null && fileStatus == 'uploaded') ...[
                       Text(
                         ' • ',
                         style: TextStyle(
@@ -274,19 +291,14 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
   Future<void> _downloadFile(Map<String, dynamic> file) async {
     final fileId = file['id'] as String;
     final fileName = file['name'] as String? ?? 'download';
-    final s3Key = file['s3Key'] as String?;
+    final s3Key = file['s3Key'] as String?; // May be null for offline files
 
-    if (s3Key == null) {
-      _showErrorSnackbar('File download information not available');
-      return;
-    }
-
-    // Call ViewModel to handle download and get file bytes
+    // Call ViewModel to handle download and get file bytes (offline-first)
     final downloadResult = await ref.read(fileValidatorViewModelProvider(widget.taskUid).notifier)
         .downloadFileBytes(
           fileId: fileId,
           fileName: fileName,
-          s3Key: s3Key,
+          s3Key: s3Key, // Optional for offline files
         );
 
     if (downloadResult == null) {
@@ -601,6 +613,36 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
       }
     } catch (e) {
       return 'Unknown';
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'local':
+        return 'Local (will upload)';
+      case 'uploading':
+        return 'Uploading...';
+      case 'uploaded':
+        return 'Uploaded';
+      case 'failed':
+        return 'Upload failed';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  Color _getStatusColor(String status, BuildContext context) {
+    switch (status) {
+      case 'local':
+        return Theme.of(context).colorScheme.primary;
+      case 'uploading':
+        return Theme.of(context).colorScheme.secondary;
+      case 'uploaded':
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
+      case 'failed':
+        return Theme.of(context).colorScheme.error;
+      default:
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
     }
   }
 

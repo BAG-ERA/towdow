@@ -64,29 +64,53 @@ class ValidatorService {
     return true;
   }
   
-  /// Update validator state by ID
+  /// Update validator state
   static List<List<Map<String, dynamic>>> updateValidatorState(
     List<List<Map<String, dynamic>>> validatorLists,
     String validatorId,
-    dynamic newState,
+    Map<String, dynamic> newState,
   ) {
-    final updatedLists = <List<Map<String, dynamic>>>[];
+    AppLogger.debug('ValidatorService: updateValidatorState called with validatorId: $validatorId');
+    AppLogger.debug('ValidatorService: newState: $newState');
     
-    for (final validatorList in validatorLists) {
-      final updatedList = <Map<String, dynamic>>[];
-      
-      for (final validator in validatorList) {
+    return validatorLists.map((validatorList) {
+      return validatorList.map((validator) {
         if (validator['id'] == validatorId) {
-          updatedList.add(_updateValidatorData(validator, newState));
-        } else {
-          updatedList.add(Map<String, dynamic>.from(validator));
+          AppLogger.debug('ValidatorService: Found validator to update: ${validator['id']}');
+          AppLogger.debug('ValidatorService: Current validator state: $validator');
+          
+          final type = newState['type'] as String;
+          AppLogger.debug('ValidatorService: Update type: $type');
+          
+          Map<String, dynamic> updated = Map.from(validator);
+          
+          switch (type) {
+            case 'toggle':
+              updated['completed'] = newState['completed'];
+              break;
+            case 'update_text':
+              updated['text'] = newState['text'];
+              break;
+            case 'add_file':
+              final updatedValidator = _addFile(updated, newState);
+              AppLogger.debug('ValidatorService: After add_file: $updatedValidator');
+              return updatedValidator;
+            case 'remove_file':
+              final updatedValidator = _removeFile(updated, newState);
+              AppLogger.debug('ValidatorService: After remove_file: $updatedValidator');
+              return updatedValidator;
+            case 'update_file_s3':
+              final updatedValidator = _updateFileS3(updated, newState);
+              AppLogger.debug('ValidatorService: After update_file_s3: $updatedValidator');
+              return updatedValidator;
+          }
+          
+          AppLogger.debug('ValidatorService: Updated validator: $updated');
+          return updated;
         }
-      }
-      
-      updatedLists.add(updatedList);
-    }
-    
-    return updatedLists;
+        return validator;
+      }).toList();
+    }).toList();
   }
   
   /// Add validator to first list (or create first list if needed)
@@ -343,6 +367,8 @@ class ValidatorService {
           return _addFile(updated, newState);
         case 'remove_file':
           return _removeFile(updated, newState);
+        case 'update_file_s3':
+          return _updateFileS3(updated, newState);
       }
     }
     
@@ -481,5 +507,38 @@ class ValidatorService {
         .where((file) => file['id'] != fileId)
         .toList();
     return {...validator, 'files': files};
+  }
+
+  static Map<String, dynamic> _updateFileS3(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    AppLogger.debug('ValidatorService: _updateFileS3 called');
+    AppLogger.debug('ValidatorService: validator: $validator');
+    AppLogger.debug('ValidatorService: newState: $newState');
+    
+    final offlineFileId = newState['offlineFileId'] as String;
+    final s3Key = newState['s3Key'] as String;
+    final s3Url = newState['s3Url'] as String;
+    final status = newState['status'] as String;
+    
+    AppLogger.debug('ValidatorService: Looking for offlineFileId: $offlineFileId');
+    
+    final files = (validator['files'] as List? ?? []).map((file) {
+      AppLogger.debug('ValidatorService: Checking file: $file');
+      if (file['offlineFileId'] == offlineFileId) {
+        AppLogger.debug('ValidatorService: Found matching file, updating with S3 info');
+        final updatedFile = {
+          ...file,
+          's3Key': s3Key,
+          's3Url': s3Url,
+          'status': status,
+        };
+        AppLogger.debug('ValidatorService: Updated file: $updatedFile');
+        return updatedFile;
+      }
+      return file;
+    }).toList();
+    
+    final result = {...validator, 'files': files};
+    AppLogger.debug('ValidatorService: _updateFileS3 result: $result');
+    return result;
   }
 } 
