@@ -8,6 +8,7 @@ import 'package:towdow_app/data/services/capability_discovery_service.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/services/local_storage_service.dart';
+import 'package:towdow_app/data/services/user_sync_service.dart';
 import 'package:towdow_app/presentation/viewmodels/calendar_selection_viewmodel.dart';
 
 import 'calendar_selection_viewmodel_test.mocks.dart';
@@ -18,6 +19,7 @@ import 'calendar_selection_viewmodel_test.mocks.dart';
   AccountRepository,
   CalendarRepository,
   LocalStorageService,
+  UserSyncService,
 ])
 void main() {
   group('CalendarSelectionViewModel Tests', () {
@@ -27,6 +29,7 @@ void main() {
     late MockAccountRepository mockAccountRepository;
     late MockCalendarRepository mockCalendarRepository;
     late MockLocalStorageService mockLocalStorageService;
+    late MockUserSyncService mockUserSyncService;
     late CaldavAccount testAccount;
     late TaskCalendar testCalendar;
 
@@ -36,6 +39,7 @@ void main() {
       mockAccountRepository = MockAccountRepository();
       mockCalendarRepository = MockCalendarRepository();
       mockLocalStorageService = MockLocalStorageService();
+      mockUserSyncService = MockUserSyncService();
 
       testAccount = CaldavAccount(
         id: 'test-account',
@@ -59,6 +63,7 @@ void main() {
         accountRepository: mockAccountRepository,
         calendarRepository: mockCalendarRepository,
         localStorageService: mockLocalStorageService,
+        userSyncService: mockUserSyncService,
       );
     });
 
