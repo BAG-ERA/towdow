@@ -1,7 +1,9 @@
 // EnhancedTextViewModel handles real-time markdown parsing for text fields
-// Supports GitHub Flavored Markdown patterns like **bold**
+// Supports GitHub Flavored Markdown patterns like **bold** and URL detection
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EnhancedTextViewModel extends ChangeNotifier {
   String _rawText = '';
@@ -44,14 +46,13 @@ class EnhancedTextViewModel extends ChangeNotifier {
     return spans;
   }
 
-  /// Parse inline markdown patterns (bold, etc.)
+  /// Parse inline markdown patterns (bold, URLs, etc.)
   List<TextSpan> _parseInlineMarkdown(String text, TextStyle baseStyle) {
     final spans = <TextSpan>[];
-    final regex = RegExp(r'\*\*(.*?)\*\*'); // Bold pattern: **text**
-    
+    // Combined regex: match URLs, email addresses, phone numbers, or **bold**
+    final combinedRegex = RegExp(r'([a-zA-Z]+://[^\s]+)|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|(\+?[\d\s\-\(\)]{7,})|(\*\*(.*?)\*\*)');
     int lastEnd = 0;
-    
-    for (final match in regex.allMatches(text)) {
+    for (final match in combinedRegex.allMatches(text)) {
       // Add text before the match
       if (match.start > lastEnd) {
         spans.add(TextSpan(
@@ -59,16 +60,52 @@ class EnhancedTextViewModel extends ChangeNotifier {
           style: baseStyle,
         ));
       }
-      
-      // Add bold text
-      spans.add(TextSpan(
-        text: match.group(1) ?? '',
-        style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-      ));
-      
+      if (match.group(1) != null) {
+        // URL match
+        final url = match.group(1)!;
+        spans.add(TextSpan(
+          text: url,
+          style: baseStyle.copyWith(
+            color: Colors.blue,
+            decoration: TextDecoration.underline,
+          ),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () => _launchUrl(url),
+        ));
+      } else if (match.group(2) != null) {
+        // Email match
+        final email = match.group(2)!;
+        spans.add(TextSpan(
+          text: email,
+          style: baseStyle.copyWith(
+            color: Colors.blue,
+            decoration: TextDecoration.underline,
+          ),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () => _launchUrl('mailto:$email'),
+        ));
+      } else if (match.group(3) != null) {
+        // Phone number match
+        final phone = match.group(3)!;
+        spans.add(TextSpan(
+          text: phone,
+          style: baseStyle.copyWith(
+            color: Colors.blue,
+            decoration: TextDecoration.underline,
+          ),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () => _launchUrl('tel:${phone.replaceAll(RegExp(r'[\s\-\(\)]'), '')}'),
+        ));
+      } else if (match.group(4) != null) {
+        // Bold match
+        final boldText = match.group(5) ?? '';
+        spans.add(TextSpan(
+          text: boldText,
+          style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+        ));
+      }
       lastEnd = match.end;
     }
-    
     // Add remaining text
     if (lastEnd < text.length) {
       spans.add(TextSpan(
@@ -76,8 +113,15 @@ class EnhancedTextViewModel extends ChangeNotifier {
         style: baseStyle,
       ));
     }
-    
     return spans;
+  }
+
+  /// Launch URL using url_launcher package
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   /// Convert formatted text back to markdown for storage

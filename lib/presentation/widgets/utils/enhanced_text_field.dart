@@ -89,8 +89,9 @@ class _EnhancedTextFieldState extends State<EnhancedTextField> {
       if (event.logicalKey == LogicalKeyboardKey.space) {
         _handleCharacterInput(' ');
       } else if (event.logicalKey == LogicalKeyboardKey.enter) {
-        if (HardwareKeyboard.instance.isAltPressed) {
-          _handleCharacterInput('\n'); // Alt+Enter for line break
+        if (HardwareKeyboard.instance.isControlPressed) {
+          // Ctrl+Enter: Save description
+          widget.onSubmitted?.call(_controller.text);
         } else {
           _handleCharacterInput('\n'); // Regular Enter
         }
@@ -162,28 +163,32 @@ class _EnhancedTextFieldState extends State<EnhancedTextField> {
                 )
               : RichText(
                   textAlign: widget.textAlign,
-                  text: TextSpan(children: spans),
+                  text: TextSpan(style: textStyle, children: spans),
                 ),
         ),
       );
     } else {
       // Edit mode: Show editable TextField
-      return TextField(
-        controller: _controller,
+      return KeyboardListener(
         focusNode: _focusNode,
-        decoration: widget.decoration ?? const InputDecoration(
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
+        onKeyEvent: _onKeyEvent,
+        child: TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          decoration: widget.decoration ?? const InputDecoration(
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
+          ),
+          style: textStyle,
+          maxLines: widget.maxLines,
+          autofocus: widget.autofocus,
+          enabled: widget.enabled,
+          readOnly: false,
+          textAlign: widget.textAlign,
+          onChanged: _onTextChanged,
+          onSubmitted: widget.onSubmitted,
+          onTap: () => widget.onTap?.call(),
         ),
-        style: textStyle,
-        maxLines: widget.maxLines,
-        autofocus: widget.autofocus,
-        enabled: widget.enabled,
-        readOnly: false,
-        textAlign: widget.textAlign,
-        onChanged: _onTextChanged,
-        onSubmitted: widget.onSubmitted,
-        onTap: () => widget.onTap?.call(),
       );
     }
   }
