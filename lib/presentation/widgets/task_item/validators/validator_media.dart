@@ -7,10 +7,12 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../viewmodels/media_validator_viewmodel.dart';
 import '../../../../core/logger.dart';
 import '../../../../data/services/offline_file_service.dart';
 import '../../../../data/providers/providers.dart';
+import '../../../../data/models/offline_file.dart';
 
 class ValidatorMedia extends ConsumerStatefulWidget {
   final Map<String, dynamic> validator;
@@ -125,115 +127,123 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
                              mediaValidatorState.downloadingFileId == fileId;
     
     return Container(
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         border: Border.all(
           color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
         ),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Media thumbnail instead of icon
+          // Large media thumbnail spanning full width
           _buildMediaThumbnail(file, fileId, validatorId),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          
+          // File info and actions section
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               children: [
-                // Show file info instead of filename for better UX
-                Row(
-                  children: [
-                    Text(
-                      _formatFileSize(fileSize),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Theme.of(context).colorScheme.onSurface,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Show file info instead of filename for better UX
+                      Row(
+                        children: [
+                          Text(
+                            _formatFileSize(fileSize),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          Text(
+                            ' • ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                          Text(
+                            _getFileTypeText(fileName),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    Text(
-                      ' • ',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                    ),
-                    Text(
-                      _getFileTypeText(fileName),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    // Show file status
-                    Text(
-                      _getStatusText(fileStatus),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: _getStatusColor(fileStatus, context),
-                        fontWeight: fileStatus == 'local' ? FontWeight.w500 : FontWeight.normal,
-                      ),
-                    ),
-                    if (uploadedAt != null && fileStatus == 'uploaded') ...[
-                      Text(
-                        ' • ',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      Text(
-                        _formatUploadDate(uploadedAt),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          // Show file status
+                          Text(
+                            _getStatusText(fileStatus),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _getStatusColor(fileStatus, context),
+                              fontWeight: fileStatus == 'local' ? FontWeight.w500 : FontWeight.normal,
+                            ),
+                          ),
+                          if (uploadedAt != null && fileStatus == 'uploaded') ...[
+                            Text(
+                              ' • ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                              ),
+                            ),
+                            Text(
+                              _formatUploadDate(uploadedAt),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
-                  ],
+                  ),
                 ),
+                const SizedBox(width: 8),
+                
+                // Action buttons
+                // Download button
+                IconButton(
+                  onPressed: isDownloadingThis ? null : () => _downloadMediaFile(file, validatorId),
+                  icon: isDownloadingThis
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.download, size: 16),
+                  tooltip: 'Download',
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(32, 32),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+                
+                // Delete button (only for organizer)
+                if (widget.isOrganizer) ...[
+                  IconButton(
+                    onPressed: () => _removeMediaFile(validatorId, fileId),
+                    icon: const Icon(Icons.delete_outline, size: 16),
+                    tooltip: 'Remove',
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(32, 32),
+                      padding: EdgeInsets.zero,
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          
-          // Action buttons
-          // Download button
-          IconButton(
-            onPressed: isDownloadingThis ? null : () => _downloadMediaFile(file, validatorId),
-            icon: isDownloadingThis
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.download, size: 16),
-            tooltip: 'Download',
-            style: IconButton.styleFrom(
-              minimumSize: const Size(32, 32),
-              padding: EdgeInsets.zero,
-            ),
-          ),
-          
-          // Delete button (only for organizer)
-          if (widget.isOrganizer) ...[
-            IconButton(
-              onPressed: () => _removeMediaFile(validatorId, fileId),
-              icon: const Icon(Icons.delete_outline, size: 16),
-              tooltip: 'Remove',
-              style: IconButton.styleFrom(
-                minimumSize: const Size(32, 32),
-                padding: EdgeInsets.zero,
-                foregroundColor: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -592,29 +602,78 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
         file: file,
         validatorId: validatorId,
         taskUid: widget.taskUid,
-        onTap: () => _downloadMediaFile(file, validatorId),
+        onTap: () => _showFullScreenImage(file, validatorId),
+        isLarge: true,
       );
     }
     
-    // For non-image files, show styled icon container
+    // For non-image files, show styled icon container spanning full width
     return GestureDetector(
       onTap: () => _downloadMediaFile(file, validatorId),
       child: Container(
-        width: 48,
-        height: 48,
+        width: double.infinity,
+        height: 120,
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-            width: 1,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(7),
+            topRight: Radius.circular(7),
           ),
         ),
         child: Icon(
           _getMediaIcon(fileName),
-          size: 24,
+          size: 48,
           color: Theme.of(context).colorScheme.primary,
         ),
+      ),
+    );
+  }
+
+  /// Show full screen image viewer dialog
+  Future<void> _showFullScreenImage(Map<String, dynamic> file, String validatorId) async {
+    final fileId = file['id'] as String;
+    final fileName = file['name'] as String? ?? 'Unknown file';
+    final s3Key = file['s3Key'] as String?;
+
+    // First try to get image from local cache
+    final offlineFileService = ref.read(offlineFileServiceProvider);
+    final localResult = await offlineFileService.readLocalFile(fileId);
+    
+    Uint8List? imageData;
+    await localResult.when(
+      success: (data) async {
+        imageData = data;
+      },
+      failure: (_) async {
+        // If not in local cache, download from S3
+        imageData = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
+            .downloadMediaFileBytes(
+              fileId: fileId,
+              fileName: fileName,
+              validatorId: validatorId,
+              s3Key: s3Key,
+            );
+      },
+    );
+
+    if (imageData == null) {
+      _showErrorSnackbar('Failed to load image');
+      return;
+    }
+
+    if (!mounted) return;
+
+    // Show full screen image dialog
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) => _FullScreenImageDialog(
+        imageData: imageData!,
+        fileName: fileName,
+        onDownload: () {
+          Navigator.of(context).pop();
+          _downloadMediaFile(file, validatorId);
+        },
       ),
     );
   }
@@ -655,6 +714,166 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
   }
 }
 
+/// Full screen image viewer dialog
+class _FullScreenImageDialog extends StatelessWidget {
+  final Uint8List imageData;
+  final String fileName;
+  final VoidCallback onDownload;
+
+  const _FullScreenImageDialog({
+    required this.imageData,
+    required this.fileName,
+    required this.onDownload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog.fullscreen(
+      backgroundColor: Colors.black87,
+      child: Stack(
+        children: [
+          // Main image area - center the image and allow zoom
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Center(
+              child: InteractiveViewer(
+                panEnabled: true,
+                scaleEnabled: true,
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: GestureDetector(
+                  onTap: () {}, // Prevent tap from bubbling up to parent GestureDetector
+                  child: Image.memory(
+                    imageData,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.broken_image,
+                              size: 64,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Failed to load image',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          // Top bar with close and actions
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 8,
+                left: 16,
+                right: 16,
+                bottom: 16,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black54,
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+              child: Row(
+                children: [
+                  // Close button
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black26,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // File name
+                  Expanded(
+                    child: Text(
+                      fileName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  
+                  // Download button
+                  IconButton(
+                    onPressed: onDownload,
+                    icon: const Icon(Icons.download, color: Colors.white),
+                    tooltip: 'Download',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black26,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Bottom instruction text
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                bottom: MediaQuery.of(context).padding.bottom + 16,
+                top: 16,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black54,
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+              child: Text(
+                'Pinch to zoom • Tap to close',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Separate widget for image thumbnails to avoid state conflicts
 class _ImageThumbnail extends ConsumerStatefulWidget {
   final String fileId;
@@ -663,6 +882,7 @@ class _ImageThumbnail extends ConsumerStatefulWidget {
   final String validatorId;
   final String taskUid;
   final VoidCallback onTap;
+  final bool isLarge;
 
   const _ImageThumbnail({
     required this.fileId,
@@ -671,6 +891,7 @@ class _ImageThumbnail extends ConsumerStatefulWidget {
     required this.validatorId,
     required this.taskUid,
     required this.onTap,
+    this.isLarge = false,
   });
 
   @override
@@ -711,14 +932,100 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
         },
         failure: (failure) async {
           AppLogger.debug('_ImageThumbnail: Failed to load local file ${widget.fileId}: ${failure.message}');
-          setState(() {
-            _isLoading = false;
-            _hasError = true;
-          });
+          // Try to download and cache the image from S3
+          await _downloadAndCacheImage();
         },
       );
     } catch (e) {
       AppLogger.debug('_ImageThumbnail: Error loading image data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
+    }
+  }
+
+  /// Download image from S3 and cache it locally for future use
+  Future<void> _downloadAndCacheImage() async {
+    try {
+      final s3Key = widget.file['s3Key'] as String?;
+      if (s3Key == null) {
+        AppLogger.debug('_ImageThumbnail: No S3 key available for ${widget.fileId}');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+          });
+        }
+        return;
+      }
+
+      // Download image bytes without triggering additional local file creation
+      final downloadResult = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
+          .downloadMediaFileBytes(
+            fileId: widget.fileId,
+            fileName: widget.fileName,
+            validatorId: widget.validatorId,
+            s3Key: s3Key,
+          );
+
+      if (downloadResult != null && mounted) {
+        // Now manually cache this with the correct fileId to avoid duplicates
+        final offlineFileService = ref.read(offlineFileServiceProvider);
+        final localStorage = ref.read(localStorageServiceProvider);
+        final fileName = widget.file['name'] as String? ?? widget.fileName;
+        final contentType = widget.file['contentType'] as String? ?? 'image/jpeg';
+        
+        // Create offline file metadata with the original fileId
+        final appDocDir = await getApplicationDocumentsDirectory();
+        final offlineFilesDir = Directory('${appDocDir.path}/offline_files');
+        if (!await offlineFilesDir.exists()) {
+          await offlineFilesDir.create(recursive: true);
+        }
+        
+        final sanitizedFileName = fileName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+        final localPath = '${offlineFilesDir.path}/${widget.fileId}_$sanitizedFileName';
+        
+        // Write file to local storage
+        final localFile = File(localPath);
+        await localFile.writeAsBytes(downloadResult);
+        
+        // Create offline file metadata
+        final offlineFile = OfflineFile(
+          id: widget.fileId,
+          taskUid: widget.taskUid,
+          validatorId: widget.validatorId,
+          fileName: fileName,
+          localPath: localPath,
+          fileSize: downloadResult.length,
+          contentType: contentType,
+          createdAt: DateTime.now(),
+          status: OfflineFileStatus.uploaded, // Mark as uploaded since it came from S3
+          s3Key: s3Key,
+        );
+        
+        // Store metadata in Hive with the original fileId
+        await localStorage.put(
+          'offline_files',
+          widget.fileId,
+          offlineFile,
+        );
+
+        setState(() {
+          _imageData = downloadResult;
+          _isLoading = false;
+          _hasError = false;
+        });
+      } else if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
+    } catch (e) {
+      AppLogger.debug('_ImageThumbnail: Failed to download and cache image: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -733,17 +1040,29 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        width: 48,
-        height: 48,
+        width: widget.isLarge ? double.infinity : 48,
+        height: widget.isLarge ? 120 : 48,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-            width: 1,
-          ),
+          borderRadius: widget.isLarge 
+              ? const BorderRadius.only(
+                  topLeft: Radius.circular(7),
+                  topRight: Radius.circular(7),
+                )
+              : BorderRadius.circular(6),
+          border: widget.isLarge 
+              ? null 
+              : Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                  width: 1,
+                ),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: widget.isLarge 
+              ? const BorderRadius.only(
+                  topLeft: Radius.circular(7),
+                  topRight: Radius.circular(7),
+                )
+              : BorderRadius.circular(5),
           child: _buildContent(context),
         ),
       ),
