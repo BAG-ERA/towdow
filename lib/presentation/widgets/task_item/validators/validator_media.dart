@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:camera/camera.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../viewmodels/media_validator_viewmodel.dart';
 import '../../../../core/logger.dart';
 import '../../../../data/services/offline_file_service.dart';
@@ -94,15 +96,15 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
           Row(
             children: [
               ElevatedButton.icon(
-                onPressed: mediaValidatorState.isUploading ? null : () => _uploadMediaFile(validatorId),
+                onPressed: mediaValidatorState.isUploading ? null : () => _showMediaUploadOptions(validatorId),
                 icon: mediaValidatorState.isUploading 
                     ? const SizedBox(
                         width: 16, 
                         height: 16, 
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.upload_file, size: 16),
-                label: Text(mediaValidatorState.isUploading ? 'Uploading...' : 'Upload Media'),
+                    : const Icon(Icons.add_photo_alternate, size: 16),
+                label: Text(mediaValidatorState.isUploading ? 'Uploading...' : 'Add Media'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   minimumSize: Size.zero,
@@ -247,6 +249,104 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
         ],
       ),
     );
+  }
+
+  /// Show media upload options (camera or file picker)
+  Future<void> _showMediaUploadOptions(String validatorId) async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take Photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _takePicture(validatorId);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _uploadMediaFile(validatorId);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Take a picture with the camera
+  Future<void> _takePicture(String validatorId) async {
+    try {
+      // Check camera permission
+      final status = await Permission.camera.request();
+      if (status != PermissionStatus.granted) {
+        _showErrorSnackbar('Camera permission is required to take photos');
+        return;
+      }
+
+      // Get available cameras
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        _showErrorSnackbar('No camera available on this device');
+        return;
+      }
+
+      if (!mounted) return;
+
+      // Navigate to camera screen
+      final result = await Navigator.push<XFile?>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => _CameraScreen(camera: cameras.first),
+        ),
+      );
+
+      if (result != null) {
+        // Read the captured image
+        final imageBytes = await result.readAsBytes();
+        final fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+        // Upload the captured image
+        await _uploadMediaFileWithData(
+          validatorId: validatorId,
+          fileName: fileName,
+          fileData: imageBytes,
+          contentType: 'image/jpeg',
+        );
+      }
+    } catch (e) {
+      _showErrorSnackbar('Failed to take picture: $e');
+    }
+  }
+
+  /// Upload media file with provided data (used for camera captures)
+  Future<void> _uploadMediaFileWithData({
+    required String validatorId,
+    required String fileName,
+    required Uint8List fileData,
+    required String contentType,
+  }) async {
+    // Call ViewModel to handle upload
+    final success = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
+        .uploadMediaFile(
+          taskUid: widget.taskUid,
+          validatorId: validatorId,
+          fileName: fileName,
+          fileData: fileData,
+          contentType: contentType,
+        );
+
+    // If upload succeeded, notify parent to refresh validator data
+    if (success) {
+      // Notify parent that task was updated so it can refresh the validator data
+      widget.onValidatorUpdated(validatorId, {'type': 'refresh'});
+    }
   }
 
   Future<void> _uploadMediaFile(String validatorId) async {
@@ -871,6 +971,112 @@ class _FullScreenImageDialog extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Camera screen for taking photos
+class _CameraScreen extends StatefulWidget {
+  final CameraDescription camera;
+
+  const _CameraScreen({required this.camera});
+
+  @override
+  State<_CameraScreen> createState() => _CameraScreenState();
+}
+
+class _CameraScreenState extends State<_CameraScreen> {
+  late CameraController _controller;
+  late Future<void> _initializeControllerFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = CameraController(
+      widget.camera,
+      ResolutionPreset.high,
+    );
+    _initializeControllerFuture = _controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Take Photo',
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+      body: FutureBuilder<void>(
+        future: _initializeControllerFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            return Stack(
+              children: [
+                // Camera preview
+                Positioned.fill(
+                  child: CameraPreview(_controller),
+                ),
+                
+                // Capture button
+                Positioned(
+                  bottom: 30,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: FloatingActionButton(
+                      onPressed: _takePicture,
+                      backgroundColor: Colors.white,
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.black,
+                        size: 30,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          } else {
+            return const Center(
+              child: CircularProgressIndicator(
+                color: Colors.white,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _takePicture() async {
+    try {
+      await _initializeControllerFuture;
+      final image = await _controller.takePicture();
+      
+      if (mounted) {
+        Navigator.of(context).pop(image);
+      }
+    } catch (e) {
+      AppLogger.error('CameraScreen: Failed to take picture', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to take picture: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 
