@@ -83,56 +83,6 @@ class _EnhancedTextFieldState extends State<EnhancedTextField> {
     widget.onChanged?.call(text);
   }
 
-  void _onKeyEvent(KeyEvent event) {
-    if (event is KeyDownEvent) {
-      // Handle character input and special keys
-      if (event.logicalKey == LogicalKeyboardKey.space) {
-        _handleCharacterInput(' ');
-      } else if (event.logicalKey == LogicalKeyboardKey.enter) {
-        if (HardwareKeyboard.instance.isControlPressed) {
-          // Ctrl+Enter: Save description
-          widget.onSubmitted?.call(_controller.text);
-        } else {
-          _handleCharacterInput('\n'); // Regular Enter
-        }
-      }
-      // Handle regular character input for other keys
-      else if (event.character != null && event.character!.isNotEmpty) {
-        _handleCharacterInput(event.character!);
-      }
-      
-      // Handle keyboard shortcuts
-      if (HardwareKeyboard.instance.isControlPressed) {
-        switch (event.logicalKey) {
-          case LogicalKeyboardKey.keyA:
-            _handleSelectAll();
-            break;
-          case LogicalKeyboardKey.keyC:
-            _handleCopy();
-            break;
-          case LogicalKeyboardKey.keyV:
-            _handlePaste();
-            break;
-          case LogicalKeyboardKey.keyX:
-            _handleCut();
-            break;
-        }
-      }
-    }
-  }
-
-  void _handleCharacterInput(String character) {
-    // Add character to controller text
-    final currentText = _controller.text;
-    final newText = currentText + character;
-    _controller.text = newText;
-    
-    // Trigger re-render with encode/decode cycle - only on keyboard input
-    setState(() {
-      widget.onChanged?.call(newText);
-    });
-  }
-
     @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -169,88 +119,29 @@ class _EnhancedTextFieldState extends State<EnhancedTextField> {
       );
     } else {
       // Edit mode: Show editable TextField
-      return KeyboardListener(
+      return TextField(
+        controller: _controller,
         focusNode: _focusNode,
-        onKeyEvent: _onKeyEvent,
-        child: TextField(
-          controller: _controller,
-          focusNode: _focusNode,
-          decoration: widget.decoration ?? const InputDecoration(
-            border: InputBorder.none,
-            contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
-          ),
-          style: textStyle,
-          maxLines: widget.maxLines,
-          autofocus: widget.autofocus,
-          enabled: widget.enabled,
-          readOnly: false,
-          textAlign: widget.textAlign,
-          onChanged: _onTextChanged,
-          onSubmitted: widget.onSubmitted,
-          onTap: () => widget.onTap?.call(),
+        decoration: widget.decoration ?? const InputDecoration(
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
         ),
+        style: textStyle,
+        maxLines: widget.maxLines,
+        autofocus: widget.autofocus,
+        enabled: widget.enabled,
+        readOnly: false,
+        textAlign: widget.textAlign,
+        onChanged: _onTextChanged,
+        onSubmitted: widget.onSubmitted,
+        onTap: () => widget.onTap?.call(),
+        onEditingComplete: () {
+          // Handle Ctrl+Enter for saving
+          if (HardwareKeyboard.instance.isControlPressed) {
+            widget.onSubmitted?.call(_controller.text);
+          }
+        },
       );
-    }
-  }
-
-  void _handleSelectAll() {
-    if (_controller.text.isNotEmpty) {
-      _controller.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _controller.text.length,
-      );
-    }
-  }
-
-  void _handleCopy() {
-    if (_controller.selection.isValid && !_controller.selection.isCollapsed) {
-      final selectedText = _controller.text.substring(
-        _controller.selection.start,
-        _controller.selection.end,
-      );
-      Clipboard.setData(ClipboardData(text: selectedText));
-    }
-  }
-
-  void _handlePaste() async {
-    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-    if (clipboardData?.text != null) {
-      final text = clipboardData!.text!;
-      final selection = _controller.selection;
-      
-      if (selection.isValid) {
-        final newText = _controller.text.replaceRange(
-          selection.start,
-          selection.end,
-          text,
-        );
-        _controller.value = TextEditingValue(
-          text: newText,
-          selection: TextSelection.collapsed(offset: selection.start + text.length),
-        );
-        _onTextChanged(newText);
-      }
-    }
-  }
-
-  void _handleCut() {
-    if (_controller.selection.isValid && !_controller.selection.isCollapsed) {
-      final selectedText = _controller.text.substring(
-        _controller.selection.start,
-        _controller.selection.end,
-      );
-      Clipboard.setData(ClipboardData(text: selectedText));
-      
-      final newText = _controller.text.replaceRange(
-        _controller.selection.start,
-        _controller.selection.end,
-        '',
-      );
-      _controller.value = TextEditingValue(
-        text: newText,
-        selection: TextSelection.collapsed(offset: _controller.selection.start),
-      );
-      _onTextChanged(newText);
     }
   }
 }
