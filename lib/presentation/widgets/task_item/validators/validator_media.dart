@@ -5,6 +5,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -253,6 +254,16 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
 
   /// Show media upload options (camera or file picker)
   Future<void> _showMediaUploadOptions(String validatorId) async {
+    // Check if camera should be available (not on Windows or Linux)
+    final isMobilePlatform = !Platform.isWindows && !Platform.isLinux;
+    
+    // If only one option is available, bypass the modal and go directly to file picker
+    if (!isMobilePlatform) {
+      _uploadMediaFile(validatorId);
+      return;
+    }
+    
+    // Show modal with both options on mobile platforms
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -283,6 +294,12 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
   /// Take a picture with the camera
   Future<void> _takePicture(String validatorId) async {
     try {
+      // Check if camera is available on this platform
+      if (Platform.isWindows || Platform.isLinux) {
+        _showErrorSnackbar('Camera is not available on desktop platforms');
+        return;
+      }
+
       // Check camera permission
       final status = await Permission.camera.request();
       if (status != PermissionStatus.granted) {
