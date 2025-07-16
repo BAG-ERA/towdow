@@ -1,8 +1,9 @@
-// Enhanced TextField widget with proper keyboard shortcuts support
-// Provides standard text editing shortcuts like Ctrl+A, Ctrl+C, Ctrl+V, etc.
+// Enhanced TextField widget with markdown support via EnhancedTextViewModel
+// Supports real-time markdown parsing on space/return key events
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../viewmodels/enhanced_text_viewmodel.dart';
 
 class EnhancedTextField extends StatefulWidget {
   final TextEditingController? controller;
@@ -11,9 +12,6 @@ class EnhancedTextField extends StatefulWidget {
   final TextStyle? style;
   final int? maxLines;
   final bool autofocus;
-  final bool obscureText;
-  final TextInputType keyboardType;
-  final TextInputAction textInputAction;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final VoidCallback? onTap;
@@ -22,15 +20,7 @@ class EnhancedTextField extends StatefulWidget {
   final bool enabled;
   final bool readOnly;
   final EdgeInsets? contentPadding;
-  final InputBorder? border;
-  final bool isDense;
-  final Widget? prefixIcon;
-  final Widget? suffixIcon;
-  final int? minLines;
-  final int? maxLength;
-  final bool expands;
   final TextAlign textAlign;
-  final TextAlignVertical? textAlignVertical;
 
   const EnhancedTextField({
     super.key,
@@ -38,11 +28,8 @@ class EnhancedTextField extends StatefulWidget {
     this.focusNode,
     this.decoration,
     this.style,
-    this.maxLines = 1,
+    this.maxLines,
     this.autofocus = false,
-    this.obscureText = false,
-    this.keyboardType = TextInputType.text,
-    this.textInputAction = TextInputAction.done,
     this.onChanged,
     this.onSubmitted,
     this.onTap,
@@ -51,15 +38,7 @@ class EnhancedTextField extends StatefulWidget {
     this.enabled = true,
     this.readOnly = false,
     this.contentPadding,
-    this.border,
-    this.isDense = false,
-    this.prefixIcon,
-    this.suffixIcon,
-    this.minLines,
-    this.maxLength,
-    this.expands = false,
     this.textAlign = TextAlign.start,
-    this.textAlignVertical,
   });
 
   @override
@@ -67,96 +46,146 @@ class EnhancedTextField extends StatefulWidget {
 }
 
 class _EnhancedTextFieldState extends State<EnhancedTextField> {
-  late FocusNode _focusNode;
   late TextEditingController _controller;
+  late FocusNode _focusNode;
+  late EnhancedTextViewModel _markdownViewModel;
   bool _controllerCreated = false;
 
   @override
   void initState() {
     super.initState();
-    _focusNode = widget.focusNode ?? FocusNode();
     _controller = widget.controller ?? TextEditingController();
     _controllerCreated = widget.controller == null;
+    _focusNode = widget.focusNode ?? FocusNode();
+    _markdownViewModel = EnhancedTextViewModel();
+    
+    _focusNode.addListener(_onFocusChange);
   }
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChange);
     if (_controllerCreated) {
       _controller.dispose();
     }
     if (widget.focusNode == null) {
       _focusNode.dispose();
     }
+    _markdownViewModel.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Create proper input decoration
-    final decoration = widget.decoration ?? InputDecoration(
-      hintText: widget.hintText,
-      labelText: widget.labelText,
-      contentPadding: widget.contentPadding,
-      border: widget.border,
-      isDense: widget.isDense,
-      prefixIcon: widget.prefixIcon,
-      suffixIcon: widget.suffixIcon,
-    );
+  void _onFocusChange() {
+    // Focus change handling without rebuild
+  }
 
-    return KeyboardListener(
-      focusNode: FocusNode(),
-      onKeyEvent: (KeyEvent event) {
-        if (event is KeyDownEvent) {
-          // Handle Ctrl+A for select all
-          if (event.logicalKey == LogicalKeyboardKey.keyA && 
-              HardwareKeyboard.instance.isControlPressed) {
-            _handleSelectAll();
-          }
-          // Handle Ctrl+C for copy
-          else if (event.logicalKey == LogicalKeyboardKey.keyC && 
-                   HardwareKeyboard.instance.isControlPressed) {
-            _handleCopy();
-          }
-          // Handle Ctrl+V for paste
-          else if (event.logicalKey == LogicalKeyboardKey.keyV && 
-                   HardwareKeyboard.instance.isControlPressed) {
-            _handlePaste();
-          }
-          // Handle Ctrl+X for cut
-          else if (event.logicalKey == LogicalKeyboardKey.keyX && 
-                   HardwareKeyboard.instance.isControlPressed) {
-            _handleCut();
-          }
+  void _onTextChanged(String text) {
+    widget.onChanged?.call(text);
+  }
+
+  void _onKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      // Handle character input and special keys
+      if (event.logicalKey == LogicalKeyboardKey.space) {
+        _handleCharacterInput(' ');
+      } else if (event.logicalKey == LogicalKeyboardKey.enter) {
+        if (HardwareKeyboard.instance.isAltPressed) {
+          _handleCharacterInput('\n'); // Alt+Enter for line break
+        } else {
+          _handleCharacterInput('\n'); // Regular Enter
         }
-      },
-      child: TextField(
+      }
+      // Handle regular character input for other keys
+      else if (event.character != null && event.character!.isNotEmpty) {
+        _handleCharacterInput(event.character!);
+      }
+      
+      // Handle keyboard shortcuts
+      if (HardwareKeyboard.instance.isControlPressed) {
+        switch (event.logicalKey) {
+          case LogicalKeyboardKey.keyA:
+            _handleSelectAll();
+            break;
+          case LogicalKeyboardKey.keyC:
+            _handleCopy();
+            break;
+          case LogicalKeyboardKey.keyV:
+            _handlePaste();
+            break;
+          case LogicalKeyboardKey.keyX:
+            _handleCut();
+            break;
+        }
+      }
+    }
+  }
+
+  void _handleCharacterInput(String character) {
+    // Add character to controller text
+    final currentText = _controller.text;
+    final newText = currentText + character;
+    _controller.text = newText;
+    
+    // Trigger re-render with encode/decode cycle - only on keyboard input
+    setState(() {
+      widget.onChanged?.call(newText);
+    });
+  }
+
+    @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textStyle = widget.style ?? theme.textTheme.bodyMedium!;
+    
+    if (widget.readOnly) {
+      // Display mode: Show formatted markdown text
+      final spans = _markdownViewModel.decode(_controller.text, textStyle);
+      
+      return GestureDetector(
+        onTap: () {
+          if (widget.enabled) {
+            widget.onTap?.call();
+          }
+        },
+        child: Container(
+          width: double.infinity,
+          padding: widget.contentPadding ??
+                   const EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
+          child: _controller.text.isEmpty && widget.hintText != null
+              ? Text(
+                  widget.hintText!,
+                  style: textStyle.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: widget.textAlign,
+                )
+              : RichText(
+                  textAlign: widget.textAlign,
+                  text: TextSpan(children: spans),
+                ),
+        ),
+      );
+    } else {
+      // Edit mode: Show editable TextField
+      return TextField(
         controller: _controller,
         focusNode: _focusNode,
-        decoration: decoration,
-        style: widget.style,
+        decoration: widget.decoration ?? const InputDecoration(
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
+        ),
+        style: textStyle,
         maxLines: widget.maxLines,
-        minLines: widget.minLines,
         autofocus: widget.autofocus,
-        obscureText: widget.obscureText,
-        keyboardType: widget.keyboardType,
-        textInputAction: widget.textInputAction,
-        onChanged: widget.onChanged,
-        onSubmitted: widget.onSubmitted,
-        onTap: widget.onTap,
         enabled: widget.enabled,
-        readOnly: widget.readOnly,
-        maxLength: widget.maxLength,
-        expands: widget.expands,
+        readOnly: false,
         textAlign: widget.textAlign,
-        textAlignVertical: widget.textAlignVertical,
-        enableInteractiveSelection: true,
-        contextMenuBuilder: (context, editableTextState) {
-          return AdaptiveTextSelectionToolbar.editableText(
-            editableTextState: editableTextState,
-          );
-        },
-      ),
-    );
+        onChanged: _onTextChanged,
+        onSubmitted: widget.onSubmitted,
+        onTap: () => widget.onTap?.call(),
+      );
+    }
   }
 
   void _handleSelectAll() {
@@ -194,11 +223,7 @@ class _EnhancedTextFieldState extends State<EnhancedTextField> {
           text: newText,
           selection: TextSelection.collapsed(offset: selection.start + text.length),
         );
-        
-        // Notify listeners
-        if (widget.onChanged != null) {
-          widget.onChanged!(newText);
-        }
+        _onTextChanged(newText);
       }
     }
   }
@@ -220,243 +245,61 @@ class _EnhancedTextFieldState extends State<EnhancedTextField> {
         text: newText,
         selection: TextSelection.collapsed(offset: _controller.selection.start),
       );
-      
-      // Notify listeners
-      if (widget.onChanged != null) {
-        widget.onChanged!(newText);
-      }
+      _onTextChanged(newText);
     }
   }
 }
 
-// Companion widget for TextFormField
-class EnhancedTextFormField extends StatefulWidget {
+// Simple TextFormField version for forms
+class EnhancedTextFormField extends StatelessWidget {
   final TextEditingController? controller;
-  final FocusNode? focusNode;
+  final String? Function(String?)? validator;
   final InputDecoration? decoration;
   final TextStyle? style;
   final int? maxLines;
   final bool autofocus;
-  final bool obscureText;
-  final TextInputType keyboardType;
-  final TextInputAction textInputAction;
   final ValueChanged<String>? onChanged;
-  final ValueChanged<String>? onFieldSubmitted;
-  final VoidCallback? onTap;
   final String? hintText;
   final String? labelText;
   final bool enabled;
   final bool readOnly;
-  final EdgeInsets? contentPadding;
-  final InputBorder? border;
-  final bool isDense;
-  final Widget? prefixIcon;
-  final Widget? suffixIcon;
-  final int? minLines;
-  final int? maxLength;
-  final bool expands;
-  final TextAlign textAlign;
-  final TextAlignVertical? textAlignVertical;
-  final String? Function(String?)? validator;
-  final AutovalidateMode? autovalidateMode;
+  final TextInputType keyboardType;
+  final TextInputAction textInputAction;
 
   const EnhancedTextFormField({
     super.key,
     this.controller,
-    this.focusNode,
+    this.validator,
     this.decoration,
     this.style,
     this.maxLines = 1,
     this.autofocus = false,
-    this.obscureText = false,
-    this.keyboardType = TextInputType.text,
-    this.textInputAction = TextInputAction.done,
     this.onChanged,
-    this.onFieldSubmitted,
-    this.onTap,
     this.hintText,
     this.labelText,
     this.enabled = true,
     this.readOnly = false,
-    this.contentPadding,
-    this.border,
-    this.isDense = false,
-    this.prefixIcon,
-    this.suffixIcon,
-    this.minLines,
-    this.maxLength,
-    this.expands = false,
-    this.textAlign = TextAlign.start,
-    this.textAlignVertical,
-    this.validator,
-    this.autovalidateMode,
+    this.keyboardType = TextInputType.text,
+    this.textInputAction = TextInputAction.done,
   });
 
   @override
-  State<EnhancedTextFormField> createState() => _EnhancedTextFormFieldState();
-}
-
-class _EnhancedTextFormFieldState extends State<EnhancedTextFormField> {
-  late FocusNode _focusNode;
-  late TextEditingController _controller;
-  bool _controllerCreated = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _focusNode = widget.focusNode ?? FocusNode();
-    _controller = widget.controller ?? TextEditingController();
-    _controllerCreated = widget.controller == null;
-  }
-
-  @override
-  void dispose() {
-    if (_controllerCreated) {
-      _controller.dispose();
-    }
-    if (widget.focusNode == null) {
-      _focusNode.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // Create proper input decoration
-    final decoration = widget.decoration ?? InputDecoration(
-      hintText: widget.hintText,
-      labelText: widget.labelText,
-      contentPadding: widget.contentPadding,
-      border: widget.border,
-      isDense: widget.isDense,
-      prefixIcon: widget.prefixIcon,
-      suffixIcon: widget.suffixIcon,
-    );
-
-    return KeyboardListener(
-      focusNode: FocusNode(),
-      onKeyEvent: (KeyEvent event) {
-        if (event is KeyDownEvent) {
-          // Handle Ctrl+A for select all
-          if (event.logicalKey == LogicalKeyboardKey.keyA && 
-              HardwareKeyboard.instance.isControlPressed) {
-            _handleSelectAll();
-          }
-          // Handle Ctrl+C for copy
-          else if (event.logicalKey == LogicalKeyboardKey.keyC && 
-                   HardwareKeyboard.instance.isControlPressed) {
-            _handleCopy();
-          }
-          // Handle Ctrl+V for paste
-          else if (event.logicalKey == LogicalKeyboardKey.keyV && 
-                   HardwareKeyboard.instance.isControlPressed) {
-            _handlePaste();
-          }
-          // Handle Ctrl+X for cut
-          else if (event.logicalKey == LogicalKeyboardKey.keyX && 
-                   HardwareKeyboard.instance.isControlPressed) {
-            _handleCut();
-          }
-        }
-      },
-      child: TextFormField(
-        controller: _controller,
-        focusNode: _focusNode,
-        decoration: decoration,
-        style: widget.style,
-        maxLines: widget.maxLines,
-        minLines: widget.minLines,
-        autofocus: widget.autofocus,
-        obscureText: widget.obscureText,
-        keyboardType: widget.keyboardType,
-        textInputAction: widget.textInputAction,
-        onChanged: widget.onChanged,
-        onFieldSubmitted: widget.onFieldSubmitted,
-        onTap: widget.onTap,
-        enabled: widget.enabled,
-        readOnly: widget.readOnly,
-        maxLength: widget.maxLength,
-        expands: widget.expands,
-        textAlign: widget.textAlign,
-        textAlignVertical: widget.textAlignVertical,
-        validator: widget.validator,
-        autovalidateMode: widget.autovalidateMode,
-        enableInteractiveSelection: true,
-        contextMenuBuilder: (context, editableTextState) {
-          return AdaptiveTextSelectionToolbar.editableText(
-            editableTextState: editableTextState,
-          );
-        },
+    return TextFormField(
+      controller: controller,
+      validator: validator,
+      decoration: decoration ?? InputDecoration(
+        hintText: hintText,
+        labelText: labelText,
       ),
+      style: style,
+      maxLines: maxLines,
+      autofocus: autofocus,
+      onChanged: onChanged,
+      enabled: enabled,
+      readOnly: readOnly,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
     );
-  }
-
-  void _handleSelectAll() {
-    if (_controller.text.isNotEmpty) {
-      _controller.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _controller.text.length,
-      );
-    }
-  }
-
-  void _handleCopy() {
-    if (_controller.selection.isValid && !_controller.selection.isCollapsed) {
-      final selectedText = _controller.text.substring(
-        _controller.selection.start,
-        _controller.selection.end,
-      );
-      Clipboard.setData(ClipboardData(text: selectedText));
-    }
-  }
-
-  void _handlePaste() async {
-    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-    if (clipboardData?.text != null) {
-      final text = clipboardData!.text!;
-      final selection = _controller.selection;
-      
-      if (selection.isValid) {
-        final newText = _controller.text.replaceRange(
-          selection.start,
-          selection.end,
-          text,
-        );
-        _controller.value = TextEditingValue(
-          text: newText,
-          selection: TextSelection.collapsed(offset: selection.start + text.length),
-        );
-        
-        // Notify listeners
-        if (widget.onChanged != null) {
-          widget.onChanged!(newText);
-        }
-      }
-    }
-  }
-
-  void _handleCut() {
-    if (_controller.selection.isValid && !_controller.selection.isCollapsed) {
-      final selectedText = _controller.text.substring(
-        _controller.selection.start,
-        _controller.selection.end,
-      );
-      Clipboard.setData(ClipboardData(text: selectedText));
-      
-      final newText = _controller.text.replaceRange(
-        _controller.selection.start,
-        _controller.selection.end,
-        '',
-      );
-      _controller.value = TextEditingValue(
-        text: newText,
-        selection: TextSelection.collapsed(offset: _controller.selection.start),
-      );
-      
-      // Notify listeners
-      if (widget.onChanged != null) {
-        widget.onChanged!(newText);
-      }
-    }
   }
 } 

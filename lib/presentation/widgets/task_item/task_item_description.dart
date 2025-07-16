@@ -66,37 +66,39 @@ class _TaskItemDescriptionState extends State<TaskItemDescription> {
   Widget _buildCompactDescriptionSection(BuildContext context) {
     final hasDescription = widget.task.description.isNotEmpty;
     
-    if (_isEditing) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.primary,
-            width: 1,
-          ),
-          borderRadius: BorderRadius.circular(8),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: _isEditing 
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
+          width: 1,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            EnhancedTextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              maxLines: null,
-              decoration: const InputDecoration(
-                hintText: 'Enter task description...',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                isDense: true,
-              ),
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
-                height: 1.3,
-              ),
-              onSubmitted: (_) => _saveDescription(),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          EnhancedTextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            maxLines: null,
+            readOnly: !_isEditing,
+            hintText: hasDescription ? null : 'No description provided • Click to add',
+            style: TextStyle(
+              fontSize: 13,
+              color: hasDescription 
+                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
+                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              fontStyle: hasDescription ? FontStyle.normal : FontStyle.italic,
+              height: 1.3,
             ),
+            onTap: widget.onTaskUpdated != null ? _startEditing : null,
+            onSubmitted: (_) => _saveDescription(),
+          ),
+          if (_isEditing) ...[
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -113,36 +115,7 @@ class _TaskItemDescriptionState extends State<TaskItemDescription> {
               ],
             ),
           ],
-        ),
-      );
-    }
-    
-    return InkWell(
-      onTap: widget.onTaskUpdated != null ? _startEditing : null,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Colors.transparent,
-            width: 1,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          hasDescription 
-              ? widget.task.description 
-              : 'No description provided • Click to add',
-          style: TextStyle(
-            fontSize: 13,
-            color: hasDescription 
-                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
-                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-            fontStyle: hasDescription ? FontStyle.normal : FontStyle.italic,
-            height: 1.3,
-          ),
-        ),
+        ],
       ),
     );
   }
