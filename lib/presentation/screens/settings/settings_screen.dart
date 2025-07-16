@@ -211,6 +211,18 @@ class SettingsScreen extends ConsumerWidget {
           ref.invalidate(externalEventListProvider);
           ref.invalidate(enabledExternalCalendarListProvider);
           ref.invalidate(enabledExternalEventListProvider);
+          ref.invalidate(hasActiveAccountProvider);
+          ref.invalidate(activeAccountProvider);
+          ref.invalidate(syncStatusStreamProvider);
+          ref.invalidate(currentSyncStatusProvider);
+          ref.invalidate(userRepositoryProvider);
+          ref.invalidate(accountRepositoryProvider);
+          ref.invalidate(calendarRepositoryProvider);
+          ref.invalidate(taskRepositoryProvider);
+                      ref.invalidate(externalAccountRepositoryProvider);
+            ref.invalidate(externalCalendarRepositoryProvider);
+                        ref.invalidate(externalEventRepositoryProvider);
+            ref.invalidate(syncServiceProvider);
           
           // Restart the app
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -337,6 +349,17 @@ class SettingsScreen extends ConsumerWidget {
             ref.invalidate(externalEventListProvider);
             ref.invalidate(enabledExternalCalendarListProvider);
             ref.invalidate(enabledExternalEventListProvider);
+            ref.invalidate(hasActiveAccountProvider);
+            ref.invalidate(activeAccountProvider);
+            ref.invalidate(syncStatusStreamProvider);
+            ref.invalidate(currentSyncStatusProvider);
+            ref.invalidate(userRepositoryProvider);
+            ref.invalidate(accountRepositoryProvider);
+            ref.invalidate(calendarRepositoryProvider);
+            ref.invalidate(taskRepositoryProvider);
+            ref.invalidate(externalAccountRepositoryProvider);
+            ref.invalidate(externalCalendarRepositoryProvider);
+            ref.invalidate(externalEventRepositoryProvider);
             
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
