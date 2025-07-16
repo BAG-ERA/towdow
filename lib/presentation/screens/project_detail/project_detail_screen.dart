@@ -21,6 +21,7 @@ import '../../../core/theme/chart_theme.dart';
 import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_info_card.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
+import '../../widgets/utils/editable_title.dart';
 import '../../../data/services/caldav_service.dart';
 import '../../../data/services/webdav_client.dart';
 
@@ -93,9 +94,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       appBar: isDesktop ? AppBar(
         title: projectAsync.when(
           data: (project) => project != null 
-              ? _EditableProjectTitle(
-                  project: project,
-                  onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+              ? EditableTitle(
+                  title: project.displayName,
+                  onTitleUpdated: (newTitle) {
+                    final updatedProject = project.copyWith(
+                      displayName: newTitle,
+                      lastModified: DateTime.now(),
+                    );
+                    _updateProject(updatedProject);
+                  },
                   isInAppBar: true,
                 )
               : const Text('Unknown Project'),
@@ -1084,223 +1091,5 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         );
       }
     }
-  }
-}
-
-// Editable Project Title Widget
-class _EditableProjectTitle extends StatefulWidget {
-  final TaskCalendar project;
-  final Function(TaskCalendar) onProjectUpdated;
-  final bool isInAppBar;
-
-  const _EditableProjectTitle({
-    required this.project,
-    required this.onProjectUpdated,
-    this.isInAppBar = false,
-  });
-
-  @override
-  State<_EditableProjectTitle> createState() => _EditableProjectTitleState();
-}
-
-class _EditableProjectTitleState extends State<_EditableProjectTitle> {
-  bool _isEditing = false;
-  bool _isHovered = false;
-  late TextEditingController _controller;
-  late FocusNode _focusNode;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.project.displayName);
-    _focusNode = FocusNode();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(_EditableProjectTitle oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    
-    // If the project changed while we were editing, we need to handle it
-    if (oldWidget.project.path != widget.project.path) {
-      // Different project - reset editing state and update controller
-      setState(() {
-        _isEditing = false;
-        _isHovered = false;
-      });
-      _controller.text = widget.project.displayName;
-    } else if (oldWidget.project.displayName != widget.project.displayName) {
-      // Same project but title changed externally - update controller if not editing
-      if (!_isEditing) {
-        _controller.text = widget.project.displayName;
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isInAppBar = widget.isInAppBar;
-    final primaryColor = isInAppBar 
-        ? Theme.of(context).colorScheme.onSurface 
-        : Theme.of(context).colorScheme.onPrimaryContainer;
-    
-    if (_isEditing) {
-      if (isInAppBar) {
-        // Simplified editing for AppBar
-        return TextField(
-          controller: _controller,
-          focusNode: _focusNode,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            isDense: true,
-            suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.close, size: 16),
-                  onPressed: _cancelEdit,
-                  tooltip: 'Cancel',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.check, size: 16),
-                  onPressed: _saveTitle,
-                  tooltip: 'Save',
-                ),
-              ],
-            ),
-          ),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: primaryColor,
-          ),
-          onSubmitted: (_) => _saveTitle(),
-        );
-      }
-      
-      return Container(
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.primary,
-            width: 2,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                isDense: true,
-              ),
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: primaryColor,
-              ),
-              onSubmitted: (_) => _saveTitle(),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: _cancelEdit,
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _saveTitle,
-                    child: const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: InkWell(
-        onTap: _startEditing,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          width: isInAppBar ? null : double.infinity,
-          padding: EdgeInsets.symmetric(
-            horizontal: isInAppBar ? 4 : 4, 
-            vertical: isInAppBar ? 4 : 8
-          ),
-          decoration: BoxDecoration(
-            color: _isHovered
-                ? (isInAppBar 
-                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)
-                    : Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.1))
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            widget.project.displayName,
-            style: (isInAppBar 
-                ? Theme.of(context).textTheme.titleLarge 
-                : Theme.of(context).textTheme.headlineSmall)?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: primaryColor,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _startEditing() {
-    setState(() {
-      _isEditing = true;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
-      _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
-    });
-  }
-
-  void _cancelEdit() {
-    setState(() {
-      _isEditing = false;
-      _controller.text = widget.project.displayName;
-    });
-  }
-
-  void _saveTitle() {
-    if (_controller.text.trim().isNotEmpty) {
-      final newTitle = _controller.text.trim();
-      AppLogger.info('ProjectDetail: Saving new title: "$newTitle" (was: "${widget.project.displayName}")');
-      
-      final updatedProject = widget.project.copyWith(
-        displayName: newTitle,
-        lastModified: DateTime.now(),
-      );
-      
-      AppLogger.info('ProjectDetail: Calling onProjectUpdated callback...');
-      widget.onProjectUpdated(updatedProject);
-    }
-    
-    setState(() {
-      _isEditing = false;
-    });
   }
 } 
