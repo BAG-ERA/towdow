@@ -3,12 +3,136 @@
 
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:pointycastle/export.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
+
+/// Parameters for encryption operation in isolate
+class _EncryptionParams {
+  final Uint8List data;
+  final String key;
+  final Uint8List salt;
+  final Uint8List iv;
+
+  _EncryptionParams({
+    required this.data,
+    required this.key,
+    required this.salt,
+    required this.iv,
+  });
+}
+
+/// Parameters for decryption operation in isolate
+class _DecryptionParams {
+  final Uint8List encryptedData;
+  final String key;
+  final Uint8List salt;
+  final Uint8List iv;
+  final Uint8List tag;
+  final Uint8List ciphertext;
+
+  _DecryptionParams({
+    required this.encryptedData,
+    required this.key,
+    required this.salt,
+    required this.iv,
+    required this.tag,
+    required this.ciphertext,
+  });
+}
+
+/// Static function for encryption in isolate
+Uint8List _encryptInIsolate(_EncryptionParams params) {
+  try {
+    const int saltLength = 32;
+    const int ivLength = 12;
+    const int tagLength = 16;
+    const int keyLength = 32;
+    const int pbkdf2Iterations = 100000;
+
+    // Derive encryption key using PBKDF2
+    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64));
+    pbkdf2.init(Pbkdf2Parameters(params.salt, pbkdf2Iterations, keyLength));
+    final derivedKey = pbkdf2.process(utf8.encode(params.key));
+    
+    // Set up AES-GCM cipher
+    final cipher = GCMBlockCipher(AESEngine());
+    final cipherParams = AEADParameters(
+      KeyParameter(derivedKey),
+      tagLength * 8, // tag length in bits
+      params.iv,
+      Uint8List(0), // no additional authenticated data
+    );
+    
+    cipher.init(true, cipherParams); // true for encryption
+    
+    // Encrypt data
+    final encryptedData = cipher.process(params.data);
+    
+    // Extract encrypted data and tag
+    final ciphertext = encryptedData.sublist(0, encryptedData.length - tagLength);
+    final tag = encryptedData.sublist(encryptedData.length - tagLength);
+    
+    // Combine: salt + iv + tag + encrypted_data
+    final result = Uint8List(saltLength + ivLength + tagLength + ciphertext.length);
+    int offset = 0;
+    
+    result.setRange(offset, offset + saltLength, params.salt);
+    offset += saltLength;
+    
+    result.setRange(offset, offset + ivLength, params.iv);
+    offset += ivLength;
+    
+    result.setRange(offset, offset + tagLength, tag);
+    offset += tagLength;
+    
+    result.setRange(offset, offset + ciphertext.length, ciphertext);
+    
+    return result;
+  } catch (e) {
+    throw Exception('Encryption failed in isolate: $e');
+  }
+}
+
+/// Static function for decryption in isolate
+Uint8List _decryptInIsolate(_DecryptionParams params) {
+  try {
+    const int tagLength = 16;
+    const int keyLength = 32;
+    const int pbkdf2Iterations = 100000;
+
+    // Derive decryption key using PBKDF2
+    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64));
+    pbkdf2.init(Pbkdf2Parameters(params.salt, pbkdf2Iterations, keyLength));
+    final derivedKey = pbkdf2.process(utf8.encode(params.key));
+    
+    // Set up AES-GCM cipher for decryption
+    final cipher = GCMBlockCipher(AESEngine());
+    final cipherParams = AEADParameters(
+      KeyParameter(derivedKey),
+      tagLength * 8, // tag length in bits
+      params.iv,
+      Uint8List(0), // no additional authenticated data
+    );
+    
+    cipher.init(false, cipherParams); // false for decryption
+    
+    // Combine ciphertext and tag for decryption
+    final dataToDecrypt = Uint8List(params.ciphertext.length + params.tag.length);
+    dataToDecrypt.setRange(0, params.ciphertext.length, params.ciphertext);
+    dataToDecrypt.setRange(params.ciphertext.length, dataToDecrypt.length, params.tag);
+    
+    // Decrypt and verify
+    final decryptedData = cipher.process(dataToDecrypt);
+    
+    return decryptedData;
+  } catch (e) {
+    throw Exception('Decryption failed in isolate: $e');
+  }
+}
 
 /// AES-256-GCM encryption service using PointyCastle
 /// Provides authenticated encryption with proper key derivation
@@ -17,8 +141,6 @@ class EncryptionService {
   static const int _saltLength = 32; // 256 bits
   static const int _ivLength = 12; // 96 bits for GCM
   static const int _tagLength = 16; // 128 bits for GCM tag
-  static const int _keyLength = 32; // 256 bits for AES-256
-  static const int _pbkdf2Iterations = 100000; // OWASP recommended minimum
   
   static final SecureRandom _secureRandom = SecureRandom('Fortuna')
     ..seed(KeyParameter(Uint8List.fromList(List.generate(32, (_) => Random.secure().nextInt(256)))));
@@ -33,61 +155,28 @@ class EncryptionService {
     return _secureRandom.nextBytes(_ivLength);
   }
 
-  /// Derive encryption key from password and salt using PBKDF2
-  Uint8List _deriveKey(String password, Uint8List salt) {
-    final pbkdf2 = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64));
-    pbkdf2.init(Pbkdf2Parameters(salt, _pbkdf2Iterations, _keyLength));
-    
-    return pbkdf2.process(utf8.encode(password));
-  }
-
-  /// Encrypt file data with AES-256-GCM
+  /// Encrypt file data with AES-256-GCM in background isolate
   /// Returns: [salt(32)] + [iv(12)] + [tag(16)] + [encrypted_data]
   Future<Result<Uint8List>> encryptFile(Uint8List data, String key) async {
     try {
-      AppLogger.debug('EncryptionService.encryptFile: Encrypting ${data.length} bytes with AES-256-GCM');
+      AppLogger.debug('EncryptionService.encryptFile: Encrypting ${data.length} bytes with AES-256-GCM in background isolate');
       
-      // Generate salt and IV
+      // Generate salt and IV on main thread (fast operations)
       final salt = _generateSalt();
       final iv = _generateIV();
       
-      // Derive encryption key using PBKDF2
-      final derivedKey = _deriveKey(key, salt);
-      
-      // Set up AES-GCM cipher
-      final cipher = GCMBlockCipher(AESEngine());
-      final params = AEADParameters(
-        KeyParameter(derivedKey),
-        _tagLength * 8, // tag length in bits
-        iv,
-        Uint8List(0), // no additional authenticated data
+      // Prepare parameters for isolate
+      final params = _EncryptionParams(
+        data: data,
+        key: key,
+        salt: salt,
+        iv: iv,
       );
       
-      cipher.init(true, params); // true for encryption
+      // Run CPU-intensive encryption in background isolate
+      final result = await compute(_encryptInIsolate, params);
       
-      // Encrypt data
-      final encryptedData = cipher.process(data);
-      
-      // Extract encrypted data and tag
-      final ciphertext = encryptedData.sublist(0, encryptedData.length - _tagLength);
-      final tag = encryptedData.sublist(encryptedData.length - _tagLength);
-      
-      // Combine: salt + iv + tag + encrypted_data
-      final result = Uint8List(_saltLength + _ivLength + _tagLength + ciphertext.length);
-      int offset = 0;
-      
-      result.setRange(offset, offset + _saltLength, salt);
-      offset += _saltLength;
-      
-      result.setRange(offset, offset + _ivLength, iv);
-      offset += _ivLength;
-      
-      result.setRange(offset, offset + _tagLength, tag);
-      offset += _tagLength;
-      
-      result.setRange(offset, offset + ciphertext.length, ciphertext);
-      
-      AppLogger.debug('EncryptionService.encryptFile: Successfully encrypted ${data.length} bytes to ${result.length} bytes');
+      AppLogger.debug('EncryptionService.encryptFile: Successfully encrypted ${data.length} bytes to ${result.length} bytes in background isolate');
       return Result.success(result);
     } catch (e, stackTrace) {
       AppLogger.error('EncryptionService.encryptFile: Failed to encrypt', e, stackTrace);
@@ -95,19 +184,19 @@ class EncryptionService {
     }
   }
 
-  /// Decrypt file data with AES-256-GCM
+  /// Decrypt file data with AES-256-GCM in background isolate
   /// Expects: [salt(32)] + [iv(12)] + [tag(16)] + [encrypted_data]
   Future<Result<Uint8List>> decryptFile(Uint8List encryptedData, String key) async {
     try {
-      AppLogger.debug('EncryptionService.decryptFile: Decrypting ${encryptedData.length} bytes with AES-256-GCM');
+      AppLogger.debug('EncryptionService.decryptFile: Decrypting ${encryptedData.length} bytes with AES-256-GCM in background isolate');
       
-      // Validate minimum length
+      // Validate minimum length (fast operation on main thread)
       const minLength = _saltLength + _ivLength + _tagLength;
       if (encryptedData.length < minLength) {
         return Result.failure(Failure(message: 'Invalid encrypted data: too short'));
       }
       
-      // Extract components
+      // Extract components on main thread (fast operations)
       int offset = 0;
       
       final salt = encryptedData.sublist(offset, offset + _saltLength);
@@ -121,29 +210,20 @@ class EncryptionService {
       
       final ciphertext = encryptedData.sublist(offset);
       
-      // Derive decryption key using PBKDF2
-      final derivedKey = _deriveKey(key, salt);
-      
-      // Set up AES-GCM cipher for decryption
-      final cipher = GCMBlockCipher(AESEngine());
-      final params = AEADParameters(
-        KeyParameter(derivedKey),
-        _tagLength * 8, // tag length in bits
-        iv,
-        Uint8List(0), // no additional authenticated data
+      // Prepare parameters for isolate
+      final params = _DecryptionParams(
+        encryptedData: encryptedData,
+        key: key,
+        salt: salt,
+        iv: iv,
+        tag: tag,
+        ciphertext: ciphertext,
       );
       
-      cipher.init(false, params); // false for decryption
+      // Run CPU-intensive decryption in background isolate
+      final decryptedData = await compute(_decryptInIsolate, params);
       
-      // Combine ciphertext and tag for decryption
-      final dataToDecrypt = Uint8List(ciphertext.length + tag.length);
-      dataToDecrypt.setRange(0, ciphertext.length, ciphertext);
-      dataToDecrypt.setRange(ciphertext.length, dataToDecrypt.length, tag);
-      
-      // Decrypt and verify
-      final decryptedData = cipher.process(dataToDecrypt);
-      
-      AppLogger.debug('EncryptionService.decryptFile: Successfully decrypted ${encryptedData.length} bytes to ${decryptedData.length} bytes');
+      AppLogger.debug('EncryptionService.decryptFile: Successfully decrypted ${encryptedData.length} bytes to ${decryptedData.length} bytes in background isolate');
       return Result.success(decryptedData);
     } catch (e, stackTrace) {
       AppLogger.error('EncryptionService.decryptFile: Failed to decrypt', e, stackTrace);
