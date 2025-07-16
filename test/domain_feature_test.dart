@@ -40,7 +40,6 @@ void main() {
         TaskCalendar(
           path: '/calendars/project1/',
           displayName: 'Marketing Campaign',
-          uid: 'cal-1',
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
@@ -50,7 +49,6 @@ void main() {
         TaskCalendar(
           path: '/calendars/project2/',
           displayName: 'Website Redesign',
-          uid: 'cal-2',
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
@@ -60,7 +58,6 @@ void main() {
         TaskCalendar(
           path: '/calendars/project3/',
           displayName: 'Budget Planning',
-          uid: 'cal-3',
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
@@ -70,7 +67,6 @@ void main() {
         TaskCalendar(
           path: '/calendars/project4/',
           displayName: 'Social Media Strategy',
-          uid: 'cal-4',
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
@@ -102,14 +98,14 @@ void main() {
       test('withDomain creates calendar with new domain', () {
         final updated = testCalendars[2].withDomain('Finance');
         expect(updated.flowitDomain, equals('Finance'));
-        expect(updated.uid, equals(testCalendars[2].uid)); // Other fields preserved
+        expect(updated.path, equals(testCalendars[2].path)); // Other fields preserved
         expect(updated.lastModified.isAfter(testCalendars[2].lastModified), isTrue);
       });
 
       test('withoutDomain removes domain', () {
         final updated = testCalendars[0].withoutDomain();
         expect(updated.flowitDomain, isNull);
-        expect(updated.uid, equals(testCalendars[0].uid)); // Other fields preserved
+        expect(updated.path, equals(testCalendars[0].path)); // Other fields preserved
       });
     });
 
@@ -175,9 +171,9 @@ void main() {
             .thenAnswer((_) async => Result.success(null));
         when(mockCalendarRepository.getCalendarsByDomain('Marketing'))
             .thenAnswer((_) async => Result.success([testCalendars[0], testCalendars[3]]));
-        when(mockCalendarRepository.getById('cal-1'))
+        when(mockCalendarRepository.getById('/calendars/project1/'))
             .thenAnswer((_) async => Result.success(testCalendars[0]));
-        when(mockCalendarRepository.getById('cal-4'))
+        when(mockCalendarRepository.getById('/calendars/project4/'))
             .thenAnswer((_) async => Result.success(testCalendars[3]));
 
         final result = await domainService.renameDomain('Marketing', 'Brand Management');
@@ -256,19 +252,19 @@ void main() {
       });
 
       test('assignDomainToCalendar uses repository getById', () async {
-        final calendar = testCalendars.firstWhere((c) => c.uid == 'cal-1');
+        final calendar = testCalendars.firstWhere((c) => c.path == '/calendars/project1/');
         
-        when(mockCalendarRepository.getById('cal-1'))
+        when(mockCalendarRepository.getById('/calendars/project1/'))
             .thenAnswer((_) async => Result.success(calendar));
         when(mockCalendarRepository.save(any))
             .thenAnswer((_) async => Result.success(null));
         when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.success(null));
 
-        final result = await domainService.assignDomainToCalendar('cal-1', 'Finance');
+        final result = await domainService.assignDomainToCalendar('/calendars/project1/', 'Finance');
         
         expect(result, isA<Success<void>>());
-        verify(mockCalendarRepository.getById('cal-1')).called(1);
+        verify(mockCalendarRepository.getById('/calendars/project1/')).called(1);
         verify(mockCalendarRepository.save(any)).called(1);
       });
 

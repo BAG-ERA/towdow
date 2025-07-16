@@ -11,14 +11,14 @@ import '../utils/enhanced_text_field.dart';
 class ProjectInfoCard extends ConsumerWidget {
   final TaskCalendar? project;
   final AsyncValue<List<Task>> tasksAsync;
-  final String projectUid;
+  final String projectPath;
   final Function(TaskCalendar) onProjectUpdated;
 
   const ProjectInfoCard({
     super.key,
     required this.project,
     required this.tasksAsync,
-    required this.projectUid,
+    required this.projectPath,
     required this.onProjectUpdated,
   });
 
@@ -41,7 +41,7 @@ class ProjectInfoCard extends ConsumerWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Project not found: $projectUid',
+                'Project not found: $projectPath',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onErrorContainer,
                 ),

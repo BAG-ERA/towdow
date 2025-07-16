@@ -158,6 +158,18 @@ class BackgroundSyncService {
       
       final webdavClient = WebDAVClient.fromAccount(account);
 
+      // Check if calendar exists on server before attempting sync
+      final calendarExists = await _checkCalendarExistsOnServer(webdavClient, calendar.path);
+      if (!calendarExists) {
+        AppLogger.info('BackgroundSyncService: Calendar ${calendar.path} not found on server, attempting to create it');
+        final createdSuccessfully = await _createCalendarOnServer(account, calendar);
+        if (!createdSuccessfully) {
+          AppLogger.warning('BackgroundSyncService: Failed to create calendar on server, skipping sync for ${calendar.path}');
+          return;
+        }
+        AppLogger.info('BackgroundSyncService: Successfully created calendar on server: ${calendar.path}');
+      }
+
       if (calendar.syncToken == null) {
         // First sync or calendar without sync token - perform full sync
         await _performFullSync(webdavClient, account, calendar);
@@ -190,7 +202,7 @@ class BackgroundSyncService {
         success: (remoteTasks) async {
           // Save all remote tasks to local storage
           for (final task in remoteTasks) {
-            final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
+            final taskWithCalendar = task.copyWith(projectPath: calendar.path);
             await _taskRepository.save(taskWithCalendar);
           }
           
@@ -365,7 +377,7 @@ class BackgroundSyncService {
       switch (change.type) {
         case SyncChangeType.deleted:
           // Find task by href and delete from local storage
-          await _deleteTaskByHref(change.href, calendar.uid);
+          await _deleteTaskByHref(change.href, calendar.path);
           // AppLogger.debug('BackgroundSyncService: Deleted task ${change.href}');
           break;
           
@@ -381,14 +393,14 @@ class BackgroundSyncService {
                 success: (localTask) async {
                   if (localTask == null) {
                     // New task - save with calendar UID
-                    final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
+                    final taskWithCalendar = task.copyWith(projectPath: calendar.path);
                     await _taskRepository.save(taskWithCalendar);
                     // AppLogger.debug('BackgroundSyncService: Created task ${task.uid}');
                   } else {
                     // Check if remote task is newer than local
                     if (task.lastModified.isAfter(localTask.lastModified)) {
                       // Update local task
-                      final taskWithCalendar = task.copyWith(sourceCalendarUid: calendar.uid);
+                      final taskWithCalendar = task.copyWith(projectPath: calendar.path);
                       await _taskRepository.save(taskWithCalendar);
                       // AppLogger.debug('BackgroundSyncService: Updated task ${task.uid}');
                     } else {
@@ -409,6 +421,68 @@ class BackgroundSyncService {
     }
   }
 
+  /// Check if calendar exists on server using PROPFIND
+  Future<bool> _checkCalendarExistsOnServer(WebDAVClient webdavClient, String calendarPath) async {
+    try {
+      final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:prop>
+    <D:resourcetype />
+  </D:prop>
+</D:propfind>''';
+
+      final result = await webdavClient.propfind(calendarPath, body: propfindBody, depth: 0);
+      return await result.when(
+        success: (response) async {
+          // Calendar exists if we get 207 Multi-Status or 200 OK
+          return response.statusCode == 207 || response.statusCode == 200;
+        },
+        failure: (failure) async {
+          // Calendar doesn't exist or we can't access it
+          return false;
+        },
+      );
+    } catch (e) {
+      // Any exception means calendar is not accessible
+      return false;
+    }
+  }
+
+  /// Create a local calendar on the server
+  Future<bool> _createCalendarOnServer(CaldavAccount account, TaskCalendar calendar) async {
+    try {
+      AppLogger.info('BackgroundSyncService: Creating calendar on server: ${calendar.displayName}');
+      
+      // Use CalDAV service to create the calendar
+      final caldavService = CalDAVService(account: account);
+      final createResult = await caldavService.createCalendar(
+        displayName: calendar.displayName,
+        description: calendar.description,
+      );
+
+      return await createResult.when(
+        success: (serverCalendar) async {
+          AppLogger.info('BackgroundSyncService: Successfully created calendar on server at ${serverCalendar.path}');
+          
+          // Update local calendar with server etag for sync tracking
+          final updatedCalendar = calendar.copyWith(
+            etag: serverCalendar.etag,
+          );
+          await _calendarRepository.save(updatedCalendar);
+          
+          return true;
+        },
+        failure: (failure) async {
+          AppLogger.error('BackgroundSyncService: Failed to create calendar on server: ${failure.message}');
+          return false;
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('BackgroundSyncService: Exception creating calendar on server', e, stackTrace);
+      return false;
+    }
+  }
+
   /// Delete task by href from local storage
   Future<void> _deleteTaskByHref(String href, String calendarUid) async {
     try {
@@ -419,7 +493,7 @@ class BackgroundSyncService {
       final taskResult = await _taskRepository.getById(uid);
       await taskResult.when(
         success: (task) async {
-          if (task != null && task.sourceCalendarUid == calendarUid) {
+          if (task != null && task.projectPath == calendarUid) {
             await _taskRepository.delete(uid);
             // AppLogger.debug('BackgroundSyncService: Deleted local task $uid');
           }

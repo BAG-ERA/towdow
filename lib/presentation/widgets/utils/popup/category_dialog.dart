@@ -8,34 +8,17 @@ import '../../../../data/models/task.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../core/logger.dart';
 
-// Provider for tasks in a specific project (copied from ProjectDetailScreen)
-final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, projectUid) {
-  final taskRepository = ref.watch(taskRepositoryProvider);
-  return taskRepository.watchTasks().map((allTasks) {
-    // Filter tasks by their source calendar (Calendar = Project model)
-    final projectTasks = allTasks
-        .where((task) => task.sourceCalendarUid == projectUid)
-        .toList();
-    
-    if (projectTasks.isEmpty && allTasks.isNotEmpty) {
-      AppLogger.warning('CategoryDialog: No tasks found for project $projectUid. Available sourceCalendarUids: ${allTasks.map((t) => t.sourceCalendarUid).toSet()}');
-    }
-    
-    return projectTasks;
-  });
-});
-
 /// Dialog for managing task categories
 class CategoryDialog extends ConsumerStatefulWidget {
   final Task task;
   final Function(Task) onTaskUpdated;
-  final String? projectUid; // Optional project UID to get all categories from the project
+  final String? projectPath; // Optional project path to get all categories from the project
 
   const CategoryDialog({
     super.key,
     required this.task,
     required this.onTaskUpdated,
-    this.projectUid,
+    this.projectPath,
   });
 
   @override
@@ -67,59 +50,76 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.label_rounded),
-          SizedBox(width: 12),
-          Text('Manage Categories'),
-        ],
-      ),
-      content: SizedBox(
-        width: MediaQuery.of(context).size.width > 600 ? 400 : MediaQuery.of(context).size.width * 0.9,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Task: ${widget.task.summary}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontStyle: FontStyle.italic,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent) {
+          // Handle Escape to close dialog
+          if (event.logicalKey == LogicalKeyboardKey.escape && !_isLoading) {
+            Navigator.of(context).pop();
+          }
+          // Handle Ctrl+Enter or Cmd+Enter to save
+          else if (event.logicalKey == LogicalKeyboardKey.enter && 
+                   (HardwareKeyboard.instance.isControlPressed || 
+                    HardwareKeyboard.instance.isMetaPressed) && !_isLoading) {
+            _saveCategories();
+          }
+        }
+      },
+      child: AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.label_rounded),
+            SizedBox(width: 12),
+            Text('Manage Categories'),
+          ],
+        ),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width > 600 ? 400 : MediaQuery.of(context).size.width * 0.9,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Task: ${widget.task.summary}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontStyle: FontStyle.italic,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Create category form at the top
-              _buildAddCategoryForm(),
-              
-              const SizedBox(height: 16),
-              
-              // Project categories section (if projectUid is provided)
-              if (widget.projectUid != null) ...[
-                _buildProjectCategoriesSection(),
+                const SizedBox(height: 16),
+                
+                // Create category form at the top
+                _buildAddCategoryForm(),
+                
+                const SizedBox(height: 16),
+                
+                // Project categories section (if projectPath is provided)
+                if (widget.projectPath != null) ...[
+                  _buildProjectCategoriesSection(),
+                ],
               ],
-            ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: _isLoading ? null : _saveCategories,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Save'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _saveCategories,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Save'),
-        ),
-      ],
     );
   }
 
@@ -142,7 +142,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
   Widget _buildProjectCategoriesSection() {
     return Consumer(
       builder: (context, ref, child) {
-        final tasksAsync = ref.watch(projectTasksProvider(widget.projectUid!));
+        final tasksAsync = ref.watch(projectTasksProvider(widget.projectPath!));
         
         return tasksAsync.when(
           data: (tasks) {

@@ -283,8 +283,8 @@ class ArchivedProjectsScreen extends ConsumerWidget {
                 // View project button
                 TextButton.icon(
                   onPressed: () {
-                    AppLogger.info('ArchivedProjectsScreen: Viewing archived project ${project.uid}');
-                    context.go('/project/${project.uid}');
+                    AppLogger.info('ArchivedProjectsScreen: Viewing archived project ${project.path}');
+                    context.go('/project/${Uri.encodeComponent(project.path)}');
                   },
                   icon: const Icon(Icons.visibility_rounded),
                   label: const Text('View'),
@@ -339,7 +339,7 @@ class ArchivedProjectsScreen extends ConsumerWidget {
       final messenger = ScaffoldMessenger.of(context);
       final theme = Theme.of(context);
       
-      final result = await statusService.unarchiveCalendar(project.uid);
+      final result = await statusService.unarchiveCalendar(project.path);
       
       if (!context.mounted) return;
       

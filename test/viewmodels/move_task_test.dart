@@ -44,7 +44,7 @@ void main() {
     group('MoveTaskCommand', () {
       test('should move task between calendars successfully', () async {
         // Arrange
-        final sourceCalendarUid = 'calendar-1';
+        final sourceProjectPath = 'calendar-1';
         final targetCalendarUid = 'calendar-2';
         
         final originalTask = Task(
@@ -55,11 +55,11 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          sourceCalendarUid: sourceCalendarUid,
+          projectPath: sourceProjectPath,
         );
 
         final expectedMovedTask = originalTask.copyWith(
-          sourceCalendarUid: targetCalendarUid,
+          projectPath: targetCalendarUid,
           lastModified: DateTime.now(),
         );
 
@@ -80,7 +80,7 @@ void main() {
 
         // Assert
         expect(result, isNotNull);
-        expect(result!.sourceCalendarUid, equals(targetCalendarUid));
+        expect(result!.projectPath, equals(targetCalendarUid));
         
         // Verify task was saved
         verify(mockTaskRepository.save(any)).called(1);
@@ -101,7 +101,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          sourceCalendarUid: calendarUid,
+          projectPath: calendarUid,
         );
 
         final command = MoveTaskCommand(mockTaskRepository, mockSyncService);
@@ -123,7 +123,7 @@ void main() {
 
       test('should handle move without sync service', () async {
         // Arrange
-        final sourceCalendarUid = 'calendar-1';
+        final sourceProjectPath = 'calendar-1';
         final targetCalendarUid = 'calendar-2';
         
         final originalTask = Task(
@@ -134,7 +134,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          sourceCalendarUid: sourceCalendarUid,
+          projectPath: sourceProjectPath,
         );
 
         when(mockTaskRepository.save(any))
@@ -151,7 +151,7 @@ void main() {
 
         // Assert
         expect(result, isNotNull);
-        expect(result!.sourceCalendarUid, equals(targetCalendarUid));
+        expect(result!.projectPath, equals(targetCalendarUid));
         
         // Verify task was saved locally
         verify(mockTaskRepository.save(any)).called(1);
@@ -167,7 +167,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          sourceCalendarUid: 'calendar-1',
+          projectPath: 'calendar-1',
         );
 
         when(mockTaskRepository.save(any))
@@ -193,7 +193,7 @@ void main() {
     group('TaskViewModel.moveTask', () {
       test('should update state during move operation', () async {
         // Arrange
-        final sourceCalendarUid = 'calendar-1';
+        final sourceProjectPath = 'calendar-1';
         final targetCalendarUid = 'calendar-2';
         
         final originalTask = Task(
@@ -204,7 +204,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          sourceCalendarUid: sourceCalendarUid,
+          projectPath: sourceProjectPath,
         );
 
         when(mockTaskRepository.save(any))
@@ -229,7 +229,7 @@ void main() {
 
       test('should handle move with sync data correctly', () async {
         // Arrange
-        final sourceCalendarUid = 'calendar-1';
+        final sourceProjectPath = 'calendar-1';
         final targetCalendarUid = 'calendar-2';
         
         final originalTask = Task(
@@ -240,7 +240,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          sourceCalendarUid: sourceCalendarUid,
+          projectPath: sourceProjectPath,
         );
 
         when(mockTaskRepository.save(any))
@@ -258,7 +258,7 @@ void main() {
 
       test('should handle move without sync service', () async {
         // Arrange
-        final sourceCalendarUid = 'calendar-1';
+        final sourceProjectPath = 'calendar-1';
         final targetCalendarUid = 'calendar-2';
         
         final originalTask = Task(
@@ -269,7 +269,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          sourceCalendarUid: sourceCalendarUid,
+          projectPath: sourceProjectPath,
         );
 
         when(mockTaskRepository.save(any))
@@ -302,7 +302,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          sourceCalendarUid: null, // Invalid source calendar
+          projectPath: null, // Invalid source calendar
         );
         // Stub save to avoid MissingStubError
         when(mockTaskRepository.save(any)).thenAnswer((_) async => const Result.success(null));
@@ -317,7 +317,7 @@ void main() {
 
       test('should handle move with sync service failure', () async {
         // Arrange
-        final sourceCalendarUid = 'calendar-1';
+        final sourceProjectPath = 'calendar-1';
         final targetCalendarUid = 'calendar-2';
         
         final originalTask = Task(
@@ -328,7 +328,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          sourceCalendarUid: sourceCalendarUid,
+          projectPath: sourceProjectPath,
         );
 
         when(mockTaskRepository.save(any))

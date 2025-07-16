@@ -479,11 +479,41 @@ class CalDAVService {
     String? uid,
   }) async {
     try {
-      // Generate UUID for unique calendar path
-      final calendarUuid = const Uuid().v4();
-      final calendarPath = '/${account.username}/$calendarUuid/';
-      final normalizedPath = calendarPath.endsWith('/') ? calendarPath : '$calendarPath/';
-      AppLogger.info('CalDAVService: Creating calendar $displayName at $normalizedPath');
+      // First discover the proper calendar home for this account
+      final capabilitiesResult = await discoverCapabilities();
+      return await capabilitiesResult.when(
+        success: (capabilities) async {
+          // Generate UUID for unique calendar path
+          final calendarUuid = const Uuid().v4();
+          final calendarHome = capabilities.calendarHome;
+          final calendarPath = '$calendarHome$calendarUuid/';
+          final normalizedPath = calendarPath.endsWith('/') ? calendarPath : '$calendarPath/';
+          AppLogger.info('CalDAVService: Creating calendar $displayName at $normalizedPath using calendar home: $calendarHome');
+          
+          return await _performCalendarCreation(normalizedPath, displayName, description);
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: Failed to discover capabilities for calendar creation', failure.exception, failure.stackTrace);
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Failed to create calendar', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to create calendar: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Perform the actual calendar creation after path discovery
+  Future<Result<TaskCalendar>> _performCalendarCreation(
+    String normalizedPath,
+    String displayName,
+    String? description,
+  ) async {
+    try {
       
       // Build MKCALENDAR request body (RFC 4791 Section 5.3.1)
       final mkCalendarBody = '''<?xml version="1.0" encoding="utf-8"?>
@@ -524,7 +554,6 @@ class CalDAVService {
                path: normalizedPath,
                displayName: displayName,
                description: description ?? 'Created by FlowIt',
-               uid: uid,
              ));
                      } else if (webDavResponse.statusCode == 409) {
              // 409 Conflict - calendar already exists
@@ -569,7 +598,7 @@ class CalDAVService {
     try {
       AppLogger.info('CalDAVService: Starting calendar properties PROPPATCH for ${calendar.displayName}');
       AppLogger.info('CalDAVService: Calendar path: ${calendar.path}');
-      AppLogger.info('CalDAVService: Calendar UID: ${calendar.uid}');
+      AppLogger.info('CalDAVService: Calendar UID: ${calendar.path}');
       AppLogger.info('CalDAVService: Description: ${calendar.description.isNotEmpty ? calendar.description.substring(0, math.min(50, calendar.description.length)) + "..." : "(empty)"}');
       AppLogger.info('CalDAVService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
       AppLogger.info('CalDAVService: Status value: ${calendar.flowitStatus ?? "(null)"}');
@@ -694,7 +723,7 @@ class CalDAVService {
     vcalendar.writeln('PRODID:-//FlowIt//FlowIt v1.0//EN');
     
     // Standard calendar properties
-    vcalendar.writeln('UID:${calendar.uid}');
+    vcalendar.writeln('UID:${calendar.path}');
     vcalendar.writeln('DTSTAMP:${_formatDateTime(calendar.dtstamp)}');
     vcalendar.writeln('CREATED:${_formatDateTime(calendar.created)}');
     vcalendar.writeln('LAST-MODIFIED:${_formatDateTime(calendar.lastModified)}');
@@ -791,7 +820,6 @@ class CalDAVService {
         path: path,
         displayName: displayName,
         description: description,
-        uid: uid,
         dtstamp: dtstamp,
         created: created,
         lastModified: lastModified,

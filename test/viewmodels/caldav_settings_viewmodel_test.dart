@@ -60,7 +60,6 @@ void main() {
           TaskCalendar(
             path: '/test/calendar1',
             displayName: 'Test Calendar 1',
-            uid: 'cal1',
             dtstamp: DateTime.now(),
             created: DateTime.now(),
             lastModified: DateTime.now(),
@@ -118,7 +117,6 @@ void main() {
         final testCalendar = TaskCalendar(
           path: '/test/calendar1',
           displayName: 'Test Calendar 1',
-          uid: 'cal1',
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
@@ -141,7 +139,6 @@ void main() {
         final testCalendar = TaskCalendar(
           path: '/test/calendar1',
           displayName: 'Test Calendar 1',
-          uid: 'cal1',
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
@@ -161,7 +158,7 @@ void main() {
 
         // Assert
         expect(viewModel.state.selectedCalendars, isEmpty);
-        verify(mockCalendarRepository.delete(testCalendar.uid)).called(1);
+        verify(mockCalendarRepository.delete(testCalendar.path)).called(1);
       });
 
       test('should handle save failure', () async {
@@ -169,7 +166,6 @@ void main() {
         final testCalendar = TaskCalendar(
           path: '/test/calendar1',
           displayName: 'Test Calendar 1',
-          uid: 'cal1',
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
@@ -272,7 +268,6 @@ void main() {
         final testCalendar = TaskCalendar(
           path: '/test/calendar1',
           displayName: 'Test Calendar 1',
-          uid: 'cal1',
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
@@ -292,7 +287,6 @@ void main() {
         final testCalendar = TaskCalendar(
           path: '/test/calendar1',
           displayName: 'Test Calendar 1',
-          uid: 'cal1',
           dtstamp: DateTime.now(),
           created: DateTime.now(),
           lastModified: DateTime.now(),
@@ -324,7 +318,6 @@ void main() {
           TaskCalendar(
             path: '/test/calendar$index',
             displayName: 'Test Calendar $index',
-            uid: 'cal$index',
             dtstamp: DateTime.now(),
             created: DateTime.now(),
             lastModified: DateTime.now(),
@@ -344,7 +337,6 @@ void main() {
           TaskCalendar(
             path: '/test/calendar1',
             displayName: 'Test Calendar 1',
-            uid: 'cal1',
             supportsTodos: true,
             dtstamp: DateTime.now(),
             created: DateTime.now(),
@@ -354,7 +346,6 @@ void main() {
           TaskCalendar(
             path: '/test/calendar2',
             displayName: 'Test Calendar 2',
-            uid: 'cal2',
             supportsTodos: false,
             dtstamp: DateTime.now(),
             created: DateTime.now(),
@@ -364,7 +355,6 @@ void main() {
           TaskCalendar(
             path: '/test/calendar3',
             displayName: 'Test Calendar 3',
-            uid: 'cal3',
             supportsTodos: true,
             dtstamp: DateTime.now(),
             created: DateTime.now(),

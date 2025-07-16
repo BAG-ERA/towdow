@@ -21,6 +21,7 @@ import 'data/models/user_preferences.dart';
 import 'data/models/external_calendar.dart';
 import 'data/models/external_caldav_account.dart';
 import 'data/models/calendar_event.dart';
+import 'data/models/offline_file.dart';
 import 'data/services/local_storage_service.dart';
 import 'data/providers/providers.dart';
 
@@ -56,6 +57,11 @@ void main() async {
   Hive.registerAdapter(ExternalCalendarAuthTypeAdapter());
   Hive.registerAdapter(ExternalCaldavAccountAdapter());
   Hive.registerAdapter(CalendarEventAdapter());
+  
+  // Register Offline File adapters
+  Hive.registerAdapter(OfflineFileStatusAdapter());
+  Hive.registerAdapter(OfflineFileAdapter());
+  Hive.registerAdapter(FileUploadQueueItemAdapter());
   
   // Initialize local storage service
   final storageService = LocalStorageService();

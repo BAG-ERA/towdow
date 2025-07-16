@@ -3,6 +3,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../../data/services/export_import_service.dart';
@@ -23,103 +24,114 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.download_rounded),
-          SizedBox(width: 8),
-          Text('Export Calendars'),
-        ],
-      ),
-      content: SizedBox(
-        width: MediaQuery.of(context).size.width > 500 ? 450 : MediaQuery.of(context).size.width * 0.9,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent) {
+          // Handle Escape to close dialog
+          if (event.logicalKey == LogicalKeyboardKey.escape && !_isExporting) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: AlertDialog(
+        title: const Row(
           children: [
-            const Text(
-              'Export all your calendars and tasks to a zip file. This will include all VTODO items from your projects.',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            
-            if (_isExporting) ...[
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              const Text('Exporting calendars...'),
-            ] else if (_exportPath != null) ...[
-              const Icon(Icons.check_circle, color: Colors.green, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Export completed!',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.green,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'File saved to:',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _exportPath!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ),
-            ] else if (_errorMessage != null) ...[
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'Export failed',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.red,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _errorMessage!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.red,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ] else ...[
-              const Icon(Icons.folder_open_rounded, size: 48, color: Colors.grey),
-              const SizedBox(height: 16),
-              const Text('Click "Export" to choose where to save the file'),
-            ],
+            Icon(Icons.download_rounded),
+            SizedBox(width: 8),
+            Text('Export Calendars'),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isExporting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width > 500 ? 450 : MediaQuery.of(context).size.width * 0.9,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Export all your calendars and tasks to a zip file. This will include all VTODO items from your projects.',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              
+              if (_isExporting) ...[
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                const Text('Exporting calendars...'),
+              ] else if (_exportPath != null) ...[
+                const Icon(Icons.check_circle, color: Colors.green, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  'Export completed!',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'File saved to:',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _exportPath!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ] else if (_errorMessage != null) ...[
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  'Export failed',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _errorMessage!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.red,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ] else ...[
+                const Icon(Icons.folder_open_rounded, size: 48, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text('Click "Export" to choose where to save the file'),
+              ],
+            ],
+          ),
         ),
-        if (!_isExporting && _exportPath == null)
-          ElevatedButton(
-            onPressed: _startExport,
-            child: const Text('Export'),
+        actions: [
+          TextButton(
+            onPressed: _isExporting ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
           ),
-        if (_exportPath != null)
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _showSuccessMessage();
-            },
-            child: const Text('Done'),
-          ),
-      ],
+          if (!_isExporting && _exportPath == null)
+            ElevatedButton(
+              onPressed: _startExport,
+              child: const Text('Export'),
+            ),
+          if (_exportPath != null)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showSuccessMessage();
+              },
+              child: const Text('Done'),
+            ),
+        ],
+      ),
     );
   }
 

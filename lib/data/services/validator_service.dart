@@ -3,6 +3,7 @@
 // Maintains backward compatibility with legacy validator format
 
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/logger.dart';
 
@@ -63,29 +64,76 @@ class ValidatorService {
     return true;
   }
   
-  /// Update validator state by ID
+  /// Update validator state
   static List<List<Map<String, dynamic>>> updateValidatorState(
     List<List<Map<String, dynamic>>> validatorLists,
     String validatorId,
-    dynamic newState,
+    Map<String, dynamic> newState,
   ) {
-    final updatedLists = <List<Map<String, dynamic>>>[];
+    AppLogger.debug('ValidatorService: updateValidatorState called with validatorId: $validatorId');
+    AppLogger.debug('ValidatorService: newState: $newState');
     
-    for (final validatorList in validatorLists) {
-      final updatedList = <Map<String, dynamic>>[];
-      
-      for (final validator in validatorList) {
+    return validatorLists.map((validatorList) {
+      return validatorList.map((validator) {
         if (validator['id'] == validatorId) {
-          updatedList.add(_updateValidatorData(validator, newState));
-        } else {
-          updatedList.add(Map<String, dynamic>.from(validator));
+          AppLogger.debug('ValidatorService: Found validator to update: ${validator['id']}');
+          AppLogger.debug('ValidatorService: Current validator state: $validator');
+          
+          final type = newState['type'] as String;
+          AppLogger.debug('ValidatorService: Update type: $type');
+          
+          Map<String, dynamic> updated = Map.from(validator);
+          
+          switch (type) {
+            case 'toggle':
+              updated['completed'] = newState['completed'];
+              break;
+            case 'update_text':
+              updated['text'] = newState['text'];
+              break;
+            case 'add_file':
+              final updatedValidator = _addFile(updated, newState);
+              AppLogger.debug('ValidatorService: After add_file: $updatedValidator');
+              return updatedValidator;
+            case 'remove_file':
+              final updatedValidator = _removeFile(updated, newState);
+              AppLogger.debug('ValidatorService: After remove_file: $updatedValidator');
+              return updatedValidator;
+            case 'update_file_s3':
+              final updatedValidator = _updateFileS3(updated, newState);
+              AppLogger.debug('ValidatorService: After update_file_s3: $updatedValidator');
+              return updatedValidator;
+            case 'checklist_item':
+              return _updateChecklistItem(updated, newState);
+            case 'selection':
+              updated['selected'] = newState['selected'];
+              break;
+            case 'free_field':
+              updated['value'] = newState['value'];
+              break;
+            case 'add_checklist_item':
+              return _addChecklistItem(updated);
+            case 'remove_checklist_item':
+              return _removeChecklistItem(updated, newState);
+            case 'add_select_option':
+              return _addSelectOption(updated);
+            case 'remove_select_option':
+              return _removeSelectOption(updated, newState);
+            case 'edit_title':
+              updated['title'] = newState['title'];
+              break;
+            case 'edit_checklist_item':
+              return _editChecklistItem(updated, newState);
+            case 'edit_select_option':
+              return _editSelectOption(updated, newState);
+          }
+          
+          AppLogger.debug('ValidatorService: Updated validator: $updated');
+          return updated;
         }
-      }
-      
-      updatedLists.add(updatedList);
-    }
-    
-    return updatedLists;
+        return validator;
+      }).toList();
+    }).toList();
   }
   
   /// Add validator to first list (or create first list if needed)
@@ -203,35 +251,63 @@ class ValidatorService {
       if (helper != null) 'helper': helper,
     };
   }
+
+  static Map<String, dynamic> createFileValidator({
+    required String title,
+    String? helper,
+    bool required = true,
+  }) {
+    const uuid = Uuid();
+    // Generate encryption key directly without EncryptionService dependency
+    // S3StorageService now handles the actual encryption/decryption
+    final encryptionKey = _generateEncryptionKey();
+    return {
+      'id': uuid.v4(),
+      'type': 'file',
+      'required': required,
+      'title': title,
+      'files': <Map<String, dynamic>>[], // Array of file attachments
+      'encryptionKey': encryptionKey, // Automatically generated encryption key
+      if (helper != null) 'helper': helper,
+    };
+  }
+
+  static Map<String, dynamic> createMediaValidator({
+    required String title,
+    String? helper,
+    bool required = true,
+  }) {
+    const uuid = Uuid();
+    // Generate encryption key directly without EncryptionService dependency
+    // S3StorageService now handles the actual encryption/decryption
+    final encryptionKey = _generateEncryptionKey();
+    return {
+      'id': uuid.v4(),
+      'type': 'media',
+      'required': required,
+      'title': title,
+      'files': <Map<String, dynamic>>[], // Array of media file attachments
+      'encryptionKey': encryptionKey, // Automatically generated encryption key
+      if (helper != null) 'helper': helper,
+    };
+  }
+
+  /// Generate a unique encryption key for file validator
+  /// Returns a cryptographically secure random key
+  static String _generateEncryptionKey() {
+    const uuid = Uuid();
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final combined = '${uuid.v4()}-$timestamp';
+    
+    // Create a hash for additional security
+    final bytes = utf8.encode(combined);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
   
   /// Private helper methods
   
-  static List<List<Map<String, dynamic>>> _migrateLegacyValidator(String legacyJson) {
-    try {
-      final legacy = jsonDecode(legacyJson);
-      
-      if (legacy['type'] == 'default') {
-        return []; // No validators for default type
-      }
-      
-      if (legacy['type'] == 'form' && legacy['form'] is List) {
-        final validators = <Map<String, dynamic>>[];
-        
-        for (final question in legacy['form']) {
-          if (question is Map<String, dynamic>) {
-            validators.add(_migrateFormQuestion(question));
-          }
-        }
-        
-        return validators.isNotEmpty ? [validators] : [];
-      }
-      
-      return [];
-    } catch (e, stackTrace) {
-      AppLogger.error('ValidatorService: Failed to migrate legacy validator', e, stackTrace);
-      return [];
-    }
-  }
+
   
   static Map<String, dynamic> _migrateFormQuestion(Map<String, dynamic> question) {
     final type = question['questiontype'] as String?;
@@ -304,6 +380,14 @@ class ValidatorService {
         final value = validator['value'] as String? ?? '';
         return value.trim().isNotEmpty;
         
+      case 'file':
+        final files = validator['files'] as List? ?? [];
+        return files.isNotEmpty;
+        
+      case 'media':
+        final files = validator['files'] as List? ?? [];
+        return files.isNotEmpty;
+        
       default:
         return false;
     }
@@ -316,6 +400,41 @@ class ValidatorService {
     final type = validator['type'] as String?;
     final updated = Map<String, dynamic>.from(validator);
     
+    // Handle complex update operations with structured commands
+    if (newState is Map<String, dynamic> && newState.containsKey('type')) {
+      final updateType = newState['type'] as String;
+      
+      switch (updateType) {
+        case 'checklist_item':
+          return _updateChecklistItem(updated, newState);
+        case 'selection':
+          return _updateSelection(updated, newState);
+        case 'free_field':
+          return _updateFreeField(updated, newState);
+        case 'edit_title':
+          return _updateTitle(updated, newState);
+        case 'add_checklist_item':
+          return _addChecklistItem(updated);
+        case 'remove_checklist_item':
+          return _removeChecklistItem(updated, newState);
+        case 'edit_checklist_item':
+          return _editChecklistItem(updated, newState);
+        case 'add_select_option':
+          return _addSelectOption(updated);
+        case 'remove_select_option':
+          return _removeSelectOption(updated, newState);
+        case 'edit_select_option':
+          return _editSelectOption(updated, newState);
+        case 'add_file':
+          return _addFile(updated, newState);
+        case 'remove_file':
+          return _removeFile(updated, newState);
+        case 'update_file_s3':
+          return _updateFileS3(updated, newState);
+      }
+    }
+    
+    // Legacy simple updates for backward compatibility
     switch (type) {
       case 'checklist':
         if (newState is Map<String, dynamic> && newState.containsKey('itemId')) {
@@ -345,5 +464,150 @@ class ValidatorService {
     }
     
     return updated;
+  }
+  
+  // Helper methods for specific validator update operations
+  
+  static Map<String, dynamic> _updateChecklistItem(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final itemId = newState['itemId'] as String;
+    final checked = newState['checked'] as bool;
+    final items = (validator['items'] as List? ?? []).map((item) {
+      if (item['id'] == itemId) {
+        return {...item, 'checked': checked};
+      }
+      return item;
+    }).toList();
+    return {...validator, 'items': items};
+  }
+  
+  static Map<String, dynamic> _updateSelection(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final selected = newState['selected'] as String;
+    return {...validator, 'selected': selected};
+  }
+  
+  static Map<String, dynamic> _updateFreeField(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final value = newState['value'] as String;
+    return {...validator, 'value': value};
+  }
+  
+  static Map<String, dynamic> _updateTitle(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final title = newState['title'] as String;
+    return {...validator, 'title': title};
+  }
+  
+  static Map<String, dynamic> _addChecklistItem(Map<String, dynamic> validator) {
+    const uuid = Uuid();
+    final items = List<Map<String, dynamic>>.from(validator['items'] as List? ?? []);
+    items.add({
+      'id': uuid.v4(),
+      'text': 'New item',
+      'checked': false,
+    });
+    return {...validator, 'items': items};
+  }
+  
+  static Map<String, dynamic> _removeChecklistItem(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final itemId = newState['itemId'] as String;
+    final items = (validator['items'] as List? ?? [])
+        .where((item) => item['id'] != itemId)
+        .toList();
+    return {...validator, 'items': items};
+  }
+  
+  static Map<String, dynamic> _editChecklistItem(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final itemId = newState['itemId'] as String;
+    final text = newState['text'] as String;
+    final items = (validator['items'] as List? ?? []).map((item) {
+      if (item['id'] == itemId) {
+        return {...item, 'text': text};
+      }
+      return item;
+    }).toList();
+    return {...validator, 'items': items};
+  }
+  
+  static Map<String, dynamic> _addSelectOption(Map<String, dynamic> validator) {
+    const uuid = Uuid();
+    final options = List<Map<String, dynamic>>.from(validator['options'] as List? ?? []);
+    options.add({
+      'id': uuid.v4(),
+      'text': 'New option',
+    });
+    return {...validator, 'options': options};
+  }
+  
+  static Map<String, dynamic> _removeSelectOption(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final optionId = newState['optionId'] as String;
+    final options = (validator['options'] as List? ?? [])
+        .where((option) => option['id'] != optionId)
+        .toList();
+    
+    // Clear selection if removed option was selected
+    String selected = validator['selected'] as String? ?? '';
+    if (selected == optionId) {
+      selected = '';
+    }
+    
+    return {...validator, 'options': options, 'selected': selected};
+  }
+  
+  static Map<String, dynamic> _editSelectOption(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final optionId = newState['optionId'] as String;
+    final text = newState['text'] as String;
+    final options = (validator['options'] as List? ?? []).map((option) {
+      if (option['id'] == optionId) {
+        return {...option, 'text': text};
+      }
+      return option;
+    }).toList();
+    return {...validator, 'options': options};
+  }
+  
+  static Map<String, dynamic> _addFile(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final fileInfo = newState['fileInfo'] as Map<String, dynamic>;
+    final files = List<Map<String, dynamic>>.from(validator['files'] as List? ?? []);
+    files.add(fileInfo);
+    return {...validator, 'files': files};
+  }
+  
+  static Map<String, dynamic> _removeFile(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    final fileId = newState['fileId'] as String;
+    final files = (validator['files'] as List? ?? [])
+        .where((file) => file['id'] != fileId)
+        .toList();
+    return {...validator, 'files': files};
+  }
+
+  static Map<String, dynamic> _updateFileS3(Map<String, dynamic> validator, Map<String, dynamic> newState) {
+    AppLogger.debug('ValidatorService: _updateFileS3 called');
+    AppLogger.debug('ValidatorService: validator: $validator');
+    AppLogger.debug('ValidatorService: newState: $newState');
+    
+    final offlineFileId = newState['offlineFileId'] as String;
+    final s3Key = newState['s3Key'] as String;
+    final s3Url = newState['s3Url'] as String;
+    final status = newState['status'] as String;
+    
+    AppLogger.debug('ValidatorService: Looking for offlineFileId: $offlineFileId');
+    
+    final files = (validator['files'] as List? ?? []).map((file) {
+      AppLogger.debug('ValidatorService: Checking file: $file');
+      if (file['offlineFileId'] == offlineFileId) {
+        AppLogger.debug('ValidatorService: Found matching file, updating with S3 info');
+        final updatedFile = {
+          ...file,
+          's3Key': s3Key,
+          's3Url': s3Url,
+          'status': status,
+        };
+        AppLogger.debug('ValidatorService: Updated file: $updatedFile');
+        return updatedFile;
+      }
+      return file;
+    }).toList();
+    
+    final result = {...validator, 'files': files};
+    AppLogger.debug('ValidatorService: _updateFileS3 result: $result');
+    return result;
   }
 } 

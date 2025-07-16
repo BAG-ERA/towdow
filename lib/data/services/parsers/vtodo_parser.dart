@@ -55,10 +55,6 @@ class VTODOParser {
       vtodo.writeln('X-FLOWIT-TEMPLATE:${task.flowitTemplate}');
     }
     
-    if (task.sourceCalendarUid != null) {
-      vtodo.writeln('X-FLOWIT-PROCESS:${task.sourceCalendarUid}');
-    }
-    
     if (task.flowitReversalTask != null) {
       vtodo.writeln('X-FLOWIT-REVERSALTASK:${task.flowitReversalTask}');
     }

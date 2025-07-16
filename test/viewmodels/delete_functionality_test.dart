@@ -13,7 +13,6 @@ import 'package:towdow_app/data/services/domain_service.dart';
 import 'package:towdow_app/data/services/local_storage_service.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/models/task.dart';
-import 'package:towdow_app/data/models/flowit_item.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
@@ -55,9 +54,9 @@ void main() {
         // Arrange
         final testProject = ProjectWithStats(
           project: TaskCalendarFactory.createNew(
-            path: '/test/calendar1',
+            path: 'project1',
             displayName: 'Test Project',
-          ).copyWith(uid: 'project1'),
+          ),
           stats: const ProjectStats(
             totalTasks: 0,
             completedTasks: 0,
@@ -105,9 +104,9 @@ void main() {
         // Arrange
         final testProject = ProjectWithStats(
           project: TaskCalendarFactory.createNew(
-            path: '/test/calendar1',
+            path: 'project1',
             displayName: 'Test Project',
-          ).copyWith(uid: 'project1'),
+          ),
           stats: const ProjectStats(
             totalTasks: 0,
             completedTasks: 0,
@@ -185,7 +184,7 @@ void main() {
         // Arrange
         final testTask = TaskFactory.createNew(
           summary: 'Test Task',
-          sourceCalendarUid: 'project1',
+          projectPath: 'project1',
         ).copyWith(uid: 'task1');
 
         final viewModel = TaskViewModel(mockTaskRepository, mockAccountRepository);
@@ -211,7 +210,7 @@ void main() {
         // Arrange
         final testTask = TaskFactory.createNew(
           summary: 'Test Task',
-          sourceCalendarUid: 'project1',
+          projectPath: 'project1',
         ).copyWith(uid: 'task1');
 
         final viewModel = TaskViewModel(mockTaskRepository, mockAccountRepository);
@@ -238,7 +237,7 @@ void main() {
         // Arrange
         final testTask = TaskFactory.createNew(
           summary: 'Test Task',
-          sourceCalendarUid: 'project1',
+          projectPath: 'project1',
         ).copyWith(uid: 'task1');
 
         final viewModel = TaskViewModel(mockTaskRepository, mockAccountRepository);

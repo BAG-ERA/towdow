@@ -2,6 +2,7 @@
 // Provides a clean interface for moving tasks between calendars/projects
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/task.dart';
 import '../../../../data/models/task_calendar.dart';
@@ -21,54 +22,65 @@ class MoveTaskDialog extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final calendarsAsync = ref.watch(calendarListProvider);
     
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.move_to_inbox_rounded),
-          SizedBox(width: 12),
-          Text('Move Task'),
-        ],
-      ),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent) {
+          // Handle Escape to close dialog
+          if (event.logicalKey == LogicalKeyboardKey.escape) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: AlertDialog(
+        title: const Row(
           children: [
-            Text(
-              'Moving: ${task.summary}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Select destination calendar:'),
-            const SizedBox(height: 12),
-            calendarsAsync.when(
-              data: (calendars) => _buildCalendarList(context, ref, calendars),
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-              error: (error, _) => Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text(
-                  'Error loading calendars: $error',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            ),
+            Icon(Icons.move_to_inbox_rounded),
+            SizedBox(width: 12),
+            Text('Move Task'),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Moving: ${task.summary}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Select destination calendar:'),
+              const SizedBox(height: 12),
+              calendarsAsync.when(
+                data: (calendars) => _buildCalendarList(context, ref, calendars),
+                loading: () => const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+                error: (error, _) => Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    'Error loading calendars: $error',
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -77,7 +89,7 @@ class MoveTaskDialog extends ConsumerWidget {
     final availableCalendars = calendars
         .where((calendar) => 
             calendar.supportsTodos && 
-            calendar.uid != task.sourceCalendarUid)
+            calendar.path != task.projectPath)
         .toList();
 
     if (availableCalendars.isEmpty) {
@@ -148,7 +160,7 @@ class MoveTaskDialog extends ConsumerWidget {
 
   void _onCalendarSelected(BuildContext context, WidgetRef ref, TaskCalendar targetCalendar) async {
     try {
-      AppLogger.info('MoveTaskDialog: Moving task ${task.uid} to calendar ${targetCalendar.uid}');
+      AppLogger.info('MoveTaskDialog: Moving task ${task.uid} to calendar ${targetCalendar.path}');
       
       // Close the dialog first
       Navigator.of(context).pop();
@@ -175,7 +187,7 @@ class MoveTaskDialog extends ConsumerWidget {
       
       // Execute the move operation via TaskViewModel
       final taskViewModel = ref.read(taskViewModelProvider.notifier);
-      await taskViewModel.moveTask(task, targetCalendar.uid);
+      await taskViewModel.moveTask(task, targetCalendar.path);
       
       // Show success message
       if (context.mounted) {

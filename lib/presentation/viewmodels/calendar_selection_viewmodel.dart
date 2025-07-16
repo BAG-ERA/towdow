@@ -6,7 +6,11 @@ import '../../data/services/caldav_service.dart';
 import '../../data/services/capability_discovery_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
+import '../../data/repositories/user_repository.dart';
+import '../../data/repositories/external_account_repository.dart';
+import '../../data/repositories/external_calendar_repository.dart';
 import '../../data/services/local_storage_service.dart';
+import '../../data/services/user_sync_service.dart';
 import '../../data/providers/providers.dart';
 
 // State object
@@ -48,6 +52,7 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
   final LocalStorageService _localStorageService;
+  final UserSyncService _userSyncService;
   final void Function()? onInvalidateProjectList;
 
   CalendarSelectionViewModel({
@@ -57,6 +62,7 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
     required LocalStorageService localStorageService,
+    required UserSyncService userSyncService,
     this.onInvalidateProjectList,
   })  : _account = account,
         _caldavService = caldavService,
@@ -64,6 +70,7 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
         _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
         _localStorageService = localStorageService,
+        _userSyncService = userSyncService,
         super(const CalendarSelectionState());
 
   Future<void> loadAccount() async {
@@ -201,6 +208,9 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
       await saveResult.when(
         success: (_) async {
           await _saveCalendarsAsProjects();
+          
+          // Trigger user sync upload for cloud/self-hosted users
+          await _triggerUserSyncUpload();
         },
         failure: (f) async {
           state = state.copyWith(error: 'Failed to save setup: ${f.message}');
@@ -234,6 +244,26 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
       onInvalidateProjectList!();
     }
   }
+
+  /// Trigger user sync upload for cloud/self-hosted users
+  Future<void> _triggerUserSyncUpload() async {
+    try {
+      final syncAvailable = await _userSyncService.isSyncAvailable();
+      if (syncAvailable) {
+        final uploadResult = await _userSyncService.uploadUserData();
+        uploadResult.when(
+          success: (_) {
+            AppLogger.info('CalendarSelection: Successfully uploaded user data to S3');
+          },
+          failure: (failure) {
+            AppLogger.warning('CalendarSelection: Failed to sync user data: ${failure.message}');
+          },
+        );
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('CalendarSelection: Error triggering user sync upload', e, stackTrace);
+    }
+  }
 }
 
 // Provider factory
@@ -245,6 +275,7 @@ final calendarSelectionViewModelProvider = StateNotifierProvider.autoDispose.fam
     accountRepository: ref.read(accountRepositoryProvider),
     calendarRepository: ref.read(calendarRepositoryProvider),
     localStorageService: ref.read(localStorageServiceProvider),
+    userSyncService: ref.read(userSyncServiceProvider),
     onInvalidateProjectList: () => ref.invalidate(projectListProvider),
   ),
 ); 

@@ -70,7 +70,7 @@ void main() {
       const calendarUid = 'test-calendar-123';
       final testTask = TaskFactory.createNew(
         summary: 'Task to Delete',
-        sourceCalendarUid: calendarUid,
+        projectPath: calendarUid,
       );
       
       final now = DateTime.now();

@@ -68,6 +68,8 @@ class CompleteTaskWithValidatorsParams {
   });
 }
 
+
+
 /// Command to update validator state (checklist item, selection, text field)
 class UpdateValidatorStateCommand extends ParameterizedCommand<Task, UpdateValidatorStateParams> {
   final TaskRepository _taskRepository;
@@ -130,9 +132,9 @@ class UpdateValidatorStateCommand extends ParameterizedCommand<Task, UpdateValid
   }
 
   Future<void> _queueSyncOperation(Task task) async {
-    if (_syncService != null && task.sourceCalendarUid != null && task.sourceCalendarUid!.isNotEmpty) {
+    if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
       final syncData = <String, dynamic>{
-        'calendarUid': task.sourceCalendarUid,
+        'calendarUid': task.projectPath,
         'taskUid': task.uid,
       };
       
@@ -250,15 +252,27 @@ class AddValidatorFromTemplateCommand extends ParameterizedCommand<Task, AddVali
           helper: params.helper,
           required: params.required,
         );
+      case 'file':
+        return ValidatorService.createFileValidator(
+          title: params.title,
+          helper: params.helper,
+          required: params.required,
+        );
+      case 'media':
+        return ValidatorService.createMediaValidator(
+          title: params.title,
+          helper: params.helper,
+          required: params.required,
+        );
       default:
         throw Exception('Unknown validator template type: ${params.templateType}');
     }
   }
 
   Future<void> _queueSyncOperation(Task task) async {
-    if (_syncService != null && task.sourceCalendarUid != null && task.sourceCalendarUid!.isNotEmpty) {
+    if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
       final syncData = <String, dynamic>{
-        'calendarUid': task.sourceCalendarUid,
+        'calendarUid': task.projectPath,
         'taskUid': task.uid,
       };
       
@@ -354,9 +368,9 @@ class RemoveValidatorCommand extends ParameterizedCommand<Task, UpdateValidatorS
   }
 
   Future<void> _queueSyncOperation(Task task) async {
-    if (_syncService != null && task.sourceCalendarUid != null && task.sourceCalendarUid!.isNotEmpty) {
+    if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
       final syncData = <String, dynamic>{
-        'calendarUid': task.sourceCalendarUid,
+        'calendarUid': task.projectPath,
         'taskUid': task.uid,
       };
       
@@ -424,9 +438,9 @@ class CompleteTaskWithValidatorsCommand extends ParameterizedCommand<Task, Compl
   }
 
   Future<void> _queueSyncOperation(Task task) async {
-    if (_syncService != null && task.sourceCalendarUid != null && task.sourceCalendarUid!.isNotEmpty) {
+    if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
       final syncData = <String, dynamic>{
-        'calendarUid': task.sourceCalendarUid,
+        'calendarUid': task.projectPath,
         'taskUid': task.uid,
       };
       

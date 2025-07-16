@@ -8,6 +8,7 @@ import '../services/background_sync_service.dart';
 import '../services/domain_service.dart';
 import '../services/status_service.dart';
 import '../repositories/task_repository.dart';
+import '../../core/logger.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/user_repository.dart';
@@ -24,6 +25,10 @@ import '../services/caldav_service.dart';
 import '../services/external_caldav_service.dart';
 import '../services/external_sync_service.dart';
 import '../services/export_import_service.dart';
+import '../services/offline_file_service.dart';
+import '../services/file_upload_queue_service.dart';
+import '../services/connection_monitor_service.dart';
+import '../services/user_sync_service.dart';
 import '../../core/app_lifecycle_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -88,6 +93,40 @@ final caldavServiceProvider = Provider.family<CalDAVService, CaldavAccount>((ref
 // External CalDAV service provider
 final externalCalDAVServiceProvider = Provider.family<ExternalCalDAVService, ExternalCaldavAccount>((ref, account) {
   return ExternalCalDAVService(account: account);
+});
+
+// Offline file service provider
+final offlineFileServiceProvider = Provider<OfflineFileService>((ref) {
+  final storageService = ref.watch(localStorageServiceProvider);
+  return OfflineFileService(storageService);
+});
+
+/// File upload queue service provider
+final fileUploadQueueServiceProvider = Provider<FileUploadQueueService>((ref) {
+  return FileUploadQueueService(
+    localStorage: ref.watch(localStorageServiceProvider),
+    offlineFileService: ref.watch(offlineFileServiceProvider),
+    accountRepository: ref.watch(accountRepositoryProvider),
+    connectionMonitorService: ref.watch(connectionMonitorServiceProvider),
+    taskRepository: ref.watch(taskRepositoryProvider),
+    syncService: ref.watch(syncServiceProvider),
+  );
+});
+
+// Connection monitor service provider
+final connectionMonitorServiceProvider = Provider<ConnectionMonitorService>((ref) {
+  return ConnectionMonitorService();
+});
+
+// User sync service provider
+final userSyncServiceProvider = Provider<UserSyncService>((ref) {
+  return UserSyncService(
+    userRepository: ref.watch(userRepositoryProvider),
+    externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
+    externalCalendarRepository: ref.watch(externalCalendarRepositoryProvider),
+    accountRepository: ref.watch(accountRepositoryProvider),
+    calendarRepository: ref.watch(calendarRepositoryProvider),
+  );
 });
 
 // External calendar sync service provider
@@ -204,12 +243,18 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final syncService = ref.watch(syncServiceProvider);
   final backgroundSyncService = ref.watch(backgroundSyncServiceProvider);
   final externalSyncService = ref.watch(externalCalendarSyncServiceProvider);
+  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
+  final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
+  final userSyncService = ref.watch(userSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
 
   final result = await lifecycleManager.initialize(
     syncService: syncService,
     backgroundSyncService: backgroundSyncService,
     externalSyncService: externalSyncService,
+    fileUploadQueueService: fileUploadQueueService,
+    connectionMonitorService: connectionMonitorService,
+    userSyncService: userSyncService,
     accountRepository: accountRepository,
   );
 
@@ -259,7 +304,7 @@ final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel,
   return ProjectListViewModel(calendarRepository, taskRepository, syncService, domainService, accountRepository, userRepository);
 });
 
-final validatorViewModelProvider = StateNotifierProvider<ValidatorViewModel, ValidatorViewModelState>((ref) {
+final validatorViewModelProvider = StateNotifierProvider.family<ValidatorViewModel, ValidatorViewModelState, String>((ref, taskUid) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final syncService = ref.watch(syncServiceProvider);
@@ -418,6 +463,24 @@ final anytimeTasksProvider = StreamProvider<List<Task>>((ref) {
   });
 });
 
+// Unified project-specific tasks provider
+final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, projectPath) {
+  final taskRepository = ref.read(taskRepositoryProvider);
+  return taskRepository.watchTasks().map((allTasks) {
+    // Encode special characters in the project path to match encoded storage format
+    final encodedProjectPath = projectPath.replaceAll('@', '%40');
+    
+    // Filter tasks by their project path (Calendar = Project model)
+    final projectTasks = allTasks
+        .where((task) => task.projectPath == encodedProjectPath)
+        .toList();
+    
+
+    
+    return projectTasks;
+  });
+});
+
 // Deprecated: Keep for backward compatibility
 final unregisteredTasksProvider = anytimeTasksProvider;
 
@@ -530,4 +593,37 @@ final tasksWithAttendeesProvider = FutureProvider<Map<String, int>>((ref) async 
     },
     failure: (failure) => throw Exception(failure.message),
   );
+});
+
+// Simple search state for project task filtering
+final projectSearchQueryProvider = StateProvider.family<String, String>((ref, projectPath) => '');
+
+// Provider for filtered tasks within a specific project based on search query
+final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, projectPath) {
+  final projectTasksAsync = ref.watch(projectTasksProvider(projectPath));
+  final searchQuery = ref.watch(projectSearchQueryProvider(projectPath));
+  
+  final allTasks = projectTasksAsync.when(
+    data: (tasks) => tasks,
+    loading: () => <Task>[],
+    error: (_, __) => <Task>[],
+  );
+  
+  if (searchQuery.trim().isEmpty) {
+    return allTasks;
+  }
+
+  final searchLower = searchQuery.toLowerCase();
+  
+  final filteredTasks = allTasks.where((task) {
+    final summaryMatch = task.summary.toLowerCase().contains(searchLower);
+    final descriptionMatch = task.description != null && task.description!.toLowerCase().contains(searchLower);
+    final categoriesMatch = task.categories.any(
+      (category) => category.toLowerCase().contains(searchLower),
+    );
+    
+    return summaryMatch || descriptionMatch || categoriesMatch;
+  }).toList();
+  
+  return filteredTasks;
 });

@@ -23,6 +23,10 @@ class LocalStorageService {
   static const String externalAccountsBoxName = 'external_accounts'; // For storing external CalDAV accounts
   static const String externalCalendarsBoxName = 'external_calendars'; // For storing external calendars
   static const String externalEventsBoxName = 'external_events'; // For storing external calendar events
+  
+  // Offline file storage boxes
+  static const String offlineFilesBoxName = 'offline_files'; // For storing offline file metadata
+  static const String fileUploadQueueBoxName = 'file_upload_queue'; // For storing file upload queue items
 
   // Box references
   late Box _tasksBox;
@@ -39,6 +43,10 @@ class LocalStorageService {
   late Box _externalAccountsBox;
   late Box _externalCalendarsBox;
   late Box _externalEventsBox;
+  
+  // Offline file storage box references
+  late Box _offlineFilesBox;
+  late Box _fileUploadQueueBox;
 
   // Initialize all Hive boxes
   Future<Result<void>> initialize() async {
@@ -67,6 +75,10 @@ class LocalStorageService {
       await _initializeBoxSafely(externalAccountsBoxName, 'external_accounts');
       await _initializeBoxSafely(externalCalendarsBoxName, 'external_calendars');
       await _initializeBoxSafely(externalEventsBoxName, 'external_events');
+      
+      // Initialize offline file storage boxes
+      await _initializeBoxSafely(offlineFilesBoxName, 'offline_files');
+      await _initializeBoxSafely(fileUploadQueueBoxName, 'file_upload_queue');
 
       // Assign the boxes after successful initialization
       _tasksBox = Hive.box(tasksBoxName);
@@ -83,6 +95,10 @@ class LocalStorageService {
       _externalAccountsBox = Hive.box(externalAccountsBoxName);
       _externalCalendarsBox = Hive.box(externalCalendarsBoxName);
       _externalEventsBox = Hive.box(externalEventsBoxName);
+      
+      // Assign offline file storage boxes
+      _offlineFilesBox = Hive.box(offlineFilesBoxName);
+      _fileUploadQueueBox = Hive.box(fileUploadQueueBoxName);
 
       // AppLogger.info('LocalStorageService: All boxes initialized successfully');
       return const Result.success(null);
@@ -412,6 +428,10 @@ class LocalStorageService {
         return _externalCalendarsBox;
       case externalEventsBoxName:
         return _externalEventsBox;
+      case offlineFilesBoxName:
+        return _offlineFilesBox;
+      case fileUploadQueueBoxName:
+        return _fileUploadQueueBox;
       default:
         throw ArgumentError('Unknown box name: $boxName');
     }
@@ -433,6 +453,8 @@ class LocalStorageService {
       _externalAccountsBox.close(),
       _externalCalendarsBox.close(),
       _externalEventsBox.close(),
+      _offlineFilesBox.close(),
+      _fileUploadQueueBox.close(),
     ]);
   }
 

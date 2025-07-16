@@ -3,11 +3,13 @@
 // Ensures background sync continues even when UI is minimized
 
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import '../data/services/sync_service.dart';
 import '../data/services/background_sync_service.dart';
 import '../data/services/external_sync_service.dart';
+import '../data/services/file_upload_queue_service.dart';
+import '../data/services/connection_monitor_service.dart';
+import '../data/services/user_sync_service.dart';
 import '../data/repositories/account_repository.dart';
 import 'logger.dart';
 import 'result.dart';
@@ -31,6 +33,9 @@ class AppLifecycleManager {
   SyncService? _syncService;
   BackgroundSyncService? _backgroundSyncService;
   ExternalCalendarSyncService? _externalSyncService;
+  FileUploadQueueService? _fileUploadQueueService;
+  ConnectionMonitorService? _connectionMonitorService;
+  UserSyncService? _userSyncService;
   AccountRepository? _accountRepository;
 
   // State management
@@ -45,13 +50,16 @@ class AppLifecycleManager {
   FlowItAppState get state => _state;
   Stream<FlowItAppState> get stateStream => _stateController.stream;
   bool get isReady => _state == FlowItAppState.ready;
-  bool get hasServices => _syncService != null && _backgroundSyncService != null && _externalSyncService != null;
+  bool get hasServices => _syncService != null && _backgroundSyncService != null && _externalSyncService != null && _fileUploadQueueService != null && _connectionMonitorService != null && _userSyncService != null;
 
   /// Initialize the app lifecycle manager with required services
   Future<Result<void>> initialize({
     required SyncService syncService,
     required BackgroundSyncService backgroundSyncService,
     required ExternalCalendarSyncService externalSyncService,
+    required FileUploadQueueService fileUploadQueueService,
+    required ConnectionMonitorService connectionMonitorService,
+    required UserSyncService userSyncService,
     required AccountRepository accountRepository,
   }) async {
     try {
@@ -62,6 +70,9 @@ class AppLifecycleManager {
       _syncService = syncService;
       _backgroundSyncService = backgroundSyncService;
       _externalSyncService = externalSyncService;
+      _fileUploadQueueService = fileUploadQueueService;
+      _connectionMonitorService = connectionMonitorService;
+      _userSyncService = userSyncService;
       _accountRepository = accountRepository;
 
       // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Services assigned, checking for active account');
@@ -150,6 +161,36 @@ class AppLifecycleManager {
         );
       }
 
+      // Start file upload queue service
+      if (_fileUploadQueueService != null) {
+        AppLogger.debug('AppLifecycleManager: Starting FileUploadQueueService');
+        _fileUploadQueueService!.startQueueProcessing();
+        AppLogger.info('AppLifecycleManager: FileUploadQueueService started successfully');
+      }
+
+      // Start user sync service (for cloud/self-hosted users)
+      if (_userSyncService != null) {
+        AppLogger.debug('AppLifecycleManager: Starting UserSyncService periodic sync');
+        _userSyncService!.startPeriodicSync(interval: const Duration(hours: 2)); // Check every 2 hours for user data updates
+        AppLogger.info('AppLifecycleManager: UserSyncService started successfully');
+      }
+
+      // Start connection monitoring service
+      if (_connectionMonitorService != null) {
+        AppLogger.debug('AppLifecycleManager: Starting ConnectionMonitorService');
+        await _connectionMonitorService!.startMonitoring();
+        
+        // Set up connection restored listener to trigger upload queue processing
+        _connectionMonitorService!.connectionRestoredStream.listen((_) {
+          AppLogger.info('AppLifecycleManager: Connection restored, triggering upload queue processing');
+          if (_fileUploadQueueService != null) {
+            _fileUploadQueueService!.startQueueProcessing(); // Trigger immediate processing
+          }
+        });
+        
+        AppLogger.info('AppLifecycleManager: ConnectionMonitorService started successfully');
+      }
+
       _updateState(FlowItAppState.ready);
       // AppLogger.info('AppLifecycleManager: All main services started successfully');
       return const Result.success(null);
@@ -207,6 +248,18 @@ class AppLifecycleManager {
         _externalSyncService!.stopBackgroundSync();
         AppLogger.info('AppLifecycleManager: ExternalCalendarSyncService stopped');
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] ExternalCalendarSyncService stopped');
+      }
+
+      // Stop file upload queue service
+      if (_fileUploadQueueService != null) {
+        _fileUploadQueueService!.stopQueueProcessing();
+        AppLogger.info('AppLifecycleManager: FileUploadQueueService stopped');
+      }
+
+      // Stop connection monitoring service
+      if (_connectionMonitorService != null) {
+        _connectionMonitorService!.stopMonitoring();
+        AppLogger.info('AppLifecycleManager: ConnectionMonitorService stopped');
       }
 
       // AppLogger.info('AppLifecycleManager: All services stopped');
@@ -364,11 +417,17 @@ class AppLifecycleManager {
     
     // Dispose services
     _externalSyncService?.dispose();
+    _fileUploadQueueService?.dispose();
+    _connectionMonitorService?.dispose();
+    _userSyncService?.dispose();
     
     // Services will be disposed by their providers
     _syncService = null;
     _backgroundSyncService = null;
     _externalSyncService = null;
+    _fileUploadQueueService = null;
+    _connectionMonitorService = null;
+    _userSyncService = null;
     _accountRepository = null;
     
     // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Resources disposed');

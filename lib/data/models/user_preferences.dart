@@ -22,12 +22,16 @@ class UserPreferences extends HiveObject {
   @HiveField(4)
   final Map<String, dynamic>? customSettings; // Future: extensible settings
 
+  @HiveField(5)
+  final List<String> syncedProjects; // Projects marked for S3 sync
+
   UserPreferences({
     this.projectOrder = const [],
     this.preferredTheme,
     this.enableNotifications,
     this.defaultProjectView,
     this.customSettings,
+    this.syncedProjects = const [],
   });
 
   /// Create a copy with updated values
@@ -37,6 +41,7 @@ class UserPreferences extends HiveObject {
     bool? enableNotifications,
     String? defaultProjectView,
     Map<String, dynamic>? customSettings,
+    List<String>? syncedProjects,
   }) {
     return UserPreferences(
       projectOrder: projectOrder ?? this.projectOrder,
@@ -44,6 +49,7 @@ class UserPreferences extends HiveObject {
       enableNotifications: enableNotifications ?? this.enableNotifications,
       defaultProjectView: defaultProjectView ?? this.defaultProjectView,
       customSettings: customSettings ?? this.customSettings,
+      syncedProjects: syncedProjects ?? this.syncedProjects,
     );
   }
 
@@ -55,6 +61,7 @@ class UserPreferences extends HiveObject {
       enableNotifications: true,
       defaultProjectView: 'list',
       customSettings: const {},
+      syncedProjects: const [],
     );
   }
 
@@ -91,8 +98,32 @@ class UserPreferences extends HiveObject {
     return copyWith(projectOrder: currentOrder);
   }
 
+  /// Add a project to the synced projects list
+  UserPreferences addSyncedProject(String projectUid) {
+    if (syncedProjects.contains(projectUid)) {
+      return this; // Already synced
+    }
+    return copyWith(syncedProjects: [...syncedProjects, projectUid]);
+  }
+
+  /// Remove a project from the synced projects list
+  UserPreferences removeSyncedProject(String projectUid) {
+    final newSyncedProjects = syncedProjects.where((uid) => uid != projectUid).toList();
+    return copyWith(syncedProjects: newSyncedProjects);
+  }
+
+  /// Check if a project is marked for sync
+  bool isProjectSynced(String projectUid) {
+    return syncedProjects.contains(projectUid);
+  }
+
+  /// Set the entire synced projects list
+  UserPreferences withSyncedProjects(List<String> projects) {
+    return copyWith(syncedProjects: projects);
+  }
+
   @override
   String toString() {
-    return 'UserPreferences(projectOrder: $projectOrder, theme: $preferredTheme, notifications: $enableNotifications)';
+    return 'UserPreferences(projectOrder: $projectOrder, theme: $preferredTheme, notifications: $enableNotifications, syncedProjects: ${syncedProjects.length})';
   }
 } 

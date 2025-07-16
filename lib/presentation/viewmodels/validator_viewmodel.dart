@@ -57,6 +57,12 @@ class ValidatorViewModelState {
 }
 
 /// Validator ViewModel
+/// 
+/// Loading states are only used for:
+/// - Initial validator loading (loadValidatorsForTask)
+/// 
+/// Validator operations (update/add/remove) are instant with optimistic UI updates
+/// and background sync to avoid loading spinners for quick interactions.
 class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
@@ -80,7 +86,14 @@ class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
   Future<void> loadValidatorsForTask(Task task) async {
     AppLogger.debug('ValidatorViewModel: Loading validators for task ${task.uid}');
     
-    state = state.copyWith(isLoading: true, error: null);
+    // Only show loading if we're switching to a different task or have no current task
+    final shouldShowLoading = state.currentTaskUid != task.uid;
+    
+    if (shouldShowLoading) {
+      state = state.copyWith(isLoading: true, error: null);
+    } else {
+      state = state.copyWith(error: null);
+    }
 
     try {
       // Get current user email for permission checks
@@ -135,7 +148,8 @@ class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
       return;
     }
 
-    state = state.copyWith(isLoading: true, error: null);
+    // Don't show loading for quick validator updates
+    state = state.copyWith(error: null);
 
     try {
       final params = UpdateValidatorStateParams(
@@ -147,8 +161,14 @@ class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
       final updatedTask = await _updateValidatorCommand.executeWith(params);
       
       if (updatedTask != null) {
-        // Reload validators from updated task
-        await loadValidatorsForTask(updatedTask);
+        // Update validators directly without full reload to avoid loading state
+        final validators = ValidatorService.parseValidators(updatedTask.flowitValidator);
+        
+        state = state.copyWith(
+          validators: validators,
+          currentTaskUid: updatedTask.uid,
+        );
+        
         AppLogger.debug('ValidatorViewModel: Validator state updated successfully');
       } else {
         throw Exception(_updateValidatorCommand.error ?? 'Failed to update validator state');
@@ -156,7 +176,6 @@ class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
     } catch (e, stackTrace) {
       AppLogger.error('ValidatorViewModel: Failed to update validator state', e, stackTrace);
       state = state.copyWith(
-        isLoading: false,
         error: 'Failed to update validator: $e',
       );
     }
@@ -179,7 +198,8 @@ class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
       return;
     }
 
-    state = state.copyWith(isLoading: true, error: null);
+    // Don't show loading for validator additions - should be instant
+    state = state.copyWith(error: null);
 
     try {
       final params = AddValidatorFromTemplateParams(
@@ -194,8 +214,14 @@ class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
       final updatedTask = await _addValidatorCommand.executeWith(params);
       
       if (updatedTask != null) {
-        // Reload validators from updated task
-        await loadValidatorsForTask(updatedTask);
+        // Update validators directly without full reload to avoid loading state
+        final validators = ValidatorService.parseValidators(updatedTask.flowitValidator);
+        
+        state = state.copyWith(
+          validators: validators,
+          currentTaskUid: updatedTask.uid,
+        );
+        
         AppLogger.debug('ValidatorViewModel: Validator added successfully');
       } else {
         throw Exception(_addValidatorCommand.error ?? 'Failed to add validator');
@@ -203,7 +229,6 @@ class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
     } catch (e, stackTrace) {
       AppLogger.error('ValidatorViewModel: Failed to add validator', e, stackTrace);
       state = state.copyWith(
-        isLoading: false,
         error: 'Failed to add validator: $e',
       );
     }
@@ -220,7 +245,8 @@ class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
       return;
     }
 
-    state = state.copyWith(isLoading: true, error: null);
+    // Don't show loading for quick validator removals
+    state = state.copyWith(error: null);
 
     try {
       final params = UpdateValidatorStateParams(
@@ -232,8 +258,14 @@ class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
       final updatedTask = await _removeValidatorCommand.executeWith(params);
       
       if (updatedTask != null) {
-        // Reload validators from updated task
-        await loadValidatorsForTask(updatedTask);
+        // Update validators directly without full reload to avoid loading state
+        final validators = ValidatorService.parseValidators(updatedTask.flowitValidator);
+        
+        state = state.copyWith(
+          validators: validators,
+          currentTaskUid: updatedTask.uid,
+        );
+        
         AppLogger.debug('ValidatorViewModel: Validator removed successfully');
       } else {
         throw Exception(_removeValidatorCommand.error ?? 'Failed to remove validator');
@@ -241,7 +273,6 @@ class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
     } catch (e, stackTrace) {
       AppLogger.error('ValidatorViewModel: Failed to remove validator', e, stackTrace);
       state = state.copyWith(
-        isLoading: false,
         error: 'Failed to remove validator: $e',
       );
     }

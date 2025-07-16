@@ -172,7 +172,7 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
       
       if (isCurrentlySelected) {
         // Remove from selection
-        final result = await _calendarRepository.delete(calendar.uid);
+        final result = await _calendarRepository.delete(calendar.path);
         await result.when(
           success: (_) async {
             final updatedSelected = state.selectedCalendars.where((cal) => cal.path != calendar.path).toList();

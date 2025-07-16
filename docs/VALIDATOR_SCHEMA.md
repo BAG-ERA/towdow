@@ -109,6 +109,31 @@ Provides a text input field for free-form user input.
 - **value**: Current text content
 - **helper**: Optional helper text to guide the user (optional field)
 
+### 4. File Validator
+
+Provides file upload functionality with encrypted storage.
+
+```json
+{
+  "id": "string (UUID recommended)",
+  "type": "file",
+  "required": "boolean",
+  "title": "string",
+  "files": "array (default: empty)",
+  "encryptionKey": "string (automatically generated)",
+  "helper": "string (optional)"
+}
+```
+
+**Properties:**
+- **id**: Unique identifier for this validator (UUID recommended)
+- **type**: Must be `"file"`
+- **required**: Whether this validator must be completed to validate the task
+- **title**: Display title for this validator
+- **files**: Array of file attachment objects
+- **encryptionKey**: Automatically generated encryption key for file security
+- **helper**: Optional helper text to guide the user (optional field)
+
 ## Validator Behavior
 
 ### Task Completion Logic
@@ -121,6 +146,7 @@ Provides a text input field for free-form user input.
 - **Checklist**: All items with `checked: true` (if `required: true`)
 - **Single Select**: Must have a `selected` value that matches one of the option IDs (if `required: true`)
 - **Free Field**: Must have non-empty `value` (if `required: true`)
+- **File**: Must have at least one file in the `files` array (if `required: true`)
 
 ### State Management
 
@@ -192,7 +218,24 @@ Tasks with empty validators can be completed by simply clicking a checkbox.
 ]
 ```
 
-### 5. Complex Multi-Validator List
+### 5. Single Validator List with File Validator
+```json
+[
+  [
+    {
+      "id": "file-001",
+      "type": "file",
+      "required": true,
+      "title": "Upload documentation",
+      "files": [],
+      "encryptionKey": "a3f8b2e1c4d5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1",
+      "helper": "Please upload the required documentation files"
+    }
+  ]
+]
+```
+
+### 6. Complex Multi-Validator List
 ```json
 [
   [
@@ -231,7 +274,7 @@ Tasks with empty validators can be completed by simply clicking a checkbox.
 ]
 ```
 
-### 6. Multiple Validator Lists
+### 7. Multiple Validator Lists
 ```json
 [
   [
@@ -296,6 +339,13 @@ Tasks with empty validators can be completed by simply clicking a checkbox.
 - Display as text input field
 - Show helper text when provided
 - Real-time validation for required fields
+
+### File Validator Rendering
+- Display file upload interface with drag-and-drop support
+- Show list of uploaded files with download/delete actions
+- Display file metadata (name, size, upload date)
+- Show helper text when provided
+- Indicate encryption status for security
 
 ### Completion Status
 - Show overall progress across all validator lists

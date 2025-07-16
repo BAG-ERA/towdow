@@ -3,16 +3,15 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
-import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/task.dart';
-import '../../../data/services/validator_service.dart';
+import '../../../data/providers/providers.dart';
 import '../utils/popup/attendee_dialog.dart';
 import '../utils/popup/category_dialog.dart';
 import '../utils/popup/due_date_dialog.dart';
 import '../utils/popup/move_task_dialog.dart';
 
-class TaskItemToolbar extends StatelessWidget {
+class TaskItemToolbar extends ConsumerWidget {
   final Task task;
   final Function(Task)? onTaskUpdated;
   final VoidCallback? onTaskDeleted;
@@ -25,7 +24,7 @@ class TaskItemToolbar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     // Prevent toolbar clicks from bubbling up to parent task item widgets
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -50,7 +49,7 @@ class TaskItemToolbar extends StatelessWidget {
         
         // Validator button (organizer only)
         if (_isOrganizer()) ...[
-          _buildValidatorPopupButton(context),
+                      _buildValidatorPopupButton(context, ref),
           const SizedBox(width: 4),
         ],
         
@@ -175,7 +174,7 @@ class TaskItemToolbar extends StatelessWidget {
 
 
 
-  Widget _buildValidatorPopupButton(BuildContext context) {
+  Widget _buildValidatorPopupButton(BuildContext context, WidgetRef ref) {
     return PopupMenuButton<String>(
       offset: const Offset(0, 40),
       icon: Container(
@@ -191,7 +190,7 @@ class TaskItemToolbar extends StatelessWidget {
         ),
       ),
       tooltip: 'Add Validator',
-      onSelected: (validatorType) => _addValidator(context, validatorType),
+      onSelected: (validatorType) => _addValidator(context, ref, validatorType),
       itemBuilder: (context) => [
         const PopupMenuItem(
           value: 'checklist',
@@ -217,6 +216,24 @@ class TaskItemToolbar extends StatelessWidget {
             leading: Icon(Icons.text_fields),
             title: Text('Free Field'),
             subtitle: Text('Text input'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'file',
+          child: ListTile(
+            leading: Icon(Icons.attach_file),
+            title: Text('File'),
+            subtitle: Text('File attachments'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'media',
+          child: ListTile(
+            leading: Icon(Icons.perm_media),
+            title: Text('Media'),
+            subtitle: Text('Photos and videos'),
             contentPadding: EdgeInsets.zero,
           ),
         ),
@@ -253,69 +270,48 @@ class TaskItemToolbar extends StatelessWidget {
     return true;
   }
 
-  String _generateId() {
-    return const Uuid().v4();
-  }
 
-  void _addValidator(BuildContext context, String validatorType) {
-    // Create default validator based on type
-    Map<String, dynamic> defaultValidator;
+
+  void _addValidator(BuildContext context, WidgetRef ref, String validatorType) {
+    // Use ValidatorViewModel to add validator properly
+    final validatorViewModel = ref.read(validatorViewModelProvider(task.uid).notifier);
+    
+    // Create default options based on type
+    List<String> defaultOptions;
+    String title;
     
     switch (validatorType) {
       case 'checklist':
-        defaultValidator = {
-          'id': _generateId(),
-          'type': 'checklist',
-          'required': true,
-          'title': 'Checklist',
-          'items': [
-            {'id': _generateId(), 'text': 'Item 1', 'checked': false},
-            {'id': _generateId(), 'text': 'Item 2', 'checked': false},
-            {'id': _generateId(), 'text': 'Item 3', 'checked': false},
-          ],
-        };
+        defaultOptions = ['Item 1', 'Item 2', 'Item 3'];
+        title = 'Checklist';
         break;
       case 'single_select':
-        defaultValidator = {
-          'id': _generateId(),
-          'type': 'single_select',
-          'required': true,
-          'title': 'Choose an option',
-          'options': [
-            {'id': _generateId(), 'text': 'Option 1'},
-            {'id': _generateId(), 'text': 'Option 2'},
-            {'id': _generateId(), 'text': 'Option 3'},
-          ],
-          'selected': '',
-        };
+        defaultOptions = ['Option 1', 'Option 2', 'Option 3'];
+        title = 'Choose an option';
         break;
       case 'free_field':
-        defaultValidator = {
-          'id': _generateId(),
-          'type': 'free_field',
-          'required': true,
-          'title': 'Text field',
-          'value': '',
-          'helper': '',
-        };
+        defaultOptions = [];
+        title = 'Text field';
+        break;
+      case 'file':
+        defaultOptions = [];
+        title = 'File attachment';
+        break;
+      case 'media':
+        defaultOptions = [];
+        title = 'Media attachment';
         break;
       default:
         return;
     }
     
-    // Add validator to task
-    final currentValidators = ValidatorService.parseValidators(task.flowitValidator);
-    currentValidators.add([defaultValidator]);
-    
-    final updatedTask = task.copyWith(
-      flowitValidator: json.encode(currentValidators),
-      lastModified: DateTime.now(),
+    // Add validator using ViewModel
+    validatorViewModel.addValidatorFromTemplate(
+      templateType: validatorType,
+      title: title,
+      options: defaultOptions,
+      required: true,
     );
-    
-    // Notify parent
-    if (onTaskUpdated != null) {
-      onTaskUpdated!(updatedTask);
-    }
   }
 
   // Dialog methods
@@ -338,7 +334,7 @@ class TaskItemToolbar extends StatelessWidget {
       context: context,
       builder: (context) => CategoryDialog(
         task: task,
-        projectUid: task.sourceCalendarUid,
+        projectPath: task.projectPath,
         onTaskUpdated: (updatedTask) {
           if (onTaskUpdated != null) {
             onTaskUpdated!(updatedTask);

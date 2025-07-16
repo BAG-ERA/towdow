@@ -25,7 +25,6 @@ class AutomatedTask with _$AutomatedTask {
     @HiveField(10) @Default(0) int percentComplete,
     
     // Automated task-specific FlowIt fields
-    @HiveField(11) String? flowitProcess, // UID of parent project
     @HiveField(12) String? flowitTemplate, // UID of template
     @HiveField(13) String? flowitReversalTask, // UID of reversal task
     @HiveField(14) @Default('{"type":"default"}') String flowitValidator, // JSON string
@@ -42,13 +41,21 @@ extension AutomatedTaskFactory on AutomatedTask {
   static AutomatedTask createNew({
     required String summary,
     String description = '',
-    String? projectUid,
     List<String> categories = const [],
-    String automateConfig = '{}',
+    String? organizer,
+    List<Attendee> attendees = const [],
+    String? flowitTemplate,
+    String? flowitReversalTask,
+    String flowitValidator = '{"type":"default"}',
+    String flowitRequirement = '{}',
+    String flowitAutomate = '{}',
+    String flowitContext = '{}',
   }) {
     final now = DateTime.now();
+    final uid = 'automated-${now.millisecondsSinceEpoch}-${(summary.hashCode % 10000).abs()}';
+    
     return AutomatedTask(
-      uid: 'auto-${now.millisecondsSinceEpoch}-${summary.hashCode}',
+      uid: uid,
       summary: summary,
       description: description,
       status: 'NEEDS-ACTION',
@@ -56,8 +63,14 @@ extension AutomatedTaskFactory on AutomatedTask {
       created: now,
       dtstamp: now,
       categories: categories,
-      flowitProcess: projectUid,
-      flowitAutomate: automateConfig,
+      organizer: organizer,
+      attendees: attendees,
+      flowitTemplate: flowitTemplate,
+      flowitReversalTask: flowitReversalTask,
+      flowitValidator: flowitValidator,
+      flowitRequirement: flowitRequirement,
+      flowitAutomate: flowitAutomate,
+      flowitContext: flowitContext,
     );
   }
 } 

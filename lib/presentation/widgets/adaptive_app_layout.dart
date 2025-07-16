@@ -297,7 +297,7 @@ class _MobileEditableProjectTitleState extends State<_MobileEditableProjectTitle
   void didUpdateWidget(_MobileEditableProjectTitle oldWidget) {
     super.didUpdateWidget(oldWidget);
     
-    if (oldWidget.project.uid != widget.project.uid) {
+    if (oldWidget.project.path != widget.project.path) {
       setState(() {
         _isEditing = false;
       });

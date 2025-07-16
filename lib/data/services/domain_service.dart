@@ -175,7 +175,7 @@ class DomainService {
   Future<Result<void>> _syncDomainToServer(TaskCalendar calendar) async {
     try {
       AppLogger.info('DomainService: *** Starting domain sync to server ***');
-      AppLogger.info('DomainService: Calendar UID: ${calendar.uid}');
+      AppLogger.info('DomainService: Calendar UID: ${calendar.path}');
       AppLogger.info('DomainService: Calendar path: ${calendar.path}');
       AppLogger.info('DomainService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
       
@@ -259,19 +259,19 @@ class DomainService {
         bool hadSyncErrors = false;
         for (final calendar in calendarsToUpdate) {
           // Get the updated calendar with the new domain
-          final updatedCalendarResult = await _calendarRepository.getById(calendar.uid);
+          final updatedCalendarResult = await _calendarRepository.getById(calendar.path);
           await updatedCalendarResult.when(
             success: (updatedCalendar) async {
               if (updatedCalendar != null) {
                 final syncResult = await _syncDomainToServer(updatedCalendar);
                 if (syncResult is Error<void>) {
-                  AppLogger.warning('DomainService: Failed to sync calendar ${updatedCalendar.uid} to server after domain rename, but continuing with others');
+                  AppLogger.warning('DomainService: Failed to sync calendar ${updatedCalendar.path} to server after domain rename, but continuing with others');
                   hadSyncErrors = true;
                 }
               }
             },
             failure: (failure) async {
-              AppLogger.error('DomainService: Could not get updated calendar ${calendar.uid} after domain rename: ${failure.message}');
+              AppLogger.error('DomainService: Could not get updated calendar ${calendar.path} after domain rename: ${failure.message}');
               hadSyncErrors = true;
             },
           );
