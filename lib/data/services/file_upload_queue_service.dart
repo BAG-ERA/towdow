@@ -432,7 +432,8 @@ class FileUploadQueueService {
       
       for (final validatorList in validators) {
         for (final validator in validatorList) {
-          if (validator['id'] == offlineFile.validatorId && validator['type'] == 'file') {
+          if (validator['id'] == offlineFile.validatorId && 
+              (validator['type'] == 'file' || validator['type'] == 'media')) {
             encryptionKey = validator['encryptionKey'] as String?;
             break;
           }

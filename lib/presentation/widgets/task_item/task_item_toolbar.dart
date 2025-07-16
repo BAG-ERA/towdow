@@ -228,6 +228,15 @@ class TaskItemToolbar extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
           ),
         ),
+        const PopupMenuItem(
+          value: 'media',
+          child: ListTile(
+            leading: Icon(Icons.perm_media),
+            title: Text('Media'),
+            subtitle: Text('Photos and videos'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
       ],
     );
   }
@@ -287,6 +296,10 @@ class TaskItemToolbar extends ConsumerWidget {
       case 'file':
         defaultOptions = [];
         title = 'File attachment';
+        break;
+      case 'media':
+        defaultOptions = [];
+        title = 'Media attachment';
         break;
       default:
         return;

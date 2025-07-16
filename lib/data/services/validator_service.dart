@@ -272,6 +272,26 @@ class ValidatorService {
     };
   }
 
+  static Map<String, dynamic> createMediaValidator({
+    required String title,
+    String? helper,
+    bool required = true,
+  }) {
+    const uuid = Uuid();
+    // Generate encryption key directly without EncryptionService dependency
+    // S3StorageService now handles the actual encryption/decryption
+    final encryptionKey = _generateEncryptionKey();
+    return {
+      'id': uuid.v4(),
+      'type': 'media',
+      'required': required,
+      'title': title,
+      'files': <Map<String, dynamic>>[], // Array of media file attachments
+      'encryptionKey': encryptionKey, // Automatically generated encryption key
+      if (helper != null) 'helper': helper,
+    };
+  }
+
   /// Generate a unique encryption key for file validator
   /// Returns a cryptographically secure random key
   static String _generateEncryptionKey() {
@@ -361,6 +381,10 @@ class ValidatorService {
         return value.trim().isNotEmpty;
         
       case 'file':
+        final files = validator['files'] as List? ?? [];
+        return files.isNotEmpty;
+        
+      case 'media':
         final files = validator['files'] as List? ?? [];
         return files.isNotEmpty;
         

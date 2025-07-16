@@ -258,6 +258,12 @@ class AddValidatorFromTemplateCommand extends ParameterizedCommand<Task, AddVali
           helper: params.helper,
           required: params.required,
         );
+      case 'media':
+        return ValidatorService.createMediaValidator(
+          title: params.title,
+          helper: params.helper,
+          required: params.required,
+        );
       default:
         throw Exception('Unknown validator template type: ${params.templateType}');
     }
