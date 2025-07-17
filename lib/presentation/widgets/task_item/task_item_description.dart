@@ -106,7 +106,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
             focusNode: _focusNode,
             maxLines: null,
             readOnly: !_isEditing,
-            hintText: hasDescription ? null : 'No description provided • Click to add',
+            hintText: hasDescription ? null : 'No description provided • Click to add one or attach files',
             style: TextStyle(
               fontSize: 13,
               color: hasDescription 

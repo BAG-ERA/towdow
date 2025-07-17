@@ -29,6 +29,15 @@ class TaskFileAttachmentList extends ConsumerStatefulWidget {
 
 class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList> {
   bool _hasShownMessage = false;
+  bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Expand by default if there's only one attachment
+    final attachments = _parseAttachments(widget.task.attachments);
+    _isExpanded = attachments.length <= 1;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +74,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
       children: [
         const SizedBox(height: 8),
         
-        // Section header
+        // Section header with expand/collapse
         Row(
           children: [
             Icon(
@@ -82,39 +91,48 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
+            if (attachments.isNotEmpty) ...[
+              Text(
+                ' (${attachments.length})',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
             const Spacer(),
             
-            // Upload button
-            IconButton(
-              onPressed: attachmentState.isUploading ? null : () => _uploadFile(),
-              icon: attachmentState.isUploading 
-                  ? const SizedBox(
-                      width: 16, 
-                      height: 16, 
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.add, size: 16),
-              tooltip: attachmentState.isUploading ? 'Uploading...' : 'Attach file',
-              style: IconButton.styleFrom(
-                minimumSize: const Size(24, 24),
-                padding: EdgeInsets.zero,
-                foregroundColor: Theme.of(context).colorScheme.primary,
+            // Expand/collapse button (only show if there are attachments)
+            if (attachments.isNotEmpty) ...[
+              IconButton(
+                onPressed: () => setState(() => _isExpanded = !_isExpanded),
+                icon: Icon(
+                  _isExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 16,
+                ),
+                tooltip: _isExpanded ? 'Collapse' : 'Expand',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(24, 24),
+                  padding: EdgeInsets.zero,
+                  foregroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
               ),
-            ),
+            ],
           ],
         ),
         
-        const SizedBox(height: 4),
-        
-        // File list
-        ...attachments.asMap().entries.map((entry) {
-          final index = entry.key;
-          final attachment = entry.value;
-          return Padding(
-            padding: EdgeInsets.only(bottom: index < attachments.length - 1 ? 8 : 0),
-            child: _buildFileItem(attachment, attachmentState),
-          );
-        }),
+        // File list (only show if expanded or if there's only one item)
+        if (_isExpanded || attachments.length <= 1) ...[
+          const SizedBox(height: 4),
+          ...attachments.asMap().entries.map((entry) {
+            final index = entry.key;
+            final attachment = entry.value;
+            return Padding(
+              padding: EdgeInsets.only(bottom: index < attachments.length - 1 ? 8 : 0),
+              child: _buildFileItem(attachment, attachmentState),
+            );
+          }),
+        ],
       ],
     );
   }

@@ -29,6 +29,15 @@ class TaskMediaAttachmentList extends ConsumerStatefulWidget {
 
 class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentList> {
   bool _hasShownMessage = false;
+  bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Expand by default if there's only one media attachment
+    final mediaAttachments = _parseMediaAttachments(widget.task.mediaAttachments);
+    _isExpanded = mediaAttachments.length <= 1;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +74,7 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
       children: [
         const SizedBox(height: 8),
         
-        // Media attachments header
+        // Media attachments header with expand/collapse
         Row(
           children: [
             Icon(
@@ -82,19 +91,44 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
+            Text(
+              ' (${mediaAttachments.length})',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+            const Spacer(),
+            
+            // Expand/collapse button
+            IconButton(
+              onPressed: () => setState(() => _isExpanded = !_isExpanded),
+              icon: Icon(
+                _isExpanded ? Icons.expand_less : Icons.expand_more,
+                size: 16,
+              ),
+              tooltip: _isExpanded ? 'Collapse' : 'Expand',
+              style: IconButton.styleFrom(
+                minimumSize: const Size(24, 24),
+                padding: EdgeInsets.zero,
+                foregroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 4),
         
-        // Media attachments grid
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: mediaAttachments.asMap().entries.map((entry) {
-            final mediaAttachment = entry.value;
-            return _buildMediaAttachmentItem(mediaAttachment, mediaAttachmentState);
-          }).toList(),
-        ),
+        // Media attachments grid (only show if expanded or if there's only one item)
+        if (_isExpanded || mediaAttachments.length <= 1) ...[
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: mediaAttachments.asMap().entries.map((entry) {
+              final mediaAttachment = entry.value;
+              return _buildMediaAttachmentItem(mediaAttachment, mediaAttachmentState);
+            }).toList(),
+          ),
+        ],
       ],
     );
   }
@@ -108,7 +142,7 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
                              mediaAttachmentState.downloadingFileId == fileId;
     
     return Container(
-      width: 120,
+      width: 118,
       decoration: BoxDecoration(
         border: Border.all(
           color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
@@ -132,7 +166,7 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
                   children: [
                     Expanded(
                       child: Text(
-                        _formatFileSize(fileSize),
+                        mediaAttachment['filename'] as String? ?? 'Unknown file',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
@@ -172,6 +206,19 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
                             : Theme.of(context).colorScheme.primary,
                       ),
                     ),
+                    
+                    // Delete button (only if we can edit tasks)
+                    if (widget.onTaskUpdated != null) ...[
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () => _removeMediaFile(fileId),
+                        child: Icon(
+                          Icons.delete_outline,
+                          size: 12,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -287,6 +334,56 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
         _downloadMediaFile(mediaAttachment);
       },
     );
+  }
+
+  Future<void> _removeMediaFile(String fileId) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Media File'),
+        content: const Text('Are you sure you want to remove this media file? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Call ViewModel to handle media file removal
+    final success = await ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier)
+        .removeMediaFile(
+          taskUid: widget.task.uid,
+          fileId: fileId,
+        );
+
+    // If removal succeeded, notify parent to refresh task data
+    if (success && widget.onTaskUpdated != null) {
+      _refreshTaskData();
+    }
+  }
+
+  void _refreshTaskData() {
+    // Trigger a refresh of the task data
+    // This is a simple approach - in a more sophisticated implementation,
+    // we might use a more reactive approach
+    if (widget.onTaskUpdated != null) {
+      // The parent will refresh when onTaskUpdated is called
+      // For now, we just trigger a rebuild
+      setState(() {});
+    }
   }
 
   IconData _getMediaIcon(String fileName) {
