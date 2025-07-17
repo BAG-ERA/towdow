@@ -32,6 +32,7 @@ class Task with _$Task {
     @HiveField(15) @Default('{"type":"default"}') String flowitValidator, // JSON string
     @HiveField(16) @Default('{}') String flowitRequirement, // JSON string
     @HiveField(17) @Default('[]') String flowitKanbanColumn, // JSON array
+    @HiveField(18) @Default('[]') String attachments, // JSON array of ATTACH field data with x-flowit-* parameters
   }) = _Task;
 
   factory Task.fromJson(Map<String, dynamic> json) => _$TaskFromJson(json);
@@ -52,6 +53,7 @@ extension TaskFactory on Task {
     String flowitValidator = '{"type":"default"}',
     String flowitRequirement = '{}',
     String flowitKanbanColumn = '[]',
+    String attachments = '[]',
   }) {
     final now = DateTime.now();
     final uid = 'task-${now.millisecondsSinceEpoch}-${(summary.hashCode % 10000).abs()}';
@@ -74,6 +76,7 @@ extension TaskFactory on Task {
       flowitValidator: flowitValidator,
       flowitRequirement: flowitRequirement,
       flowitKanbanColumn: flowitKanbanColumn,
+      attachments: attachments,
     );
   }
 } 
