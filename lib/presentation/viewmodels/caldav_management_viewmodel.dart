@@ -17,6 +17,7 @@ import '../../data/models/task_calendar.dart';
 
 import '../../data/services/caldav_service.dart';
 import '../../data/services/user_sync_service.dart';
+import '../../data/services/status_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/user_repository.dart';
@@ -31,6 +32,7 @@ class CalDAVManagementState {
   final CalDAVCapabilities? capabilities;
   final Set<TaskCalendar> selectedCalendars;
   final bool hasChanges;
+  final String searchQuery;
 
   const CalDAVManagementState({
     this.isLoading = false,
@@ -39,6 +41,7 @@ class CalDAVManagementState {
     this.capabilities,
     this.selectedCalendars = const {},
     this.hasChanges = false,
+    this.searchQuery = '',
   });
 
   CalDAVManagementState copyWith({
@@ -48,6 +51,7 @@ class CalDAVManagementState {
     CalDAVCapabilities? capabilities,
     Set<TaskCalendar>? selectedCalendars,
     bool? hasChanges,
+    String? searchQuery,
   }) => CalDAVManagementState(
         isLoading: isLoading ?? this.isLoading,
         error: error,
@@ -55,6 +59,7 @@ class CalDAVManagementState {
         capabilities: capabilities ?? this.capabilities,
         selectedCalendars: selectedCalendars ?? this.selectedCalendars,
         hasChanges: hasChanges ?? this.hasChanges,
+        searchQuery: searchQuery ?? this.searchQuery,
       );
 }
 
@@ -236,6 +241,121 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     return state.selectedCalendars.any((c) => c.path == calendar.path);
   }
 
+  /// Select all available calendars
+  void selectAllCalendars() {
+    if (state.capabilities == null) return;
+    
+    final allCalendars = Set<TaskCalendar>.from(state.capabilities!.taskCalendars);
+    state = state.copyWith(
+      selectedCalendars: allCalendars,
+      hasChanges: true,
+    );
+    
+    // Update user preferences with new project order
+    _updateUserPreferencesProjectOrder();
+  }
+
+  /// Deselect all calendars
+  void deselectAllCalendars() {
+    state = state.copyWith(
+      selectedCalendars: {},
+      hasChanges: true,
+    );
+    
+    // Update user preferences with new project order
+    _updateUserPreferencesProjectOrder();
+  }
+
+  /// Delete a calendar from the server and local storage
+  Future<void> deleteCalendar(TaskCalendar calendar) async {
+    if (state.currentAccount == null) return;
+
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      // First, try to delete from server
+      final caldavService = CalDAVService(account: state.currentAccount!);
+      final serverDeleteResult = await caldavService.deleteCalendar(calendar.path);
+      
+      serverDeleteResult.when(
+        success: (_) {
+          AppLogger.info('CalDAVManagement: Successfully deleted calendar from server: ${calendar.displayName}');
+        },
+        failure: (failure) {
+          AppLogger.warning('CalDAVManagement: Failed to delete calendar from server: ${failure.message}');
+          // Continue with local deletion even if server deletion fails
+        },
+      );
+
+      // Remove from local storage
+      final localDeleteResult = await _calendarRepository.delete(calendar.path);
+      localDeleteResult.when(
+        success: (_) {
+          AppLogger.info('CalDAVManagement: Successfully deleted calendar from local storage: ${calendar.displayName}');
+        },
+        failure: (failure) {
+          AppLogger.error('CalDAVManagement: Failed to delete calendar from local storage: ${failure.message}');
+          state = state.copyWith(error: 'Failed to delete calendar: ${failure.message}');
+        },
+      );
+
+      // Remove from selected calendars if it was selected
+      final updatedSelectedCalendars = Set<TaskCalendar>.from(state.selectedCalendars);
+      updatedSelectedCalendars.removeWhere((c) => c.path == calendar.path);
+      
+      state = state.copyWith(
+        selectedCalendars: updatedSelectedCalendars,
+        hasChanges: true,
+      );
+
+      // Update user preferences with new project order
+      _updateUserPreferencesProjectOrder();
+
+      // Refresh calendar discovery to update the list
+      await refreshCalendars();
+
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVManagement: Error deleting calendar', e, stackTrace);
+      state = state.copyWith(error: 'Error deleting calendar: $e');
+    } finally {
+      state = state.copyWith(isLoading: false);
+    }
+  }
+
+  /// Archive a calendar (set status to ARCHIVE)
+  Future<void> archiveCalendar(TaskCalendar calendar) async {
+    if (state.currentAccount == null) return;
+
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      // Get the status service from providers
+      final statusService = StatusService(_calendarRepository, _localStorageService, _accountRepository);
+      
+      // Archive the calendar
+      final result = await statusService.archiveCalendar(calendar.path);
+      
+      result.when(
+        success: (_) {
+          AppLogger.info('CalDAVManagement: Successfully archived calendar: ${calendar.displayName}');
+        },
+        failure: (failure) {
+          AppLogger.error('CalDAVManagement: Failed to archive calendar: ${failure.message}');
+          state = state.copyWith(error: 'Failed to archive calendar: ${failure.message}');
+        },
+      );
+
+      // Refresh calendar discovery to update the list
+      await refreshCalendars();
+
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVManagement: Error archiving calendar', e, stackTrace);
+      state = state.copyWith(error: 'Error archiving calendar: $e');
+    } finally {
+      state = state.copyWith(isLoading: false);
+    }
+  }
+
   /// Reset changes by reloading from repository
   Future<void> resetChanges() async {
     await _loadSelectedCalendars();
@@ -267,7 +387,7 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
           await _triggerUserSyncUpload();
 
           if (_onInvalidateProjectList != null) {
-            _onInvalidateProjectList!();
+            _onInvalidateProjectList();
           }
         },
         failure: (failure) async {
@@ -363,6 +483,23 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
 
   void clearError() {
     state = state.copyWith(error: null);
+  }
+
+  /// Update the search query for filtering calendars
+  void updateSearchQuery(String query) {
+    state = state.copyWith(searchQuery: query);
+  }
+
+  /// Get filtered calendars based on search query
+  List<TaskCalendar> get filteredCalendars {
+    if (state.capabilities == null || state.searchQuery.isEmpty) {
+      return state.capabilities?.taskCalendars ?? [];
+    }
+    
+    final query = state.searchQuery.toLowerCase();
+    return state.capabilities!.taskCalendars.where((calendar) {
+      return calendar.displayName.toLowerCase().contains(query);
+    }).toList();
   }
 }
 
