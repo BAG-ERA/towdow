@@ -75,46 +75,49 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
         const SizedBox(height: 8),
         
         // Media attachments header with expand/collapse
-        Row(
-          children: [
-            Icon(
-              Icons.perm_media,
-              size: 14,
-              color: Theme.of(context).colorScheme.secondary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              mediaAttachments.length == 1 ? 'Media' : 'Media Files',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+        GestureDetector(
+          onTap: () => setState(() => _isExpanded = !_isExpanded),
+          child: Row(
+            children: [
+              Icon(
+                Icons.perm_media,
+                size: 14,
+                color: Theme.of(context).colorScheme.secondary,
               ),
-            ),
-            Text(
-              ' (${mediaAttachments.length})',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              const SizedBox(width: 4),
+              Text(
+                mediaAttachments.length == 1 ? 'Media' : 'Media Files',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
               ),
-            ),
-            const Spacer(),
-            
-            // Expand/collapse button
-            IconButton(
-              onPressed: () => setState(() => _isExpanded = !_isExpanded),
-              icon: Icon(
+              Text(
+                ' (${mediaAttachments.length})',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _isExpanded = !_isExpanded),
+                  child: Container(
+                    height: 24,
+                    color: Colors.transparent,
+                  ),
+                ),
+              ),
+              
+              // Expand/collapse indicator
+              Icon(
                 _isExpanded ? Icons.expand_less : Icons.expand_more,
                 size: 16,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
-              tooltip: _isExpanded ? 'Collapse' : 'Expand',
-              style: IconButton.styleFrom(
-                minimumSize: const Size(24, 24),
-                padding: EdgeInsets.zero,
-                foregroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
         
         // Media attachments grid (only show if expanded or if there's only one item)

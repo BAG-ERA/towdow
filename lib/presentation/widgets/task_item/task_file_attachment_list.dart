@@ -75,50 +75,53 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
         const SizedBox(height: 8),
         
         // Section header with expand/collapse
-        Row(
-          children: [
-            Icon(
-              Icons.attach_file,
-              size: 14,
-              color: Theme.of(context).colorScheme.secondary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'Attachments',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+        GestureDetector(
+          onTap: attachments.isNotEmpty ? () => setState(() => _isExpanded = !_isExpanded) : null,
+          child: Row(
+            children: [
+              Icon(
+                Icons.attach_file,
+                size: 14,
+                color: Theme.of(context).colorScheme.secondary,
               ),
-            ),
-            if (attachments.isNotEmpty) ...[
+              const SizedBox(width: 4),
               Text(
-                ' (${attachments.length})',
+                'Attachments',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
-            ],
-            const Spacer(),
-            
-            // Expand/collapse button (only show if there are attachments)
-            if (attachments.isNotEmpty) ...[
-              IconButton(
-                onPressed: () => setState(() => _isExpanded = !_isExpanded),
-                icon: Icon(
+              if (attachments.isNotEmpty) ...[
+                Text(
+                  ' (${attachments.length})',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+              Expanded(
+                child: GestureDetector(
+                  onTap: attachments.isNotEmpty ? () => setState(() => _isExpanded = !_isExpanded) : null,
+                  child: Container(
+                    height: 24,
+                    color: Colors.transparent,
+                  ),
+                ),
+              ),
+              
+              // Expand/collapse indicator (only show if there are attachments)
+              if (attachments.isNotEmpty) ...[
+                Icon(
                   _isExpanded ? Icons.expand_less : Icons.expand_more,
                   size: 16,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
-                tooltip: _isExpanded ? 'Collapse' : 'Expand',
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(24, 24),
-                  padding: EdgeInsets.zero,
-                  foregroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
         
         // File list (only show if expanded or if there's only one item)
