@@ -330,6 +330,10 @@ class LocalStorageService {
       await clear(externalCalendarsBoxName);
       await clear(externalEventsBoxName);
       
+      // Clear offline file storage data
+      await clear(offlineFilesBoxName);
+      await clear(fileUploadQueueBoxName);
+      
       // AppLogger.info('LocalStorageService: Successfully cleared ALL data');
       return const Result.success(null);
     } catch (e, stackTrace) {

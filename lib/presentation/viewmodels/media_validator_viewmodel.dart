@@ -5,7 +5,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/services/s3_storage_service.dart';
@@ -14,7 +13,6 @@ import '../../data/services/sync_service.dart';
 import '../../data/services/offline_file_service.dart';
 import '../../data/services/file_upload_queue_service.dart';
 import '../../data/providers/providers.dart';
-import '../../data/models/offline_file.dart';
 import '../../core/logger.dart';
 
 /// Media Validator ViewModel State
@@ -62,6 +60,9 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
   final SyncService? _syncService;
   final OfflineFileService _offlineFileService;
   final FileUploadQueueService _fileUploadQueueService;
+  
+  // In-memory cache for image data to avoid repeated loading
+  final Map<String, Uint8List> _imageCache = {};
 
   MediaValidatorViewModel(
     this._taskUid,
@@ -149,13 +150,17 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
 
       AppLogger.info('MediaValidatorViewModel: Storing media file locally for task $taskUid');
       
+      // Get encryption key for this validator
+      final encryptionKey = await _getValidatorEncryptionKey(validatorId);
+      
       // Store file locally first (offline-first approach)
       final offlineFileResult = await _offlineFileService.storeFileLocally(
         taskUid: taskUid,
-        validatorId: validatorId,
+        aesKey: encryptionKey,
         fileName: fileName,
         fileData: fileData,
         contentType: contentType,
+        validatorId: validatorId, // Keep for validator association
       );
 
       final success = await offlineFileResult.when(
@@ -489,8 +494,8 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
   }
 
   /// Queue sync operation for updated task
-  Future<void> _queueSyncOperation(task) async {
-    if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
+  Future<void> _queueSyncOperation(dynamic task) async {
+    if (_syncService != null && task.projectPath != null && task.projectPath.isNotEmpty) {
       final syncData = <String, dynamic>{
         'calendarUid': task.projectPath,
         'taskUid': task.uid,
@@ -513,21 +518,78 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
     }
   }
 
-  /// Sanitize filename to avoid S3 signature issues with special characters
-  String _sanitizeFileName(String fileName) {
-    // Replace problematic characters that can cause S3 signature mismatches
-    return fileName
-        // Replace em dash and en dash with regular hyphen
-        .replaceAll('–', '-')
-        .replaceAll('—', '-')
-        // Replace other Unicode spaces and dashes
-        .replaceAll(RegExp(r'[\u2000-\u206F\u2E00-\u2E7F\u3000]'), '-')
-        // Replace multiple consecutive spaces/dashes with single dash
-        .replaceAll(RegExp(r'[-\s]+'), '-')
-        // Remove leading/trailing dashes and spaces
-        .trim()
-        .replaceAll(RegExp(r'^-+|-+$'), '');
+  /// Get image data for display (for thumbnails and full-screen viewing)
+  Future<Uint8List?> getImageData({
+    required String fileId,
+    required String fileName,
+    required String validatorId,
+    String? s3Key,
+  }) async {
+    try {
+      // Check cache first
+      if (_imageCache.containsKey(fileId)) {
+        AppLogger.debug('MediaValidatorViewModel: Returning cached image for $fileId');
+        return _imageCache[fileId];
+      }
+
+      // First try to get file from local storage (offline-first)
+      final localFileResult = await _offlineFileService.readLocalFile(fileId);
+      
+      final fileBytes = await localFileResult.when(
+        success: (data) async {
+          if (data.isNotEmpty) {
+            _imageCache[fileId] = data; // Cache the data
+            return data;
+          } else {
+            // If local file is empty or null, try to download from S3
+            if (s3Key != null) {
+              return await _downloadAndCacheImage(fileId, fileName, validatorId, s3Key);
+            }
+            return null;
+          }
+        },
+        failure: (failure) async {
+          AppLogger.debug('MediaValidatorViewModel: Failed to load local file $fileId: ${failure.message}');
+          // Try to download and cache the image from S3
+          if (s3Key != null) {
+            return await _downloadAndCacheImage(fileId, fileName, validatorId, s3Key);
+          }
+          return null;
+        },
+      );
+
+      return fileBytes;
+    } catch (e) {
+      AppLogger.debug('MediaValidatorViewModel: Error loading image data: $e');
+      return null;
+    }
   }
+
+  /// Download image from S3 and cache it locally for future use
+  Future<Uint8List?> _downloadAndCacheImage(
+    String fileId,
+    String fileName,
+    String validatorId,
+    String s3Key,
+  ) async {
+    try {
+      // Download image bytes from S3
+      final downloadResult = await _downloadFromS3(s3Key, validatorId);
+      
+      if (downloadResult != null) {
+        // Cache the downloaded image locally
+        _imageCache[fileId] = downloadResult; // Cache the data
+        return downloadResult;
+      }
+      
+      return null;
+    } catch (e) {
+      AppLogger.debug('MediaValidatorViewModel: Failed to download and cache image: $e');
+      return null;
+    }
+  }
+
+
 }
 
 /// Provider for media validator view model

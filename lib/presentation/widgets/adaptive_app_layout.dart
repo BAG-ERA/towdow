@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'navbar/app_sidebar.dart';
 import '../../data/models/task_calendar.dart';
+import 'utils/editable_title.dart';
 
 // Provider for dynamic mobile title (used by detail screens)
 final mobileTitleProvider = StateProvider<String?>((ref) => null);
@@ -249,153 +250,21 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     final updateCallback = ref.watch(mobileProjectUpdateProvider);
     
     if (project != null && updateCallback != null) {
-      return _MobileEditableProjectTitle(
-        project: project,
-        onProjectUpdated: updateCallback,
+      return EditableTitle(
+        title: project.displayName,
+        onTitleUpdated: (newTitle) {
+          final updatedProject = project.copyWith(
+            displayName: newTitle,
+            lastModified: DateTime.now(),
+          );
+          updateCallback(updatedProject);
+        },
+        isInAppBar: true,
       );
     }
     
     // Fallback to regular title
     final title = ref.watch(mobileTitleProvider) ?? 'Project Details';
     return Text(title);
-  }
-}
-
-class _MobileEditableProjectTitle extends StatefulWidget {
-  final TaskCalendar project;
-  final Function(TaskCalendar) onProjectUpdated;
-
-  const _MobileEditableProjectTitle({
-    required this.project,
-    required this.onProjectUpdated,
-  });
-
-  @override
-  State<_MobileEditableProjectTitle> createState() => _MobileEditableProjectTitleState();
-}
-
-class _MobileEditableProjectTitleState extends State<_MobileEditableProjectTitle> {
-  bool _isEditing = false;
-  late TextEditingController _controller;
-  late FocusNode _focusNode;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.project.displayName);
-    _focusNode = FocusNode();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(_MobileEditableProjectTitle oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    
-    if (oldWidget.project.path != widget.project.path) {
-      setState(() {
-        _isEditing = false;
-      });
-      _controller.text = widget.project.displayName;
-    } else if (oldWidget.project.displayName != widget.project.displayName) {
-      if (!_isEditing) {
-        _controller.text = widget.project.displayName;
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isEditing) {
-      return SizedBox(
-        width: double.infinity,
-        child: TextField(
-          controller: _controller,
-          focusNode: _focusNode,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            isDense: true,
-            suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.close, size: 16),
-                  onPressed: _cancelEdit,
-                  tooltip: 'Cancel',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.check, size: 16),
-                  onPressed: _saveTitle,
-                  tooltip: 'Save',
-                ),
-              ],
-            ),
-          ),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          onSubmitted: (_) => _saveTitle(),
-        ),
-      );
-    }
-
-    return InkWell(
-      onTap: _startEditing,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Text(
-          widget.project.displayName,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _startEditing() {
-    setState(() {
-      _isEditing = true;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
-      _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
-    });
-  }
-
-  void _cancelEdit() {
-    setState(() {
-      _isEditing = false;
-      _controller.text = widget.project.displayName;
-    });
-  }
-
-  void _saveTitle() {
-    if (_controller.text.trim().isNotEmpty) {
-      final newTitle = _controller.text.trim();
-      
-      final updatedProject = widget.project.copyWith(
-        displayName: newTitle,
-        lastModified: DateTime.now(),
-      );
-      
-      widget.onProjectUpdated(updatedProject);
-    }
-    
-    setState(() {
-      _isEditing = false;
-    });
   }
 } 

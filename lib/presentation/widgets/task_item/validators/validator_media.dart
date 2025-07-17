@@ -3,19 +3,15 @@
 // Follows MVVM architecture - all business logic is in MediaValidatorViewModel
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../viewmodels/media_validator_viewmodel.dart';
 import '../../../../core/logger.dart';
-import '../../../../data/services/offline_file_service.dart';
-import '../../../../data/providers/providers.dart';
-import '../../../../data/models/offline_file.dart';
+import '../../utils/full_screen_image_viewer.dart';
 
 class ValidatorMedia extends ConsumerStatefulWidget {
   final Map<String, dynamic> validator;
@@ -473,77 +469,7 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
     }
   }
 
-  Future<void> _downloadAllMediaFiles(List<dynamic> files, String validatorId) async {
-    // For bulk download, ask user to choose a directory
-    final directory = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: 'Choose Download Directory',
-    );
 
-    if (directory == null) {
-      // User cancelled the directory selection
-      return;
-    }
-
-    // Download files one by one to the chosen directory
-    for (final file in files) {
-      final fileId = file['id'] as String;
-      final fileName = file['name'] as String? ?? 'download';
-      final s3Key = file['s3Key'] as String?;
-
-      if (s3Key != null) {
-        final savePath = '$directory/$fileName';
-        await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
-            .downloadMediaFile(
-              fileId: fileId,
-              fileName: fileName,
-              validatorId: validatorId,
-              s3Key: s3Key,
-              savePath: savePath,
-            );
-      }
-    }
-  }
-
-  Future<void> _removeAllMediaFiles(String validatorId, List<dynamic> files) async {
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete All Media Files'),
-        content: Text('Are you sure you want to delete all ${files.length} media file(s)? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            child: const Text('Delete All'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    // Remove files one by one
-    for (final file in files) {
-      final fileId = file['id'] as String;
-      await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
-          .removeMediaFile(
-            taskUid: widget.taskUid,
-            validatorId: validatorId,
-            fileId: fileId,
-          );
-    }
-    
-    // Notify parent that task was updated so it can refresh the validator data
-    widget.onValidatorUpdated(validatorId, {'type': 'refresh'});
-  }
 
   IconData _getMediaIcon(String fileName) {
     final extension = fileName.split('.').last.toLowerCase();
@@ -719,7 +645,7 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
         file: file,
         validatorId: validatorId,
         taskUid: widget.taskUid,
-        onTap: () => _showFullScreenImage(file, validatorId),
+        onTap: (imageData) => _showFullScreenImageWithData(file, validatorId, imageData),
         isLarge: true,
       );
     }
@@ -746,54 +672,30 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
     );
   }
 
-  /// Show full screen image viewer dialog
-  Future<void> _showFullScreenImage(Map<String, dynamic> file, String validatorId) async {
-    final fileId = file['id'] as String;
+  /// Show full screen image viewer dialog (when image data is already available)
+  Future<void> _showFullScreenImageWithData(Map<String, dynamic> file, String validatorId, Uint8List? imageData) async {
     final fileName = file['name'] as String? ?? 'Unknown file';
-    final s3Key = file['s3Key'] as String?;
-
-    // First try to get image from local cache
-    final offlineFileService = ref.read(offlineFileServiceProvider);
-    final localResult = await offlineFileService.readLocalFile(fileId);
-    
-    Uint8List? imageData;
-    await localResult.when(
-      success: (data) async {
-        imageData = data;
-      },
-      failure: (_) async {
-        // If not in local cache, download from S3
-        imageData = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
-            .downloadMediaFileBytes(
-              fileId: fileId,
-              fileName: fileName,
-              validatorId: validatorId,
-              s3Key: s3Key,
-            );
-      },
-    );
 
     if (imageData == null) {
-      _showErrorSnackbar('Failed to load image');
+      _showErrorSnackbar('Image data not available');
       return;
     }
 
     if (!mounted) return;
 
-    // Show full screen image dialog
-    showDialog(
+    // Show full screen image viewer using the reusable widget with already-loaded data
+    showFullScreenImageViewer(
       context: context,
-      barrierColor: Colors.black87,
-      builder: (context) => _FullScreenImageDialog(
-        imageData: imageData!,
-        fileName: fileName,
-        onDownload: () {
-          Navigator.of(context).pop();
-          _downloadMediaFile(file, validatorId);
-        },
-      ),
+      imageData: imageData,
+      fileName: fileName,
+      onDownload: () {
+        Navigator.of(context).pop();
+        _downloadMediaFile(file, validatorId);
+      },
     );
   }
+
+
 
   /// Check if file extension is an image type
   bool _isImageType(String extension) {
@@ -831,165 +733,7 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
   }
 }
 
-/// Full screen image viewer dialog
-class _FullScreenImageDialog extends StatelessWidget {
-  final Uint8List imageData;
-  final String fileName;
-  final VoidCallback onDownload;
 
-  const _FullScreenImageDialog({
-    required this.imageData,
-    required this.fileName,
-    required this.onDownload,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog.fullscreen(
-      backgroundColor: Colors.black87,
-      child: Stack(
-        children: [
-          // Main image area - center the image and allow zoom
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Center(
-              child: InteractiveViewer(
-                panEnabled: true,
-                scaleEnabled: true,
-                minScale: 0.5,
-                maxScale: 4.0,
-                child: GestureDetector(
-                  onTap: () {}, // Prevent tap from bubbling up to parent GestureDetector
-                  child: Image.memory(
-                    imageData,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.broken_image,
-                              size: 64,
-                              color: Colors.white70,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Failed to load image',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-          
-          // Top bar with close and actions
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 8,
-                left: 16,
-                right: 16,
-                bottom: 16,
-              ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black54,
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-              child: Row(
-                children: [
-                  // Close button
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.black26,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  
-                  // File name
-                  Expanded(
-                    child: Text(
-                      fileName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  
-                  // Download button
-                  IconButton(
-                    onPressed: onDownload,
-                    icon: const Icon(Icons.download, color: Colors.white),
-                    tooltip: 'Download',
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.black26,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Bottom instruction text
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                bottom: MediaQuery.of(context).padding.bottom + 16,
-                top: 16,
-              ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Colors.black54,
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-              child: Text(
-                'Pinch to zoom • Tap to close',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 /// Camera screen for taking photos
 class _CameraScreen extends StatefulWidget {
@@ -1104,7 +848,7 @@ class _ImageThumbnail extends ConsumerStatefulWidget {
   final Map<String, dynamic> file;
   final String validatorId;
   final String taskUid;
-  final VoidCallback onTap;
+  final Function(Uint8List? imageData) onTap;
   final bool isLarge;
 
   const _ImageThumbnail({
@@ -1125,6 +869,7 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
   Uint8List? _imageData;
   bool _isLoading = true;
   bool _hasError = false;
+  String? _currentFileId; // Track the current file ID to avoid unnecessary reloads
 
   @override
   void initState() {
@@ -1132,125 +877,57 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
     _loadImageData();
   }
 
-  Future<void> _loadImageData() async {
-    try {
-      // Try to get the image data from local storage first
-      final offlineFileService = ref.read(offlineFileServiceProvider);
-      final result = await offlineFileService.readLocalFile(widget.fileId);
-      
-      await result.when(
-        success: (data) async {
-          if (mounted && data != null && data.isNotEmpty) {
-            setState(() {
-              _imageData = data;
-              _isLoading = false;
-              _hasError = false;
-            });
-          } else {
-            setState(() {
-              _isLoading = false;
-              _hasError = true;
-            });
-          }
-        },
-        failure: (failure) async {
-          AppLogger.debug('_ImageThumbnail: Failed to load local file ${widget.fileId}: ${failure.message}');
-          // Try to download and cache the image from S3
-          await _downloadAndCacheImage();
-        },
-      );
-    } catch (e) {
-      AppLogger.debug('_ImageThumbnail: Error loading image data: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
+  @override
+  void didUpdateWidget(_ImageThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only reload if the fileId has changed
+    if (oldWidget.fileId != widget.fileId) {
+      _loadImageData();
     }
   }
 
-  /// Download image from S3 and cache it locally for future use
-  Future<void> _downloadAndCacheImage() async {
-    try {
-      final s3Key = widget.file['s3Key'] as String?;
-      if (s3Key == null) {
-        AppLogger.debug('_ImageThumbnail: No S3 key available for ${widget.fileId}');
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _hasError = true;
-          });
-        }
-        return;
-      }
+  Future<void> _loadImageData() async {
+    // Don't reload if we already have data for this file
+    if (_currentFileId == widget.fileId && _imageData != null) {
+      return;
+    }
 
-      // Download image bytes without triggering additional local file creation
-      final downloadResult = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
-          .downloadMediaFileBytes(
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+
+    try {
+      // Use ViewModel to get image data (now cached)
+      final s3Key = widget.file['s3Key'] as String?;
+      final imageData = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
+          .getImageData(
             fileId: widget.fileId,
             fileName: widget.fileName,
             validatorId: widget.validatorId,
             s3Key: s3Key,
           );
 
-      if (downloadResult != null && mounted) {
-        // Now manually cache this with the correct fileId to avoid duplicates
-        final offlineFileService = ref.read(offlineFileServiceProvider);
-        final localStorage = ref.read(localStorageServiceProvider);
-        final fileName = widget.file['name'] as String? ?? widget.fileName;
-        final contentType = widget.file['contentType'] as String? ?? 'image/jpeg';
-        
-        // Create offline file metadata with the original fileId
-        final appDocDir = await getApplicationDocumentsDirectory();
-        final offlineFilesDir = Directory('${appDocDir.path}/offline_files');
-        if (!await offlineFilesDir.exists()) {
-          await offlineFilesDir.create(recursive: true);
-        }
-        
-        final sanitizedFileName = fileName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
-        final localPath = '${offlineFilesDir.path}/${widget.fileId}_$sanitizedFileName';
-        
-        // Write file to local storage
-        final localFile = File(localPath);
-        await localFile.writeAsBytes(downloadResult);
-        
-        // Create offline file metadata
-        final offlineFile = OfflineFile(
-          id: widget.fileId,
-          taskUid: widget.taskUid,
-          validatorId: widget.validatorId,
-          fileName: fileName,
-          localPath: localPath,
-          fileSize: downloadResult.length,
-          contentType: contentType,
-          createdAt: DateTime.now(),
-          status: OfflineFileStatus.uploaded, // Mark as uploaded since it came from S3
-          s3Key: s3Key,
-        );
-        
-        // Store metadata in Hive with the original fileId
-        await localStorage.put(
-          'offline_files',
-          widget.fileId,
-          offlineFile,
-        );
-
+      if (mounted) {
         setState(() {
-          _imageData = downloadResult;
-          _isLoading = false;
-          _hasError = false;
-        });
-      } else if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
+          _currentFileId = widget.fileId;
+          if (imageData != null) {
+            _imageData = imageData;
+            _isLoading = false;
+            _hasError = false;
+          } else {
+            _isLoading = false;
+            _hasError = true;
+          }
         });
       }
     } catch (e) {
-      AppLogger.debug('_ImageThumbnail: Failed to download and cache image: $e');
+      AppLogger.debug('_ImageThumbnail: Error loading image data: $e');
       if (mounted) {
         setState(() {
+          _currentFileId = widget.fileId;
           _isLoading = false;
           _hasError = true;
         });
@@ -1258,10 +935,12 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
     }
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: () => widget.onTap(_imageData),
       child: Container(
         width: widget.isLarge ? double.infinity : 48,
         height: widget.isLarge ? 120 : 48,

@@ -1,6 +1,7 @@
 // VTODO parser for CalDAV operations
 // Centralizes all VTODO serialization and parsing logic including attendee handling
 
+import 'dart:convert';
 import '../../../core/logger.dart';
 import '../../models/task.dart';
 import '../../models/attendee.dart';
@@ -46,6 +47,18 @@ class VTODOParser {
       vtodo.writeln(_serializeAttendee(attendee));
     }
     
+    // Attachments (RFC 5545 ATTACH field with FlowIt extensions)
+    final attachments = _parseAttachments(task.attachments);
+    for (final attachment in attachments) {
+      vtodo.writeln(_serializeAttachment(attachment));
+    }
+    
+    // Media Attachments (RFC 5545 ATTACH field with FlowIt media extensions)
+    final mediaAttachments = _parseAttachments(task.mediaAttachments);
+    for (final mediaAttachment in mediaAttachments) {
+      vtodo.writeln(_serializeMediaAttachment(mediaAttachment));
+    }
+    
     // FlowIt-specific extensions
     vtodo.writeln('X-FLOWIT-TYPE:task');
     vtodo.writeln('X-FLOWIT-VALIDATOR:${_escapeCalendarText(task.flowitValidator)}');
@@ -87,6 +100,8 @@ class VTODOParser {
       DateTime? created, lastModified, due;
       List<String> categories = [];
       List<Attendee> attendees = [];
+      List<Map<String, dynamic>> attachments = [];
+      List<Map<String, dynamic>> mediaAttachments = [];
       String? flowitValidator;
       int percentComplete = 0;
       
@@ -133,6 +148,20 @@ class VTODOParser {
             }
             AppLogger.debug('VTODOParser: Added attendee: ${attendee.email} (${attendee.displayName ?? 'no name'})');
           }
+        } else if (line.startsWith('ATTACH:') || line.startsWith('ATTACH;')) {
+          // Parse attachment with parameters according to RFC 5545
+          final attachment = _parseAttachment(line);
+          if (attachment != null) {
+            // Check if this is a media attachment
+            final attachType = attachment['attachType'] as String?;
+            if (attachType == 'media') {
+              mediaAttachments.add(attachment);
+              AppLogger.debug('VTODOParser: Added media attachment: ${attachment['filename'] ?? attachment['uri'] ?? 'unknown'}');
+            } else {
+              attachments.add(attachment);
+              AppLogger.debug('VTODOParser: Added attachment: ${attachment['filename'] ?? attachment['uri'] ?? 'unknown'}');
+            }
+          }
         }
       }
       
@@ -141,6 +170,8 @@ class VTODOParser {
         AppLogger.debug('VTODOParser: - Summary: $summary');
         AppLogger.debug('VTODOParser: - Organizer: $organizer');
         AppLogger.debug('VTODOParser: - Attendees count: ${attendees.length}');
+        AppLogger.debug('VTODOParser: - Attachments count: ${attachments.length}');
+        AppLogger.debug('VTODOParser: - Media attachments count: ${mediaAttachments.length}');
         for (int i = 0; i < attendees.length; i++) {
           final attendee = attendees[i];
           AppLogger.debug('VTODOParser: - Attendee $i: ${attendee.email} (${attendee.displayName ?? 'no name'}) - ${attendee.status.value}');
@@ -160,6 +191,8 @@ class VTODOParser {
           attendees: attendees,
           percentComplete: percentComplete,
           flowitValidator: flowitValidator ?? 'default',
+          attachments: _serializeAttachments(attachments),
+          mediaAttachments: _serializeAttachments(mediaAttachments),
         );
       }
     } catch (e) {
@@ -372,6 +405,179 @@ class VTODOParser {
     } catch (e) {
       AppLogger.error('VTODOParser: Failed to parse attendee line: $line', e, StackTrace.current);
       return null;
+    }
+  }
+
+  /// Serialize an attachment object to RFC 5545 ATTACH line with FlowIt extensions
+  static String _serializeAttachment(Map<String, dynamic> attachment) {
+    final parameters = <String>[];
+    final uri = attachment['uri'] as String? ?? '';
+    
+    // Add FlowIt-specific parameters
+    final attachType = attachment['attachType'] as String?;
+    if (attachType != null) {
+      parameters.add('X-FLOWIT-ATTACHTYPE=$attachType');
+    }
+    
+    final aesKey = attachment['aesKey'] as String?;
+    if (aesKey != null) {
+      parameters.add('X-FLOWIT-AESKEY=$aesKey');
+    }
+    
+    // Add standard ATTACH parameters
+    final filename = attachment['filename'] as String?;
+    if (filename != null) {
+      parameters.add('FILENAME=${_escapeCalendarText(filename)}');
+    }
+    
+    final fmttype = attachment['fmttype'] as String?;
+    if (fmttype != null) {
+      parameters.add('FMTTYPE=$fmttype');
+    }
+    
+    final size = attachment['size'] as int?;
+    if (size != null) {
+      parameters.add('SIZE=$size');
+    }
+    
+    // Build the ATTACH line
+    final paramString = parameters.isNotEmpty ? ';${parameters.join(';')}' : '';
+    return 'ATTACH$paramString:$uri';
+  }
+  
+  /// Serialize a media attachment object to RFC 5545 ATTACH line with FlowIt media extensions
+  static String _serializeMediaAttachment(Map<String, dynamic> attachment) {
+    final parameters = <String>[];
+    final uri = attachment['uri'] as String? ?? '';
+    
+    // Add FlowIt-specific media parameters
+    parameters.add('X-FLOWIT-ATTACHTYPE=media');
+    
+    final aesKey = attachment['aesKey'] as String?;
+    if (aesKey != null) {
+      parameters.add('X-FLOWIT-AESKEY=$aesKey');
+    }
+    
+    final mediaType = attachment['mediaType'] as String?;
+    if (mediaType != null) {
+      parameters.add('X-FLOWIT-MEDIATYPE=$mediaType');
+    }
+    
+    // Add standard ATTACH parameters
+    final filename = attachment['filename'] as String?;
+    if (filename != null) {
+      parameters.add('FILENAME=${_escapeCalendarText(filename)}');
+    }
+    
+    final fmttype = attachment['fmttype'] as String?;
+    if (fmttype != null) {
+      parameters.add('FMTTYPE=$fmttype');
+    }
+    
+    final size = attachment['size'] as int?;
+    if (size != null) {
+      parameters.add('SIZE=$size');
+    }
+    
+    // Build the ATTACH line
+    final paramString = parameters.isNotEmpty ? ';${parameters.join(';')}' : '';
+    return 'ATTACH$paramString:$uri';
+  }
+  
+  /// Parse an ATTACH line according to RFC 5545 with FlowIt extensions
+  static Map<String, dynamic>? _parseAttachment(String line) {
+    try {
+      // Split line into parameters and value parts
+      final colonIndex = line.indexOf(':');
+      if (colonIndex == -1) return null;
+      
+      final parametersPart = line.substring(0, colonIndex);
+      final valuePart = line.substring(colonIndex + 1);
+      
+      // Extract URI from value part
+      final uri = valuePart.trim();
+      if (uri.isEmpty) return null;
+      
+      // Parse parameters
+      final parameters = <String, String>{};
+      if (parametersPart.contains(';')) {
+        final paramList = parametersPart.split(';').skip(1); // Skip 'ATTACH' part
+        for (final param in paramList) {
+          final equalIndex = param.indexOf('=');
+          if (equalIndex > 0) {
+            final key = param.substring(0, equalIndex).trim().toUpperCase();
+            final value = param.substring(equalIndex + 1).trim();
+            // Remove quotes if present and unescape
+            parameters[key] = _unescapeCalendarText(value.replaceAll('"', ''));
+          }
+        }
+      }
+      
+      // Build attachment object
+      final attachment = <String, dynamic>{
+        'uri': uri,
+      };
+      
+      // Add standard parameters
+      if (parameters['FILENAME'] != null) {
+        attachment['filename'] = parameters['FILENAME'];
+      }
+      if (parameters['FMTTYPE'] != null) {
+        attachment['fmttype'] = parameters['FMTTYPE'];
+      }
+      if (parameters['SIZE'] != null) {
+        final size = int.tryParse(parameters['SIZE']!);
+        if (size != null) {
+          attachment['size'] = size;
+        }
+      }
+      
+      // Add FlowIt-specific parameters
+      if (parameters['X-FLOWIT-ATTACHTYPE'] != null) {
+        attachment['attachType'] = parameters['X-FLOWIT-ATTACHTYPE'];
+      }
+      if (parameters['X-FLOWIT-AESKEY'] != null) {
+        attachment['aesKey'] = parameters['X-FLOWIT-AESKEY'];
+      }
+      if (parameters['X-FLOWIT-MEDIATYPE'] != null) {
+        attachment['mediaType'] = parameters['X-FLOWIT-MEDIATYPE'];
+      }
+      
+      return attachment;
+    } catch (e) {
+      AppLogger.error('VTODOParser: Failed to parse attachment line: $line', e, StackTrace.current);
+      return null;
+    }
+  }
+  
+  /// Parse attachments JSON array
+  static List<Map<String, dynamic>> _parseAttachments(String attachmentsJson) {
+    try {
+      if (attachmentsJson.isEmpty || attachmentsJson == '[]') {
+        return [];
+      }
+      
+      final decoded = jsonDecode(attachmentsJson);
+      if (decoded is List) {
+        return decoded.map<Map<String, dynamic>>((attachment) {
+          return attachment is Map<String, dynamic> ? attachment : <String, dynamic>{};
+        }).toList();
+      }
+      
+      return [];
+    } catch (e) {
+      AppLogger.error('VTODOParser: Failed to parse attachments JSON', e, StackTrace.current);
+      return [];
+    }
+  }
+  
+  /// Serialize attachments to JSON array
+  static String _serializeAttachments(List<Map<String, dynamic>> attachments) {
+    try {
+      return jsonEncode(attachments);
+    } catch (e) {
+      AppLogger.error('VTODOParser: Failed to serialize attachments', e, StackTrace.current);
+      return '[]';
     }
   }
 } 

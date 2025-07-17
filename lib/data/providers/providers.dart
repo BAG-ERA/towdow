@@ -38,6 +38,8 @@ import '../../presentation/viewmodels/caldav_settings_viewmodel.dart';
 import '../../presentation/viewmodels/navbar_sync_viewmodel.dart';
 import '../../presentation/viewmodels/project_list_viewmodel.dart';
 import '../../presentation/viewmodels/validator_viewmodel.dart';
+import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
+import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
 import '../../app.dart';
 
 // Local storage service provider
@@ -309,6 +311,39 @@ final validatorViewModelProvider = StateNotifierProvider.family<ValidatorViewMod
   final accountRepository = ref.watch(accountRepositoryProvider);
   final syncService = ref.watch(syncServiceProvider);
   return ValidatorViewModel(taskRepository, accountRepository, syncService);
+});
+
+// Task file attachment ViewModel provider for managing file attachments per task
+final taskFileAttachmentViewModelProvider = StateNotifierProvider.family<TaskFileAttachmentViewModel, TaskFileAttachmentState, String>((ref, taskUid) {
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final offlineFileService = ref.watch(offlineFileServiceProvider);
+  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
+  final syncService = ref.watch(syncServiceProvider);
+  return TaskFileAttachmentViewModel(
+    taskRepository: taskRepository,
+    accountRepository: accountRepository,
+    offlineFileService: offlineFileService,
+    fileUploadQueueService: fileUploadQueueService,
+    syncService: syncService,
+  );
+});
+
+// Task media attachment ViewModel provider for managing media attachments per task
+final taskMediaAttachmentViewModelProvider = StateNotifierProvider.family<TaskMediaAttachmentViewModel, TaskMediaAttachmentState, String>((ref, taskUid) {
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final offlineFileService = ref.watch(offlineFileServiceProvider);
+  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
+  final syncService = ref.watch(syncServiceProvider);
+  return TaskMediaAttachmentViewModel(
+    taskUid,
+    taskRepository,
+    accountRepository,
+    offlineFileService,
+    fileUploadQueueService,
+    syncService,
+  );
 });
 
 // Account status providers
