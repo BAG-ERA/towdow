@@ -165,26 +165,29 @@ void main() {
       expect(spans.length, greaterThan(1));
 
       // Check for URL
-      final urlSpan = spans.firstWhere(
+      final urlSpans = spans.where(
         (span) => span.text?.contains('https://example.com') == true,
-        orElse: () => spans.first,
-      );
+      ).toList();
+      expect(urlSpans, isNotEmpty, reason: 'URL span should be found');
+      final urlSpan = urlSpans.first;
       expect(urlSpan.style?.color, Colors.blue);
       expect(urlSpan.style?.decoration, TextDecoration.underline);
 
       // Check for email
-      final emailSpan = spans.firstWhere(
+      final emailSpans = spans.where(
         (span) => span.text?.contains('support@company.org') == true,
-        orElse: () => spans.first,
-      );
+      ).toList();
+      expect(emailSpans, isNotEmpty, reason: 'Email span should be found');
+      final emailSpan = emailSpans.first;
       expect(emailSpan.style?.color, Colors.blue);
       expect(emailSpan.style?.decoration, TextDecoration.underline);
 
       // Check for bold text
-      final boldSpan = spans.firstWhere(
+      final boldSpans = spans.where(
         (span) => span.style?.fontWeight == FontWeight.bold,
-        orElse: () => spans.first,
-      );
+      ).toList();
+      expect(boldSpans, isNotEmpty, reason: 'Bold span should be found');
+      final boldSpan = boldSpans.first;
       expect(boldSpan.style?.fontWeight, FontWeight.bold);
     });
 
@@ -219,35 +222,53 @@ void main() {
       expect(spans.length, greaterThan(1));
 
       // Check for URL
-      final urlSpan = spans.firstWhere(
+      final urlSpans = spans.where(
         (span) => span.text?.contains('https://example.com') == true,
-        orElse: () => spans.first,
-      );
+      ).toList();
+      expect(urlSpans, isNotEmpty, reason: 'URL span should be found');
+      final urlSpan = urlSpans.first;
       expect(urlSpan.style?.color, Colors.blue);
       expect(urlSpan.style?.decoration, TextDecoration.underline);
 
       // Check for email
-      final emailSpan = spans.firstWhere(
+      final emailSpans = spans.where(
         (span) => span.text?.contains('support@company.org') == true,
-        orElse: () => spans.first,
-      );
+      ).toList();
+      expect(emailSpans, isNotEmpty, reason: 'Email span should be found');
+      final emailSpan = emailSpans.first;
       expect(emailSpan.style?.color, Colors.blue);
       expect(emailSpan.style?.decoration, TextDecoration.underline);
 
       // Check for phone number
-      final phoneSpan = spans.firstWhere(
+      final phoneSpans = spans.where(
         (span) => span.text?.contains('+1-555-123-4567') == true,
-        orElse: () => spans.first,
-      );
+      ).toList();
+      expect(phoneSpans, isNotEmpty, reason: 'Phone span should be found');
+      final phoneSpan = phoneSpans.first;
       expect(phoneSpan.style?.color, Colors.blue);
       expect(phoneSpan.style?.decoration, TextDecoration.underline);
 
       // Check for bold text
-      final boldSpan = spans.firstWhere(
+      final boldSpans = spans.where(
         (span) => span.style?.fontWeight == FontWeight.bold,
-        orElse: () => spans.first,
-      );
+      ).toList();
+      expect(boldSpans, isNotEmpty, reason: 'Bold span should be found');
+      final boldSpan = boldSpans.first;
       expect(boldSpan.style?.fontWeight, FontWeight.bold);
+    });
+
+    test('DEBUG: should show what spans are created for mixed content', () {
+      const text = 'Visit https://example.com or email **support@company.org** for help';
+      const baseStyle = TextStyle(fontSize: 14);
+
+      final spans = viewModel.decode(text, baseStyle);
+
+      // Print all spans for debugging
+      for (int i = 0; i < spans.length; i++) {
+        print('Span $i: text="${spans[i].text}", color=${spans[i].style?.color}, weight=${spans[i].style?.fontWeight}');
+      }
+
+      expect(spans.length, greaterThan(0));
     });
   });
 } 

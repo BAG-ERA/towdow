@@ -97,12 +97,10 @@ class EnhancedTextViewModel extends ChangeNotifier {
             ..onTap = () => _launchUrl('tel:${phone.replaceAll(RegExp(r'[\s\-\(\)]'), '')}'),
         ));
       } else if (match.group(4) != null) {
-        // Bold match
+        // Bold match - check if the content inside has URLs or emails
         final boldText = match.group(5) ?? '';
-        spans.add(TextSpan(
-          text: boldText,
-          style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-        ));
+        final nestedSpans = _parseInlineMarkdown(boldText, baseStyle.copyWith(fontWeight: FontWeight.bold));
+        spans.addAll(nestedSpans);
       }
       lastEnd = match.end;
     }

@@ -107,13 +107,14 @@ void main() {
       final testOfflineFile = OfflineFile(
         id: 'test-file',
         taskUid: 'test-task',
-        validatorId: 'test-validator',
+        aesKey: 'test-aes-key-12345678901234567890123456789012',
         fileName: 'test.txt',
         localPath: '/test/path',
         fileSize: 1024,
         contentType: 'text/plain',
         createdAt: now,
         status: OfflineFileStatus.local,
+        validatorId: 'test-validator',
       );
 
       // Add data to various boxes
