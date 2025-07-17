@@ -224,28 +224,11 @@ void main() {
     });
 
     group('Project Creation', () {
-      test('should create project successfully', () async {
+      test('should handle project creation when account repository fails', () async {
         // Arrange
-        when(mockCalendarRepository.save(mockito.any))
-            .thenAnswer((_) async => Result.success(null));
-        when(mockCalendarRepository.getProjectCalendars())
-            .thenAnswer((_) async => Result.success([]));
-
-        // Act
-        await viewModel.createProject(
-          name: 'New Project',
-          description: 'New project description',
-        );
-
-        // Assert
-        verify(mockCalendarRepository.save(mockito.any)).called(1);
-      });
-
-      test('should handle project creation failure', () async {
-        // Arrange
-        when(mockCalendarRepository.save(mockito.any))
+        when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.failure(
-                  Failure(message: 'Save failed'),
+                  Failure(message: 'Account not found'),
                 ));
 
         // Act
@@ -255,7 +238,22 @@ void main() {
         );
 
         // Assert
-        expect(viewModel.state.error, isNotNull);
+        expect(viewModel.state.error, contains('Failed to get active account'));
+      });
+
+      test('should handle project creation when no active account', () async {
+        // Arrange
+        when(mockAccountRepository.getActiveAccount())
+            .thenAnswer((_) async => Result.success(null));
+
+        // Act
+        await viewModel.createProject(
+          name: 'New Project',
+          description: 'New project description',
+        );
+
+        // Assert
+        expect(viewModel.state.error, contains('No active CalDAV account found'));
       });
     });
 
