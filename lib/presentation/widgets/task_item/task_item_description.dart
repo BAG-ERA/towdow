@@ -11,6 +11,7 @@ import 'chips/attendee_chip.dart';
 import 'chips/category_chip.dart';
 import '../utils/enhanced_text_field.dart';
 import 'task_file_attachment_list.dart';
+import 'task_media_attachment_list.dart';
 import '../../../data/providers/providers.dart';
 
 class TaskItemDescription extends ConsumerStatefulWidget {
@@ -56,6 +57,12 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
         
         // File Attachments
         TaskFileAttachmentList(
+          task: widget.task,
+          onTaskUpdated: widget.onTaskUpdated,
+        ),
+        
+        // Media Attachments
+        TaskMediaAttachmentList(
           task: widget.task,
           onTaskUpdated: widget.onTaskUpdated,
         ),
@@ -128,6 +135,17 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
                     foregroundColor: Theme.of(context).colorScheme.primary,
                   ),
                 ),
+                // Media attachment button
+                IconButton(
+                  onPressed: _triggerMediaAttachment,
+                  icon: const Icon(Icons.perm_media, size: 16),
+                  tooltip: 'Attach media',
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(32, 32),
+                    padding: EdgeInsets.zero,
+                    foregroundColor: Theme.of(context).colorScheme.secondary,
+                  ),
+                ),
                 const Spacer(),
                 // Cancel and Save buttons
                 TextButton(
@@ -175,6 +193,92 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
     setState(() {
       _isEditing = false;
     });
+  }
+
+  Future<void> _triggerMediaAttachment() async {
+    try {
+      // Pick media file (restrict to image/video types for media attachments)
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          // Image formats
+          'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'tif',
+          // Video formats (if desired)
+          // 'mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', '3gp', 'm4v',
+        ],
+        allowMultiple: false,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        return;
+      }
+
+      final file = result.files.first;
+      final fileName = file.name;
+      Uint8List? fileBytes = file.bytes;
+
+      // Handle desktop file reading
+      if (fileBytes == null && file.path != null) {
+        try {
+          final fileObj = File(file.path!);
+          fileBytes = await fileObj.readAsBytes();
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not read media file: $e')),
+            );
+          }
+          return;
+        }
+      }
+
+      if (fileBytes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not read media file data')),
+          );
+        }
+        return;
+      }
+
+      // Upload media file using TaskMediaAttachmentViewModel
+      final success = await ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier)
+          .uploadMediaFile(
+        taskUid: widget.task.uid,
+        fileName: fileName,
+        fileData: fileBytes,
+        contentType: _getContentType(fileName),
+      );
+
+      if (mounted && success) {
+        // Refresh the task to get the updated version with media attachment
+        final taskRepository = ref.read(taskRepositoryProvider);
+        final taskResult = await taskRepository.getById(widget.task.uid);
+        
+        await taskResult.when(
+          success: (updatedTask) async {
+            if (updatedTask != null && widget.onTaskUpdated != null) {
+              widget.onTaskUpdated!(updatedTask);
+            }
+          },
+          failure: (failure) async {
+            // Task update failed, but file was uploaded
+          },
+        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Media file "$fileName" uploaded successfully')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading media file: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _triggerFileAttachment() async {

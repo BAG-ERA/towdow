@@ -127,10 +127,10 @@ class TaskFileAttachmentViewModel extends StateNotifier<TaskFileAttachmentState>
       // Use the file ID from the stored offline file
       final fileId = offlineFile.id;
 
-      // Update task with new attachment
+      // Update task with new attachment using VTODO parser field names
       final attachments = _parseAttachments(task.attachments);
       attachments.add({
-        'id': fileId,
+        'uri': fileId, // Use URI as the primary identifier (like VTODO parser)
         'filename': fileName,
         'size': fileData.length,
         'fmttype': contentType,
@@ -138,7 +138,6 @@ class TaskFileAttachmentViewModel extends StateNotifier<TaskFileAttachmentState>
         'aesKey': encryptionKey,
         'status': 'local',
         'createdAt': DateTime.now().toIso8601String(),
-        'uri': '', // Will be set when uploaded to S3
       });
 
       final updatedTask = task.copyWith(
@@ -313,7 +312,7 @@ class TaskFileAttachmentViewModel extends StateNotifier<TaskFileAttachmentState>
       // Remove attachment from task
       final attachments = _parseAttachments(task.attachments);
       final originalCount = attachments.length;
-      attachments.removeWhere((attachment) => attachment['id'] == fileId);
+      attachments.removeWhere((attachment) => attachment['uri'] == fileId);
 
       if (attachments.length == originalCount) {
         throw Exception('File attachment not found');

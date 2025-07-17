@@ -33,6 +33,7 @@ class Task with _$Task {
     @HiveField(16) @Default('{}') String flowitRequirement, // JSON string
     @HiveField(17) @Default('[]') String flowitKanbanColumn, // JSON array
     @HiveField(18) @Default('[]') String attachments, // JSON array of ATTACH field data with x-flowit-* parameters
+    @HiveField(19) @Default('[]') String mediaAttachments, // JSON array of media attachments with image preview support
   }) = _Task;
 
   factory Task.fromJson(Map<String, dynamic> json) => _$TaskFromJson(json);

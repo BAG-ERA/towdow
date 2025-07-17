@@ -60,6 +60,9 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
   final SyncService? _syncService;
   final OfflineFileService _offlineFileService;
   final FileUploadQueueService _fileUploadQueueService;
+  
+  // In-memory cache for image data to avoid repeated loading
+  final Map<String, Uint8List> _imageCache = {};
 
   MediaValidatorViewModel(
     this._taskUid,
@@ -523,17 +526,24 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
     String? s3Key,
   }) async {
     try {
+      // Check cache first
+      if (_imageCache.containsKey(fileId)) {
+        AppLogger.debug('MediaValidatorViewModel: Returning cached image for $fileId');
+        return _imageCache[fileId];
+      }
+
       // First try to get file from local storage (offline-first)
       final localFileResult = await _offlineFileService.readLocalFile(fileId);
       
-      return await localFileResult.when(
+      final fileBytes = await localFileResult.when(
         success: (data) async {
           if (data.isNotEmpty) {
+            _imageCache[fileId] = data; // Cache the data
             return data;
           } else {
             // If local file is empty or null, try to download from S3
             if (s3Key != null) {
-              return await _downloadFromS3(s3Key, validatorId);
+              return await _downloadAndCacheImage(fileId, fileName, validatorId, s3Key);
             }
             return null;
           }
@@ -547,6 +557,8 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
           return null;
         },
       );
+
+      return fileBytes;
     } catch (e) {
       AppLogger.debug('MediaValidatorViewModel: Error loading image data: $e');
       return null;
@@ -566,15 +578,7 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
       
       if (downloadResult != null) {
         // Cache the downloaded image locally
-        await _offlineFileService.storeFileLocally(
-          taskUid: _taskUid,
-          aesKey: await _getValidatorEncryptionKey(validatorId),
-          fileName: fileName,
-          fileData: downloadResult,
-          contentType: _getContentType(fileName),
-          validatorId: validatorId,
-        );
-        
+        _imageCache[fileId] = downloadResult; // Cache the data
         return downloadResult;
       }
       
@@ -585,32 +589,7 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
     }
   }
 
-  /// Get content type for a file based on its extension
-  String _getContentType(String fileName) {
-    final extension = fileName.split('.').last.toLowerCase();
-    
-    switch (extension) {
-      // Image formats
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      case 'bmp':
-        return 'image/bmp';
-      case 'webp':
-        return 'image/webp';
-      case 'svg':
-        return 'image/svg+xml';
-      case 'tiff':
-      case 'tif':
-        return 'image/tiff';
-      default:
-        return 'application/octet-stream';
-    }
-  }
+
 }
 
 /// Provider for media validator view model

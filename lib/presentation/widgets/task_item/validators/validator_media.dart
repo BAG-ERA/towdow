@@ -645,7 +645,7 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
         file: file,
         validatorId: validatorId,
         taskUid: widget.taskUid,
-        onTap: () => _showFullScreenImage(file, validatorId),
+        onTap: (imageData) => _showFullScreenImageWithData(file, validatorId, imageData),
         isLarge: true,
       );
     }
@@ -672,29 +672,18 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
     );
   }
 
-  /// Show full screen image viewer dialog
-  Future<void> _showFullScreenImage(Map<String, dynamic> file, String validatorId) async {
-    final fileId = file['id'] as String;
+  /// Show full screen image viewer dialog (when image data is already available)
+  Future<void> _showFullScreenImageWithData(Map<String, dynamic> file, String validatorId, Uint8List? imageData) async {
     final fileName = file['name'] as String? ?? 'Unknown file';
-    final s3Key = file['s3Key'] as String?;
-
-    // Use ViewModel to get image data
-    final imageData = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
-        .getImageData(
-          fileId: fileId,
-          fileName: fileName,
-          validatorId: validatorId,
-          s3Key: s3Key,
-        );
 
     if (imageData == null) {
-      _showErrorSnackbar('Failed to load image');
+      _showErrorSnackbar('Image data not available');
       return;
     }
 
     if (!mounted) return;
 
-    // Show full screen image viewer using the reusable widget
+    // Show full screen image viewer using the reusable widget with already-loaded data
     showFullScreenImageViewer(
       context: context,
       imageData: imageData,
@@ -705,6 +694,8 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
       },
     );
   }
+
+
 
   /// Check if file extension is an image type
   bool _isImageType(String extension) {
@@ -857,7 +848,7 @@ class _ImageThumbnail extends ConsumerStatefulWidget {
   final Map<String, dynamic> file;
   final String validatorId;
   final String taskUid;
-  final VoidCallback onTap;
+  final Function(Uint8List? imageData) onTap;
   final bool isLarge;
 
   const _ImageThumbnail({
@@ -878,6 +869,7 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
   Uint8List? _imageData;
   bool _isLoading = true;
   bool _hasError = false;
+  String? _currentFileId; // Track the current file ID to avoid unnecessary reloads
 
   @override
   void initState() {
@@ -885,9 +877,30 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
     _loadImageData();
   }
 
+  @override
+  void didUpdateWidget(_ImageThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only reload if the fileId has changed
+    if (oldWidget.fileId != widget.fileId) {
+      _loadImageData();
+    }
+  }
+
   Future<void> _loadImageData() async {
+    // Don't reload if we already have data for this file
+    if (_currentFileId == widget.fileId && _imageData != null) {
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+
     try {
-      // Use ViewModel to get image data
+      // Use ViewModel to get image data (now cached)
       final s3Key = widget.file['s3Key'] as String?;
       final imageData = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
           .getImageData(
@@ -898,23 +911,23 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
           );
 
       if (mounted) {
-        if (imageData != null) {
-          setState(() {
+        setState(() {
+          _currentFileId = widget.fileId;
+          if (imageData != null) {
             _imageData = imageData;
             _isLoading = false;
             _hasError = false;
-          });
-        } else {
-          setState(() {
+          } else {
             _isLoading = false;
             _hasError = true;
-          });
-        }
+          }
+        });
       }
     } catch (e) {
       AppLogger.debug('_ImageThumbnail: Error loading image data: $e');
       if (mounted) {
         setState(() {
+          _currentFileId = widget.fileId;
           _isLoading = false;
           _hasError = true;
         });
@@ -927,7 +940,7 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: () => widget.onTap(_imageData),
       child: Container(
         width: widget.isLarge ? double.infinity : 48,
         height: widget.isLarge ? 120 : 48,

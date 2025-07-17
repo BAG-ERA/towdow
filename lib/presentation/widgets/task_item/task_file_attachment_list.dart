@@ -123,7 +123,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
     final fileName = attachment['filename'] as String? ?? 'Unknown file';
     final fileSize = attachment['size'] as int? ?? 0;
     final createdAt = attachment['createdAt'] as String?;
-    final fileId = attachment['id'] as String;
+    final fileId = attachment['uri'] as String;
     final fileStatus = attachment['status'] as String? ?? 'uploaded';
     // Note: s3Key and aesKey available if needed for debugging
     
@@ -300,7 +300,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
   }
 
   Future<void> _downloadFile(Map<String, dynamic> attachment) async {
-    final fileId = attachment['id'] as String;
+    final fileId = attachment['uri'] as String;
     final fileName = attachment['filename'] as String? ?? 'download';
     final s3Key = attachment['s3Key'] as String?;
     final encryptionKey = attachment['aesKey'] as String?;

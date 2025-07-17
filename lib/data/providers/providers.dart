@@ -39,6 +39,7 @@ import '../../presentation/viewmodels/navbar_sync_viewmodel.dart';
 import '../../presentation/viewmodels/project_list_viewmodel.dart';
 import '../../presentation/viewmodels/validator_viewmodel.dart';
 import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
+import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
 import '../../app.dart';
 
 // Local storage service provider
@@ -325,6 +326,23 @@ final taskFileAttachmentViewModelProvider = StateNotifierProvider.family<TaskFil
     offlineFileService: offlineFileService,
     fileUploadQueueService: fileUploadQueueService,
     syncService: syncService,
+  );
+});
+
+// Task media attachment ViewModel provider for managing media attachments per task
+final taskMediaAttachmentViewModelProvider = StateNotifierProvider.family<TaskMediaAttachmentViewModel, TaskMediaAttachmentState, String>((ref, taskUid) {
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final offlineFileService = ref.watch(offlineFileServiceProvider);
+  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
+  final syncService = ref.watch(syncServiceProvider);
+  return TaskMediaAttachmentViewModel(
+    taskUid,
+    taskRepository,
+    accountRepository,
+    offlineFileService,
+    fileUploadQueueService,
+    syncService,
   );
 });
 
