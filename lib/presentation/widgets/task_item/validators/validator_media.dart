@@ -13,7 +13,7 @@ import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../viewmodels/media_validator_viewmodel.dart';
 import '../../../../core/logger.dart';
-import '../../../../data/services/offline_file_service.dart';
+import '../../../../data/services/validator_service.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../data/models/offline_file.dart';
 
@@ -1215,11 +1215,41 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
         final localFile = File(localPath);
         await localFile.writeAsBytes(downloadResult);
         
+        // Get encryption key from validator
+        final taskRepository = ref.read(taskRepositoryProvider);
+        final taskResult = await taskRepository.getById(widget.taskUid);
+        final task = await taskResult.when(
+          success: (task) async => task,
+          failure: (failure) async => throw Exception('Failed to get task: ${failure.message}'),
+        );
+        
+        if (task == null) {
+          throw Exception('Task not found: ${widget.taskUid}');
+        }
+        
+        // Extract encryption key from validator
+        final validators = ValidatorService.parseValidators(task.flowitValidator);
+        String? encryptionKey;
+        
+        for (final validatorList in validators) {
+          for (final validator in validatorList) {
+            if (validator['id'] == widget.validatorId && validator['type'] == 'media') {
+              encryptionKey = validator['encryptionKey'] as String?;
+              break;
+            }
+          }
+          if (encryptionKey != null) break;
+        }
+        
+        if (encryptionKey == null) {
+          throw Exception('Encryption key not found for validator ${widget.validatorId}');
+        }
+        
         // Create offline file metadata
         final offlineFile = OfflineFile(
           id: widget.fileId,
           taskUid: widget.taskUid,
-          validatorId: widget.validatorId,
+          aesKey: encryptionKey,
           fileName: fileName,
           localPath: localPath,
           fileSize: downloadResult.length,
@@ -1227,6 +1257,7 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
           createdAt: DateTime.now(),
           status: OfflineFileStatus.uploaded, // Mark as uploaded since it came from S3
           s3Key: s3Key,
+          validatorId: widget.validatorId, // Optional field for validator association
         );
         
         // Store metadata in Hive with the original fileId

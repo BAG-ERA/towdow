@@ -27,7 +27,7 @@ class OfflineFile with _$OfflineFile {
   const factory OfflineFile({
     @HiveField(0) required String id,
     @HiveField(1) required String taskUid,
-    @HiveField(2) required String validatorId,
+    @HiveField(2) required String aesKey, // AES encryption key for this file
     @HiveField(3) required String fileName,
     @HiveField(4) required String localPath,
     @HiveField(5) required int fileSize,
@@ -40,6 +40,7 @@ class OfflineFile with _$OfflineFile {
     @HiveField(12) String? errorMessage,
     @HiveField(13) @Default(0) int retryCount,
     @HiveField(14) DateTime? lastRetryAt,
+    @HiveField(15) String? validatorId, // Optional: for validator-specific files (backward compatibility)
   }) = _OfflineFile;
 
   factory OfflineFile.fromJson(Map<String, dynamic> json) => _$OfflineFileFromJson(json);

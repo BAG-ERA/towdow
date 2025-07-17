@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/offline_file.dart';
+import '../models/task.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/task_repository.dart';
 import 'local_storage_service.dart';
@@ -414,36 +415,8 @@ class FileUploadQueueService {
         failure: (failure) async => throw Exception('Failed to get account: ${failure.message}'),
       );
       
-      // Get task to extract encryption key from validator
-      final taskResult = await _taskRepository.getById(offlineFile.taskUid);
-      final task = await taskResult.when(
-        success: (task) async {
-          if (task == null) {
-            throw Exception('Task not found: ${offlineFile.taskUid}');
-          }
-          return task;
-        },
-        failure: (failure) async => throw Exception('Failed to get task: ${failure.message}'),
-      );
-      
-      // Extract encryption key from validator
-      final validators = ValidatorService.parseValidators(task.flowitValidator);
-      String? encryptionKey;
-      
-      for (final validatorList in validators) {
-        for (final validator in validatorList) {
-          if (validator['id'] == offlineFile.validatorId && 
-              (validator['type'] == 'file' || validator['type'] == 'media')) {
-            encryptionKey = validator['encryptionKey'] as String?;
-            break;
-          }
-        }
-        if (encryptionKey != null) break;
-      }
-      
-      if (encryptionKey == null) {
-        throw Exception('Encryption key not found for validator ${offlineFile.validatorId}');
-      }
+      // Use encryption key directly from OfflineFile
+      final encryptionKey = offlineFile.aesKey;
       
       // Read file data
       final fileDataResult = await _offlineFileService.readLocalFile(offlineFile.id);
@@ -465,7 +438,7 @@ class FileUploadQueueService {
         key: s3Key,
         data: fileData,
         isPrivate: false, // Use shared bucket
-        symmetricKey: encryptionKey, // Use validator's encryption key
+        symmetricKey: encryptionKey, // Use file's AES encryption key
         contentType: offlineFile.contentType,
       );
       
@@ -507,35 +480,39 @@ class FileUploadQueueService {
           AppLogger.debug('FileUploadQueueService: Found task: ${task.uid}');
           AppLogger.debug('FileUploadQueueService: Current validator data: ${task.flowitValidator}');
           
-          // Parse current validators
-          final validatorLists = ValidatorService.parseValidators(task.flowitValidator);
-          AppLogger.debug('FileUploadQueueService: Parsed validators: $validatorLists');
-          
-          // Update the file validator with S3 info
-          final updateData = {
-            'type': 'update_file_s3',
-            'offlineFileId': offlineFile.id,
-            's3Key': s3Info['s3Key'],
-            's3Url': s3Info['s3Url'],
-            'status': 'uploaded',
-          };
-          AppLogger.debug('FileUploadQueueService: Update data: $updateData');
-          
-          final updatedValidatorLists = ValidatorService.updateValidatorState(
-            validatorLists,
-            offlineFile.validatorId,
-            updateData,
-          );
-          AppLogger.debug('FileUploadQueueService: Updated validators: $updatedValidatorLists');
-          
-          // Update task with new validator data
-          final newValidatorString = ValidatorService.serializeValidators(updatedValidatorLists);
-          AppLogger.debug('FileUploadQueueService: New validator string: $newValidatorString');
-          
-          final updatedTask = task.copyWith(
-            flowitValidator: newValidatorString,
-            lastModified: DateTime.now(),
-          );
+          // Update validator state only if this file belongs to a validator
+          Task updatedTask = task;
+          if (offlineFile.validatorId != null) {
+            // Parse current validators
+            final validatorLists = ValidatorService.parseValidators(task.flowitValidator);
+            AppLogger.debug('FileUploadQueueService: Parsed validators: $validatorLists');
+            
+            // Update the file validator with S3 info
+            final updateData = {
+              'type': 'update_file_s3',
+              'offlineFileId': offlineFile.id,
+              's3Key': s3Info['s3Key'],
+              's3Url': s3Info['s3Url'],
+              'status': 'uploaded',
+            };
+            AppLogger.debug('FileUploadQueueService: Update data: $updateData');
+            
+            final updatedValidatorLists = ValidatorService.updateValidatorState(
+              validatorLists,
+              offlineFile.validatorId!,
+              updateData,
+            );
+            AppLogger.debug('FileUploadQueueService: Updated validators: $updatedValidatorLists');
+            
+            // Update task with new validator data
+            final newValidatorString = ValidatorService.serializeValidators(updatedValidatorLists);
+            AppLogger.debug('FileUploadQueueService: New validator string: $newValidatorString');
+            
+            updatedTask = task.copyWith(
+              flowitValidator: newValidatorString,
+              lastModified: DateTime.now(),
+            );
+          }
           
           AppLogger.debug('FileUploadQueueService: Saving updated task...');
           

@@ -149,13 +149,17 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
 
       AppLogger.info('MediaValidatorViewModel: Storing media file locally for task $taskUid');
       
+      // Get encryption key for this validator
+      final encryptionKey = await _getValidatorEncryptionKey(validatorId);
+      
       // Store file locally first (offline-first approach)
       final offlineFileResult = await _offlineFileService.storeFileLocally(
         taskUid: taskUid,
-        validatorId: validatorId,
+        aesKey: encryptionKey,
         fileName: fileName,
         fileData: fileData,
         contentType: contentType,
+        validatorId: validatorId, // Keep for validator association
       );
 
       final success = await offlineFileResult.when(

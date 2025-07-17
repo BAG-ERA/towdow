@@ -6,9 +6,7 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../models/offline_file.dart';
-import '../models/caldav_account.dart';
 import 'local_storage_service.dart';
-import 's3_storage_service.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
 
@@ -23,10 +21,11 @@ class OfflineFileService {
   /// Store a file locally for offline access
   Future<Result<OfflineFile>> storeFileLocally({
     required String taskUid,
-    required String validatorId,
+    required String aesKey,
     required String fileName,
     required Uint8List fileData,
     required String contentType,
+    String? validatorId, // Optional: for validator-specific files (backward compatibility)
   }) async {
     try {
       AppLogger.debug('OfflineFileService: Storing file locally: $fileName');
@@ -56,13 +55,14 @@ class OfflineFileService {
       final offlineFile = OfflineFile(
         id: fileId,
         taskUid: taskUid,
-        validatorId: validatorId,
+        aesKey: aesKey,
         fileName: fileName,
         localPath: localPath,
         fileSize: fileData.length,
         contentType: contentType,
         createdAt: DateTime.now(),
         status: OfflineFileStatus.local,
+        validatorId: validatorId, // Optional field for backward compatibility
       );
       
       // Store metadata in Hive
