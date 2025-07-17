@@ -392,6 +392,7 @@ class CalDAVService {
     <FLOWIT:asflow/>
     <FLOWIT:owner/>
     <FLOWIT:template/>
+    <FLOWIT:status/>
   </D:prop>
 </D:propfind>''';
 
