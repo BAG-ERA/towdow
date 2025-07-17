@@ -89,6 +89,7 @@ extension TaskCalendarFactory on TaskCalendar {
     bool? flowitAsFlow,
     String? flowitOwner,
     String? flowitTemplate,
+    String? flowitStatus,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -107,6 +108,7 @@ extension TaskCalendarFactory on TaskCalendar {
       flowitAsFlow: flowitAsFlow ?? false,
       flowitOwner: flowitOwner,
       flowitTemplate: flowitTemplate,
+      flowitStatus: flowitStatus,
     );
   }
 }

@@ -146,9 +146,10 @@ class XMLResponseParser {
         final flowitAsFlow = flowitAsFlowStr?.toLowerCase() == 'true';
         final flowitOwner = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
         final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
+        final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
         
         if (isCalendar && supportsTodos) {
-          AppLogger.debug('XMLResponseParser: Found VTODO calendar: $displayName at $href with domain: $domain');
+          AppLogger.debug('XMLResponseParser: Found VTODO calendar: $displayName at $href with domain: $domain, status: $flowitStatus');
           calendars.add(TaskCalendarFactory.fromCalDAVDiscovery(
             path: href,
             displayName: displayName,
@@ -158,6 +159,7 @@ class XMLResponseParser {
             flowitAsFlow: flowitAsFlow,
             flowitOwner: flowitOwner,
             flowitTemplate: flowitTemplate,
+            flowitStatus: flowitStatus,
           ));
         }
       }

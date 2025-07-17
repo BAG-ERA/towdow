@@ -12,6 +12,7 @@ import '../../data/services/domain_service.dart';
 import '../../data/services/caldav_service.dart';
 import '../../data/models/user_preferences.dart';
 import '../../core/logger.dart';
+import '../../data/services/caldav_service.dart';
 
 // Project with associated statistics
 class ProjectWithStats {
@@ -482,35 +483,52 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     try {
       state = state.copyWith(error: null);
       
-      // Create new project calendar
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final path = '/calendars/project_${timestamp}_${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}/';
-      AppLogger.info('ProjectListViewModel: Creating project with path: $path');
-      
-      final newProject = TaskCalendarFactory.createNew(
-        path: path,
-        displayName: name,
-        description: description,
-        organizer: organizer,
-        categories: categories,
-      );
-      
-      AppLogger.info('ProjectListViewModel: Created project object with UID: ${newProject.path}');
-      
-      final result = await _calendarRepository.save(newProject);
-      await result.when(
-        success: (_) async {
-          // AppLogger.info('ProjectListViewModel: Project created successfully: $name');
-          // Add to user ordering
-          await _addProjectToUserOrder(newProject.path);
-          // Reload projects to show the new one
-          await loadProjects();
-        },
-        failure: (failure) async {
-          AppLogger.error('ProjectListViewModel: Failed to create project', failure.exception, failure.stackTrace);
-          state = state.copyWith(error: 'Failed to create project: ${failure.message}');
-        },
-      );
+             // Get active account to use CalDAV service for calendar creation
+       final accountResult = await _accountRepository.getActiveAccount();
+       await accountResult.when(
+         success: (account) async {
+           if (account != null) {
+             // Use CalDAV service for all calendar creation (it handles UUID generation)
+             final caldavService = CalDAVService(account: account);
+             final createResult = await caldavService.createCalendar(
+               displayName: name,
+               description: description,
+             );
+             
+             await createResult.when(
+               success: (calendar) async {
+                 AppLogger.info('ProjectListViewModel: Calendar created successfully via CalDAV service');
+                 
+                 // Save calendar locally
+                 final result = await _calendarRepository.save(calendar);
+                 await result.when(
+                   success: (_) async {
+                     // Add to user ordering
+                     await _addProjectToUserOrder(calendar.path);
+                     // Reload projects to show the new one
+                     await loadProjects();
+                   },
+                   failure: (failure) async {
+                     AppLogger.error('ProjectListViewModel: Failed to save project locally', failure.exception, failure.stackTrace);
+                     state = state.copyWith(error: 'Failed to save project: ${failure.message}');
+                   },
+                 );
+               },
+               failure: (failure) async {
+                 AppLogger.error('ProjectListViewModel: Failed to create project via CalDAV service', failure.exception, failure.stackTrace);
+                 state = state.copyWith(error: 'Failed to create project: ${failure.message}');
+               },
+             );
+           } else {
+             AppLogger.error('ProjectListViewModel: No active account found');
+             state = state.copyWith(error: 'No active CalDAV account found');
+           }
+         },
+         failure: (failure) async {
+           AppLogger.error('ProjectListViewModel: Failed to get active account', failure.exception, failure.stackTrace);
+           state = state.copyWith(error: 'Failed to get active account: ${failure.message}');
+         },
+       );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Exception creating project', e, stackTrace);
       state = state.copyWith(error: 'Failed to create project: $e');

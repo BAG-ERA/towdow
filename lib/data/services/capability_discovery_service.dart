@@ -301,6 +301,7 @@ class CapabilityDiscoveryService {
     <FLOWIT:asflow/>
     <FLOWIT:owner/>
     <FLOWIT:template/>
+    <FLOWIT:status/>
   </D:prop>
 </D:propfind>''';
 
@@ -431,9 +432,11 @@ class CapabilityDiscoveryService {
         final flowitAsFlow = flowitAsFlowStr?.toLowerCase() == 'true';
         final flowitOwner = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
         final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
+        final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
+        AppLogger.debug('CapabilityDiscovery: Status extraction result: $flowitStatus');
         
         if (supportsTodos) {
-          AppLogger.debug('CapabilityDiscovery: Found VTODO calendar: $displayName at $href with domain: $domain');
+          AppLogger.debug('CapabilityDiscovery: Found VTODO calendar: $displayName at $href with domain: $domain, status: $flowitStatus');
           calendars.add(TaskCalendarFactory.fromCalDAVDiscovery(
             path: href,
             displayName: displayName,
@@ -443,6 +446,7 @@ class CapabilityDiscoveryService {
             flowitAsFlow: flowitAsFlow,
             flowitOwner: flowitOwner,
             flowitTemplate: flowitTemplate,
+            flowitStatus: flowitStatus,
           ));
         }
       }
