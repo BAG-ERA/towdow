@@ -473,6 +473,28 @@ class CalDAVService {
     }
   }
 
+  /// Generate a calendar path with UUID (for local calendar creation)
+  Future<Result<String>> generateCalendarPath() async {
+    try {
+      final capabilitiesResult = await discoverCapabilities();
+      return await capabilitiesResult.when(
+        success: (capabilities) async {
+          final calendarUuid = const Uuid().v4();
+          final calendarHome = capabilities.calendarHome;
+          final calendarPath = '$calendarHome$calendarUuid/';
+          return Result.success(calendarPath);
+        },
+        failure: (failure) async => Result.failure(failure),
+      );
+    } catch (e, stackTrace) {
+      return Result.failure(Failure(
+        message: 'Failed to generate calendar path: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
   /// Create a new calendar on the server using MKCALENDAR
   Future<Result<TaskCalendar>> createCalendar({
     required String displayName,
