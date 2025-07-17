@@ -173,7 +173,7 @@ void main() {
         print('DEBUG: freshStorageService.getAll<CaldavAccount>(\'accounts\') result: ${storageResult}');
 
         // Act
-        final result = await freshSyncService.syncNow();
+        final result = await freshSyncService.syncAllActiveCaldav();
 
         // Assert
         final hasCorrectError = result.when(
@@ -311,7 +311,7 @@ void main() {
         });
 
         // Act
-        await syncService.syncNow();
+        await syncService.syncAllActiveCaldav();
 
         // Assert
         expect(statusUpdates, contains(SyncStatus.syncing));
@@ -334,7 +334,7 @@ void main() {
         );
 
         // Act - Try to sync without proper storage initialization
-        final result = await errorSyncService.syncNow();
+        final result = await errorSyncService.syncAllActiveCaldav();
 
         // Assert - Should fail because storage is not initialized
         final isFailure = result.when(

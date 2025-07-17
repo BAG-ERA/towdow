@@ -4,7 +4,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/local_storage_service.dart';
 import '../services/sync_service.dart';
-import '../services/background_sync_service.dart';
 import '../services/domain_service.dart';
 import '../services/status_service.dart';
 import '../repositories/task_repository.dart';
@@ -29,13 +28,14 @@ import '../services/offline_file_service.dart';
 import '../services/file_upload_queue_service.dart';
 import '../services/connection_monitor_service.dart';
 import '../services/user_sync_service.dart';
+import '../services/caldav_monitor.dart';
 import '../../core/app_lifecycle_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../presentation/viewmodels/task_viewmodel.dart';
 import '../../presentation/viewmodels/caldav_settings_viewmodel.dart';
-import '../../presentation/viewmodels/navbar_sync_viewmodel.dart';
+
 import '../../presentation/viewmodels/project_list_viewmodel.dart';
 import '../../presentation/viewmodels/validator_viewmodel.dart';
 import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
@@ -173,22 +173,6 @@ void handleSessionExpired([ProviderRef? ref]) {
   }
 }
 
-// Background sync service provider
-final backgroundSyncServiceProvider = Provider<BackgroundSyncService>((ref) {
-  final taskRepository = ref.watch(taskRepositoryProvider);
-  final accountRepository = ref.watch(accountRepositoryProvider);
-  final calendarRepository = ref.watch(calendarRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  
-  return BackgroundSyncService(
-    taskRepository: taskRepository,
-    accountRepository: accountRepository,
-    calendarRepository: calendarRepository,
-    syncService: syncService,
-    onSessionExpired: (_) => handleSessionExpired(ref),
-  );
-});
-
 // Sync service provider
 final syncServiceProvider = Provider<SyncService>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
@@ -201,6 +185,21 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
     localStorage: localStorage,
+  );
+});
+
+// CalDAV Monitor provider
+final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
+  final syncService = ref.watch(syncServiceProvider);
+  
+  return CalDAVMonitor(
+    accountRepository: accountRepository,
+    calendarRepository: calendarRepository,
+    connectionMonitorService: connectionMonitorService,
+    syncService: syncService,
   );
 });
 
@@ -243,16 +242,17 @@ final appLifecycleManagerProvider = Provider<AppLifecycleManager>((ref) {
 final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final lifecycleManager = ref.watch(appLifecycleManagerProvider);
   final syncService = ref.watch(syncServiceProvider);
-  final backgroundSyncService = ref.watch(backgroundSyncServiceProvider);
   final externalSyncService = ref.watch(externalCalendarSyncServiceProvider);
   final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final userSyncService = ref.watch(userSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
 
+  final caldavMonitor = ref.watch(caldavMonitorProvider);
+
   final result = await lifecycleManager.initialize(
     syncService: syncService,
-    backgroundSyncService: backgroundSyncService,
+    caldavMonitor: caldavMonitor,
     externalSyncService: externalSyncService,
     fileUploadQueueService: fileUploadQueueService,
     connectionMonitorService: connectionMonitorService,
@@ -290,11 +290,7 @@ final caldavSettingsViewModelProvider = StateNotifierProvider<CaldavSettingsView
   return CaldavSettingsViewModel(accountRepository, calendarRepository);
 });
 
-final navbarSyncViewModelProvider = StateNotifierProvider<NavbarSyncViewModel, NavbarSyncState>((ref) {
-  final accountRepository = ref.watch(accountRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  return NavbarSyncViewModel(accountRepository, syncService);
-});
+
 
 final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
@@ -543,7 +539,7 @@ final currentSyncStatusProvider = Provider<SyncStatus>((ref) {
 // Manual sync trigger provider
 final manualSyncProvider = FutureProvider.autoDispose<SyncResult>((ref) async {
   final syncService = ref.watch(syncServiceProvider);
-  final result = await syncService.syncNow();
+        final result = await syncService.syncAllActiveCaldav();
   return result.when(
     success: (syncResult) => syncResult,
     failure: (failure) => throw Exception(failure.message),

@@ -108,7 +108,7 @@ void main() {
           failure: (_) => false,
         );
         expect(isSuccess, true);
-        // Note: getActiveAccount is called twice - once in initialize, once in syncNow
+        // Note: getActiveAccount is called twice - once in initialize, once in syncAllActiveCaldav
         verify(mockAccountRepository.getActiveAccount()).called(2);
       });
 
@@ -150,7 +150,7 @@ void main() {
       });
     });
 
-    group('syncNow', () {
+    group('syncAllActiveCaldav', () {
       test('should prevent multiple concurrent syncs', () async {
         // Arrange
         when(mockAccountRepository.getActiveAccount())
@@ -163,10 +163,10 @@ void main() {
             .thenAnswer((_) async => const Result.success([]));
 
         // Start first sync (will be slow)
-        final future1 = syncService.syncNow();
+        final future1 = syncService.syncAllActiveCaldav();
         
         // Start second sync immediately  
-        final result2 = await syncService.syncNow();
+        final result2 = await syncService.syncAllActiveCaldav();
 
         // Assert second sync is rejected
         final isFailure = result2.when(
@@ -185,7 +185,7 @@ void main() {
             .thenAnswer((_) async => const Result.success(null));
 
         // Act
-        final result = await syncService.syncNow();
+        final result = await syncService.syncAllActiveCaldav();
 
         // Assert
         final isFailure = result.when(
@@ -205,7 +205,7 @@ void main() {
                 )));
 
         // Act
-        final result = await syncService.syncNow();
+        final result = await syncService.syncAllActiveCaldav();
 
         // Assert
         final isFailure = result.when(
@@ -241,7 +241,7 @@ void main() {
             .thenAnswer((_) async => const Result.success([]));
 
         // Act
-        await syncService.syncNow();
+        await syncService.syncAllActiveCaldav();
 
         // Assert
         expect(statusUpdates, contains(SyncStatus.syncing));
@@ -278,7 +278,7 @@ void main() {
             .thenAnswer((_) async => const Result.success([]));
 
         // Act
-        final result = await syncService.syncNow();
+        final result = await syncService.syncAllActiveCaldav();
 
         // Assert - Sync should complete but with errors
         final syncResult = result.when(
@@ -306,7 +306,7 @@ void main() {
                 )));
 
         // Act
-        final result = await syncService.syncNow();
+        final result = await syncService.syncAllActiveCaldav();
 
         // Assert - Sync should complete but with errors due to no calendars
         final syncResult = result.when(

@@ -71,7 +71,7 @@ void main() {
           .thenAnswer((_) async => const Result.success(null));
 
       // Act
-      final result = await syncService.syncNow();
+              final result = await syncService.syncAllActiveCaldav();
 
       // Assert
       final hasCorrectError = result.when(

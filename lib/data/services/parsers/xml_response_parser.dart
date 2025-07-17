@@ -18,6 +18,18 @@ class XMLResponseParser {
     }
   }
 
+  /// Extract ETag from PROPFIND response
+  static String? extractETag(String xmlResponse) {
+    try {
+      final document = XmlDocument.parse(xmlResponse);
+      final etagElement = document.findAllElements('getetag').firstOrNull;
+      return etagElement?.innerText;
+    } catch (e) {
+      AppLogger.error('XMLResponseParser: Failed to parse ETag from PROPFIND response', e, StackTrace.current);
+      return null;
+    }
+  }
+
   /// Parse current-user-principal from PROPFIND response
   static String? extractCurrentUserPrincipal(String xmlResponse) {
     try {
@@ -312,6 +324,13 @@ class XMLResponseParser {
         final etagMatch = etagPattern.firstMatch(responseContent);
         if (etagMatch != null) {
           responseData['getetag'] = etagMatch.group(1)!.trim();
+        }
+        
+        // Extract sync-token
+        final syncTokenPattern = RegExp(r'<(?:d:)?sync-token[^>]*>(.*?)</(?:d:)?sync-token>', dotAll: true, caseSensitive: false);
+        final syncTokenMatch = syncTokenPattern.firstMatch(responseContent);
+        if (syncTokenMatch != null) {
+          responseData['sync-token'] = syncTokenMatch.group(1)!.trim();
         }
         
         // Extract ctag

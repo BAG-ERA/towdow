@@ -4,6 +4,7 @@
 import 'dart:math' as math;
 
 import 'package:uuid/uuid.dart';
+import 'package:xml/xml.dart';
 
 import '../../core/result.dart';
 import '../../core/logger.dart';
@@ -20,8 +21,8 @@ class CalDAVService {
   final CaldavAccount account;
   late final WebDAVClient _client;
 
-  CalDAVService({required this.account}) {
-    _client = WebDAVClient.fromAccount(account);
+  CalDAVService({required this.account, WebDAVClient? client}) {
+    _client = client ?? WebDAVClient.fromAccount(account);
   }
 
   /// Test connection to CalDAV server
@@ -489,6 +490,127 @@ class CalDAVService {
     } catch (e, stackTrace) {
       return Result.failure(Failure(
         message: 'Failed to generate calendar path: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Get sync token and ETag for a calendar in a single request
+  Future<Result<Map<String, String?>>> getCalendarProperties(TaskCalendar calendar) async {
+    try {
+      AppLogger.debug('CalDAVService: Getting properties for calendar ${calendar.displayName}');
+      
+      final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop>
+    <D:sync-token />
+    <D:getetag />
+  </D:prop>
+</D:propfind>''';
+
+      final result = await _client.propfind(calendar.path, body: propfindBody, depth: 0);
+      return await result.when(
+        success: (response) async {
+          if (response.statusCode == 207) {
+            final syncToken = XMLResponseParser.extractSyncToken(response.body);
+            final etag = XMLResponseParser.extractETag(response.body);
+            
+            final properties = <String, String?>{
+              'syncToken': syncToken,
+              'etag': etag,
+            };
+            
+            AppLogger.debug('CalDAVService: Calendar properties - syncToken: $syncToken, etag: $etag');
+            return Result.success(properties);
+          } else {
+            return Result.failure(Failure(
+              message: 'Failed to get calendar properties: HTTP ${response.statusCode}',
+              exception: Exception('Server returned ${response.statusCode}'),
+            ));
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: Failed to get calendar properties', failure.exception, failure.stackTrace);
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Failed to get calendar properties', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to get calendar properties: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Resync calendar information (for CalDAVMonitor when ETags differ)
+  Future<Result<TaskCalendar>> resyncCalendarInfo(TaskCalendar calendar) async {
+    try {
+      AppLogger.debug('CalDAVService: Resyncing calendar info for ${calendar.displayName}');
+      
+      // Get ALL calendar properties from server (including custom namespaces)
+      final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:FLOWIT="https://flowit.app/ns/">
+  <D:prop>
+    <D:displayname />
+    <D:getetag />
+    <D:sync-token />
+    <C:supported-calendar-component-set />
+    <C:calendar-description />
+    <FLOWIT:domain />
+    <FLOWIT:type />
+    <FLOWIT:asflow />
+    <FLOWIT:owner />
+    <FLOWIT:template />
+    <FLOWIT:status />
+  </D:prop>
+</D:propfind>''';
+
+      final result = await _client.propfind(calendar.path, body: propfindBody, depth: 0);
+      return await result.when(
+        success: (response) async {
+          if (response.statusCode == 207) {
+            // Use existing parser to get all properties including custom namespaces
+            final responses = XMLResponseParser.parseMultiStatusResponse(response.body);
+            
+            if (responses.isNotEmpty) {
+              final responseData = responses.first;
+              
+              // Update the calendar with new properties
+              final updatedCalendar = calendar.copyWith(
+                etag: responseData['getetag'],
+                syncToken: responseData['sync-token'],
+                displayName: responseData['displayname'] ?? calendar.displayName,
+                description: responseData['calendar-description'] ?? calendar.description,
+                lastSyncAt: DateTime.now(),
+              );
+              
+              AppLogger.debug('CalDAVService: Calendar info resynced successfully');
+              return Result.success(updatedCalendar);
+            } else {
+              return Result.failure(Failure(
+                message: 'No calendar properties found in response',
+                exception: Exception('Empty response data'),
+              ));
+            }
+          } else {
+            return Result.failure(Failure(
+              message: 'Failed to resync calendar info: HTTP ${response.statusCode}',
+              exception: Exception('Server returned ${response.statusCode}'),
+            ));
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: Failed to resync calendar info', failure.exception, failure.stackTrace);
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Failed to resync calendar info', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to resync calendar info: $e',
         exception: e is Exception ? e : Exception(e.toString()),
         stackTrace: stackTrace,
       ));
