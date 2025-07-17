@@ -5,7 +5,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/services/s3_storage_service.dart';
@@ -14,7 +13,6 @@ import '../../data/services/sync_service.dart';
 import '../../data/services/offline_file_service.dart';
 import '../../data/services/file_upload_queue_service.dart';
 import '../../data/providers/providers.dart';
-import '../../data/models/offline_file.dart';
 import '../../core/logger.dart';
 
 /// Media Validator ViewModel State
@@ -493,8 +491,8 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
   }
 
   /// Queue sync operation for updated task
-  Future<void> _queueSyncOperation(task) async {
-    if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
+  Future<void> _queueSyncOperation(dynamic task) async {
+    if (_syncService != null && task.projectPath != null && task.projectPath.isNotEmpty) {
       final syncData = <String, dynamic>{
         'calendarUid': task.projectPath,
         'taskUid': task.uid,
@@ -517,20 +515,101 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
     }
   }
 
-  /// Sanitize filename to avoid S3 signature issues with special characters
-  String _sanitizeFileName(String fileName) {
-    // Replace problematic characters that can cause S3 signature mismatches
-    return fileName
-        // Replace em dash and en dash with regular hyphen
-        .replaceAll('–', '-')
-        .replaceAll('—', '-')
-        // Replace other Unicode spaces and dashes
-        .replaceAll(RegExp(r'[\u2000-\u206F\u2E00-\u2E7F\u3000]'), '-')
-        // Replace multiple consecutive spaces/dashes with single dash
-        .replaceAll(RegExp(r'[-\s]+'), '-')
-        // Remove leading/trailing dashes and spaces
-        .trim()
-        .replaceAll(RegExp(r'^-+|-+$'), '');
+  /// Get image data for display (for thumbnails and full-screen viewing)
+  Future<Uint8List?> getImageData({
+    required String fileId,
+    required String fileName,
+    required String validatorId,
+    String? s3Key,
+  }) async {
+    try {
+      // First try to get file from local storage (offline-first)
+      final localFileResult = await _offlineFileService.readLocalFile(fileId);
+      
+      return await localFileResult.when(
+        success: (data) async {
+          if (data.isNotEmpty) {
+            return data;
+          } else {
+            // If local file is empty or null, try to download from S3
+            if (s3Key != null) {
+              return await _downloadFromS3(s3Key, validatorId);
+            }
+            return null;
+          }
+        },
+        failure: (failure) async {
+          AppLogger.debug('MediaValidatorViewModel: Failed to load local file $fileId: ${failure.message}');
+          // Try to download and cache the image from S3
+          if (s3Key != null) {
+            return await _downloadAndCacheImage(fileId, fileName, validatorId, s3Key);
+          }
+          return null;
+        },
+      );
+    } catch (e) {
+      AppLogger.debug('MediaValidatorViewModel: Error loading image data: $e');
+      return null;
+    }
+  }
+
+  /// Download image from S3 and cache it locally for future use
+  Future<Uint8List?> _downloadAndCacheImage(
+    String fileId,
+    String fileName,
+    String validatorId,
+    String s3Key,
+  ) async {
+    try {
+      // Download image bytes from S3
+      final downloadResult = await _downloadFromS3(s3Key, validatorId);
+      
+      if (downloadResult != null) {
+        // Cache the downloaded image locally
+        await _offlineFileService.storeFileLocally(
+          taskUid: _taskUid,
+          aesKey: await _getValidatorEncryptionKey(validatorId),
+          fileName: fileName,
+          fileData: downloadResult,
+          contentType: _getContentType(fileName),
+          validatorId: validatorId,
+        );
+        
+        return downloadResult;
+      }
+      
+      return null;
+    } catch (e) {
+      AppLogger.debug('MediaValidatorViewModel: Failed to download and cache image: $e');
+      return null;
+    }
+  }
+
+  /// Get content type for a file based on its extension
+  String _getContentType(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
+    
+    switch (extension) {
+      // Image formats
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'bmp':
+        return 'image/bmp';
+      case 'webp':
+        return 'image/webp';
+      case 'svg':
+        return 'image/svg+xml';
+      case 'tiff':
+      case 'tif':
+        return 'image/tiff';
+      default:
+        return 'application/octet-stream';
+    }
   }
 }
 
