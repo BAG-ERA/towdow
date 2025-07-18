@@ -231,16 +231,34 @@ class S3StorageService {
   /// Parse JWT payload to extract S3 configuration
   Map<String, dynamic> _parseJwtPayload(String token) {
     try {
+      // DEBUG: Log token details for diagnosis
+      AppLogger.debug('S3StorageService._parseJwtPayload: Token length: ${token.length}');
+      AppLogger.debug('S3StorageService._parseJwtPayload: Token starts with: ${token.length > 20 ? token.substring(0, 20) : token}...');
+      
       final parts = token.split('.');
-      if (parts.length != 3) return {};
+      AppLogger.debug('S3StorageService._parseJwtPayload: JWT parts count: ${parts.length}');
+      
+      if (parts.length != 3) {
+        AppLogger.warning('S3StorageService._parseJwtPayload: Invalid JWT - expected 3 parts, got ${parts.length}');
+        return {};
+      }
       
       final payload = parts[1];
-      // Add padding if needed
-      final padded = payload + '=' * (4 - payload.length % 4);
+      AppLogger.debug('S3StorageService._parseJwtPayload: Payload part length: ${payload.length}');
+      
+      // Remove any existing padding and add correct padding
+      String normalizedPayload = payload.replaceAll('=', '');
+      final paddingNeeded = (4 - normalizedPayload.length % 4) % 4;
+      final padded = normalizedPayload + '=' * paddingNeeded;
+      
       final decoded = base64Url.decode(padded);
       final jsonStr = utf8.decode(decoded);
       
-      return json.decode(jsonStr) as Map<String, dynamic>;
+      final claims = json.decode(jsonStr) as Map<String, dynamic>;
+      AppLogger.debug('S3StorageService._parseJwtPayload: Successfully parsed JWT with ${claims.keys.length} claims');
+      AppLogger.debug('S3StorageService._parseJwtPayload: Claims keys: ${claims.keys.toList()}');
+      
+      return claims;
     } catch (e, stackTrace) {
       AppLogger.error('S3StorageService._parseJwtPayload: Failed to parse JWT', e, stackTrace);
       return {};
@@ -528,8 +546,23 @@ class S3StorageService {
   /// Generate a user-specific path prefix  
   String getUserPrefix() {
     // Use JWT 'sub' claim as user identifier (matches bucket permissions: {jwt_sub}/)
-    final jwtPayload = _parseJwtPayload(account.accessToken ?? '');
+    AppLogger.debug('S3StorageService.getUserPrefix: AccessToken null: ${account.accessToken == null}, empty: ${account.accessToken?.isEmpty ?? true}');
+    AppLogger.debug('S3StorageService.getUserPrefix: AccessToken length: ${account.accessToken?.length ?? 0}');
+    
+    // Validate token exists before parsing
+    if (account.accessToken == null || account.accessToken!.isEmpty) {
+      AppLogger.error('S3StorageService.getUserPrefix: No access token available for S3 operations');
+      throw Exception('No access token available for S3 operations');
+    }
+    
+    final jwtPayload = _parseJwtPayload(account.accessToken!);
     final userId = jwtPayload['sub'];
+    
+    if (userId == null) {
+      AppLogger.error('S3StorageService.getUserPrefix: JWT token missing sub claim');
+      throw Exception('Invalid JWT token: missing sub claim');
+    }
+    
     AppLogger.debug('S3StorageService.getUserPrefix: Using userId=$userId from JWT sub=${jwtPayload['sub']}');
     return '$userId/';
   }
@@ -537,8 +570,19 @@ class S3StorageService {
   /// Generate a shared path prefix for a specific context
   String getSharedPrefix(String context) {
     // For shared bucket, use JWT 'sub' as folder name (matches bucket permissions: {jwt_sub}/)
-    final jwtPayload = _parseJwtPayload(account.accessToken ?? '');
+    if (account.accessToken == null || account.accessToken!.isEmpty) {
+      AppLogger.error('S3StorageService.getSharedPrefix: No access token available for S3 operations');
+      throw Exception('No access token available for S3 operations');
+    }
+    
+    final jwtPayload = _parseJwtPayload(account.accessToken!);
     final userId = jwtPayload['sub']; 
+    
+    if (userId == null) {
+      AppLogger.error('S3StorageService.getSharedPrefix: JWT token missing sub claim');
+      throw Exception('Invalid JWT token: missing sub claim');
+    }
+    
     return '$userId/';
   }
 
