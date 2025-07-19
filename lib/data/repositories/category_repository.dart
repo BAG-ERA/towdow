@@ -1,29 +1,27 @@
-// Category repository for managing categories across projects
+// CategoryRepository for managing project categories
 // Provides a singleton instance with CRUD operations following repository pattern
 
-import '../../core/result.dart';
-import '../../core/logger.dart';
+import 'dart:convert';
+import '../services/local_storage_service.dart';
 import '../models/category.dart';
 import '../models/task_calendar.dart';
 import 'calendar_repository.dart';
+import '../services/caldav_service.dart';
+import 'account_repository.dart';
+import '../../core/result.dart';
+import '../../core/logger.dart';
 
-/// Singleton repository for category management
-/// Manages categories across all projects and provides CRUD operations
+/// Repository for category management
+/// Handles CRUD operations and caching for categories
 class CategoryRepository {
-  static CategoryRepository? _instance;
   final CalendarRepository _calendarRepository;
+  final AccountRepository _accountRepository;
   
-  // Cache for all categories across projects
+  // Category cache and project mapping
   final Map<String, Category> _categoryCache = {};
-  final Map<String, Set<String>> _projectCategoriesMap = {}; // projectPath -> categoryIds
+  final Map<String, Set<String>> _projectCategoriesMap = {};
   
-  CategoryRepository._(this._calendarRepository);
-  
-  /// Get singleton instance
-  static CategoryRepository getInstance(CalendarRepository calendarRepository) {
-    _instance ??= CategoryRepository._(calendarRepository);
-    return _instance!;
-  }
+  CategoryRepository(this._calendarRepository, this._accountRepository);
   
   /// Initialize the repository by loading all categories from projects
   Future<Result<void>> initialize() async {
@@ -134,6 +132,10 @@ class CategoryRepository {
             _projectCategoriesMap[projectPath]!.add(categoryId);
             
             AppLogger.info('CategoryRepository: Successfully created category $categoryId');
+            
+            // Sync to CalDAV server (similar to DomainService and StatusService)
+            await _syncCategoryToServer(updatedCalendar);
+            
             return Result.success(category);
           },
           failure: (failure) async {
@@ -337,5 +339,106 @@ class CategoryRepository {
     _categoryCache.clear();
     _projectCategoriesMap.clear();
     AppLogger.debug('CategoryRepository: Cache cleared');
+  }
+
+  /// Load categories for a project from its calendar's projectCategories field
+  /// This populates the cache with categories from server data
+  Future<Result<List<Category>>> loadCategoriesFromCalendar(TaskCalendar calendar) async {
+    try {
+      AppLogger.info('CategoryRepository: Loading categories from calendar ${calendar.displayName}');
+      
+      if (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') {
+        AppLogger.debug('CategoryRepository: No categories found in calendar ${calendar.displayName}');
+        return Result.success([]);
+      }
+      
+      // Parse categories JSON
+      final List<dynamic> categoriesJson = jsonDecode(calendar.projectCategories);
+      final List<Category> categories = [];
+      
+      for (final categoryData in categoriesJson) {
+        if (categoryData is Map<String, dynamic>) {
+          try {
+            final category = Category.fromJson(categoryData);
+            categories.add(category);
+            
+            // Update cache
+            _categoryCache[category.id] = category;
+            _projectCategoriesMap[calendar.path] ??= <String>{};
+            _projectCategoriesMap[calendar.path]!.add(category.id);
+            
+            AppLogger.debug('CategoryRepository: Loaded category ${category.name} (${category.id}) from calendar');
+          } catch (e) {
+            AppLogger.warning('CategoryRepository: Failed to parse category from JSON: $categoryData, error: $e');
+          }
+        }
+      }
+      
+      AppLogger.info('CategoryRepository: Successfully loaded ${categories.length} categories from calendar ${calendar.displayName}');
+      return Result.success(categories);
+      
+    } catch (e, stackTrace) {
+      AppLogger.error('CategoryRepository: Failed to load categories from calendar', e, stackTrace);
+      return Result.failure(
+        Failure(
+          message: 'Failed to load categories from calendar: $e',
+          exception: e is Exception ? e : Exception(e.toString()),
+          stackTrace: stackTrace,
+        ),
+      );
+    }
+  }
+
+  /// Syncs categories to the CalDAV server for a specific calendar.
+  /// This method follows the same pattern as DomainService and StatusService.
+  Future<Result<void>> _syncCategoryToServer(TaskCalendar calendar) async {
+    try {
+      AppLogger.info('CategoryRepository: *** Starting category sync to server ***');
+      AppLogger.info('CategoryRepository: Calendar path: ${calendar.path}');
+      AppLogger.info('CategoryRepository: Categories value: ${calendar.projectCategories}');
+      
+      // Get active account
+      final accountResult = await _accountRepository.getActiveAccount();
+      return accountResult.when(
+        success: (account) async {
+          if (account == null) {
+            AppLogger.warning('CategoryRepository: No active account found, skipping server sync');
+            return Result.success(null); // Still success since local save worked
+          }
+          
+          AppLogger.info('CategoryRepository: Found active account: ${account.username}@${account.serverUrl}');
+          
+          // Create CalDAV service instance
+          final caldavService = CalDAVService(account: account);
+          AppLogger.info('CategoryRepository: Created CalDAV service, calling updateCalendarProperties...');
+          
+          // Update calendar properties on server
+          final updateResult = await caldavService.updateCalendarProperties(calendar);
+          
+          return updateResult.when(
+            success: (_) {
+              AppLogger.info('CategoryRepository: *** Successfully synced categories to server ***');
+              return Result.success(null);
+            },
+            failure: (failure) {
+              AppLogger.error('CategoryRepository: Failed to sync categories to server: ${failure.message}');
+              AppLogger.error('CategoryRepository: Failure code: ${failure.code}');
+              // Don't fail the entire operation since local save succeeded
+              // The sync will be retried during next full sync
+              return Result.success(null);
+            },
+          );
+        },
+        failure: (failure) {
+          AppLogger.error('CategoryRepository: Failed to get active account for server sync: ${failure.message}');
+          AppLogger.error('CategoryRepository: Account failure code: ${failure.code}');
+          // Don't fail the entire operation since local save succeeded
+          return Result.success(null);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CategoryRepository: Exception during category sync', e, stackTrace);
+      return Result.success(null); // Don't fail the entire operation
+    }
   }
 } 

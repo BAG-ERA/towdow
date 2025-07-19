@@ -89,10 +89,11 @@ final externalEventRepositoryProvider = Provider<ExternalEventRepository>((ref) 
   return LocalExternalEventRepository(storageService);
 });
 
-// Category repository provider (singleton)
+// Category repository provider
 final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
-  return CategoryRepository.getInstance(calendarRepository);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return CategoryRepository(calendarRepository, accountRepository);
 });
 
 // CalDAV service provider  
@@ -186,12 +187,14 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
   final localStorage = ref.watch(localStorageServiceProvider);
   
   return SyncService(
     taskRepository: taskRepository,
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
+    categoryRepository: categoryRepository,
     localStorage: localStorage,
   );
 });
@@ -200,12 +203,14 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
   final accountRepository = ref.watch(accountRepositoryProvider);
   final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final syncService = ref.watch(syncServiceProvider);
   
   return CalDAVMonitor(
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
+    categoryRepository: categoryRepository,
     connectionMonitorService: connectionMonitorService,
     syncService: syncService,
   );

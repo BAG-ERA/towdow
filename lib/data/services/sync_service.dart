@@ -11,6 +11,7 @@ import '../models/task_calendar.dart';
 import '../repositories/task_repository.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/calendar_repository.dart';
+import '../repositories/category_repository.dart';
 import 'caldav_service.dart';
 import 'local_storage_service.dart';
 import 'webdav_client.dart';
@@ -81,6 +82,7 @@ class SyncService {
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
+  final CategoryRepository _categoryRepository;
   final LocalStorageService _localStorage;
 
   // Sync state
@@ -99,10 +101,12 @@ class SyncService {
     required TaskRepository taskRepository,
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
+    required CategoryRepository categoryRepository,
     required LocalStorageService localStorage,
   })  : _taskRepository = taskRepository,
         _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
+        _categoryRepository = categoryRepository,
         _localStorage = localStorage;
 
   // Public streams
@@ -718,6 +722,9 @@ class SyncService {
         lastSyncAt: DateTime.now(),
       );
       await _calendarRepository.save(updatedCalendar);
+      
+      // Load categories from the updated calendar data
+      await _categoryRepository.loadCategoriesFromCalendar(updatedCalendar);
       
     } catch (e, stackTrace) {
       AppLogger.error('SyncService: Failed to sync from server for ${calendar.path}', e, stackTrace);

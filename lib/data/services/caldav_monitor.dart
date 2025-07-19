@@ -9,6 +9,7 @@ import '../models/caldav_account.dart';
 import '../models/task_calendar.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/calendar_repository.dart';
+import '../repositories/category_repository.dart';
 import 'connection_monitor_service.dart';
 import 'sync_service.dart';
 import 'caldav_service.dart';
@@ -19,6 +20,7 @@ class CalDAVMonitor {
   // Dependencies - focused on calendar monitoring
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
+  final CategoryRepository _categoryRepository;
   final ConnectionMonitorService _connectionMonitorService;
   final SyncService _syncService;
 
@@ -37,10 +39,12 @@ class CalDAVMonitor {
   CalDAVMonitor({
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
+    required CategoryRepository categoryRepository,
     required ConnectionMonitorService connectionMonitorService,
     required SyncService syncService,
   })  : _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
+        _categoryRepository = categoryRepository,
         _connectionMonitorService = connectionMonitorService,
         _syncService = syncService;
 
@@ -206,6 +210,10 @@ class CalDAVMonitor {
               success: (updatedCalendar) async {
                 // Save the updated calendar to repository
                 await _calendarRepository.save(updatedCalendar);
+                
+                // Load categories from the updated calendar data
+                await _categoryRepository.loadCategoriesFromCalendar(updatedCalendar);
+                
                 AppLogger.debug('CalDAVMonitor: Calendar info resynced successfully for ${calendar.displayName}');
               },
               failure: (failure) async {
