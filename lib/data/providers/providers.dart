@@ -21,6 +21,7 @@ import '../models/caldav_account.dart';
 import '../models/external_caldav_account.dart';
 import '../models/external_calendar.dart';
 import '../models/calendar_event.dart';
+import '../models/category.dart';
 import '../services/caldav_service.dart';
 import '../services/external_caldav_service.dart';
 import '../services/external_sync_service.dart';
@@ -525,7 +526,9 @@ final anytimeTasksProvider = StreamProvider<List<Task>>((ref) {
 // Unified project-specific tasks provider
 final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, projectPath) {
   final taskRepository = ref.read(taskRepositoryProvider);
-  return taskRepository.watchTasks().map((allTasks) {
+  final categoryRepository = ref.read(categoryRepositoryProvider);
+  
+  return taskRepository.watchTasks().asyncMap((allTasks) async {
     // Encode special characters in the project path to match encoded storage format
     final encodedProjectPath = projectPath.replaceAll('@', '%40');
     
@@ -534,9 +537,32 @@ final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, pro
         .where((task) => task.projectPath == encodedProjectPath)
         .toList();
     
-
+    // Get project categories to filter task categoryIds
+    final projectCategoriesResult = await categoryRepository.getProjectCategories(encodedProjectPath);
+    final projectCategories = await projectCategoriesResult.when(
+      success: (categories) async => categories,
+      failure: (_) async => <Category>[],
+    );
     
-    return projectTasks;
+    // Create a set of valid category IDs for this project
+    final validCategoryIds = projectCategories.map((cat) => cat.id).toSet();
+    
+    // Filter out invalid category IDs from tasks
+    final filteredTasks = projectTasks.map((task) {
+      final validTaskCategoryIds = task.categoryIds
+          .where((categoryId) => validCategoryIds.contains(categoryId))
+          .toList();
+      
+      // Only update the task if category IDs were filtered out
+      if (validTaskCategoryIds.length != task.categoryIds.length) {
+        AppLogger.debug('TaskProvider: Filtered categories for task ${task.summary}: '
+                       'from ${task.categoryIds} to $validTaskCategoryIds');
+        return task.copyWith(categoryIds: validTaskCategoryIds);
+      }
+      return task;
+    }).toList();
+    
+    return filteredTasks;
   });
 });
 

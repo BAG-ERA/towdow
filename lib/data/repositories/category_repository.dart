@@ -177,6 +177,9 @@ class CategoryRepository {
           if (calendar != null) {
             final updatedCalendar = calendar.updateCategory(updatedCategory);
             await _calendarRepository.save(updatedCalendar);
+            
+            // Sync category changes to CalDAV server
+            await _syncCategoryToServer(updatedCalendar);
           }
         },
         failure: (failure) async {
@@ -218,6 +221,9 @@ class CategoryRepository {
           if (calendar != null) {
             final updatedCalendar = calendar.removeCategory(categoryId);
             await _calendarRepository.save(updatedCalendar);
+            
+            // Sync category deletion to CalDAV server
+            await _syncCategoryToServer(updatedCalendar);
           }
         },
         failure: (failure) async {

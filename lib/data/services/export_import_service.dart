@@ -172,7 +172,7 @@ class ExportImportService {
     
           if (task.categoryIds.isNotEmpty) {
         buffer.writeln('CATEGORIES:${task.categoryIds.map(_escapeCalendarText).join(',')}');
-      }
+    }
     
     if (task.organizer != null) {
       buffer.writeln('ORGANIZER:mailto:${task.organizer}');
