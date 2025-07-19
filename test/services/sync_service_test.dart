@@ -11,6 +11,7 @@ import 'package:towdow_app/data/services/local_storage_service.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
+import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/core/result.dart';
@@ -21,6 +22,7 @@ import 'sync_service_test.mocks.dart';
   TaskRepository,
   AccountRepository,
   CalendarRepository,
+  CategoryRepository,
   LocalStorageService,
   CalDAVService,
 ])
@@ -30,6 +32,7 @@ void main() {
     late MockTaskRepository mockTaskRepository;
     late MockAccountRepository mockAccountRepository;
     late MockCalendarRepository mockCalendarRepository;
+    late MockCategoryRepository mockCategoryRepository;
     late MockLocalStorageService mockLocalStorage;
 
     // Test data
@@ -40,12 +43,14 @@ void main() {
       mockTaskRepository = MockTaskRepository();
       mockAccountRepository = MockAccountRepository();
       mockCalendarRepository = MockCalendarRepository();
+      mockCategoryRepository = MockCategoryRepository();
       mockLocalStorage = MockLocalStorageService();
 
       syncService = SyncService(
         taskRepository: mockTaskRepository,
         accountRepository: mockAccountRepository,
         calendarRepository: mockCalendarRepository,
+        categoryRepository: mockCategoryRepository,
         localStorage: mockLocalStorage,
       );
 

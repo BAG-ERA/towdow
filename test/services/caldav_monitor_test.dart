@@ -9,6 +9,8 @@ import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
+import 'package:towdow_app/data/repositories/task_repository.dart';
+import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/services/caldav_monitor.dart';
 import 'package:towdow_app/data/services/connection_monitor_service.dart';
 import 'package:towdow_app/data/services/sync_service.dart';
@@ -20,6 +22,7 @@ import 'caldav_monitor_test.mocks.dart';
 @GenerateMocks([
   AccountRepository,
   CalendarRepository,
+  CategoryRepository,
   ConnectionMonitorService,
   SyncService,
   WebDAVClient,
@@ -29,18 +32,21 @@ void main() {
     late CalDAVMonitor monitor;
     late MockAccountRepository mockAccountRepository;
     late MockCalendarRepository mockCalendarRepository;
+    late MockCategoryRepository mockCategoryRepository;
     late MockConnectionMonitorService mockConnectionMonitor;
     late MockSyncService mockSyncService;
 
     setUp(() {
       mockAccountRepository = MockAccountRepository();
       mockCalendarRepository = MockCalendarRepository();
+      mockCategoryRepository = MockCategoryRepository();
       mockConnectionMonitor = MockConnectionMonitorService();
       mockSyncService = MockSyncService();
 
       monitor = CalDAVMonitor(
         accountRepository: mockAccountRepository,
         calendarRepository: mockCalendarRepository,
+        categoryRepository: mockCategoryRepository,
         connectionMonitorService: mockConnectionMonitor,
         syncService: mockSyncService,
       );
@@ -266,6 +272,7 @@ void main() {
         monitor = CalDAVMonitor(
           accountRepository: mockAccountRepository,
           calendarRepository: mockCalendarRepository,
+          categoryRepository: mockCategoryRepository,
           connectionMonitorService: mockConnectionMonitor,
           syncService: mockSyncService,
         );
