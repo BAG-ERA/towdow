@@ -42,8 +42,7 @@ extension CategoryExtension on Category {
   /// Generate a unique ID for a category based on its name
   static String generateId(String name) {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final nameHash = name.hashCode.abs();
-    return 'cat-$nameHash-$timestamp';
+    return '$name-$timestamp';
   }
   
   /// Generate a color for a category based on its position
