@@ -69,24 +69,16 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         }
       },
       child: AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.label_rounded),
-            SizedBox(width: 12),
-            Text('Manage Categories'),
-          ],
-        ),
+        title: const Text('Manage Categories'),
         content: SizedBox(
-          width: MediaQuery.of(context).size.width > 600 ? 500 : MediaQuery.of(context).size.width * 0.9,
-          height: MediaQuery.of(context).size.height * 0.7,
+          width: 400,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Task info
               Text(
                 'Task: ${widget.task.summary}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontStyle: FontStyle.italic,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
@@ -115,8 +107,9 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
               ),
               const SizedBox(height: 16),
               
-              // Categories list
-              Expanded(
+              // Categories list with constrained height
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 300),
                 child: _buildCategoriesList(),
               ),
             ],
@@ -127,7 +120,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: _isLoading ? null : _saveCategories,
             child: _isLoading
                 ? const SizedBox(
@@ -165,13 +158,22 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                 .where((category) => category.name.toLowerCase().contains(_searchQuery.toLowerCase()))
                 .toList();
 
+        // Separate selected and available categories
+        final selectedCategories = filteredCategories
+            .where((category) => _selectedCategoryIds.contains(category.id))
+            .toList();
+        final availableCategoriesFiltered = filteredCategories
+            .where((category) => !_selectedCategoryIds.contains(category.id))
+            .toList();
+
         // Check if we need to show "Create new category" button
-        final exactMatch = availableCategories.any(
+        final exactMatch = availableCategoriesFiltered.any(
           (category) => category.name.toLowerCase() == _searchQuery.toLowerCase()
         );
         final showCreateButton = _searchQuery.isNotEmpty && !exactMatch;
 
         return ListView(
+          shrinkWrap: true,
           children: [
             // Show create button if search doesn't match existing categories
             if (showCreateButton) ...[
@@ -179,81 +181,155 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
               const SizedBox(height: 8),
             ],
             
-            // Show filtered categories
-            ...filteredCategories.map((category) => _buildCategoryItem(category)),
+            // Selected categories section
+            if (selectedCategories.isNotEmpty) ...[
+              _buildSectionHeader('Selected Categories', selectedCategories.length),
+              const SizedBox(height: 4),
+              ...selectedCategories.map((category) => _buildCategoryItem(category, isSelected: true)),
+              const SizedBox(height: 16),
+            ],
+            
+            // Available categories section
+            if (availableCategoriesFiltered.isNotEmpty) ...[
+              _buildSectionHeader('Available Categories', availableCategoriesFiltered.length),
+              const SizedBox(height: 4),
+              ...availableCategoriesFiltered.map((category) => _buildCategoryItem(category, isSelected: false)),
+            ],
+            
+            // Empty state when no categories match search
+            if (selectedCategories.isEmpty && availableCategoriesFiltered.isEmpty && !showCreateButton) ...[
+              const SizedBox(height: 16),
+              Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.search_off_rounded,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No categories found',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Try adjusting your search or create a new category',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         );
       },
     );
   }
 
-  Widget _buildCreateCategoryItem() {
-    return Card(
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 24,
-          decoration: BoxDecoration(
-            color: Colors.blue.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue.withValues(alpha: 0.5), style: BorderStyle.solid),
+  Widget _buildSectionHeader(String title, int count) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
-          child: const Icon(Icons.add, size: 16, color: Colors.blue),
-        ),
-        title: Text('Create "$_searchQuery"'),
-        subtitle: const Text('Click to create new category'),
-        onTap: () => _showCreateCategoryDialog(_searchQuery),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              count.toString(),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCategoryItem(Category category) {
-    final isSelected = _selectedCategoryIds.contains(category.id);
-    
-    return Card(
-      child: ListTile(
-        leading: CategoryChip(
-          categoryId: category.id,
-          projectPath: widget.projectPath,
-        ),
-        title: Text(
-          isSelected ? 'Click to remove' : 'Click to add',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-          ),
-        ),
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
-          onSelected: (value) => _handleCategoryAction(category, value),
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'remove_from_project',
-              child: ListTile(
-                leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                title: const Text('Remove from project'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            PopupMenuItem(
-              value: 'edit_name',
-              child: ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('Change name'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            PopupMenuItem(
-              value: 'edit_color',
-              child: ListTile(
-                leading: const Icon(Icons.palette),
-                title: const Text('Change color'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
-        ),
-        onTap: () => _toggleCategory(category.id),
+  Widget _buildCreateCategoryItem() {
+    return ListTile(
+      leading: Icon(
+        Icons.add_circle_outline,
+        color: Theme.of(context).colorScheme.primary,
+        size: 20,
       ),
+      title: Text(
+        'Create "$_searchQuery"',
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        'Create new category',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+      ),
+      onTap: () => _showCreateCategoryDialog(_searchQuery),
+    );
+  }
+
+  Widget _buildCategoryItem(Category category, {required bool isSelected}) {
+    return ListTile(
+      leading: CategoryChip(
+        categoryId: category.id,
+        projectPath: widget.projectPath,
+      ),
+      title: Text(
+        isSelected ? 'Click to remove' : 'Click to add',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+        ),
+      ),
+      trailing: PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert),
+        onSelected: (value) => _handleCategoryAction(category, value),
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: 'remove_from_project',
+            child: ListTile(
+              leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
+              title: const Text('Remove from project'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          PopupMenuItem(
+            value: 'edit_name',
+            child: ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Change name'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          PopupMenuItem(
+            value: 'edit_color',
+            child: ListTile(
+              leading: const Icon(Icons.palette),
+              title: const Text('Change color'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ],
+      ),
+      onTap: () => _toggleCategory(category.id),
     );
   }
 
@@ -345,20 +421,37 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Edit Category Name'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Category name',
-            border: OutlineInputBorder(),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Update the name for "${category.name}".',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Category name *',
+                  hintText: 'Enter new category name',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+            ],
           ),
-          autofocus: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () async {
               final newName = controller.text.trim();
               if (newName.isNotEmpty && newName != category.name) {
@@ -403,45 +496,59 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Edit Category Color'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Color preview
-              Container(
-                width: 60,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: selectedColor.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: selectedColor),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Choose a color for "${category.name}".',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
-                child: Center(
-                  child: Text(
-                    category.name,
-                    style: TextStyle(
-                      color: selectedColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                const SizedBox(height: 16),
+                
+                // Color preview
+                Center(
+                  child: Container(
+                    width: 80,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: selectedColor.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: selectedColor),
+                    ),
+                    child: Center(
+                      child: Text(
+                        category.name,
+                        style: TextStyle(
+                          color: selectedColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Color picker
-              _buildColorPicker(selectedColor, (color) {
-                setDialogState(() {
-                  selectedColor = color;
-                });
-              }),
-            ],
+                const SizedBox(height: 16),
+                
+                // Color picker
+                _buildColorPicker(selectedColor, (color) {
+                  setDialogState(() {
+                    selectedColor = color;
+                  });
+                }),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
             ),
-            ElevatedButton(
+            FilledButton(
               onPressed: () async {
                 Navigator.of(context).pop();
                 await _updateCategoryColor(category, selectedColor);
@@ -515,29 +622,46 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Custom Color'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Hex color (e.g., #FF5733)',
-            border: OutlineInputBorder(),
-            prefixText: '#',
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Enter a hex color code for your custom color.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Hex color *',
+                  hintText: 'e.g., FF5733',
+                  border: OutlineInputBorder(),
+                  prefixText: '#',
+                ),
+                onChanged: (value) {
+                  // Remove # if user adds it
+                  if (value.startsWith('#')) {
+                    controller.text = value.substring(1);
+                    controller.selection = TextSelection.fromPosition(
+                      TextPosition(offset: controller.text.length),
+                    );
+                  }
+                },
+              ),
+            ],
           ),
-          onChanged: (value) {
-            // Remove # if user adds it
-            if (value.startsWith('#')) {
-              controller.text = value.substring(1);
-              controller.selection = TextSelection.fromPosition(
-                TextPosition(offset: controller.text.length),
-              );
-            }
-          },
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () {
               final hexColor = controller.text.trim();
               if (hexColor.length == 6) {
@@ -590,36 +714,48 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Create New Category'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Category name',
-                  border: OutlineInputBorder(),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Create a new category for organizing tasks.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Color:',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 8),
-              _buildColorPicker(selectedColor, (color) {
-                setDialogState(() {
-                  selectedColor = color;
-                });
-              }),
-            ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Category name *',
+                    hintText: 'e.g., Urgent, In Progress, Review',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Color:',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                _buildColorPicker(selectedColor, (color) {
+                  setDialogState(() {
+                    selectedColor = color;
+                  });
+                }),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
             ),
-            ElevatedButton(
+            FilledButton(
               onPressed: () async {
                 final name = nameController.text.trim();
                 if (name.isNotEmpty) {
