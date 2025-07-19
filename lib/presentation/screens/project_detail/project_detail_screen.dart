@@ -13,6 +13,7 @@ import '../../widgets/agenda_calendar.dart';
 import '../../widgets/utils/tasklist_toolbar.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/category.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../viewmodels/commands/attendee_commands.dart';
@@ -710,16 +711,21 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
   Widget _buildCategoryKanban(BuildContext context, WidgetRef ref, List<Task> tasks) {
-    // Get all unique categories from tasks
-    final Set<String> allCategories = {};
-    for (final task in tasks) {
-      allCategories.addAll(task.categories);
+    // Get project categories from the category view model
+    final categoryViewModelState = ref.watch(projectCategoryViewModelProvider(widget.projectPath));
+    
+    if (categoryViewModelState.isLoading) {
+      return const Center(child: CircularProgressIndicator());
     }
     
-    final categoriesList = allCategories.toList()..sort();
+    if (categoryViewModelState.error != null) {
+      return Center(child: Text('Error loading categories: ${categoryViewModelState.error}'));
+    }
+    
+    final projectCategories = categoryViewModelState.projectCategories;
     
     // Tasks without categories - sorted by status (done tasks last)
-    final uncategorizedTasks = tasks.where((task) => task.categories.isEmpty).toList();
+    final uncategorizedTasks = tasks.where((task) => task.categoryIds.isEmpty).toList();
     _sortTasksByStatus(uncategorizedTasks);
     
     final columns = <KanbanColumn>[];
@@ -737,20 +743,20 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       ),
     );
     
-    // Add columns for each category
-    for (final category in categoriesList) {
-      final categoryTasks = tasks.where((task) => task.categories.contains(category)).toList();
+    // Add columns for each project category
+    for (final category in projectCategories) {
+      final categoryTasks = tasks.where((task) => task.categoryIds.contains(category.id)).toList();
       _sortTasksByStatus(categoryTasks);
       
       columns.add(
         KanbanColumn(
-          id: category,
-          title: category,
+          id: category.id,
+          title: category.name,
           subtitle: '${categoryTasks.length} tasks',
           tasks: categoryTasks,
-          color: _getCategoryColor(category),
+          color: category.colorValue,
           icon: Icons.label_rounded,
-          onAddTask: () => _addTaskToCategory(context, ref, category),
+          onAddTask: () => _addTaskToCategory(context, ref, category.id),
         ),
       );
     }
@@ -789,12 +795,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
   }
 
-  Color _getCategoryColor(String category) {
-    // Simple hash to get consistent colors for categories
-    final hash = category.hashCode;
-    final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.teal, Colors.pink, Colors.indigo, Colors.red];
-    return colors[hash.abs() % colors.length];
-  }
+
 
   /// Sort tasks by status with completed tasks appearing last
   void _sortTasksByStatus(List<Task> tasks) {

@@ -159,10 +159,11 @@ class XMLResponseParser {
         final flowitOwner = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
         final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
         final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
+        final flowitCategories = _extractFlowItPropertyWithPrefixes(responseContent, 'categories', globalFlowItPrefixes);
         
         if (isCalendar && supportsTodos) {
           AppLogger.debug('XMLResponseParser: Found VTODO calendar: $displayName at $href with domain: $domain, status: $flowitStatus');
-          calendars.add(TaskCalendarFactory.fromCalDAVDiscovery(
+          final calendar = TaskCalendarFactory.fromCalDAVDiscovery(
             path: href,
             displayName: displayName,
             description: description ?? (supportsTodos ? 'Supports tasks (VTODO)' : 'Calendar collection'),
@@ -172,7 +173,14 @@ class XMLResponseParser {
             flowitOwner: flowitOwner,
             flowitTemplate: flowitTemplate,
             flowitStatus: flowitStatus,
-          ));
+          );
+          
+          // Update project categories if found
+          if (flowitCategories != null && flowitCategories.isNotEmpty) {
+            calendars.add(calendar.copyWith(projectCategories: flowitCategories));
+          } else {
+            calendars.add(calendar);
+          }
         }
       }
       
@@ -361,6 +369,16 @@ class XMLResponseParser {
           // Store the parsed component names as a comma-separated string for backward compatibility
           responseData['supported-calendar-component-set'] = compNames.join(',');
         }
+        
+        // Extract FlowIt properties
+        final globalFlowItPrefixes = _findFlowItNamespacePrefixes(xmlResponse);
+        responseData['flowit-domain'] = _extractFlowItPropertyWithPrefixes(responseContent, 'domain', globalFlowItPrefixes);
+        responseData['flowit-status'] = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
+        responseData['flowit-categories'] = _extractFlowItPropertyWithPrefixes(responseContent, 'categories', globalFlowItPrefixes);
+        responseData['flowit-type'] = _extractFlowItPropertyWithPrefixes(responseContent, 'type', globalFlowItPrefixes);
+        responseData['flowit-asflow'] = _extractFlowItPropertyWithPrefixes(responseContent, 'asflow', globalFlowItPrefixes);
+        responseData['flowit-owner'] = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
+        responseData['flowit-template'] = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
         
         responses.add(responseData);
       }

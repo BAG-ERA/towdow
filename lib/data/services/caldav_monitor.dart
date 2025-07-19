@@ -186,11 +186,11 @@ class CalDAVMonitor {
       // Get both sync token and ETag using CalDAVService
       final serverPropertiesResult = await caldavService.getCalendarProperties(calendar);
       return await serverPropertiesResult.when(
-        success: (serverProperties) async {
+        success: (updatedCalendar) async {
           final localSyncToken = calendar.syncToken;
           final localEtag = calendar.etag;
-          final serverSyncToken = serverProperties['syncToken'];
-          final serverEtag = serverProperties['etag'];
+          final serverSyncToken = updatedCalendar.syncToken;
+          final serverEtag = updatedCalendar.etag;
           
           // Check sync tokens first
           if (localSyncToken != serverSyncToken) {

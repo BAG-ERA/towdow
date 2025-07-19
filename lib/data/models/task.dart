@@ -8,7 +8,7 @@ import 'attendee.dart';
 part 'task.freezed.dart';
 part 'task.g.dart';
 
-@HiveType(typeId: 6) // Incremented due to addition of dtstamp field
+@HiveType(typeId: 6)
 @freezed
 class Task with _$Task {
   const factory Task({
@@ -20,7 +20,7 @@ class Task with _$Task {
     @HiveField(5) required DateTime created,
     @HiveField(6) required DateTime dtstamp, // Required by iCalendar
     @HiveField(7) DateTime? due,
-    @HiveField(8) @Default([]) List<String> categories,
+    @HiveField(8) @Default([]) List<String> categoryIds,
     @HiveField(9) String? organizer,
     @HiveField(10) @Default([]) List<Attendee> attendees,
     @HiveField(11) @Default(0) int percentComplete,
@@ -45,7 +45,7 @@ extension TaskFactory on Task {
     required String summary,
     String description = '',
     DateTime? due,
-    List<String> categories = const [],
+    List<String> categoryIds = const [],
     String? projectPath,
     String? organizer,
     List<Attendee> attendees = const [],
@@ -68,7 +68,7 @@ extension TaskFactory on Task {
       created: now,
       dtstamp: now,
       due: due,
-      categories: categories,
+      categoryIds: categoryIds,
       projectPath: projectPath,
       organizer: organizer,
       attendees: attendees,
@@ -79,5 +79,43 @@ extension TaskFactory on Task {
       flowitKanbanColumn: flowitKanbanColumn,
       attachments: attachments,
     );
+  }
+}
+
+/// Extension for Task category management
+extension TaskCategoryExtension on Task {
+  /// Add a category ID to the task
+  Task addCategoryId(String categoryId) {
+    if (categoryIds.contains(categoryId)) {
+      return this; // Already has this category
+    }
+    
+    final updatedCategoryIds = List<String>.from(categoryIds)..add(categoryId);
+    return copyWith(
+      categoryIds: updatedCategoryIds,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Remove a category ID from the task
+  Task removeCategoryId(String categoryId) {
+    final updatedCategoryIds = List<String>.from(categoryIds)..remove(categoryId);
+    return copyWith(
+      categoryIds: updatedCategoryIds,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Replace all category IDs
+  Task withCategoryIds(List<String> newCategoryIds) {
+    return copyWith(
+      categoryIds: newCategoryIds,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Check if task has a specific category ID
+  bool hasCategoryId(String categoryId) {
+    return categoryIds.contains(categoryId);
   }
 } 

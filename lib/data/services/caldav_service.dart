@@ -394,6 +394,7 @@ class CalDAVService {
     <FLOWIT:owner/>
     <FLOWIT:template/>
     <FLOWIT:status/>
+    <FLOWIT:categories/>
   </D:prop>
 </D:propfind>''';
 
@@ -515,6 +516,7 @@ class CalDAVService {
     <FLOWIT:owner />
     <FLOWIT:template />
     <FLOWIT:status />
+    <FLOWIT:categories />
   </D:prop>
 </D:propfind>''';
 
@@ -534,6 +536,9 @@ class CalDAVService {
                 syncToken: responseData['sync-token'],
                 displayName: responseData['displayname'] ?? calendar.displayName,
                 description: responseData['calendar-description'] ?? calendar.description,
+                flowitDomain: responseData['flowit-domain'],
+                flowitStatus: responseData['flowit-status'],
+                projectCategories: responseData['flowit-categories'] ?? calendar.projectCategories,
                 lastSyncAt: DateTime.now(),
               );
               
@@ -773,12 +778,18 @@ class CalDAVService {
       xml.writeln('      <FLOWIT:status>${_escapeXmlText(calendar.flowitStatus!)}</FLOWIT:status>');
     }
     
+    // Set project categories as JSON
+    if (calendar.projectCategories.isNotEmpty && calendar.projectCategories != '[]') {
+      xml.writeln('      <FLOWIT:categories><![CDATA[${calendar.projectCategories}]]></FLOWIT:categories>');
+    }
+    
     xml.writeln('    </D:prop>');
     xml.writeln('  </D:set>');
     
     // Remove FlowIt properties if they're null/empty
     if ((calendar.flowitDomain == null || calendar.flowitDomain!.isEmpty) || 
-        (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty)) {
+        (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) ||
+        (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]')) {
       xml.writeln('  <D:remove>');
       xml.writeln('    <D:prop>');
       
@@ -788,6 +799,10 @@ class CalDAVService {
       
       if (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) {
         xml.writeln('      <FLOWIT:status/>');
+      }
+      
+      if (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') {
+        xml.writeln('      <FLOWIT:categories/>');
       }
       
       xml.writeln('    </D:prop>');
@@ -861,8 +876,8 @@ class CalDAVService {
     vcalendar.writeln('CALENDAR-ORDER:${calendar.calendarOrder}');
     
     // Categories
-    if (calendar.categories.isNotEmpty) {
-      vcalendar.writeln('CATEGORIES:${calendar.categories.map(_escapeCalendarText).join(',')}');
+    if (calendar.projectCategories.isNotEmpty && calendar.projectCategories != '[]') {
+      vcalendar.writeln('CATEGORIES:${calendar.projectCategories}');
     }
     
     // End VCALENDAR
@@ -871,7 +886,7 @@ class CalDAVService {
     return vcalendar.toString();
   }
 
-  /// Parse calendar properties from VCALENDAR response
+  /// Parse calendar properties from VCALENDAR response probably not needed anymore
   TaskCalendar? _parseCalendarProperties(String vcalendarContent, String path, String displayName) {
     try {
       final lines = vcalendarContent.split('\n').map((line) => line.trim()).toList();
@@ -907,9 +922,8 @@ class CalDAVService {
       final flowitTemplate = properties['X-FLOWIT-TEMPLATE'];
       final calendarOrder = int.tryParse(properties['CALENDAR-ORDER'] ?? '1') ?? 1;
       
-      // Parse categories
-      final categoriesStr = properties['CATEGORIES'];
-      final categories = categoriesStr?.split(',').map((c) => c.trim()).toList() ?? <String>[];
+      // Project categories are handled via X-FLOWIT-CATEGORIES field, not CATEGORIES
+      // CATEGORIES field is no longer used in TaskCalendar
       
       return TaskCalendar(
         path: path,
@@ -929,7 +943,7 @@ class CalDAVService {
         flowitOwner: flowitOwner,
         flowitTemplate: flowitTemplate,
         calendarOrder: calendarOrder,
-        categories: categories,
+        // projectCategories will be set by the caller via X-FLOWIT-CATEGORIES
       );
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVService: Failed to parse calendar properties', e, stackTrace);

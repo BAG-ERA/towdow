@@ -4,8 +4,10 @@
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:hive/hive.dart';
+import 'dart:convert';
 import 'task.dart';
 import 'attendee.dart';
+import 'category.dart';
 
 part 'task_calendar.freezed.dart';
 part 'task_calendar.g.dart';
@@ -41,7 +43,7 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(20) @Default(1) int calendarOrder, // CALENDAR-ORDER
     @HiveField(21) String? organizer, // ORGANIZER
     @HiveField(22) @Default([]) List<Attendee> attendees, // ATTENDEE
-    @HiveField(23) @Default([]) List<String> categories, // CATEGORIES
+    @HiveField(23) @Default('[]') String projectCategories, // JSON array of Category objects for project-level categories
     @HiveField(25) String? flowitDomain, // X-FLOWIT-DOMAIN - domain for grouping projects
     @HiveField(26) String? flowitStatus, // X-FLOWIT-STATUS - project status (DRAFT, CANCELED, ONGOING, STOPPED, ARCHIVE, COMPLETED, NEEDACTION, FAILED)
   }) = _TaskCalendar;
@@ -71,7 +73,7 @@ extension TaskCalendarFactory on TaskCalendar {
       status: 'NEEDS-ACTION',
       organizer: organizer,
       attendees: attendees,
-      categories: categories,
+      // categories field removed - project categories now stored in projectCategories JSON
       flowitOwner: organizer,
       flowitDomain: domain,
     );
@@ -263,5 +265,77 @@ extension TaskCalendarStatus on TaskCalendar {
   /// Set this calendar as ongoing
   TaskCalendar withOngoingStatus() {
     return withStatus('ONGOING');
+  }
+  
+  /// Get parsed project categories from JSON string
+  List<Category> get projectCategoriesList {
+    try {
+      if (projectCategories.isEmpty || projectCategories == '[]') {
+        return [];
+      }
+      final List<dynamic> jsonList = json.decode(projectCategories);
+      return jsonList.map((json) => Category.fromJson(json as Map<String, dynamic>)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+  
+  /// Update project categories with a list of Category objects
+  TaskCalendar withProjectCategories(List<Category> categories) {
+    final jsonString = json.encode(categories.map((cat) => cat.toJson()).toList());
+    return copyWith(
+      projectCategories: jsonString,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Add a category to the project
+  TaskCalendar addCategory(Category category) {
+    final currentCategories = projectCategoriesList;
+    final existingIndex = currentCategories.indexWhere((cat) => cat.id == category.id);
+    
+    if (existingIndex != -1) {
+      // Update existing category
+      currentCategories[existingIndex] = category;
+    } else {
+      // Add new category
+      currentCategories.add(category);
+    }
+    
+    return withProjectCategories(currentCategories);
+  }
+  
+  /// Remove a category from the project
+  TaskCalendar removeCategory(String categoryId) {
+    final currentCategories = projectCategoriesList;
+    currentCategories.removeWhere((cat) => cat.id == categoryId);
+    return withProjectCategories(currentCategories);
+  }
+  
+  /// Update a category in the project
+  TaskCalendar updateCategory(Category updatedCategory) {
+    final currentCategories = projectCategoriesList;
+    final index = currentCategories.indexWhere((cat) => cat.id == updatedCategory.id);
+    
+    if (index != -1) {
+      currentCategories[index] = updatedCategory;
+      return withProjectCategories(currentCategories);
+    }
+    
+    return this; // Category not found, return unchanged
+  }
+  
+  /// Check if the project has a specific category
+  bool hasCategory(String categoryId) {
+    return projectCategoriesList.any((cat) => cat.id == categoryId);
+  }
+  
+  /// Get a category by ID
+  Category? getCategoryById(String categoryId) {
+    try {
+      return projectCategoriesList.firstWhere((cat) => cat.id == categoryId);
+    } catch (e) {
+      return null;
+    }
   }
 } 

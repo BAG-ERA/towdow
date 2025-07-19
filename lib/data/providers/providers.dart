@@ -14,6 +14,7 @@ import '../repositories/user_repository.dart';
 import '../repositories/external_account_repository.dart';
 import '../repositories/external_calendar_repository.dart';
 import '../repositories/external_event_repository.dart';
+import '../repositories/category_repository.dart';
 import '../models/task.dart';
 import '../models/task_calendar.dart';
 import '../models/caldav_account.dart';
@@ -40,6 +41,7 @@ import '../../presentation/viewmodels/project_list_viewmodel.dart';
 import '../../presentation/viewmodels/validator_viewmodel.dart';
 import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
+import '../../presentation/viewmodels/category_viewmodel.dart';
 import '../../app.dart';
 
 // Local storage service provider
@@ -85,6 +87,12 @@ final externalCalendarRepositoryProvider = Provider<ExternalCalendarRepository>(
 final externalEventRepositoryProvider = Provider<ExternalEventRepository>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
   return LocalExternalEventRepository(storageService);
+});
+
+// Category repository provider (singleton)
+final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  return CategoryRepository.getInstance(calendarRepository);
 });
 
 // CalDAV service provider  
@@ -340,6 +348,21 @@ final taskMediaAttachmentViewModelProvider = StateNotifierProvider.family<TaskMe
     fileUploadQueueService,
     syncService,
   );
+});
+
+// Category ViewModel provider
+final categoryViewModelProvider = StateNotifierProvider<CategoryViewModel, CategoryViewModelState>((ref) {
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
+  return CategoryViewModel(categoryRepository);
+});
+
+// Category ViewModel provider for specific project
+final projectCategoryViewModelProvider = StateNotifierProvider.family<CategoryViewModel, CategoryViewModelState, String>((ref, projectPath) {
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final viewModel = CategoryViewModel(categoryRepository);
+  // Initialize with project path
+  viewModel.initialize(projectPath);
+  return viewModel;
 });
 
 // Account status providers
@@ -649,8 +672,8 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   final filteredTasks = allTasks.where((task) {
     final summaryMatch = task.summary.toLowerCase().contains(searchLower);
     final descriptionMatch = task.description != null && task.description!.toLowerCase().contains(searchLower);
-    final categoriesMatch = task.categories.any(
-      (category) => category.toLowerCase().contains(searchLower),
+    final categoriesMatch = task.categoryIds.any(
+      (categoryId) => categoryId.toLowerCase().contains(searchLower),
     );
     
     return summaryMatch || descriptionMatch || categoriesMatch;

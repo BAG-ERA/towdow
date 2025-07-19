@@ -74,7 +74,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
         ],
         
         // Categories
-        if (widget.task.categories.isNotEmpty) ...[
+                  if (widget.task.categoryIds.isNotEmpty) ...[
           const SizedBox(height: 8),
           _buildCompactCategoriesSection(context),
         ],
@@ -424,8 +424,11 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
     return Wrap(
       spacing: 4,
       runSpacing: 3,
-      children: widget.task.categories.map((category) {
-        return CategoryChip(category: category);
+      children: widget.task.categoryIds.map((categoryId) {
+        return CategoryChip(
+          categoryId: categoryId,
+          projectPath: widget.task.projectPath,
+        );
       }).toList(),
     );
   }

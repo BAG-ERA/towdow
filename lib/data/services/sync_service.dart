@@ -621,8 +621,8 @@ class SyncService {
       // Use CalDAVService to get both sync token and ETag
       final propertiesResult = await caldavService.getCalendarProperties(calendar);
       return await propertiesResult.when(
-        success: (properties) async {
-          final syncToken = properties['syncToken'];
+        success: (updatedCalendar) async {
+          final syncToken = updatedCalendar.syncToken;
           if (syncToken != null) {
             return Result.success(syncToken);
           } else {

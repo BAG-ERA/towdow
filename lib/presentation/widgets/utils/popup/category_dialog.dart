@@ -1,14 +1,16 @@
 // Category management dialog for adding, editing, and removing task categories
-// Provides an interface for managing task categorization
+// Provides an interface for managing task categorization with the new Category model
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/task.dart';
+import '../../../../data/models/category.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../core/logger.dart';
+import '../../../../core/theme/chart_theme.dart';
 
-/// Dialog for managing task categories
+/// Dialog for managing task categories using the new Category model
 class CategoryDialog extends ConsumerStatefulWidget {
   final Task task;
   final Function(Task) onTaskUpdated;
@@ -28,13 +30,14 @@ class CategoryDialog extends ConsumerStatefulWidget {
 class _CategoryDialogState extends ConsumerState<CategoryDialog> {
   final _formKey = GlobalKey<FormState>();
   final _categoryController = TextEditingController();
-  late List<String> _categories;
+  late List<String> _selectedCategoryIds;
   bool _isLoading = false;
-
+  Color _selectedColor = Colors.blue;
+  
   @override
   void initState() {
     super.initState();
-    _categories = List.from(widget.task.categories);
+    _selectedCategoryIds = List.from(widget.task.categoryIds);
     
     // Add listener to update UI when text changes
     _categoryController.addListener(() {
@@ -90,12 +93,12 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                 ),
                 const SizedBox(height: 16),
                 
-                // Create category form at the top
+                // Create category form
                 _buildAddCategoryForm(),
                 
                 const SizedBox(height: 16),
                 
-                // Project categories section (if projectPath is provided)
+                // Project categories section
                 if (widget.projectPath != null) ...[
                   _buildProjectCategoriesSection(),
                 ],
@@ -108,7 +111,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: _isLoading ? null : _saveCategories,
             child: _isLoading
                 ? const SizedBox(
@@ -123,189 +126,248 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
     );
   }
 
-  Widget _buildCategoryChip(String category) {
-    return Chip(
-      label: Text(
-        category,
-        style: const TextStyle(fontSize: 12),
-      ),
-      deleteIcon: Icon(
-        Icons.close,
-        size: 16,
-        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-      ),
-      onDeleted: () => _removeCategory(category),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  Widget _buildAddCategoryForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Create New Category',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _categoryController,
+                decoration: const InputDecoration(
+                  hintText: 'Enter category name',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Category name cannot be empty';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text('Color: ', style: Theme.of(context).textTheme.bodyMedium),
+                  const SizedBox(width: 8),
+                  _buildColorPicker(),
+                  const Spacer(),
+                  if (_categoryController.text.trim().isNotEmpty)
+                    ElevatedButton(
+                      onPressed: _createCategory,
+                      child: const Text('Create'),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Selected categories display
+        if (_selectedCategoryIds.isNotEmpty) ...[
+          Text(
+            'Selected Categories',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          _buildSelectedCategoriesDisplay(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildColorPicker() {
+    // Use FlowIt chart color series for consistent branding
+    final colors = [
+      FlowItColors.primary,           // Blue Medium
+      FlowItColors.waterGreen,        // Water Green
+      FlowItColors.violet,            // Violet
+      FlowItColors.greenApple,        // Green Apple
+      FlowItColors.yellowDark,        // Yellow Dark
+      FlowItColors.pink,              // Pink
+      FlowItColors.coral,             // Coral
+      FlowItColors.greenAnis,         // Green Anis
+    ];
+    
+    return Wrap(
+      spacing: 4,
+      children: colors.map((color) {
+        final isSelected = _selectedColor.value == color.value;
+        return GestureDetector(
+          onTap: () => setState(() => _selectedColor = color),
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: isSelected ? Border.all(color: Colors.black, width: 2) : null,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSelectedCategoriesDisplay() {
+    return Consumer(
+      builder: (context, ref, child) {
+        final viewModelState = ref.watch(projectCategoryViewModelProvider(widget.projectPath ?? ''));
+        
+        if (viewModelState.isLoading) {
+          return const CircularProgressIndicator();
+        }
+        
+        final selectedCategories = _selectedCategoryIds
+            .map((categoryId) => viewModelState.projectCategories.where((cat) => cat.id == categoryId).firstOrNull)
+            .where((category) => category != null)
+            .cast<Category>()
+            .toList();
+        
+        return Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: selectedCategories.map((category) => 
+            _buildCategoryChip(category, onRemove: () => _removeCategoryId(category.id))
+          ).toList(),
+        );
+      },
     );
   }
 
   Widget _buildProjectCategoriesSection() {
     return Consumer(
       builder: (context, ref, child) {
-        final tasksAsync = ref.watch(projectTasksProvider(widget.projectPath!));
+        final viewModelState = ref.watch(projectCategoryViewModelProvider(widget.projectPath!));
         
-        return tasksAsync.when(
-          data: (tasks) {
-            // Get all unique categories from tasks in the project
-            final Set<String> allCategories = {};
-            for (final task in tasks) {
-              allCategories.addAll(task.categories);
-            }
-            
-            final categoriesList = allCategories.toList()..sort();
-            
-            // Filter out categories that are already added to current task
-            final availableCategories = categoriesList
-                .where((category) => !_categories.contains(category))
-                .toList();
-            
-            // Filter categories based on input field content
-            final searchQuery = _categoryController.text.trim().toLowerCase();
-            final filteredCategories = searchQuery.isEmpty 
-                ? availableCategories 
-                : availableCategories
-                    .where((category) => category.toLowerCase().contains(searchQuery))
-                    .toList();
-            
-            if (filteredCategories.isEmpty) {
-              return const SizedBox.shrink();
-            }
-            
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                Text(
-                  searchQuery.isEmpty 
-                      ? 'Categories used in this project:'
-                      : 'Matching categories:',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: filteredCategories.map((category) => 
-                    ActionChip(
-                      label: Text(
-                        category,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      onPressed: () => _addCategoryDirectly(category),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ).toList(),
-                ),
-              ],
-            );
-          },
-          loading: () => const SizedBox.shrink(),
-          error: (_, __) => const SizedBox.shrink(),
+        if (viewModelState.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (viewModelState.error != null) {
+          return Text('Error loading categories: ${viewModelState.error}');
+        }
+        
+        // Filter out categories that are already selected
+        final availableCategories = viewModelState.projectCategories
+            .where((category) => !_selectedCategoryIds.contains(category.id))
+            .toList();
+        
+        if (availableCategories.isEmpty) {
+          return const Text('No additional categories available');
+        }
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Available Categories',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: availableCategories.map((category) =>
+                _buildCategoryChip(
+                  category,
+                  onAdd: () => _addCategoryId(category.id),
+                )
+              ).toList(),
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _buildAddCategoryForm() {
-    return Form(
-      key: _formKey,
-      child: Row(
-        children: [
-          Expanded(
-            child: TextFormField(
-              controller: _categoryController,
-              decoration: InputDecoration(
-                hintText: 'Enter category name',
-                border: const OutlineInputBorder(),
-                isDense: true,
-                prefixIcon: _categories.isNotEmpty 
-                    ? Padding(
-                        padding: const EdgeInsets.only(left: 8.0, right: 8.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: _categories.map((category) => _buildCategoryChip(category)).toList(),
-                            ),
-                          ],
-                        ),
-                      )
-                    : null,
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Category cannot be empty';
-                }
-                if (_categories.contains(value.trim())) {
-                  return 'Category already exists';
-                }
-                return null;
-              },
-              onFieldSubmitted: (_) => _addCategory(),
-            ),
-          ),
-          if (!_isExactMatch() && _categoryController.text.trim().isNotEmpty) ...[
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: _addCategory,
-              child: Text(_getButtonText()),
-            ),
-          ],
-        ],
-      ),
+  Widget _buildCategoryChip(Category category, {VoidCallback? onAdd, VoidCallback? onRemove}) {
+    return Chip(
+      label: Text(category.name),
+      backgroundColor: category.colorValue.withValues(alpha: 0.3),
+      labelStyle: TextStyle(color: category.colorValue),
+      deleteIcon: onRemove != null ? const Icon(Icons.close, size: 16) : null,
+      onDeleted: onRemove,
+      avatar: onAdd != null 
+          ? GestureDetector(
+              onTap: onAdd,
+              child: Icon(Icons.add, size: 16, color: category.colorValue),
+            )
+          : null,
     );
   }
 
-  void _addCategory() {
-    if (_formKey.currentState?.validate() == true) {
-      final category = _categoryController.text.trim();
-      setState(() {
-        _categories.add(category);
-        _categoryController.clear();
-      });
-      AppLogger.info('CategoryDialog: Added category "$category"');
-      HapticFeedback.lightImpact();
-    }
-  }
-
-  void _addCategoryDirectly(String category) {
+  void _addCategoryId(String categoryId) {
     setState(() {
-      _categories.add(category);
+      if (!_selectedCategoryIds.contains(categoryId)) {
+        _selectedCategoryIds.add(categoryId);
+      }
     });
-    AppLogger.info('CategoryDialog: Added category "$category" directly');
     HapticFeedback.lightImpact();
   }
 
-  bool _isExactMatch() {
-    final inputText = _categoryController.text.trim();
-    if (inputText.isEmpty) return false;
-    
-    // Check if the input exactly matches any existing category in current task (case-insensitive)
-    final isMatch = _categories.any((category) => 
-        category.toLowerCase() == inputText.toLowerCase());
-    
-    AppLogger.debug('CategoryDialog: Input "$inputText" exact match: $isMatch (categories: $_categories)');
-    return isMatch;
-  }
-
-  String _getButtonText() {
-    final inputText = _categoryController.text.trim();
-    if (inputText.isEmpty) {
-      return 'Add new';
-    }
-    return 'Create "$inputText"';
-  }
-
-  void _removeCategory(String category) {
+  void _removeCategoryId(String categoryId) {
     setState(() {
-      _categories.remove(category);
+      _selectedCategoryIds.remove(categoryId);
     });
-    AppLogger.info('CategoryDialog: Removed category "$category"');
     HapticFeedback.lightImpact();
+  }
+
+  Future<void> _createCategory() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (widget.projectPath == null) {
+      AppLogger.error('CategoryDialog: No project path provided for category creation');
+      return;
+    }
+
+    final categoryName = _categoryController.text.trim();
+    
+    try {
+      final categoryViewModel = ref.read(projectCategoryViewModelProvider(widget.projectPath!).notifier);
+      
+      setState(() => _isLoading = true);
+      
+      await categoryViewModel.createCategory(
+        name: categoryName,
+        color: _selectedColor,
+        projectPath: widget.projectPath,
+      );
+      
+      // Clear the form
+      _categoryController.clear();
+      
+      // Refresh the categories
+      await categoryViewModel.refresh();
+      
+      setState(() => _isLoading = false);
+      
+      AppLogger.info('CategoryDialog: Successfully created category "$categoryName"');
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Category "$categoryName" created successfully'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      AppLogger.error('CategoryDialog: Failed to create category', e);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to create category: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   void _saveCategories() async {
@@ -313,20 +375,20 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
     
     try {
       final updatedTask = widget.task.copyWith(
-        categories: _categories,
+        categoryIds: _selectedCategoryIds,
         lastModified: DateTime.now(),
       );
       
       widget.onTaskUpdated(updatedTask);
-      AppLogger.info('CategoryDialog: Updated task categories to: $_categories');
+      AppLogger.info('CategoryDialog: Updated task categories to: $_selectedCategoryIds');
       
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_categories.isEmpty 
+            content: Text(_selectedCategoryIds.isEmpty 
                 ? 'All categories removed'
-                : 'Categories updated: ${_categories.join(', ')}'
+                : 'Categories updated successfully'
             ),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
@@ -336,6 +398,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
     } catch (e) {
       AppLogger.error('CategoryDialog: Error updating categories', e);
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error updating categories: $e'),
@@ -343,10 +406,6 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             duration: const Duration(seconds: 3),
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
       }
     }
   }
