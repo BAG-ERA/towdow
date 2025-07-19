@@ -496,57 +496,7 @@ class CalDAVService {
     }
   }
 
-  /// Get sync token and ETag for a calendar in a single request
-  Future<Result<Map<String, String?>>> getCalendarProperties(TaskCalendar calendar) async {
-    try {
-      AppLogger.debug('CalDAVService: Getting properties for calendar ${calendar.displayName}');
-      
-      final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
-<D:propfind xmlns:D="DAV:">
-  <D:prop>
-    <D:sync-token />
-    <D:getetag />
-  </D:prop>
-</D:propfind>''';
-
-      final result = await _client.propfind(calendar.path, body: propfindBody, depth: 0);
-      return await result.when(
-        success: (response) async {
-          if (response.statusCode == 207) {
-            final syncToken = XMLResponseParser.extractSyncToken(response.body);
-            final etag = XMLResponseParser.extractETag(response.body);
-            
-            final properties = <String, String?>{
-              'syncToken': syncToken,
-              'etag': etag,
-            };
-            
-            AppLogger.debug('CalDAVService: Calendar properties - syncToken: $syncToken, etag: $etag');
-            return Result.success(properties);
-          } else {
-            return Result.failure(Failure(
-              message: 'Failed to get calendar properties: HTTP ${response.statusCode}',
-              exception: Exception('Server returned ${response.statusCode}'),
-            ));
-          }
-        },
-        failure: (failure) async {
-          AppLogger.error('CalDAVService: Failed to get calendar properties', failure.exception, failure.stackTrace);
-          return Result.failure(failure);
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('CalDAVService: Failed to get calendar properties', e, stackTrace);
-      return Result.failure(Failure(
-        message: 'Failed to get calendar properties: $e',
-        exception: e is Exception ? e : Exception(e.toString()),
-        stackTrace: stackTrace,
-      ));
-    }
-  }
-
-  /// Resync calendar information (for CalDAVMonitor when ETags differ)
-  Future<Result<TaskCalendar>> resyncCalendarInfo(TaskCalendar calendar) async {
+  Future<Result<TaskCalendar>> getCalendarProperties(TaskCalendar calendar) async {
     try {
       AppLogger.debug('CalDAVService: Resyncing calendar info for ${calendar.displayName}');
       

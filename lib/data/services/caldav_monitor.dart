@@ -201,7 +201,7 @@ class CalDAVMonitor {
           } else if (localEtag != serverEtag) {
             // Sync tokens are equal but ETags differ - resync calendar information
             AppLogger.debug('CalDAVMonitor: ETag differs for ${calendar.displayName}, resyncing calendar info');
-            final resyncResult = await caldavService.resyncCalendarInfo(calendar);
+            final resyncResult = await caldavService.getCalendarProperties(calendar);
             await resyncResult.when(
               success: (updatedCalendar) async {
                 // Save the updated calendar to repository
