@@ -356,14 +356,30 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
 
   /// Build a regex pattern that excludes a specific category ID
   String _buildExclusionRegex(String currentRegex, String categoryId) {
+    final escapedCategoryId = RegExp.escape(categoryId);
+    
     // If current regex is the default "match all" pattern, create a negative lookahead
     if (currentRegex == r'.*') {
-      return '^(?!${categoryId}\$).*';
+      return '^(?!${escapedCategoryId}\$).*';
     }
     
-    // For more complex regex patterns, we need to be more careful
-    // For now, let's use a simple approach: add negative lookahead
-    return '^(?!${categoryId}\$)$currentRegex';
+    // If the current regex is already a negative lookahead pattern, add to it
+    if (currentRegex.startsWith('^(?!') && currentRegex.endsWith(').*')) {
+      // Extract existing exclusions and add the new one
+      final complexPattern = RegExp(r'^\^\(\?!(.*)\$\)\.\*$');
+      final match = complexPattern.firstMatch(currentRegex);
+      
+      if (match != null) {
+        final existingExclusions = match.group(1)!.split('|');
+        if (!existingExclusions.contains(escapedCategoryId)) {
+          existingExclusions.add(escapedCategoryId);
+          return '^(?!${existingExclusions.join('|')}\$).*';
+        }
+      }
+    }
+    
+    // For other patterns, create a new negative lookahead
+    return '^(?!${escapedCategoryId}\$).*';
   }
 
   /// Build a regex pattern that includes a specific category ID
@@ -371,8 +387,33 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     // If the current regex is a negative lookahead pattern, remove the exclusion
     if (currentRegex.startsWith('^(?!') && currentRegex.contains(categoryId)) {
       // Remove the negative lookahead for this specific category
-      final pattern = currentRegex.replaceFirst('^(?!${categoryId}\\)', '');
-      return pattern.isEmpty ? r'.*' : pattern;
+      // The pattern is like: ^(?!cat-id$).* or ^(?!cat-id1$|cat-id2$).*
+      final escapedCategoryId = RegExp.escape(categoryId);
+      
+      // Check if it's a simple exclusion pattern: ^(?!categoryId$).*
+      if (currentRegex == '^(?!${escapedCategoryId}\$).*') {
+        return r'.*'; // Return match all pattern
+      }
+      
+      // Check if it's a complex exclusion pattern with multiple categories
+      // Pattern like: ^(?!cat-id1$|cat-id2$|cat-id3$).*
+      final complexPattern = RegExp(r'^\^\(\?!(.*)\$\)\.\*$');
+      final match = complexPattern.firstMatch(currentRegex);
+      
+      if (match != null) {
+        final excludedCategories = match.group(1)!.split('|');
+        // Remove the category we want to show
+        final remainingCategories = excludedCategories
+            .where((cat) => cat != escapedCategoryId)
+            .toList();
+        
+        if (remainingCategories.isEmpty) {
+          return r'.*'; // No more exclusions, show all
+        } else {
+          // Rebuild the exclusion pattern without the removed category
+          return '^(?!${remainingCategories.join('|')}\$).*';
+        }
+      }
     }
     
     // For other patterns, just return the original regex

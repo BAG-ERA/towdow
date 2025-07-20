@@ -35,6 +35,7 @@ class KanbanBoard extends ConsumerWidget {
   final Function(Task)? onTaskDeleted;
   final Function(String)? onColumnHide;
   final double? height;
+  final Widget? hiddenColumnsButton;
 
   const KanbanBoard({
     super.key,
@@ -46,6 +47,7 @@ class KanbanBoard extends ConsumerWidget {
     this.onTaskDeleted,
     this.onColumnHide,
     this.height,
+    this.hiddenColumnsButton,
   });
 
   @override
@@ -55,9 +57,17 @@ class KanbanBoard extends ConsumerWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.all(16),
-        itemCount: columns.length,
+        itemCount: columns.length + (hiddenColumnsButton != null ? 1 : 0),
         separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
+          // If this is the last item and we have a hidden columns button, show it
+          if (hiddenColumnsButton != null && index == columns.length) {
+            return SizedBox(
+              width: 200,
+              child: hiddenColumnsButton!,
+            );
+          }
+          
           final column = columns[index];
           return SizedBox(
             width: 300,

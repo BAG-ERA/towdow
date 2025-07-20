@@ -71,6 +71,11 @@ class ProjectKanbanView extends ConsumerWidget {
     // Apply regex filter to project categories to get visible categories
     final visibleCategories = _getVisibleCategoriesFromRegex(kanbanRegex, projectCategories);
     
+    // Calculate hidden categories (categories that exist but are not visible)
+    final hiddenCategories = projectCategories.where((category) => 
+        !visibleCategories.any((visible) => visible.id == category.id)
+    ).toList();
+    
     // Tasks without categories - sorted by status (done tasks last)
     final uncategorizedTasks = tasks.where((task) => task.categoryIds.isEmpty).toList();
     _sortTasksByStatus(uncategorizedTasks);
@@ -111,6 +116,50 @@ class ProjectKanbanView extends ConsumerWidget {
 
     return KanbanBoard(
       columns: columns,
+      hiddenColumnsButton: hiddenCategories.isNotEmpty
+          ? Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.visibility_off_rounded,
+                      size: 32,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${hiddenCategories.length} hidden',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => _showHiddenColumnsDialog(context, ref, hiddenCategories),
+                      icon: const Icon(Icons.visibility_rounded, size: 16),
+                      label: const Text('Show'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : null,
       onTaskTap: (task) {
         // Navigate to task detail
         ScaffoldMessenger.of(context).showSnackBar(
@@ -388,5 +437,75 @@ class ProjectKanbanView extends ConsumerWidget {
         );
       }
     }
+  }
+
+  /// Show dialog with hidden columns and allow unhiding them
+  Future<void> _showHiddenColumnsDialog(BuildContext context, WidgetRef ref, List<Category> hiddenCategories) async {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.visibility_off_rounded,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text('Hidden Columns'),
+          ],
+        ),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'The following columns are hidden by the kanban filter:',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...hiddenCategories.map((category) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: category.colorValue,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        category.name,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        Navigator.of(context).pop();
+                        await _handleColumnShow(context, ref, category.id);
+                      },
+                      child: const Text('Show'),
+                    ),
+                  ],
+                ),
+              )),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 } 
