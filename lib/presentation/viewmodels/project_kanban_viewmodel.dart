@@ -279,6 +279,103 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     return state.kanbans.any((kanban) => kanban.title == title);
   }
 
+  /// Hide a column by updating the regex to exclude the category ID
+  Future<void> hideColumn(String columnId) async {
+    if (state.projectPath == null) {
+      state = state.copyWith(error: 'No project selected');
+      return;
+    }
+
+    state = state.copyWith(isSaving: true, error: null);
+
+    try {
+      AppLogger.info('ProjectKanbanViewModel: Hiding column "$columnId"');
+
+      // Get the current kanban or create a default one
+      Kanban currentKanban = state.selectedKanban ?? 
+          (state.kanbans.isNotEmpty ? state.kanbans.first : const Kanban(title: 'Default'));
+
+      // Create a regex pattern that excludes the column ID
+      // The regex should match all category IDs except the one we want to hide
+      final currentRegex = currentKanban.regex ?? r'.*';
+      final updatedRegex = _buildExclusionRegex(currentRegex, columnId);
+
+      final updatedKanban = currentKanban.copyWith(regex: updatedRegex);
+
+      // Update the kanban
+      await updateKanban(updatedKanban);
+
+      AppLogger.info('ProjectKanbanViewModel: Successfully hidden column "$columnId"');
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectKanbanViewModel: Exception hiding column', e, stackTrace);
+      state = state.copyWith(
+        isSaving: false,
+        error: 'Failed to hide column: $e',
+      );
+    }
+  }
+
+  /// Show a column by updating the regex to include the category ID
+  Future<void> showColumn(String columnId) async {
+    if (state.projectPath == null) {
+      state = state.copyWith(error: 'No project selected');
+      return;
+    }
+
+    state = state.copyWith(isSaving: true, error: null);
+
+    try {
+      AppLogger.info('ProjectKanbanViewModel: Showing column "$columnId"');
+
+      // Get the current kanban or create a default one
+      Kanban currentKanban = state.selectedKanban ?? 
+          (state.kanbans.isNotEmpty ? state.kanbans.first : const Kanban(title: 'Default'));
+
+      // Create a regex pattern that includes the column ID
+      // The regex should match all category IDs including the one we want to show
+      final currentRegex = currentKanban.regex ?? r'.*';
+      final updatedRegex = _buildInclusionRegex(currentRegex, columnId);
+
+      final updatedKanban = currentKanban.copyWith(regex: updatedRegex);
+
+      // Update the kanban
+      await updateKanban(updatedKanban);
+
+      AppLogger.info('ProjectKanbanViewModel: Successfully shown column "$columnId"');
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectKanbanViewModel: Exception showing column', e, stackTrace);
+      state = state.copyWith(
+        isSaving: false,
+        error: 'Failed to show column: $e',
+      );
+    }
+  }
+
+  /// Build a regex pattern that excludes a specific category ID
+  String _buildExclusionRegex(String currentRegex, String categoryId) {
+    // If current regex is the default "match all" pattern, create a negative lookahead
+    if (currentRegex == r'.*') {
+      return '^(?!${categoryId}\$).*';
+    }
+    
+    // For more complex regex patterns, we need to be more careful
+    // For now, let's use a simple approach: add negative lookahead
+    return '^(?!${categoryId}\$)$currentRegex';
+  }
+
+  /// Build a regex pattern that includes a specific category ID
+  String _buildInclusionRegex(String currentRegex, String categoryId) {
+    // If the current regex is a negative lookahead pattern, remove the exclusion
+    if (currentRegex.startsWith('^(?!') && currentRegex.contains(categoryId)) {
+      // Remove the negative lookahead for this specific category
+      final pattern = currentRegex.replaceFirst('^(?!${categoryId}\\)', '');
+      return pattern.isEmpty ? r'.*' : pattern;
+    }
+    
+    // For other patterns, just return the original regex
+    return currentRegex;
+  }
+
   /// Clear any errors
   void clearError() {
     state = state.copyWith(error: null);

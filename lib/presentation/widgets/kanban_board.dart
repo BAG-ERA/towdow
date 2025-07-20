@@ -33,6 +33,7 @@ class KanbanBoard extends ConsumerWidget {
   final Function(Task)? onTaskToggle;
   final Function(Task)? onTaskUpdated;
   final Function(Task)? onTaskDeleted;
+  final Function(String)? onColumnHide;
   final double? height;
 
   const KanbanBoard({
@@ -43,6 +44,7 @@ class KanbanBoard extends ConsumerWidget {
     this.onTaskToggle,
     this.onTaskUpdated,
     this.onTaskDeleted,
+    this.onColumnHide,
     this.height,
   });
 
@@ -66,6 +68,7 @@ class KanbanBoard extends ConsumerWidget {
               onTaskToggle: onTaskToggle,
               onTaskUpdated: onTaskUpdated,
               onTaskDeleted: onTaskDeleted,
+              onColumnHide: onColumnHide,
             ),
           );
         },
@@ -81,6 +84,7 @@ class KanbanColumnWidget extends ConsumerWidget {
   final Function(Task)? onTaskToggle;
   final Function(Task)? onTaskUpdated;
   final Function(Task)? onTaskDeleted;
+  final Function(String)? onColumnHide;
 
   const KanbanColumnWidget({
     super.key,
@@ -90,6 +94,7 @@ class KanbanColumnWidget extends ConsumerWidget {
     this.onTaskToggle,
     this.onTaskUpdated,
     this.onTaskDeleted,
+    this.onColumnHide,
   });
 
   @override
@@ -164,6 +169,21 @@ class KanbanColumnWidget extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (onColumnHide != null && column.id != 'uncategorized')
+                  IconButton(
+                    onPressed: () => onColumnHide!(column.id),
+                    icon: Icon(
+                      Icons.visibility_off_rounded,
+                      size: 16,
+                      color: column.color.withValues(alpha: 0.7),
+                    ),
+                    tooltip: 'Hide column',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 24,
+                      minHeight: 24,
+                    ),
+                  ),
               ],
             ),
           ),

@@ -64,13 +64,20 @@ class ProjectKanbanView extends ConsumerWidget {
     
     final projectCategories = categoryViewModelState.projectCategories;
     
+    // Get kanban regex to filter visible categories
+    final kanbanViewModelState = ref.watch(projectKanbanViewModelProvider(projectPath));
+    final kanbanRegex = kanbanViewModelState.selectedKanban?.regex ?? r'.*';
+    
+    // Apply regex filter to project categories to get visible categories
+    final visibleCategories = _getVisibleCategoriesFromRegex(kanbanRegex, projectCategories);
+    
     // Tasks without categories - sorted by status (done tasks last)
     final uncategorizedTasks = tasks.where((task) => task.categoryIds.isEmpty).toList();
     _sortTasksByStatus(uncategorizedTasks);
     
     final columns = <KanbanColumn>[];
     
-    // Add uncategorized column first
+    // Add uncategorized column first (never hidden)
     columns.add(
       KanbanColumn(
         id: 'uncategorized',
@@ -83,8 +90,9 @@ class ProjectKanbanView extends ConsumerWidget {
       ),
     );
     
-    // Add columns for each project category
-    for (final category in projectCategories) {
+    // Add columns for each visible project category
+    for (final category in visibleCategories) {
+      
       final categoryTasks = tasks.where((task) => task.categoryIds.contains(category.id)).toList();
       _sortTasksByStatus(categoryTasks);
       
@@ -154,6 +162,7 @@ class ProjectKanbanView extends ConsumerWidget {
         }
       },
       onTaskMoved: (task, columnId) => _handleTaskMove(context, ref, task, columnId),
+      onColumnHide: (columnId) => _handleColumnHide(context, ref, columnId),
     );
   }
 
@@ -276,6 +285,104 @@ class ProjectKanbanView extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error moving task: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Handle column hiding in kanban view
+  Future<void> _handleColumnHide(BuildContext context, WidgetRef ref, String columnId) async {
+    try {
+      AppLogger.info('ProjectKanbanView: Hiding column "$columnId"');
+      
+      // Get the kanban view model
+      final kanbanViewModel = ref.read(projectKanbanViewModelProvider(projectPath).notifier);
+      
+      // Hide the column by adding it to the filter
+      await kanbanViewModel.hideColumn(columnId);
+      
+      // Refresh the UI
+      onTasksRefresh?.call();
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hidden column "$columnId"'),
+            backgroundColor: Colors.orange,
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () => _handleColumnShow(context, ref, columnId),
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      AppLogger.error('ProjectKanbanView: Error hiding column', error);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error hiding column: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Get visible categories by applying regex filter to project categories
+  List<Category> _getVisibleCategoriesFromRegex(String regex, List<Category> categories) {
+    try {
+      final visibleCategories = <Category>[];
+      
+      // Test each category ID against the regex
+      for (final category in categories) {
+        final categoryId = category.id;
+        
+        // If the regex matches the category ID, it's visible
+        final regexPattern = RegExp(regex);
+        if (regexPattern.hasMatch(categoryId)) {
+          visibleCategories.add(category);
+        }
+      }
+      
+      return visibleCategories;
+    } catch (e) {
+      AppLogger.warning('ProjectKanbanView: Error applying regex "$regex": $e');
+      // If regex is invalid, show all categories
+      return categories;
+    }
+  }
+
+  /// Handle column showing in kanban view (undo functionality)
+  Future<void> _handleColumnShow(BuildContext context, WidgetRef ref, String columnId) async {
+    try {
+      AppLogger.info('ProjectKanbanView: Showing column "$columnId"');
+      
+      // Get the kanban view model
+      final kanbanViewModel = ref.read(projectKanbanViewModelProvider(projectPath).notifier);
+      
+      // Show the column by updating the regex
+      await kanbanViewModel.showColumn(columnId);
+      
+      // Refresh the UI
+      onTasksRefresh?.call();
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Shown column "$columnId"'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (error) {
+      AppLogger.error('ProjectKanbanView: Error showing column', error);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error showing column: $error'),
             backgroundColor: Colors.red,
           ),
         );
