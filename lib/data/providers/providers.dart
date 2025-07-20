@@ -43,6 +43,7 @@ import '../../presentation/viewmodels/validator_viewmodel.dart';
 import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/category_viewmodel.dart';
+import '../../presentation/viewmodels/project_kanban_viewmodel.dart';
 import '../../app.dart';
 
 // Local storage service provider
@@ -366,6 +367,25 @@ final categoryViewModelProvider = StateNotifierProvider<CategoryViewModel, Categ
 final projectCategoryViewModelProvider = StateNotifierProvider.family<CategoryViewModel, CategoryViewModelState, String>((ref, projectPath) {
   final categoryRepository = ref.watch(categoryRepositoryProvider);
   final viewModel = CategoryViewModel(categoryRepository);
+  // Initialize with project path
+  viewModel.initialize(projectPath);
+  return viewModel;
+});
+
+// Project Kanban ViewModel provider for specific project
+final projectKanbanViewModelProvider = StateNotifierProvider.family<ProjectKanbanViewModel, ProjectKanbanState, String>((ref, projectPath) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final userRepository = ref.watch(userRepositoryProvider);
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final syncService = ref.watch(syncServiceProvider);
+  final localStorageService = ref.watch(localStorageServiceProvider);
+  final viewModel = ProjectKanbanViewModel(
+    calendarRepository,
+    userRepository,
+    categoryRepository,
+    syncService,
+    localStorageService,
+  );
   // Initialize with project path
   viewModel.initialize(projectPath);
   return viewModel;

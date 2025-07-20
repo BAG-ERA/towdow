@@ -704,7 +704,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   // Kanban View - Organized by categories
   Widget _buildKanbanView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
     return tasksAsync.when(
-      data: (tasks) => _buildCategoryKanban(context, ref, tasks),
+      data: (tasks) => _buildKanbanWithViewModel(context, ref, tasks),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('Error loading tasks: $error')),
     );
@@ -795,7 +795,23 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
   }
 
-
+  // Kanban View with ViewModel - Uses the new ProjectKanbanViewModel
+  Widget _buildKanbanWithViewModel(BuildContext context, WidgetRef ref, List<Task> tasks) {
+    // Get the kanban view model for this project
+    final kanbanViewModelState = ref.watch(projectKanbanViewModelProvider(widget.projectPath));
+    
+    if (kanbanViewModelState.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (kanbanViewModelState.error != null) {
+      return Center(child: Text('Error loading kanban: ${kanbanViewModelState.error}'));
+    }
+    
+    // For now, fall back to the original category-based kanban
+    // This will be enhanced later to use the kanban configurations
+    return _buildCategoryKanban(context, ref, tasks);
+  }
 
   /// Sort tasks by status with completed tasks appearing last
   void _sortTasksByStatus(List<Task> tasks) {
