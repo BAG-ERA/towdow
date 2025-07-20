@@ -7,6 +7,7 @@ import 'package:towdow_app/data/services/local_storage_service.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
+import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/core/result.dart';
@@ -30,6 +31,7 @@ void main() {
     late TaskRepository taskRepository;
     late AccountRepository accountRepository;
     late CalendarRepository calendarRepository;
+    late CategoryRepository categoryRepository;
     late SyncService syncService;
     late Directory tempDir;
 
@@ -100,11 +102,13 @@ void main() {
       taskRepository = LocalTaskRepository(storageService);
       accountRepository = LocalAccountRepository(storageService);
       calendarRepository = LocalCalendarRepository(storageService);
+      categoryRepository = CategoryRepository(calendarRepository, accountRepository);
       
       syncService = SyncService(
         taskRepository: taskRepository,
         accountRepository: accountRepository,
         calendarRepository: calendarRepository,
+        categoryRepository: categoryRepository,
         localStorage: storageService,
       );
     });
@@ -161,10 +165,12 @@ void main() {
         final freshTaskRepository = LocalTaskRepository(freshStorageService);
         final freshAccountRepository = LocalAccountRepository(freshStorageService);
         final freshCalendarRepository = LocalCalendarRepository(freshStorageService);
+        final freshCategoryRepository = CategoryRepository(freshCalendarRepository, freshAccountRepository);
         final freshSyncService = SyncService(
           taskRepository: freshTaskRepository,
           accountRepository: freshAccountRepository,
           calendarRepository: freshCalendarRepository,
+          categoryRepository: freshCategoryRepository,
           localStorage: freshStorageService,
         );
 
@@ -173,7 +179,7 @@ void main() {
         print('DEBUG: freshStorageService.getAll<CaldavAccount>(\'accounts\') result: ${storageResult}');
 
         // Act
-        final result = await freshSyncService.syncNow();
+        final result = await freshSyncService.syncAllActiveCaldav();
 
         // Assert
         final hasCorrectError = result.when(
@@ -311,7 +317,7 @@ void main() {
         });
 
         // Act
-        await syncService.syncNow();
+        await syncService.syncAllActiveCaldav();
 
         // Assert
         expect(statusUpdates, contains(SyncStatus.syncing));
@@ -330,11 +336,12 @@ void main() {
           taskRepository: errorTaskRepository,
           accountRepository: errorAccountRepository,
           calendarRepository: errorCalendarRepository,
+          categoryRepository: categoryRepository,
           localStorage: errorStorageService,
         );
 
         // Act - Try to sync without proper storage initialization
-        final result = await errorSyncService.syncNow();
+        final result = await errorSyncService.syncAllActiveCaldav();
 
         // Assert - Should fail because storage is not initialized
         final isFailure = result.when(

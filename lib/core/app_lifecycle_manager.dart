@@ -5,7 +5,7 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import '../data/services/sync_service.dart';
-import '../data/services/background_sync_service.dart';
+import '../data/services/caldav_monitor.dart';
 import '../data/services/external_sync_service.dart';
 import '../data/services/file_upload_queue_service.dart';
 import '../data/services/connection_monitor_service.dart';
@@ -31,7 +31,7 @@ class AppLifecycleManager {
 
   // Services
   SyncService? _syncService;
-  BackgroundSyncService? _backgroundSyncService;
+  CalDAVMonitor? _caldavMonitor;
   ExternalCalendarSyncService? _externalSyncService;
   FileUploadQueueService? _fileUploadQueueService;
   ConnectionMonitorService? _connectionMonitorService;
@@ -50,12 +50,12 @@ class AppLifecycleManager {
   FlowItAppState get state => _state;
   Stream<FlowItAppState> get stateStream => _stateController.stream;
   bool get isReady => _state == FlowItAppState.ready;
-  bool get hasServices => _syncService != null && _backgroundSyncService != null && _externalSyncService != null && _fileUploadQueueService != null && _connectionMonitorService != null && _userSyncService != null;
+  bool get hasServices => _syncService != null && _caldavMonitor != null && _externalSyncService != null && _fileUploadQueueService != null && _connectionMonitorService != null && _userSyncService != null;
 
   /// Initialize the app lifecycle manager with required services
   Future<Result<void>> initialize({
     required SyncService syncService,
-    required BackgroundSyncService backgroundSyncService,
+    required CalDAVMonitor caldavMonitor,
     required ExternalCalendarSyncService externalSyncService,
     required FileUploadQueueService fileUploadQueueService,
     required ConnectionMonitorService connectionMonitorService,
@@ -68,7 +68,7 @@ class AppLifecycleManager {
 
       // Store service references
       _syncService = syncService;
-      _backgroundSyncService = backgroundSyncService;
+      _caldavMonitor = caldavMonitor;
       _externalSyncService = externalSyncService;
       _fileUploadQueueService = fileUploadQueueService;
       _connectionMonitorService = connectionMonitorService;
@@ -140,23 +140,18 @@ class AppLifecycleManager {
         );
       }
 
-      // Start background sync service
-      if (_backgroundSyncService != null) {
-        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting BackgroundSyncService');
+      // Start CalDAV monitor service
+      if (_caldavMonitor != null) {
+        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting CalDAVMonitor');
         
-        // Set the main sync service reference for queue processing
-        if (_syncService != null) {
-          _backgroundSyncService!.setSyncService(_syncService!);
-        }
-        
-        final bgResult = await _backgroundSyncService!.start();
-        bgResult.when(
+        final monitorResult = await _caldavMonitor!.start();
+        monitorResult.when(
           success: (_) {
-            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] BackgroundSyncService started successfully');
+            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] CalDAVMonitor started successfully');
           },
           failure: (failure) {
-            AppLogger.warning('AppLifecycleManager: BackgroundSyncService start failed: ${failure.message}');
-            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] BackgroundSyncService start failed: ${failure.message}');
+            AppLogger.warning('AppLifecycleManager: CalDAVMonitor start failed: ${failure.message}');
+            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] CalDAVMonitor start failed: ${failure.message}');
           },
         );
       }
@@ -234,13 +229,13 @@ class AppLifecycleManager {
     try {
       // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Stopping sync services');
 
-      // Stop background sync
-      if (_backgroundSyncService != null) {
-        _backgroundSyncService!.stop();
-        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] BackgroundSyncService stopped');
+      // Stop CalDAV monitor
+      if (_caldavMonitor != null) {
+        _caldavMonitor!.stop();
+        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] CalDAVMonitor stopped');
       }
 
-      // Note: SyncService no longer has periodic sync - BackgroundSyncService handles this
+      // Note: SyncService no longer has periodic sync - CalDAVMonitor handles this
       // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService periodic sync not needed');
 
       // Stop external calendar sync
@@ -311,7 +306,7 @@ class AppLifecycleManager {
       // Trigger immediate sync to get latest data
       if (_syncService != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Triggering sync on app resume');
-        _syncService!.syncNow();
+        _syncService!.syncAllActiveCaldav();
       }
     }
   }
@@ -325,7 +320,7 @@ class AppLifecycleManager {
       
       // Services should continue running in background
       // Just log current status
-      // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Background sync status: ${_backgroundSyncService?.isRunning ?? false}');
+              // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] CalDAV monitor status: ${_caldavMonitor?.isMonitoring ?? false}');
       // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Periodic sync active: ${_syncService != null}');
     }
   }
@@ -343,11 +338,11 @@ class AppLifecycleManager {
     try {
       // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Checking service health');
       
-      // Check background sync
-      if (_backgroundSyncService != null && !_backgroundSyncService!.isRunning) {
-        AppLogger.warning('AppLifecycleManager: Background sync not running, restarting');
-        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Restarting background sync service');
-        _backgroundSyncService!.start();
+      // Check CalDAV monitor
+      if (_caldavMonitor != null && !_caldavMonitor!.isMonitoring) {
+        AppLogger.warning('AppLifecycleManager: CalDAV monitor not running, restarting');
+        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Restarting CalDAV monitor service');
+        _caldavMonitor!.start();
       }
 
       // Check external calendar sync (restart if timer is not active)
@@ -370,7 +365,7 @@ class AppLifecycleManager {
             if (account != null && _syncService != null) {
               // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account available, ensuring sync service is initialized');
               // Services should be running, trigger a health check sync
-              _syncService!.syncNow();
+              _syncService!.syncAllActiveCaldav();
             }
           },
           failure: (failure) {
@@ -400,8 +395,8 @@ class AppLifecycleManager {
       'appLifecycleState': _state.name,
       'hasServices': hasServices,
       'syncServiceStatus': _syncService?.status.name ?? 'not_initialized',
-      'backgroundSyncRunning': _backgroundSyncService?.isRunning ?? false,
-      'backgroundSyncing': _backgroundSyncService?.isSyncing ?? false,
+              'caldavMonitorRunning': _caldavMonitor?.isMonitoring ?? false,
+        'caldavMonitorActive': _caldavMonitor?.isMonitoring ?? false,
       'externalSyncRunning': _externalSyncService?.isSyncRunning ?? false,
       'lastSyncTime': _syncService?.lastSyncTime?.toIso8601String(),
     };
@@ -423,7 +418,7 @@ class AppLifecycleManager {
     
     // Services will be disposed by their providers
     _syncService = null;
-    _backgroundSyncService = null;
+          _caldavMonitor = null;
     _externalSyncService = null;
     _fileUploadQueueService = null;
     _connectionMonitorService = null;

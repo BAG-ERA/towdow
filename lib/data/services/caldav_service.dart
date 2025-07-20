@@ -4,6 +4,7 @@
 import 'dart:math' as math;
 
 import 'package:uuid/uuid.dart';
+import 'package:xml/xml.dart';
 
 import '../../core/result.dart';
 import '../../core/logger.dart';
@@ -20,8 +21,8 @@ class CalDAVService {
   final CaldavAccount account;
   late final WebDAVClient _client;
 
-  CalDAVService({required this.account}) {
-    _client = WebDAVClient.fromAccount(account);
+  CalDAVService({required this.account, WebDAVClient? client}) {
+    _client = client ?? WebDAVClient.fromAccount(account);
   }
 
   /// Test connection to CalDAV server
@@ -393,6 +394,7 @@ class CalDAVService {
     <FLOWIT:owner/>
     <FLOWIT:template/>
     <FLOWIT:status/>
+    <FLOWIT:categories/>
   </D:prop>
 </D:propfind>''';
 
@@ -489,6 +491,83 @@ class CalDAVService {
     } catch (e, stackTrace) {
       return Result.failure(Failure(
         message: 'Failed to generate calendar path: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  Future<Result<TaskCalendar>> getCalendarProperties(TaskCalendar calendar) async {
+    try {
+      AppLogger.debug('CalDAVService: Resyncing calendar info for ${calendar.displayName}');
+      
+      // Get ALL calendar properties from server (including custom namespaces)
+      final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:FLOWIT="https://flowit.app/ns/">
+  <D:prop>
+    <D:displayname />
+    <D:getetag />
+    <D:sync-token />
+    <C:supported-calendar-component-set />
+    <C:calendar-description />
+    <FLOWIT:domain />
+    <FLOWIT:type />
+    <FLOWIT:asflow />
+    <FLOWIT:owner />
+    <FLOWIT:template />
+    <FLOWIT:status />
+    <FLOWIT:kanban />
+    <FLOWIT:categories />
+  </D:prop>
+</D:propfind>''';
+
+      final result = await _client.propfind(calendar.path, body: propfindBody, depth: 0);
+      return await result.when(
+        success: (response) async {
+          if (response.statusCode == 207) {
+            // Use existing parser to get all properties including custom namespaces
+            final responses = XMLResponseParser.parseMultiStatusResponse(response.body);
+            
+            if (responses.isNotEmpty) {
+              final responseData = responses.first;
+              
+              // Update the calendar with new properties
+              final updatedCalendar = calendar.copyWith(
+                etag: responseData['getetag'],
+                syncToken: responseData['sync-token'],
+                displayName: responseData['displayname'] ?? calendar.displayName,
+                description: responseData['calendar-description'] ?? calendar.description,
+                flowitDomain: responseData['flowit-domain'],
+                flowitStatus: responseData['flowit-status'],
+                flowitKanban: responseData['flowit-kanban'] ?? calendar.flowitKanban,
+                projectCategories: responseData['flowit-categories'] ?? calendar.projectCategories,
+                lastSyncAt: DateTime.now(),
+              );
+              
+              AppLogger.debug('CalDAVService: Calendar info resynced successfully');
+              return Result.success(updatedCalendar);
+            } else {
+              return Result.failure(Failure(
+                message: 'No calendar properties found in response',
+                exception: Exception('Empty response data'),
+              ));
+            }
+          } else {
+            return Result.failure(Failure(
+              message: 'Failed to resync calendar info: HTTP ${response.statusCode}',
+              exception: Exception('Server returned ${response.statusCode}'),
+            ));
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVService: Failed to resync calendar info', failure.exception, failure.stackTrace);
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Failed to resync calendar info', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to resync calendar info: $e',
         exception: e is Exception ? e : Exception(e.toString()),
         stackTrace: stackTrace,
       ));
@@ -701,12 +780,24 @@ class CalDAVService {
       xml.writeln('      <FLOWIT:status>${_escapeXmlText(calendar.flowitStatus!)}</FLOWIT:status>');
     }
     
+    // Set kanban configuration as JSON
+    if (calendar.flowitKanban.isNotEmpty && calendar.flowitKanban != '[]') {
+      xml.writeln('      <FLOWIT:kanban><![CDATA[${calendar.flowitKanban}]]></FLOWIT:kanban>');
+    }
+    
+    // Set project categories as JSON
+    if (calendar.projectCategories.isNotEmpty && calendar.projectCategories != '[]') {
+      xml.writeln('      <FLOWIT:categories><![CDATA[${calendar.projectCategories}]]></FLOWIT:categories>');
+    }
+    
     xml.writeln('    </D:prop>');
     xml.writeln('  </D:set>');
     
     // Remove FlowIt properties if they're null/empty
     if ((calendar.flowitDomain == null || calendar.flowitDomain!.isEmpty) || 
-        (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty)) {
+        (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) ||
+        (calendar.flowitKanban.isEmpty || calendar.flowitKanban == '[]') ||
+        (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]')) {
       xml.writeln('  <D:remove>');
       xml.writeln('    <D:prop>');
       
@@ -716,6 +807,14 @@ class CalDAVService {
       
       if (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) {
         xml.writeln('      <FLOWIT:status/>');
+      }
+      
+      if (calendar.flowitKanban.isEmpty || calendar.flowitKanban == '[]') {
+        xml.writeln('      <FLOWIT:kanban/>');
+      }
+      
+      if (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') {
+        xml.writeln('      <FLOWIT:categories/>');
       }
       
       xml.writeln('    </D:prop>');
@@ -789,8 +888,8 @@ class CalDAVService {
     vcalendar.writeln('CALENDAR-ORDER:${calendar.calendarOrder}');
     
     // Categories
-    if (calendar.categories.isNotEmpty) {
-      vcalendar.writeln('CATEGORIES:${calendar.categories.map(_escapeCalendarText).join(',')}');
+    if (calendar.projectCategories.isNotEmpty && calendar.projectCategories != '[]') {
+      vcalendar.writeln('CATEGORIES:${calendar.projectCategories}');
     }
     
     // End VCALENDAR
@@ -799,7 +898,7 @@ class CalDAVService {
     return vcalendar.toString();
   }
 
-  /// Parse calendar properties from VCALENDAR response
+  /// Parse calendar properties from VCALENDAR response probably not needed anymore
   TaskCalendar? _parseCalendarProperties(String vcalendarContent, String path, String displayName) {
     try {
       final lines = vcalendarContent.split('\n').map((line) => line.trim()).toList();
@@ -835,9 +934,8 @@ class CalDAVService {
       final flowitTemplate = properties['X-FLOWIT-TEMPLATE'];
       final calendarOrder = int.tryParse(properties['CALENDAR-ORDER'] ?? '1') ?? 1;
       
-      // Parse categories
-      final categoriesStr = properties['CATEGORIES'];
-      final categories = categoriesStr?.split(',').map((c) => c.trim()).toList() ?? <String>[];
+      // Project categories are handled via X-FLOWIT-CATEGORIES field, not CATEGORIES
+      // CATEGORIES field is no longer used in TaskCalendar
       
       return TaskCalendar(
         path: path,
@@ -857,7 +955,7 @@ class CalDAVService {
         flowitOwner: flowitOwner,
         flowitTemplate: flowitTemplate,
         calendarOrder: calendarOrder,
-        categories: categories,
+        // projectCategories will be set by the caller via X-FLOWIT-CATEGORIES
       );
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVService: Failed to parse calendar properties', e, stackTrace);

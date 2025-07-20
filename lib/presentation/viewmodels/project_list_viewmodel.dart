@@ -422,7 +422,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     
     try {
       // Trigger sync first
-      final syncResult = await _syncService.syncNow();
+      final syncResult = await _syncService.syncAllActiveCaldav();
       await syncResult.when(
         success: (_) async {
           // AppLogger.info('ProjectListViewModel: Sync completed, reloading projects');

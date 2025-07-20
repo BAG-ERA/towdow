@@ -4,10 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../widgets/task_item/task_item.dart';
-import '../../widgets/utils/overlay_draggable_task.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
-import '../../widgets/utils/buttons/create_task_button.dart';
 import '../../widgets/kanban_board.dart';
 import '../../widgets/agenda_calendar.dart';
 import '../../widgets/utils/tasklist_toolbar.dart';
@@ -21,6 +18,7 @@ import '../../../core/theme/chart_theme.dart';
 import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_info_card.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
+import '../../widgets/project_detail/project_kanban_view.dart';
 import '../../widgets/utils/editable_title.dart';
 import '../../../data/services/caldav_service.dart';
 import '../../../data/services/webdav_client.dart';
@@ -702,98 +700,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   // Kanban View - Organized by categories
   Widget _buildKanbanView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
-    return tasksAsync.when(
-      data: (tasks) => _buildCategoryKanban(context, ref, tasks),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('Error loading tasks: $error')),
+    return ProjectKanbanView(
+      projectPath: widget.projectPath,
+      tasksAsync: tasksAsync,
+      onTasksRefresh: () => _refreshProjectTasks(ref),
     );
-  }
-
-  Widget _buildCategoryKanban(BuildContext context, WidgetRef ref, List<Task> tasks) {
-    // Get all unique categories from tasks
-    final Set<String> allCategories = {};
-    for (final task in tasks) {
-      allCategories.addAll(task.categories);
-    }
-    
-    final categoriesList = allCategories.toList()..sort();
-    
-    // Tasks without categories - sorted by status (done tasks last)
-    final uncategorizedTasks = tasks.where((task) => task.categories.isEmpty).toList();
-    _sortTasksByStatus(uncategorizedTasks);
-    
-    final columns = <KanbanColumn>[];
-    
-    // Add uncategorized column first
-    columns.add(
-      KanbanColumn(
-        id: 'uncategorized',
-        title: 'Uncategorized',
-        subtitle: '${uncategorizedTasks.length} tasks',
-        tasks: uncategorizedTasks,
-        color: Colors.grey,
-        icon: Icons.inbox_rounded,
-        onAddTask: () => _addTaskToCategory(context, ref, null),
-      ),
-    );
-    
-    // Add columns for each category
-    for (final category in categoriesList) {
-      final categoryTasks = tasks.where((task) => task.categories.contains(category)).toList();
-      _sortTasksByStatus(categoryTasks);
-      
-      columns.add(
-        KanbanColumn(
-          id: category,
-          title: category,
-          subtitle: '${categoryTasks.length} tasks',
-          tasks: categoryTasks,
-          color: _getCategoryColor(category),
-          icon: Icons.label_rounded,
-          onAddTask: () => _addTaskToCategory(context, ref, category),
-        ),
-      );
-    }
-
-    return KanbanBoard(
-      columns: columns,
-      onTaskTap: (task) {
-        // Navigate to task detail
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('👁️ View task: ${task.summary}')),
-        );
-      },
-      onTaskToggle: (task) async {
-        final taskViewModel = ref.read(taskViewModelProvider.notifier);
-        await taskViewModel.toggleTaskCompletion(task);
-        
-        // Refresh the tasks list
-        _refreshProjectTasks(ref);
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                task.status == 'COMPLETED' 
-                    ? '✅ Task marked as incomplete' 
-                    : '✅ Task completed!',
-              ),
-            ),
-          );
-        }
-      },
-      onTaskUpdated: (task) async {
-        await ref.read(taskViewModelProvider.notifier).updateTask(task);
-        _refreshProjectTasks(ref);
-      },
-    );
-  }
-
-  Color _getCategoryColor(String category) {
-    // Simple hash to get consistent colors for categories
-    final hash = category.hashCode;
-    final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.teal, Colors.pink, Colors.indigo, Colors.red];
-    return colors[hash.abs() % colors.length];
   }
 
   /// Sort tasks by status with completed tasks appearing last
@@ -824,56 +735,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       // If neither has due dates, sort alphabetically by summary
       return a.summary.toLowerCase().compareTo(b.summary.toLowerCase());
     });
-  }
-
-  Future<void> _addTaskToCategory(BuildContext context, WidgetRef ref, String? category) async {
-    final textController = TextEditingController();
-    
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(category != null 
-            ? 'Add Task to "$category"' 
-            : 'Add Uncategorized Task'),
-        content: TextField(
-          controller: textController,
-          decoration: const InputDecoration(
-            hintText: 'Enter task summary',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(textController.text.trim()),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-    
-    if (result != null && result.isNotEmpty) {
-      final taskViewModel = ref.read(taskViewModelProvider.notifier);
-      await taskViewModel.createTask(
-        summary: result,
-        projectPath: widget.projectPath,
-      );
-      
-      // TODO: After creation, we would need to update the task with the category
-      // This would require additional API to update task categories
-      
-      ref.invalidate(projectTasksProvider(widget.projectPath));
-      
-      if (context.mounted) {
-        final categoryText = category != null ? ' in "$category"' : ' (uncategorized)';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Task "$result" added$categoryText')),
-        );
-      }
-    }
   }
 
   // Agenda View - Calendar with tasks positioned by due date

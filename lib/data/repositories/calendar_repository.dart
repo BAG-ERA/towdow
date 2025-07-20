@@ -107,9 +107,9 @@ class LocalCalendarRepository implements CalendarRepository {
     final result = await getAll();
     return result.when(
       success: (calendars) {
-        // All calendars that support VTODO are projects
-        final projects = calendars.where((c) => c.supportsTodos).toList();
-        // AppLogger.info('LocalCalendarRepository: Found ${projects.length} project calendars (all synchronized VTODO calendars)');
+        // All calendars that support VTODO and are not archived are projects
+        final projects = calendars.where((c) => c.supportsTodos && !c.isArchived).toList();
+        // AppLogger.info('LocalCalendarRepository: Found  [32m${projects.length} [0m active project calendars (all synchronized VTODO calendars)');
         return Result.success(projects);
       },
       failure: (failure) => Result.failure(failure),

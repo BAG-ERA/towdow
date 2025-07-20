@@ -33,8 +33,8 @@ class VTODOParser {
     vtodo.writeln('PERCENT-COMPLETE:${task.percentComplete}');
     
     // Categories
-    if (task.categories.isNotEmpty) {
-      vtodo.writeln('CATEGORIES:${task.categories.join(',')}');
+    if (task.categoryIds.isNotEmpty) {
+      vtodo.writeln('CATEGORIES:${task.categoryIds.join(',')}');
     }
     
     // Organizer (RFC 5545)
@@ -186,7 +186,7 @@ class VTODOParser {
           created: created ?? DateTime.now(),
           dtstamp: DateTime.now(), // Required by iCalendar specification
           due: due,
-          categories: categories,
+          categoryIds: categories,
           organizer: organizer,
           attendees: attendees,
           percentComplete: percentComplete,

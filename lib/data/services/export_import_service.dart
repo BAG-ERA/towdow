@@ -170,8 +170,8 @@ class ExportImportService {
     buffer.writeln('STATUS:${task.status}');
     buffer.writeln('PERCENT-COMPLETE:${task.percentComplete}');
     
-    if (task.categories.isNotEmpty) {
-      buffer.writeln('CATEGORIES:${task.categories.map(_escapeCalendarText).join(',')}');
+          if (task.categoryIds.isNotEmpty) {
+        buffer.writeln('CATEGORIES:${task.categoryIds.map(_escapeCalendarText).join(',')}');
     }
     
     if (task.organizer != null) {
@@ -443,7 +443,7 @@ class ExportImportService {
         status: status,
         percentComplete: percentComplete,
         organizer: organizer,
-        categories: categories,
+                    categoryIds: categories,
         flowitValidator: flowitValidator,
         flowitRequirement: flowitRequirement,
         flowitTemplate: flowitTemplate,
