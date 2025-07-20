@@ -6,6 +6,7 @@ import 'dart:convert';
 import '../../core/logger.dart';
 import '../../core/result.dart';
 import '../models/kanban.dart';
+import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
 import '../services/caldav_service.dart';
@@ -55,10 +56,11 @@ class KanbanService {
       
       return await calendarResult.when(
         success: (calendar) async {
-          if (calendar != null && calendar.flowitKanban.isNotEmpty) {
+          if (calendar != null && calendar.flowitKanban.isNotEmpty && calendar.flowitKanban != '[]') {
             try {
               final kanbanData = jsonDecode(calendar.flowitKanban);
-              if (kanbanData is List) {
+              if (kanbanData is List && kanbanData.isNotEmpty) {
+                AppLogger.info('KanbanService: Found ${kanbanData.length} kanbans in local calendar');
                 return kanbanData
                     .map((data) => Kanban.fromJson(Map<String, dynamic>.from(data)))
                     .toList();
@@ -67,7 +69,9 @@ class KanbanService {
               AppLogger.warning('KanbanService: Failed to parse kanbans from calendar: $e');
             }
           }
-          return [];
+          
+          AppLogger.info('KanbanService: No kanbans in local calendar, checking server...');
+          return await _loadKanbansFromServer(projectPath);
         },
         failure: (failure) async {
           AppLogger.warning('KanbanService: Failed to load calendar: ${failure.message}');
@@ -76,6 +80,71 @@ class KanbanService {
       );
     } catch (e, stackTrace) {
       AppLogger.error('KanbanService: Exception loading from calendar', e, stackTrace);
+      return [];
+    }
+  }
+
+  /// Load kanbans directly from server when local data is missing
+  Future<List<Kanban>> _loadKanbansFromServer(String projectPath) async {
+    try {
+      // Get active account to query server
+      final accountResult = await _accountRepository.getActiveAccount();
+      return await accountResult.when(
+        success: (account) async {
+          if (account == null) {
+            AppLogger.warning('KanbanService: No active account, cannot check server');
+            return [];
+          }
+
+          // Use CalDAV service to refresh calendar info from server
+          final caldavService = CalDAVService(account: account);
+          
+          // Create a minimal calendar object to get properties
+          final tempCalendar = TaskCalendarFactory.fromCalDAVDiscovery(
+            path: projectPath,
+            displayName: 'Temp',
+          );
+          
+          final refreshResult = await caldavService.getCalendarProperties(tempCalendar);
+          
+          return await refreshResult.when(
+            success: (updatedCalendar) async {
+              if (updatedCalendar != null && 
+                  updatedCalendar.flowitKanban.isNotEmpty && 
+                  updatedCalendar.flowitKanban != '[]') {
+                try {
+                  final kanbanData = jsonDecode(updatedCalendar.flowitKanban);
+                  if (kanbanData is List && kanbanData.isNotEmpty) {
+                    AppLogger.info('KanbanService: Found ${kanbanData.length} kanbans from server');
+                    
+                    // Save the updated calendar to local repository
+                    await _calendarRepository.save(updatedCalendar);
+                    
+                    return kanbanData
+                        .map((data) => Kanban.fromJson(Map<String, dynamic>.from(data)))
+                        .toList();
+                  }
+                } catch (e) {
+                  AppLogger.warning('KanbanService: Failed to parse kanbans from server: $e');
+                }
+              }
+              
+              AppLogger.info('KanbanService: No kanbans found on server either');
+              return [];
+            },
+            failure: (failure) async {
+              AppLogger.warning('KanbanService: Failed to refresh calendar from server: ${failure.message}');
+              return [];
+            },
+          );
+        },
+        failure: (failure) async {
+          AppLogger.warning('KanbanService: Failed to get active account: ${failure.message}');
+          return [];
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('KanbanService: Exception loading from server', e, stackTrace);
       return [];
     }
   }
