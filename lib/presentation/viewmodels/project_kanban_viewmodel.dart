@@ -74,7 +74,10 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
       
       await kanbansResult.when(
         success: (kanbans) async {
-          state = state.copyWith(kanbans: kanbans);
+          state = state.copyWith(
+            kanbans: kanbans,
+            selectedKanban: kanbans.isNotEmpty ? kanbans.first : null,
+          );
         },
         failure: (failure) async {
           AppLogger.error('ProjectKanbanViewModel: Failed to load kanbans: ${failure.message}');
