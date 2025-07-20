@@ -17,6 +17,7 @@ import 'local_storage_service.dart';
 import 'webdav_client.dart';
 import 'parsers/xml_response_parser.dart';
 import 'parsers/vtodo_parser.dart';
+import 'towdow_sharing_service.dart';
 
 enum SyncOperation {
   create,
@@ -726,6 +727,9 @@ class SyncService {
       // Load categories from the updated calendar data
       await _categoryRepository.loadCategoriesFromCalendar(updatedCalendar);
       
+      // Update sharing information if supported
+      await _updateSharingInformation(caldavService.account, updatedCalendar);
+      
     } catch (e, stackTrace) {
       AppLogger.error('SyncService: Failed to sync from server for ${calendar.path}', e, stackTrace);
       errors.add('Failed to sync from server for ${calendar.path}: $e');
@@ -1270,6 +1274,64 @@ class SyncService {
       AppLogger.error('SyncService: Exception creating calendar on server', e, stackTrace);
       return false;
     }
+  }
+
+  /// Update sharing information for a calendar
+  Future<void> _updateSharingInformation(CaldavAccount account, TaskCalendar calendar) async {
+    try {
+      // Only update sharing info for TowDow Cloud and self-hosted accounts
+      final sharingService = TowDowSharingService(account: account);
+      if (!sharingService.supportsSharing) {
+        return;
+      }
+      
+      AppLogger.info('SyncService: Updating sharing information for calendar ${calendar.path}');
+      
+      // Extract project path from calendar path (UUID part)
+      final projectPath = _extractProjectPathFromCalendarPath(calendar.path);
+      if (projectPath.isEmpty) {
+        AppLogger.warning('SyncService: Could not extract project path from ${calendar.path}');
+        return;
+      }
+      
+      // Get current sharing members from API
+      final membersResult = await sharingService.getProjectMembers(projectPath);
+      await membersResult.when(
+        success: (members) async {
+          // Convert SharedProjectMember objects to JSON for storage
+          final membersJson = members.map((member) => member.toJson()).toList();
+          
+          // Update calendar with sharing information
+          final updatedCalendar = calendar.withSharedWith(membersJson);
+          await _calendarRepository.save(updatedCalendar);
+          
+          AppLogger.info('SyncService: Updated sharing info for ${calendar.path} - ${members.length} members');
+        },
+        failure: (failure) async {
+          // Log the error but don't fail the sync - sharing is optional
+          AppLogger.warning('SyncService: Failed to get sharing info for ${calendar.path}: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      // Log the error but don't fail the sync - sharing is optional  
+      AppLogger.warning('SyncService: Error updating sharing information for ${calendar.path}', e, stackTrace);
+    }
+  }
+  
+  /// Extract project path (UUID) from calendar path
+  String _extractProjectPathFromCalendarPath(String calendarPath) {
+    // Calendar paths typically look like: /calendars/username/uuid/
+    // Extract the UUID part
+    final segments = calendarPath.split('/').where((s) => s.isNotEmpty).toList();
+    
+    // Look for a UUID pattern (8-4-4-4-12 format)
+    for (final segment in segments) {
+      if (RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(segment)) {
+        return segment;
+      }
+    }
+    
+    return '';
   }
 
   /// Dispose resources

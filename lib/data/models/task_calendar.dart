@@ -46,6 +46,7 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(23) @Default('[]') String projectCategories, // JSON array of Category objects for project-level categories
     @HiveField(25) String? flowitDomain, // X-FLOWIT-DOMAIN - domain for grouping projects
     @HiveField(26) String? flowitStatus, // X-FLOWIT-STATUS - project status (DRAFT, CANCELED, ONGOING, STOPPED, ARCHIVE, COMPLETED, NEEDACTION, FAILED)
+    @HiveField(27) @Default('[]') String sharedWith, // JSON array of SharedProjectMember objects for project sharing
   }) = _TaskCalendar;
 
   factory TaskCalendar.fromJson(Map<String, dynamic> json) => _$TaskCalendarFromJson(json);
@@ -202,6 +203,86 @@ extension TaskCalendarDomain on TaskCalendar {
   TaskCalendar withoutDomain() {
     return copyWith(
       flowitDomain: null,
+      lastModified: DateTime.now(),
+    );
+  }
+}
+
+// Extension for sharing-related operations  
+extension TaskCalendarSharing on TaskCalendar {
+  /// Parse shared project members from JSON
+  List<Map<String, dynamic>> get sharedWithMembers {
+    try {
+      if (sharedWith.isEmpty || sharedWith == '[]') return [];
+      final decoded = jsonDecode(sharedWith);
+      if (decoded is List) {
+        return decoded.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Check if project is shared with others
+  bool get isSharedWith => sharedWithMembers.isNotEmpty;
+
+  /// Check if project is shared with me (owner != current user)
+  bool isSharedWithMe(String? currentCalendarHome) {
+    if (currentCalendarHome == null || currentCalendarHome.isEmpty) return false;
+    
+    // Extract username from calendar home path
+    final currentUser = _extractUserFromPath(currentCalendarHome);
+    final ownerUser = flowitOwner != null ? _extractUserFromPath(flowitOwner!) : _extractUserFromPath(path);
+    
+    return currentUser.isNotEmpty && ownerUser.isNotEmpty && currentUser != ownerUser;
+  }
+
+  /// Extract username from calendar path or owner field
+  String _extractUserFromPath(String path) {
+    // Handle different CalDAV path formats:
+    // /calendars/username/ or /principals/users/username/ or similar
+    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    
+    if (segments.length >= 2) {
+      // Look for common patterns: calendars/username or principals/users/username
+      final calendarIndex = segments.indexOf('calendars');
+      final principalIndex = segments.indexOf('principals');
+      
+      if (calendarIndex >= 0 && calendarIndex + 1 < segments.length) {
+        return segments[calendarIndex + 1];
+      } else if (principalIndex >= 0 && principalIndex + 2 < segments.length) {
+        return segments[principalIndex + 2]; // principals/users/username
+      } else if (segments.length >= 2) {
+        // Fallback: use second segment
+        return segments[1];
+      }
+    }
+    
+    return '';
+  }
+
+  /// Get list of users this project is shared with
+  List<String> get sharedWithEmails {
+    return sharedWithMembers
+        .map((member) => member['targetUserEmail'] as String?)
+        .where((email) => email != null)
+        .cast<String>()
+        .toList();
+  }
+
+  /// Create a copy with updated sharing info
+  TaskCalendar withSharedWith(List<Map<String, dynamic>> members) {
+    return copyWith(
+      sharedWith: jsonEncode(members),
+      lastModified: DateTime.now(),
+    );
+  }
+
+  /// Create a copy with no sharing
+  TaskCalendar withoutSharing() {
+    return copyWith(
+      sharedWith: '[]',
       lastModified: DateTime.now(),
     );
   }
