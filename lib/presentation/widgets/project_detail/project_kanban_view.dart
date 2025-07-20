@@ -9,9 +9,6 @@ import '../../../data/models/category.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../widgets/kanban_board.dart';
-import '../../widgets/task_item/task_item.dart';
-import '../../widgets/utils/popup/category_dialog.dart';
-import '../../viewmodels/commands/attendee_commands.dart';
 
 class ProjectKanbanView extends ConsumerWidget {
   final String projectPath;
@@ -240,38 +237,41 @@ class ProjectKanbanView extends ConsumerWidget {
     }
   }
 
-  /// Handle task movement between columns (for attendee-based kanban)
+  /// Handle task movement between columns (for category-based kanban)
   Future<void> _handleTaskMove(BuildContext context, WidgetRef ref, Task task, String columnId) async {
     try {
-      // This is currently used for attendee-based kanban
-      // For category-based kanban, we would need to implement category assignment
-      if (columnId == '__no_attendees__') {
-        // Remove all attendees
-        final updatedTask = task.copyWith(attendees: []);
+      AppLogger.info('ProjectKanbanView: Moving task "${task.summary}" to column "$columnId"');
+      
+      if (columnId == 'uncategorized') {
+        // Remove all categories (move to uncategorized)
+        final updatedTask = task.copyWith(
+          categoryIds: [],
+          lastModified: DateTime.now(),
+        );
         await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
       } else {
-        // Add attendee to task
-        final command = AssignAttendeeToTaskCommand(
-          ref.read(taskRepositoryProvider),
-          ref.read(syncServiceProvider),
+        // Replace all categories with the new one (single category per task)
+        final updatedTask = task.copyWith(
+          categoryIds: [columnId],
+          lastModified: DateTime.now(),
         );
-        final params = AssignAttendeeToTaskParams(task: task, attendeeEmail: columnId);
-        await command.executeWith(params);
+        await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
       }
       
       // Refresh the UI
       onTasksRefresh?.call();
       
       if (context.mounted) {
-        final attendeeName = columnId == '__no_attendees__' ? 'No Attendees' : columnId;
+        final columnName = columnId == 'uncategorized' ? 'Uncategorized' : columnId;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Moved "${task.summary}" to "$attendeeName"'),
+            content: Text('Moved "${task.summary}" to "$columnName"'),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (error) {
+      AppLogger.error('ProjectKanbanView: Error moving task', error);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
