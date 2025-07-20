@@ -159,6 +159,7 @@ class XMLResponseParser {
         final flowitOwner = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
         final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
         final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
+        final flowitKanban = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
         final flowitCategories = _extractFlowItPropertyWithPrefixes(responseContent, 'categories', globalFlowItPrefixes);
         
         if (isCalendar && supportsTodos) {
@@ -173,6 +174,7 @@ class XMLResponseParser {
             flowitOwner: flowitOwner,
             flowitTemplate: flowitTemplate,
             flowitStatus: flowitStatus,
+            flowitKanban: flowitKanban,
           );
           
           // Update project categories if found
@@ -374,6 +376,7 @@ class XMLResponseParser {
         final globalFlowItPrefixes = _findFlowItNamespacePrefixes(xmlResponse);
         responseData['flowit-domain'] = _extractFlowItPropertyWithPrefixes(responseContent, 'domain', globalFlowItPrefixes);
         responseData['flowit-status'] = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
+        responseData['flowit-kanban'] = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
         responseData['flowit-categories'] = _extractFlowItPropertyWithPrefixes(responseContent, 'categories', globalFlowItPrefixes);
         responseData['flowit-type'] = _extractFlowItPropertyWithPrefixes(responseContent, 'type', globalFlowItPrefixes);
         responseData['flowit-asflow'] = _extractFlowItPropertyWithPrefixes(responseContent, 'asflow', globalFlowItPrefixes);

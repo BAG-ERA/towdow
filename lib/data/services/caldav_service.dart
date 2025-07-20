@@ -516,6 +516,7 @@ class CalDAVService {
     <FLOWIT:owner />
     <FLOWIT:template />
     <FLOWIT:status />
+    <FLOWIT:kanban />
     <FLOWIT:categories />
   </D:prop>
 </D:propfind>''';
@@ -538,6 +539,7 @@ class CalDAVService {
                 description: responseData['calendar-description'] ?? calendar.description,
                 flowitDomain: responseData['flowit-domain'],
                 flowitStatus: responseData['flowit-status'],
+                flowitKanban: responseData['flowit-kanban'] ?? calendar.flowitKanban,
                 projectCategories: responseData['flowit-categories'] ?? calendar.projectCategories,
                 lastSyncAt: DateTime.now(),
               );
@@ -778,6 +780,11 @@ class CalDAVService {
       xml.writeln('      <FLOWIT:status>${_escapeXmlText(calendar.flowitStatus!)}</FLOWIT:status>');
     }
     
+    // Set kanban configuration as JSON
+    if (calendar.flowitKanban.isNotEmpty && calendar.flowitKanban != '[]') {
+      xml.writeln('      <FLOWIT:kanban><![CDATA[${calendar.flowitKanban}]]></FLOWIT:kanban>');
+    }
+    
     // Set project categories as JSON
     if (calendar.projectCategories.isNotEmpty && calendar.projectCategories != '[]') {
       xml.writeln('      <FLOWIT:categories><![CDATA[${calendar.projectCategories}]]></FLOWIT:categories>');
@@ -789,6 +796,7 @@ class CalDAVService {
     // Remove FlowIt properties if they're null/empty
     if ((calendar.flowitDomain == null || calendar.flowitDomain!.isEmpty) || 
         (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) ||
+        (calendar.flowitKanban.isEmpty || calendar.flowitKanban == '[]') ||
         (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]')) {
       xml.writeln('  <D:remove>');
       xml.writeln('    <D:prop>');
@@ -799,6 +807,10 @@ class CalDAVService {
       
       if (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) {
         xml.writeln('      <FLOWIT:status/>');
+      }
+      
+      if (calendar.flowitKanban.isEmpty || calendar.flowitKanban == '[]') {
+        xml.writeln('      <FLOWIT:kanban/>');
       }
       
       if (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') {

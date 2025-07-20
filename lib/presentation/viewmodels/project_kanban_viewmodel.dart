@@ -12,12 +12,8 @@ import '../../core/result.dart';
 import '../../data/models/kanban.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/models/category.dart';
-import '../../data/repositories/calendar_repository.dart';
-import '../../data/repositories/user_repository.dart';
 import '../../data/repositories/category_repository.dart';
-import '../../data/services/sync_service.dart';
-import '../../data/services/caldav_service.dart';
-import '../../data/services/local_storage_service.dart';
+import '../../data/services/kanban_service.dart';
 
 part 'project_kanban_viewmodel.freezed.dart';
 
@@ -38,20 +34,14 @@ class ProjectKanbanState with _$ProjectKanbanState {
 }
 
 /// ViewModel for project kanban management operations
-/// Handles CRUD operations for kanban boards with proper state management
+/// Handles UI state management and delegates business logic to KanbanService
 class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
-  final CalendarRepository _calendarRepository;
-  final UserRepository _userRepository;
+  final KanbanService _kanbanService;
   final CategoryRepository _categoryRepository;
-  final SyncService _syncService;
-  final LocalStorageService _localStorageService;
 
   ProjectKanbanViewModel(
-    this._calendarRepository,
-    this._userRepository,
+    this._kanbanService,
     this._categoryRepository,
-    this._syncService,
-    this._localStorageService,
   ) : super(const ProjectKanbanState());
 
   /// Initialize the view model for a specific project
@@ -77,87 +67,23 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     }
   }
 
-  /// Load kanban configurations for the project
+  /// Load kanban configurations for the project using the service
   Future<void> _loadKanbans(String projectPath) async {
     try {
-      // First try to load from user preferences (client-side storage)
-      final preferencesResult = await _userRepository.getUserPreferences();
+      final kanbansResult = await _kanbanService.loadKanbansForProject(projectPath);
       
-      await preferencesResult.when(
-        success: (preferences) async {
-          final kanbans = _loadKanbansFromPreferences(preferences, projectPath);
-          
-          if (kanbans.isEmpty) {
-            // If no kanbans in preferences, try to load from calendar (server-side)
-            await _loadKanbansFromCalendar(projectPath);
-          } else {
-            state = state.copyWith(kanbans: kanbans);
-          }
+      await kanbansResult.when(
+        success: (kanbans) async {
+          state = state.copyWith(kanbans: kanbans);
         },
         failure: (failure) async {
-          AppLogger.warning('ProjectKanbanViewModel: Failed to load from preferences: ${failure.message}');
-          // Fallback to calendar loading
-          await _loadKanbansFromCalendar(projectPath);
+          AppLogger.error('ProjectKanbanViewModel: Failed to load kanbans: ${failure.message}');
+          state = state.copyWith(error: 'Failed to load kanbans: ${failure.message}');
         },
       );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectKanbanViewModel: Exception loading kanbans', e, stackTrace);
       state = state.copyWith(error: 'Failed to load kanbans: $e');
-    }
-  }
-
-  /// Load kanbans from user preferences
-  List<Kanban> _loadKanbansFromPreferences(dynamic preferences, String projectPath) {
-    try {
-      final customSettings = preferences.customSettings;
-      if (customSettings == null) return [];
-      
-      final projectKanbans = customSettings['kanbans_$projectPath'];
-      if (projectKanbans == null) return [];
-      
-      if (projectKanbans is List) {
-        return projectKanbans
-            .map((kanbanData) => Kanban.fromJson(Map<String, dynamic>.from(kanbanData)))
-            .toList();
-      }
-      
-      return [];
-    } catch (e) {
-      AppLogger.warning('ProjectKanbanViewModel: Failed to parse kanbans from preferences: $e');
-      return [];
-    }
-  }
-
-  /// Load kanbans from calendar (server-side storage)
-  Future<void> _loadKanbansFromCalendar(String projectPath) async {
-    try {
-      final calendarResult = await _calendarRepository.getByPath(projectPath);
-      
-      await calendarResult.when(
-        success: (calendar) async {
-          if (calendar != null && calendar.flowitKanban.isNotEmpty) {
-            try {
-              final kanbanData = jsonDecode(calendar.flowitKanban);
-              if (kanbanData is List) {
-                final kanbans = kanbanData
-                    .map((data) => Kanban.fromJson(Map<String, dynamic>.from(data)))
-                    .toList();
-                state = state.copyWith(kanbans: kanbans);
-                
-                // Also save to preferences for client-side storage
-                await _saveKanbansToPreferences(kanbans, projectPath);
-              }
-            } catch (e) {
-              AppLogger.warning('ProjectKanbanViewModel: Failed to parse kanbans from calendar: $e');
-            }
-          }
-        },
-        failure: (failure) async {
-          AppLogger.warning('ProjectKanbanViewModel: Failed to load calendar: ${failure.message}');
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('ProjectKanbanViewModel: Exception loading from calendar', e, stackTrace);
     }
   }
 
@@ -198,27 +124,32 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     try {
       AppLogger.info('ProjectKanbanViewModel: Creating kanban "$title"');
 
-      final kanban = Kanban(
+      final kanbanResult = await _kanbanService.createKanban(
+        projectPath: state.projectPath!,
         title: title,
-        orderedList: orderedList ?? [],
-        filter: filter ?? [],
-        regex: regex ?? r'.*', // Default "capture all" regex pattern
+        orderedList: orderedList,
+        filter: filter,
+        regex: regex,
       );
 
-      final updatedKanbans = [...state.kanbans, kanban];
-      
-      // Save to preferences first (client-side)
-      await _saveKanbansToPreferences(updatedKanbans, state.projectPath!);
-      
-      // Update state
-      state = state.copyWith(
-        kanbans: updatedKanbans,
-        selectedKanban: kanban,
-        isSaving: false,
+      await kanbanResult.when(
+        success: (kanban) async {
+          // Reload kanbans to get the updated list
+          await _loadKanbans(state.projectPath!);
+          
+          // Update selected kanban
+          state = state.copyWith(
+            selectedKanban: kanban,
+            isSaving: false,
+          );
+        },
+        failure: (failure) async {
+          state = state.copyWith(
+            isSaving: false,
+            error: 'Failed to create kanban: ${failure.message}',
+          );
+        },
       );
-
-      // Queue for server sync
-      await _queueKanbanUpdate(state.projectPath!);
 
       AppLogger.info('ProjectKanbanViewModel: Successfully created kanban "$title"');
     } catch (e, stackTrace) {
@@ -242,26 +173,29 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     try {
       AppLogger.info('ProjectKanbanViewModel: Updating kanban "${updatedKanban.title}"');
 
-      final updatedKanbans = state.kanbans.map((kanban) {
-        // Find the kanban to update (by title for now)
-        if (kanban.title == updatedKanban.title) {
-          return updatedKanban;
-        }
-        return kanban;
-      }).toList();
-
-      // Save to preferences first (client-side)
-      await _saveKanbansToPreferences(updatedKanbans, state.projectPath!);
-      
-      // Update state
-      state = state.copyWith(
-        kanbans: updatedKanbans,
-        selectedKanban: updatedKanban,
-        isSaving: false,
+      final kanbanResult = await _kanbanService.updateKanban(
+        projectPath: state.projectPath!,
+        updatedKanban: updatedKanban,
       );
 
-      // Queue for server sync
-      await _queueKanbanUpdate(state.projectPath!);
+      await kanbanResult.when(
+        success: (kanban) async {
+          // Reload kanbans to get the updated list
+          await _loadKanbans(state.projectPath!);
+          
+          // Update selected kanban
+          state = state.copyWith(
+            selectedKanban: kanban,
+            isSaving: false,
+          );
+        },
+        failure: (failure) async {
+          state = state.copyWith(
+            isSaving: false,
+            error: 'Failed to update kanban: ${failure.message}',
+          );
+        },
+      );
 
       AppLogger.info('ProjectKanbanViewModel: Successfully updated kanban "${updatedKanban.title}"');
     } catch (e, stackTrace) {
@@ -285,20 +219,29 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     try {
       AppLogger.info('ProjectKanbanViewModel: Deleting kanban "$title"');
 
-      final updatedKanbans = state.kanbans.where((kanban) => kanban.title != title).toList();
-
-      // Save to preferences first (client-side)
-      await _saveKanbansToPreferences(updatedKanbans, state.projectPath!);
-      
-      // Update state
-      state = state.copyWith(
-        kanbans: updatedKanbans,
-        selectedKanban: updatedKanbans.isNotEmpty ? updatedKanbans.first : null,
-        isDeleting: false,
+      final deleteResult = await _kanbanService.deleteKanban(
+        projectPath: state.projectPath!,
+        title: title,
       );
 
-      // Queue for server sync
-      await _queueKanbanUpdate(state.projectPath!);
+      await deleteResult.when(
+        success: (_) async {
+          // Reload kanbans to get the updated list
+          await _loadKanbans(state.projectPath!);
+          
+          // Update selected kanban
+          state = state.copyWith(
+            selectedKanban: state.kanbans.isNotEmpty ? state.kanbans.first : null,
+            isDeleting: false,
+          );
+        },
+        failure: (failure) async {
+          state = state.copyWith(
+            isDeleting: false,
+            error: 'Failed to delete kanban: ${failure.message}',
+          );
+        },
+      );
 
       AppLogger.info('ProjectKanbanViewModel: Successfully deleted kanban "$title"');
     } catch (e, stackTrace) {
@@ -320,59 +263,7 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     state = state.copyWith(selectedKanban: null);
   }
 
-  /// Save kanbans to user preferences
-  Future<void> _saveKanbansToPreferences(List<Kanban> kanbans, String projectPath) async {
-    try {
-      final preferencesResult = await _userRepository.getUserPreferences();
-      
-      await preferencesResult.when(
-        success: (preferences) async {
-          final customSettings = Map<String, dynamic>.from(preferences.customSettings ?? {});
-          customSettings['kanbans_$projectPath'] = kanbans.map((k) => k.toJson()).toList();
-          
-          final updatedPreferences = preferences.copyWith(customSettings: customSettings);
-          await _userRepository.saveUserPreferences(updatedPreferences);
-        },
-        failure: (failure) async {
-          AppLogger.warning('ProjectKanbanViewModel: Failed to save to preferences: ${failure.message}');
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('ProjectKanbanViewModel: Exception saving to preferences', e, stackTrace);
-    }
-  }
 
-  /// Queue kanban update for server synchronization
-  Future<void> _queueKanbanUpdate(String projectPath) async {
-    try {
-      // Get the calendar to update
-      final calendarResult = await _calendarRepository.getByPath(projectPath);
-      
-      await calendarResult.when(
-        success: (calendar) async {
-          if (calendar != null) {
-            // Update the flowitKanban field
-            final kanbanJson = jsonEncode(state.kanbans.map((k) => k.toJson()).toList());
-            final updatedCalendar = calendar.copyWith(
-              flowitKanban: kanbanJson,
-              lastModified: DateTime.now(),
-            );
-            
-            // Save locally
-            await _calendarRepository.save(updatedCalendar);
-            
-            // Queue for sync (this would be handled by the sync service)
-            AppLogger.info('ProjectKanbanViewModel: Queued kanban update for sync');
-          }
-        },
-        failure: (failure) async {
-          AppLogger.warning('ProjectKanbanViewModel: Failed to queue update: ${failure.message}');
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('ProjectKanbanViewModel: Exception queuing update', e, stackTrace);
-    }
-  }
 
   /// Get kanban by title
   Kanban? getKanbanByTitle(String title) {

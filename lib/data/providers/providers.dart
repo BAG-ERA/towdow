@@ -44,6 +44,7 @@ import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/category_viewmodel.dart';
 import '../../presentation/viewmodels/project_kanban_viewmodel.dart';
+import '../services/kanban_service.dart';
 import '../../app.dart';
 
 // Local storage service provider
@@ -96,6 +97,16 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   return CategoryRepository(calendarRepository, accountRepository);
+});
+
+// Kanban service provider
+final kanbanServiceProvider = Provider<KanbanService>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return KanbanService(
+    calendarRepository: calendarRepository,
+    accountRepository: accountRepository,
+  );
 });
 
 // CalDAV service provider  
@@ -374,17 +385,11 @@ final projectCategoryViewModelProvider = StateNotifierProvider.family<CategoryVi
 
 // Project Kanban ViewModel provider for specific project
 final projectKanbanViewModelProvider = StateNotifierProvider.family<ProjectKanbanViewModel, ProjectKanbanState, String>((ref, projectPath) {
-  final calendarRepository = ref.watch(calendarRepositoryProvider);
-  final userRepository = ref.watch(userRepositoryProvider);
+  final kanbanService = ref.watch(kanbanServiceProvider);
   final categoryRepository = ref.watch(categoryRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  final localStorageService = ref.watch(localStorageServiceProvider);
   final viewModel = ProjectKanbanViewModel(
-    calendarRepository,
-    userRepository,
+    kanbanService,
     categoryRepository,
-    syncService,
-    localStorageService,
   );
   // Initialize with project path
   viewModel.initialize(projectPath);
