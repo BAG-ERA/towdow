@@ -202,7 +202,7 @@ void handleSessionExpired([ProviderRef? ref]) {
   }
 }
 
-// Sync service provider
+// Sync service provider - initializes singleton
 final syncServiceProvider = Provider<SyncService>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
@@ -210,6 +210,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   final categoryRepository = ref.watch(categoryRepositoryProvider);
   final localStorage = ref.watch(localStorageServiceProvider);
   
+  // Initialize singleton instance
   return SyncService(
     taskRepository: taskRepository,
     accountRepository: accountRepository,
@@ -407,8 +408,7 @@ final projectKanbanViewModelProvider = StateNotifierProvider.family<ProjectKanba
 final projectSharingViewModelProvider = StateNotifierProvider<ProjectSharingViewModel, ProjectSharingState>((ref) {
   final accountRepository = ref.watch(accountRepositoryProvider);
   final calendarRepository = ref.watch(calendarRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  return ProjectSharingViewModel(accountRepository, calendarRepository, syncService);
+  return ProjectSharingViewModel(accountRepository, calendarRepository);
 });
 
 // Account status providers

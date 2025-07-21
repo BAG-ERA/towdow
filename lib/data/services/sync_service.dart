@@ -23,6 +23,7 @@ enum SyncOperation {
   create,
   update,
   delete,
+  updateCalendar,
 }
 
 enum SyncStatus {
@@ -80,11 +81,60 @@ class SyncResult {
 }
 
 class SyncService {
+  static SyncService? _instance;
+  
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
   final CategoryRepository _categoryRepository;
   final LocalStorageService _localStorage;
+  final ShareService? _shareService;
+
+  // Private constructor
+  SyncService._({
+    required TaskRepository taskRepository,
+    required AccountRepository accountRepository,
+    required CalendarRepository calendarRepository,
+    required CategoryRepository categoryRepository,
+    required LocalStorageService localStorage,
+    ShareService? shareService,
+  })  : _taskRepository = taskRepository,
+        _accountRepository = accountRepository,
+        _calendarRepository = calendarRepository,
+        _categoryRepository = categoryRepository,
+        _localStorage = localStorage,
+        _shareService = shareService;
+
+  // Factory constructor for creating/getting singleton instance
+  factory SyncService({
+    required TaskRepository taskRepository,
+    required AccountRepository accountRepository,
+    required CalendarRepository calendarRepository,
+    required CategoryRepository categoryRepository,
+    required LocalStorageService localStorage,
+    ShareService? shareService,
+  }) {
+    _instance ??= SyncService._(
+      taskRepository: taskRepository,
+      accountRepository: accountRepository,
+      calendarRepository: calendarRepository,
+      categoryRepository: categoryRepository,
+      localStorage: localStorage,
+      shareService: shareService,
+    );
+    return _instance!;
+  }
+
+  // Static getter for accessing the singleton instance
+  static SyncService? get instance => _instance;
+
+  // Static method to ensure instance is available
+  static SyncService get requireInstance {
+    if (_instance == null) {
+      throw Exception('SyncService instance not initialized. Call SyncService() first.');
+    }
+    return _instance!;
+  }
 
   // Sync state
   SyncStatus _status = SyncStatus.idle;
@@ -97,18 +147,6 @@ class SyncService {
   static const Duration syncInterval = Duration(seconds: 10);
   static const int maxRetryCount = 3;
   static const String syncQueueBoxName = 'sync_queue';
-
-  SyncService({
-    required TaskRepository taskRepository,
-    required AccountRepository accountRepository,
-    required CalendarRepository calendarRepository,
-    required CategoryRepository categoryRepository,
-    required LocalStorageService localStorage,
-  })  : _taskRepository = taskRepository,
-        _accountRepository = accountRepository,
-        _calendarRepository = calendarRepository,
-        _categoryRepository = categoryRepository,
-        _localStorage = localStorage;
 
   // Public streams
   Stream<SyncStatus> get statusStream => _statusController.stream;
@@ -511,6 +549,63 @@ class SyncService {
           throw Exception('Missing required data for task deletion');
         }
         break;
+
+      case SyncOperation.updateCalendar:
+        // Get the calendar from repository using calendarUid
+        final calendarUid = item.data['calendarUid'] as String?;
+        
+        if (calendarUid == null) {
+          AppLogger.warning('SyncService: Missing calendarUid for calendar update');
+          throw Exception('Missing required data for calendar update');
+        }
+        
+        // Get the complete calendar from repository
+        final calendarResult = await _calendarRepository.getById(calendarUid);
+        await calendarResult.when(
+          success: (calendar) async {
+            if (calendar == null) {
+              throw Exception('Calendar not found in repository: $calendarUid');
+            }
+            
+            // Update calendar properties on server
+            final result = await caldavService.updateCalendarProperties(calendar);
+            await result.when(
+              success: (_) async {
+                AppLogger.debug('SyncService: Updated calendar properties ${calendar.displayName} on server');
+              },
+              failure: (failure) async {
+                throw Exception('Failed to update calendar properties: ${failure.message}');
+              },
+            );
+          },
+          failure: (failure) async {
+            AppLogger.warning('SyncService: Could not find calendar $calendarUid for update');
+            throw Exception('Calendar not found for update: ${failure.message}');
+          },
+        );
+        break;
+    }
+  }
+
+  /// Queue a calendar update operation for later processing
+  Future<Result<void>> queueCalendarUpdate(String calendarUid) async {
+    try {
+      final syncData = <String, dynamic>{
+        'calendarUid': calendarUid,
+      };
+
+      return await queueSyncOperation(
+        SyncOperation.updateCalendar,
+        calendarUid,
+        syncData,
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Failed to queue calendar update', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to queue calendar update: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
     }
   }
 

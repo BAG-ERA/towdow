@@ -9,6 +9,7 @@ import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
 import 'local_storage_service.dart';
 import 'caldav_service.dart';
+import 'sync_service.dart';
 
 /// Service for managing project domains and domain-related operations
 class DomainService {
@@ -171,7 +172,7 @@ class DomainService {
     );
   }
 
-  /// Sync domain changes to CalDAV server
+  /// Sync domain changes to CalDAV server using queue for offline resilience
   Future<Result<void>> _syncDomainToServer(TaskCalendar calendar) async {
     try {
       AppLogger.info('DomainService: *** Starting domain sync to server ***');
@@ -179,49 +180,36 @@ class DomainService {
       AppLogger.info('DomainService: Calendar path: ${calendar.path}');
       AppLogger.info('DomainService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
       
-      // Get active account
-      final accountResult = await _accountRepository.getActiveAccount();
-      return accountResult.when(
-        success: (account) async {
-          if (account == null) {
-            AppLogger.warning('DomainService: No active account found, skipping server sync');
-            return Result.success(null); // Still success since local save worked
-          }
-          
-          AppLogger.info('DomainService: Found active account: ${account.username}@${account.serverUrl}');
-          
-          // Create CalDAV service instance
-          final caldavService = CalDAVService(account: account);
-          AppLogger.info('DomainService: Created CalDAV service, calling updateCalendarProperties...');
-          
-          // Update calendar properties on server
-          final updateResult = await caldavService.updateCalendarProperties(calendar);
-          
-          return updateResult.when(
-            success: (_) {
-              AppLogger.info('DomainService: *** Successfully synced domain to server ***');
-              return Result.success(null);
-            },
-            failure: (failure) {
-              AppLogger.error('DomainService: Failed to sync domain to server: ${failure.message}');
-              AppLogger.error('DomainService: Failure code: ${failure.code}');
-              // Don't fail the entire operation since local save succeeded
-              // The sync will be retried during next full sync
-              return Result.success(null);
-            },
-          );
-        },
-        failure: (failure) {
-          AppLogger.error('DomainService: Failed to get active account for server sync: ${failure.message}');
-          AppLogger.error('DomainService: Account failure code: ${failure.code}');
-          // Don't fail the entire operation since local save succeeded
-          return Result.success(null);
-        },
-      );
+      // Always use sync queue for offline resilience
+      final syncService = SyncService.instance;
+      if (syncService != null) {
+        AppLogger.debug('DomainService: Queuing calendar update for domain sync');
+        final queueResult = await syncService.queueCalendarUpdate(calendar.path);
+        
+        return await queueResult.when(
+          success: (_) async {
+            AppLogger.info('DomainService: *** Successfully queued domain sync to server ***');
+            return Result.success(null);
+          },
+          failure: (failure) async {
+            AppLogger.error('DomainService: Failed to queue domain sync: ${failure.message}');
+            return Result.failure(failure);
+          },
+        );
+      } else {
+        AppLogger.error('DomainService: SyncService singleton not initialized - cannot queue update');
+        return Result.failure(Failure(
+          message: 'SyncService not initialized',
+          exception: Exception('SyncService singleton not available'),
+        ));
+      }
     } catch (e, stackTrace) {
-      AppLogger.error('DomainService: Exception during server sync', e, stackTrace);
-      // Don't fail the entire operation since local save succeeded
-      return Result.success(null);
+      AppLogger.error('DomainService: Exception during domain sync to server', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to sync domain to server: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
     }
   }
 

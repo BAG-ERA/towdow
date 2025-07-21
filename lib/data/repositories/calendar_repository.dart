@@ -6,6 +6,7 @@ import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/task_calendar.dart';
 import '../services/local_storage_service.dart';
+import '../services/sync_service.dart';
 
 // Abstract repository interface
 abstract class CalendarRepository {
@@ -32,6 +33,9 @@ abstract class CalendarRepository {
   Future<Result<List<TaskCalendar>>> getCalendarsWithoutStatus();
   Future<Result<List<TaskCalendar>>> getArchivedCalendars();
   Future<Result<List<TaskCalendar>>> getActiveCalendars();
+  
+  // Sync-related methods
+  Future<Result<void>> updateCalendarProperties(TaskCalendar calendar);
 }
 
 // Local implementation using Hive
@@ -336,5 +340,55 @@ class LocalCalendarRepository implements CalendarRepository {
       },
       failure: (failure) => Result.failure(failure),
     );
+  }
+
+  @override
+  Future<Result<void>> updateCalendarProperties(TaskCalendar calendar) async {
+    try {
+      AppLogger.info('LocalCalendarRepository: Updating calendar properties for ${calendar.displayName}');
+      
+      // First save the calendar locally with updated properties
+      final saveResult = await save(calendar);
+      
+      return await saveResult.when(
+        success: (_) async {
+          AppLogger.debug('LocalCalendarRepository: Calendar saved locally, queuing server sync');
+          
+          // Always use sync queue for offline resilience via singleton
+          final syncService = SyncService.instance;
+          if (syncService != null) {
+            final queueResult = await syncService.queueCalendarUpdate(calendar.path);
+            
+            return await queueResult.when(
+              success: (_) async {
+                AppLogger.info('LocalCalendarRepository: Successfully queued calendar properties update');
+                return Result.success(null);
+              },
+              failure: (failure) async {
+                AppLogger.error('LocalCalendarRepository: Failed to queue calendar update: ${failure.message}');
+                return Result.failure(failure);
+              },
+            );
+          } else {
+            AppLogger.error('LocalCalendarRepository: SyncService singleton not initialized - cannot queue update');
+            return Result.failure(Failure(
+              message: 'SyncService not initialized',
+              exception: Exception('SyncService singleton not available'),
+            ));
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('LocalCalendarRepository: Failed to save calendar locally: ${failure.message}');
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('LocalCalendarRepository: Exception updating calendar properties', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to update calendar properties: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
   }
 } 

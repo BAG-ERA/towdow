@@ -6,9 +6,7 @@ import '../../data/models/task_calendar.dart';
 import '../../data/models/shared_project_member.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
-import '../../data/services/sync_service.dart';
 import '../../core/logger.dart';
-import '../../data/services/caldav_service.dart'; // Added import for CalDAVService
 
 // Project Sharing ViewModel State
 class ProjectSharingState {
@@ -78,9 +76,8 @@ class ProjectSharingState {
 class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
-  final SyncService _syncService;
 
-  ProjectSharingViewModel(this._accountRepository, this._calendarRepository, this._syncService) : super(const ProjectSharingState());
+  ProjectSharingViewModel(this._accountRepository, this._calendarRepository) : super(const ProjectSharingState());
 
   /// Initialize the view model for a specific project
   Future<void> initializeForProject(TaskCalendar project) async {
@@ -264,78 +261,28 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
       // Update calendar with new sharing data (optimistic UI)
       final updatedCalendar = state.currentProject!.withSharedWith(membersJson);
       
-      // Save calendar locally first
-      final saveResult = await _calendarRepository.save(updatedCalendar);
+      AppLogger.debug('ProjectSharingViewModel: Updating calendar properties via repository');
       
-      await saveResult.when(
+      // Use repository for proper MVVM architecture - it handles local save and sync queue
+      final updateResult = await _calendarRepository.updateCalendarProperties(updatedCalendar);
+      
+      await updateResult.when(
         success: (_) async {
-          AppLogger.debug('ProjectSharingViewModel: Calendar sharing data saved locally');
+          AppLogger.debug('ProjectSharingViewModel: Successfully updated sharing data via repository');
           
-          // Get active account to call CalDAV service directly
-          final accountResult = await _accountRepository.getActiveAccount();
-          await accountResult.when(
-            success: (account) async {
-              if (account == null) {
-                AppLogger.warning('ProjectSharingViewModel: No active account found, skipping server sync');
-                // Still update state as local save succeeded
-                state = state.copyWith(
-                  isSaving: false,
-                  currentProject: updatedCalendar,
-                  members: List.from(state.editedMembers),
-                  hasUnsavedChanges: false,
-                  error: 'Saved locally - account not found',
-                );
-                return;
-              }
-              
-              AppLogger.debug('ProjectSharingViewModel: Calling CalDAV updateCalendarProperties for sharing sync');
-              
-              // Create CalDAV service and sync to server (similar to StatusService/DomainService)
-              final caldavService = CalDAVService(account: account);
-              final updateResult = await caldavService.updateCalendarProperties(updatedCalendar);
-              
-              await updateResult.when(
-                success: (_) async {
-                  AppLogger.debug('ProjectSharingViewModel: Successfully synced sharing data to server');
-                  
-                  // Update state with success
-                  state = state.copyWith(
-                    isSaving: false,
-                    currentProject: updatedCalendar,
-                    members: List.from(state.editedMembers),
-                    hasUnsavedChanges: false,
-                  );
-                },
-                failure: (failure) async {
-                  AppLogger.error('ProjectSharingViewModel: Failed to sync sharing data to server: ${failure.message}');
-                  // Still update state as local save succeeded - will retry during next sync
-                  state = state.copyWith(
-                    isSaving: false,
-                    currentProject: updatedCalendar,
-                    members: List.from(state.editedMembers),
-                    hasUnsavedChanges: false,
-                    error: 'Saved locally - server sync failed, will retry automatically',
-                  );
-                },
-              );
-            },
-            failure: (failure) async {
-              AppLogger.error('ProjectSharingViewModel: Failed to get active account: ${failure.message}');
-              state = state.copyWith(
-                isSaving: false,
-                currentProject: updatedCalendar,
-                members: List.from(state.editedMembers),
-                hasUnsavedChanges: false,
-                error: 'Saved locally - failed to get account for server sync',
-              );
-            },
+          // Update state with success
+          state = state.copyWith(
+            isSaving: false,
+            currentProject: updatedCalendar,
+            members: List.from(state.editedMembers),
+            hasUnsavedChanges: false,
           );
         },
         failure: (failure) async {
-          AppLogger.error('ProjectSharingViewModel: Failed to save sharing changes locally: ${failure.message}');
+          AppLogger.error('ProjectSharingViewModel: Failed to update calendar properties: ${failure.message}');
           state = state.copyWith(
             isSaving: false,
-            error: 'Failed to save changes: ${failure.message}',
+            error: 'Failed to save sharing data: ${failure.message}',
           );
         },
       );
