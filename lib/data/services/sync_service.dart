@@ -554,6 +554,8 @@ class SyncService {
         // Get the calendar from repository using calendarUid
         final calendarUid = item.data['calendarUid'] as String?;
         
+        AppLogger.debug('SyncService: Processing calendar update for: $calendarUid');
+        
         if (calendarUid == null) {
           AppLogger.warning('SyncService: Missing calendarUid for calendar update');
           throw Exception('Missing required data for calendar update');
@@ -564,8 +566,11 @@ class SyncService {
         await calendarResult.when(
           success: (calendar) async {
             if (calendar == null) {
+              AppLogger.warning('SyncService: Calendar not found in repository: $calendarUid');
               throw Exception('Calendar not found in repository: $calendarUid');
             }
+            
+            AppLogger.debug('SyncService: Found calendar ${calendar.displayName}, calling CalDAV update');
             
             // Update calendar properties on server
             final result = await caldavService.updateCalendarProperties(calendar);
@@ -590,15 +595,20 @@ class SyncService {
   /// Queue a calendar update operation for later processing
   Future<Result<void>> queueCalendarUpdate(String calendarUid) async {
     try {
+      AppLogger.debug('SyncService: Queuing calendar update for: $calendarUid');
+      
       final syncData = <String, dynamic>{
         'calendarUid': calendarUid,
       };
 
-      return await queueSyncOperation(
+      final result = await queueSyncOperation(
         SyncOperation.updateCalendar,
         calendarUid,
         syncData,
       );
+      
+      AppLogger.debug('SyncService: Calendar update queue result: ${result is Success ? "SUCCESS" : "FAILURE"}');
+      return result;
     } catch (e, stackTrace) {
       AppLogger.error('SyncService: Failed to queue calendar update', e, stackTrace);
       return Result.failure(Failure(
@@ -1387,7 +1397,7 @@ class SyncService {
       AppLogger.debug('SyncService: Account: ${account.username}@${account.serverUrl}, Provider: ${account.providerType}');
       
       // Extract project path from calendar path (UUID part)
-      final projectPath = _extractProjectPathFromCalendarPath(calendar.path);
+      final projectPath = calendar.uid;
       if (projectPath.isEmpty) {
         AppLogger.warning('SyncService: Could not extract project path from ${calendar.path}');
         return;
@@ -1430,22 +1440,6 @@ class SyncService {
     }
   }
   
-  /// Extract project path (UUID) from calendar path
-  String _extractProjectPathFromCalendarPath(String calendarPath) {
-    // Calendar paths typically look like: /calendars/username/uuid/
-    // Extract the UUID part
-    final segments = calendarPath.split('/').where((s) => s.isNotEmpty).toList();
-    
-    // Look for a UUID pattern (8-4-4-4-12 format)
-    for (final segment in segments) {
-      if (RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(segment)) {
-        return segment;
-      }
-    }
-    
-    return '';
-  }
-
   /// Dispose resources
   void dispose() {
     // Note: No periodic sync to stop - CalDAVMonitor handles this

@@ -782,7 +782,14 @@ class CalDAVService {
       final sharingService = ShareService(account: account);
       
       // Extract project path (UUID) from calendar path
-      final projectPath = calendar.path.split('/').where((s) => s.isNotEmpty).last;
+      final projectPath = calendar.uid;
+      
+      if (projectPath.isEmpty) {
+        AppLogger.warning('CalDAVService: Could not extract project path from ${calendar.path}');
+        return;
+      }
+      
+      AppLogger.debug('CalDAVService: Extracted project path: $projectPath');
       
       // Get member emails for the API from SharedProjectMember objects
       final memberEmails = calendar.sharedWithMembers.map((member) => member['targetUserEmail'] as String).toList();

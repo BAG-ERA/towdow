@@ -63,10 +63,8 @@ class ProjectSharingState {
   String get projectPath {
     if (currentProject == null) return '';
     
-    // Calendar paths typically look like: /calendars/username/uuid/ or /user-uuid/project-uuid/
-    // Extract the UUID part - we want the last UUID in the path (same as test screen)
-    final segments = currentProject!.path.split('/').where((s) => s.isNotEmpty).toList();
-    return segments.isNotEmpty ? segments.last : '';
+    // Use the TaskCalendar.uid getter which properly handles path extraction
+    return currentProject!.uid;
   }
 
   /// Get list of emails from edited members for UI display

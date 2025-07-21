@@ -52,6 +52,21 @@ class TaskCalendar with _$TaskCalendar {
   factory TaskCalendar.fromJson(Map<String, dynamic> json) => _$TaskCalendarFromJson(json);
 }
 
+// UID extraction extension
+extension TaskCalendarUID on TaskCalendar {
+  /// Extract project UID from calendar path
+  /// Path format: /user-uuid/project-uuid/ -> returns project-uuid
+  String get uid {
+    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    if (segments.isEmpty) return '';
+    
+    // If last segment is empty (path ends with /), take the one before
+    // Otherwise take the last segment
+    final lastSegment = segments.last;
+    return lastSegment.isEmpty && segments.length > 1 ? segments[segments.length - 2] : lastSegment;
+  }
+}
+
 // Factory methods for creating task calendars
 extension TaskCalendarFactory on TaskCalendar {
   static TaskCalendar createNew({

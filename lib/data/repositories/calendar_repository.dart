@@ -346,9 +346,9 @@ class LocalCalendarRepository implements CalendarRepository {
   Future<Result<void>> updateCalendarProperties(TaskCalendar calendar) async {
     try {
       AppLogger.info('LocalCalendarRepository: Updating calendar properties for ${calendar.displayName}');
+      AppLogger.debug('LocalCalendarRepository: Calendar path: ${calendar.path}');
       
-      // First save the calendar locally with updated properties
-      final saveResult = await save(calendar);
+      final saveResult = await save(calendar); // Save locally first
       
       return await saveResult.when(
         success: (_) async {
@@ -357,6 +357,9 @@ class LocalCalendarRepository implements CalendarRepository {
           // Always use sync queue for offline resilience via singleton
           final syncService = SyncService.instance;
           if (syncService != null) {
+            AppLogger.debug('LocalCalendarRepository: SyncService singleton found, queuing calendar update');
+            AppLogger.debug('LocalCalendarRepository: Queuing update for calendar path: ${calendar.path}');
+            
             final queueResult = await syncService.queueCalendarUpdate(calendar.path);
             
             return await queueResult.when(
@@ -370,10 +373,11 @@ class LocalCalendarRepository implements CalendarRepository {
               },
             );
           } else {
-            AppLogger.error('LocalCalendarRepository: SyncService singleton not initialized - cannot queue update');
+            AppLogger.error('LocalCalendarRepository: SyncService singleton is NULL - cannot queue update');
+            AppLogger.error('LocalCalendarRepository: This indicates the SyncService was not properly initialized');
             return Result.failure(Failure(
               message: 'SyncService not initialized',
-              exception: Exception('SyncService singleton not available'),
+              exception: Exception('SyncService singleton not available - check initialization order'),
             ));
           }
         },
