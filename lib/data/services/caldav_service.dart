@@ -396,6 +396,7 @@ class CalDAVService {
     <FLOWIT:template/>
     <FLOWIT:status/>
     <FLOWIT:categories/>
+    <FLOWIT:sharedWith/>
   </D:prop>
 </D:propfind>''';
 
@@ -519,6 +520,7 @@ class CalDAVService {
     <FLOWIT:status />
     <FLOWIT:kanban />
     <FLOWIT:categories />
+    <FLOWIT:sharedWith />
   </D:prop>
 </D:propfind>''';
 
@@ -542,6 +544,7 @@ class CalDAVService {
                 flowitStatus: responseData['flowit-status'],
                 flowitKanban: responseData['flowit-kanban'] ?? calendar.flowitKanban,
                 projectCategories: responseData['flowit-categories'] ?? calendar.projectCategories,
+                sharedWith: responseData['flowit-sharedWith'] ?? calendar.sharedWith,
                 lastSyncAt: DateTime.now(),
               );
               
@@ -855,6 +858,11 @@ class CalDAVService {
       xml.writeln('      <FLOWIT:categories><![CDATA[${calendar.projectCategories}]]></FLOWIT:categories>');
     }
     
+    // Set shared project members as JSON
+    if (calendar.sharedWith.isNotEmpty && calendar.sharedWith != '[]') {
+      xml.writeln('      <FLOWIT:sharedWith><![CDATA[${calendar.sharedWith}]]></FLOWIT:sharedWith>');
+    }
+    
     xml.writeln('    </D:prop>');
     xml.writeln('  </D:set>');
     
@@ -862,7 +870,8 @@ class CalDAVService {
     if ((calendar.flowitDomain == null || calendar.flowitDomain!.isEmpty) || 
         (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) ||
         (calendar.flowitKanban.isEmpty || calendar.flowitKanban == '[]') ||
-        (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]')) {
+        (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') ||
+        (calendar.sharedWith.isEmpty || calendar.sharedWith == '[]')) {
       xml.writeln('  <D:remove>');
       xml.writeln('    <D:prop>');
       
@@ -880,6 +889,10 @@ class CalDAVService {
       
       if (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') {
         xml.writeln('      <FLOWIT:categories/>');
+      }
+      
+      if (calendar.sharedWith.isEmpty || calendar.sharedWith == '[]') {
+        xml.writeln('      <FLOWIT:sharedWith/>');
       }
       
       xml.writeln('    </D:prop>');

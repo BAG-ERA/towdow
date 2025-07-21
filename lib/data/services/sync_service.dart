@@ -1100,6 +1100,31 @@ class SyncService {
     }
   }
 
+  /// Reset SyncService instance and clean up resources
+  /// Called when clearing all data to ensure clean state
+  static Future<void> reset() async {
+    AppLogger.info('SyncService: Resetting singleton instance and cleaning up resources');
+    
+    if (_instance != null) {
+      // Cancel any active timers
+      _instance!._periodicSyncTimer?.cancel();
+      _instance!._periodicSyncTimer = null;
+      
+      // Close stream controllers
+      await _instance!._statusController.close();
+      await _instance!._progressController.close();
+      
+      // Reset state
+      _instance!._status = SyncStatus.idle;
+      _instance!._lastSyncTime = null;
+    }
+    
+    // Clear singleton instance
+    _instance = null;
+    
+    AppLogger.info('SyncService: Reset complete');
+  }
+
   /// Helper to convert SyncQueueItem to Map for storage
   Map<String, dynamic> _mapFromSyncQueueItem(SyncQueueItem item) {
     return {

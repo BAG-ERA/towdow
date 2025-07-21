@@ -15,6 +15,7 @@ import 's3_debug_screen.dart';
 import 'shared_projects_test_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
+import '../../../data/services/sync_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -221,7 +222,10 @@ class SettingsScreen extends ConsumerWidget {
       final result = await storageService.clearAllData();
 
       result.when(
-        success: (_) {
+        success: (_) async {
+          // Reset SyncService singleton to clean up timers and streams
+          await SyncService.reset();
+          
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('✅ All data cleared successfully!')),
@@ -460,7 +464,10 @@ class SettingsScreen extends ConsumerWidget {
 
       if (context.mounted) {
         result.when(
-          success: (_) {
+          success: (_) async {
+            // Reset SyncService singleton to clean up timers and streams
+            await SyncService.reset();
+            
             // Invalidate all relevant providers to clear cached data
             ref.invalidate(taskListProvider);
             ref.invalidate(calendarListProvider);
@@ -479,7 +486,8 @@ class SettingsScreen extends ConsumerWidget {
             ref.invalidate(externalAccountRepositoryProvider);
             ref.invalidate(externalCalendarRepositoryProvider);
             ref.invalidate(externalEventRepositoryProvider);
-
+            ref.invalidate(syncServiceProvider);
+            
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('✅ All data cleared successfully!'),

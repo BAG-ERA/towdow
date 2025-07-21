@@ -465,6 +465,7 @@ abstract class WebDAVClient {
     <FLOWIT:asflow/>
     <FLOWIT:owner/>
     <FLOWIT:template/>
+    <FLOWIT:sharedWith/>
   </D:prop>
 </D:propfind>''';
 }

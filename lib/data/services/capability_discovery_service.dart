@@ -303,6 +303,7 @@ class CapabilityDiscoveryService {
     <FLOWIT:template/>
     <FLOWIT:status/>
     <FLOWIT:kanban/>
+    <FLOWIT:sharedWith/>
   </D:prop>
 </D:propfind>''';
 
@@ -435,6 +436,7 @@ class CapabilityDiscoveryService {
         final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
         final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
         final flowitKanban = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
+        final flowitSharedWith = _extractFlowItPropertyWithPrefixes(responseContent, 'sharedWith', globalFlowItPrefixes);
         AppLogger.debug('CapabilityDiscovery: Status extraction result: $flowitStatus');
         AppLogger.debug('CapabilityDiscovery: Kanban extraction result: $flowitKanban');
         
@@ -451,6 +453,7 @@ class CapabilityDiscoveryService {
             flowitTemplate: flowitTemplate,
             flowitStatus: flowitStatus,
             flowitKanban: flowitKanban,
+            sharedWith: flowitSharedWith,
           ));
         }
       }

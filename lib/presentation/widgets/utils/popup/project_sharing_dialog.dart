@@ -43,7 +43,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
     final sharingNotifier = ref.read(projectSharingViewModelProvider.notifier);
     
     return AlertDialog(
-      title: Text('Share "${widget.project.displayName}"'),
+      title: Text('Share ${widget.project.displayName}'),
       content: SizedBox(
         width: 500,
         height: 400,
@@ -52,7 +52,19 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: sharingState.hasUnsavedChanges && !sharingState.isSaving 
+              ? () => _saveChanges(sharingNotifier)
+              : null,
+          child: sharingState.isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
         ),
       ],
     );
@@ -154,7 +166,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
             const SizedBox(width: 8),
             ElevatedButton(
               onPressed: state.isSaving ? null : () => _addMember(notifier),
-              child: const Text('Add'),
+              child: const Text('Invite'),
             ),
           ],
         ),
@@ -196,7 +208,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
           const SizedBox(height: 16),
         ],
         
-        // Members list header with save/discard actions
+        // Members list header
         Row(
           children: [
             Text(
@@ -221,23 +233,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
               ),
             ],
             const Spacer(),
-            if (state.hasUnsavedChanges) ...[
-              TextButton(
-                onPressed: state.isSaving ? null : () => notifier.discardChanges(),
-                child: const Text('Discard'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: state.isSaving ? null : () => _saveChanges(notifier),
-                child: state.isSaving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Save'),
-              ),
-            ] else ...[
+            if (!state.hasUnsavedChanges) ...[
               TextButton.icon(
                 onPressed: state.isSaving ? null : () => notifier.refresh(),
                 icon: const Icon(Icons.refresh, size: 16),
@@ -271,34 +267,27 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                       ),
                       title: Text(
                         member.targetUserEmail,
-                        style: isNew ? TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.w500,
-                        ) : null,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isNew ? Theme.of(context).colorScheme.primary : null,
+                          fontWeight: isNew ? FontWeight.w500 : FontWeight.normal,
+                        ),
                       ),
-                      subtitle: Row(
-                        children: [
-                          Text('Access: ${member.projectRight}'),
-                          if (isNew) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'NEW',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                      subtitle: isNew ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'NEW',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ) : null,
                       trailing: IconButton(
                         icon: const Icon(Icons.remove_circle_outline),
                         onPressed: state.isSaving ? null : () => notifier.removeMemberFromEdit(member),

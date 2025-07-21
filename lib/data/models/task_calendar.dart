@@ -109,6 +109,7 @@ extension TaskCalendarFactory on TaskCalendar {
     String? flowitTemplate,
     String? flowitStatus,
     String? flowitKanban,
+    String? sharedWith,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -129,6 +130,7 @@ extension TaskCalendarFactory on TaskCalendar {
       flowitTemplate: flowitTemplate,
       flowitStatus: flowitStatus,
       flowitKanban: flowitKanban ?? '[]',
+      sharedWith: sharedWith ?? '[]',
     );
   }
 }

@@ -161,6 +161,7 @@ class XMLResponseParser {
         final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
         final flowitKanban = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
         final flowitCategories = _extractFlowItPropertyWithPrefixes(responseContent, 'categories', globalFlowItPrefixes);
+        final flowitSharedWith = _extractFlowItPropertyWithPrefixes(responseContent, 'sharedWith', globalFlowItPrefixes);
         
         if (isCalendar && supportsTodos) {
           AppLogger.debug('XMLResponseParser: Found VTODO calendar: $displayName at $href with domain: $domain, status: $flowitStatus');
@@ -175,6 +176,7 @@ class XMLResponseParser {
             flowitTemplate: flowitTemplate,
             flowitStatus: flowitStatus,
             flowitKanban: flowitKanban,
+            sharedWith: flowitSharedWith,
           );
           
           // Update project categories if found
@@ -382,6 +384,7 @@ class XMLResponseParser {
         responseData['flowit-asflow'] = _extractFlowItPropertyWithPrefixes(responseContent, 'asflow', globalFlowItPrefixes);
         responseData['flowit-owner'] = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
         responseData['flowit-template'] = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
+        responseData['flowit-sharedWith'] = _extractFlowItPropertyWithPrefixes(responseContent, 'sharedWith', globalFlowItPrefixes);
         
         responses.add(responseData);
       }
