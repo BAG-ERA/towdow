@@ -170,7 +170,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
       summary: 'Temporary Task',
       description: '',
       due: selectedDue,
-      categories: const [],
+      categoryIds: const [],
       projectPath: widget.projectPath,
     );
 

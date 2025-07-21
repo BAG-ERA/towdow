@@ -14,6 +14,7 @@ import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
+import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/services/local_storage_service.dart';
 import 'package:towdow_app/data/services/sync_service.dart';
 import 'package:towdow_app/presentation/viewmodels/task_viewmodel.dart';
@@ -24,6 +25,7 @@ import 'sync_delete_flow_test.mocks.dart';
   TaskRepository,
   AccountRepository,
   CalendarRepository,
+  CategoryRepository,
   LocalStorageService,
   SyncService,
 ])
@@ -34,18 +36,21 @@ void main() {
     late MockTaskRepository mockTaskRepository;
     late MockAccountRepository mockAccountRepository;
     late MockCalendarRepository mockCalendarRepository;
+    late MockCategoryRepository mockCategoryRepository;
     late MockLocalStorageService mockLocalStorage;
 
     setUp(() {
       mockTaskRepository = MockTaskRepository();
       mockAccountRepository = MockAccountRepository();
       mockCalendarRepository = MockCalendarRepository();
+      mockCategoryRepository = MockCategoryRepository();
       mockLocalStorage = MockLocalStorageService();
 
       syncService = SyncService(
         taskRepository: mockTaskRepository,
         accountRepository: mockAccountRepository,
         calendarRepository: mockCalendarRepository,
+        categoryRepository: mockCategoryRepository,
         localStorage: mockLocalStorage,
       );
       taskViewModel = TaskViewModel(mockTaskRepository, mockAccountRepository, syncService);
@@ -175,7 +180,7 @@ void main() {
       // Note: CalDAV service is created internally by SyncService
       // We can't easily mock it in this integration test
       
-      final syncResult = await syncService.syncNow();
+      final syncResult = await syncService.syncAllActiveCaldav();
       
       await syncResult.when(
         success: (result) {
@@ -196,7 +201,7 @@ void main() {
       // The important verification is that the delete operation was queued correctly.
       
       // Clean up timers to avoid test framework complaints
-      syncService.stopPeriodicSync();
+      // Note: SyncService doesn't have periodic sync methods - CalDAVMonitor handles this
       
       AppLogger.debug('✅ DIAGNOSIS: Complete delete + sync flow test completed');
     });
@@ -217,7 +222,7 @@ void main() {
       when(mockAccountRepository.getActiveAccount())
           .thenAnswer((_) async => const Result.success(null));
       
-      final syncResult = await syncService.syncNow();
+      final syncResult = await syncService.syncAllActiveCaldav();
       
       await syncResult.when(
         success: (_) {
@@ -252,18 +257,10 @@ void main() {
       final initResult = await syncService.initialize();
       expect(initResult, isA<Success<void>>());
       
-      // Start periodic sync
-      syncService.startPeriodicSync();
+      // Note: SyncService doesn't have periodic sync methods - CalDAVMonitor handles this
+      // The test was trying to test periodic sync functionality that doesn't exist in SyncService
       
-      // Wait a bit longer to let timer start and sync service settle
-      await Future.delayed(const Duration(milliseconds: 200));
-      
-      // Check if timer is running (this might fail if sync service has issues)
-      final isRunning = syncService.isBackgroundSyncRunning;
-      AppLogger.debug('🔍 DIAGNOSIS: Background sync running: $isRunning');
-      
-      // Stop periodic sync regardless
-      syncService.stopPeriodicSync();
+      AppLogger.debug('🔍 DIAGNOSIS: Background sync not available in SyncService');
       
       // Wait a bit for cleanup
       await Future.delayed(const Duration(milliseconds: 50));

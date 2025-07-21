@@ -124,6 +124,10 @@ void main() {
         uid: anyNamed('uid'),
       )).thenAnswer((_) async => Result.failure(const Failure(message: 'Calendar creation failed')));
 
+      // Add stub for generateCalendarPath which is called when server creation fails
+      when(mockCalDAVService.generateCalendarPath())
+          .thenAnswer((_) async => Result.success('/test/calendar/'));
+
       // Add stub for calendarRepository.save to prevent MissingStubError
       when(mockCalendarRepository.save(any))
           .thenAnswer((_) async => Result.failure(const Failure(message: 'Calendar save failed')));

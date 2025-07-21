@@ -18,6 +18,18 @@ class XMLResponseParser {
     }
   }
 
+  /// Extract ETag from PROPFIND response
+  static String? extractETag(String xmlResponse) {
+    try {
+      final document = XmlDocument.parse(xmlResponse);
+      final etagElement = document.findAllElements('getetag').firstOrNull;
+      return etagElement?.innerText;
+    } catch (e) {
+      AppLogger.error('XMLResponseParser: Failed to parse ETag from PROPFIND response', e, StackTrace.current);
+      return null;
+    }
+  }
+
   /// Parse current-user-principal from PROPFIND response
   static String? extractCurrentUserPrincipal(String xmlResponse) {
     try {
@@ -147,10 +159,12 @@ class XMLResponseParser {
         final flowitOwner = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
         final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
         final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
+        final flowitKanban = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
+        final flowitCategories = _extractFlowItPropertyWithPrefixes(responseContent, 'categories', globalFlowItPrefixes);
         
         if (isCalendar && supportsTodos) {
           AppLogger.debug('XMLResponseParser: Found VTODO calendar: $displayName at $href with domain: $domain, status: $flowitStatus');
-          calendars.add(TaskCalendarFactory.fromCalDAVDiscovery(
+          final calendar = TaskCalendarFactory.fromCalDAVDiscovery(
             path: href,
             displayName: displayName,
             description: description ?? (supportsTodos ? 'Supports tasks (VTODO)' : 'Calendar collection'),
@@ -160,7 +174,15 @@ class XMLResponseParser {
             flowitOwner: flowitOwner,
             flowitTemplate: flowitTemplate,
             flowitStatus: flowitStatus,
-          ));
+            flowitKanban: flowitKanban,
+          );
+          
+          // Update project categories if found
+          if (flowitCategories != null && flowitCategories.isNotEmpty) {
+            calendars.add(calendar.copyWith(projectCategories: flowitCategories));
+          } else {
+            calendars.add(calendar);
+          }
         }
       }
       
@@ -314,6 +336,13 @@ class XMLResponseParser {
           responseData['getetag'] = etagMatch.group(1)!.trim();
         }
         
+        // Extract sync-token
+        final syncTokenPattern = RegExp(r'<(?:d:)?sync-token[^>]*>(.*?)</(?:d:)?sync-token>', dotAll: true, caseSensitive: false);
+        final syncTokenMatch = syncTokenPattern.firstMatch(responseContent);
+        if (syncTokenMatch != null) {
+          responseData['sync-token'] = syncTokenMatch.group(1)!.trim();
+        }
+        
         // Extract ctag
         final ctagPattern = RegExp(r'<(?:CS:)?getctag[^>]*>(.*?)</(?:CS:)?getctag>', dotAll: true, caseSensitive: false);
         final ctagMatch = ctagPattern.firstMatch(responseContent);
@@ -342,6 +371,17 @@ class XMLResponseParser {
           // Store the parsed component names as a comma-separated string for backward compatibility
           responseData['supported-calendar-component-set'] = compNames.join(',');
         }
+        
+        // Extract FlowIt properties
+        final globalFlowItPrefixes = _findFlowItNamespacePrefixes(xmlResponse);
+        responseData['flowit-domain'] = _extractFlowItPropertyWithPrefixes(responseContent, 'domain', globalFlowItPrefixes);
+        responseData['flowit-status'] = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
+        responseData['flowit-kanban'] = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
+        responseData['flowit-categories'] = _extractFlowItPropertyWithPrefixes(responseContent, 'categories', globalFlowItPrefixes);
+        responseData['flowit-type'] = _extractFlowItPropertyWithPrefixes(responseContent, 'type', globalFlowItPrefixes);
+        responseData['flowit-asflow'] = _extractFlowItPropertyWithPrefixes(responseContent, 'asflow', globalFlowItPrefixes);
+        responseData['flowit-owner'] = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
+        responseData['flowit-template'] = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
         
         responses.add(responseData);
       }

@@ -11,6 +11,7 @@ import '../models/task_calendar.dart';
 import '../repositories/task_repository.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/calendar_repository.dart';
+import '../repositories/category_repository.dart';
 import 'caldav_service.dart';
 import 'local_storage_service.dart';
 import 'webdav_client.dart';
@@ -81,6 +82,7 @@ class SyncService {
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
+  final CategoryRepository _categoryRepository;
   final LocalStorageService _localStorage;
 
   // Sync state
@@ -99,10 +101,12 @@ class SyncService {
     required TaskRepository taskRepository,
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
+    required CategoryRepository categoryRepository,
     required LocalStorageService localStorage,
   })  : _taskRepository = taskRepository,
         _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
+        _categoryRepository = categoryRepository,
         _localStorage = localStorage;
 
   // Public streams
@@ -125,8 +129,8 @@ class SyncService {
       await accountResult.when(
         success: (account) async {
           if (account != null) {
-            // Perform initial sync
-            await syncNow();
+                    // Perform initial sync
+        await syncAllActiveCaldav();
           }
         },
         failure: (failure) async {
@@ -146,26 +150,8 @@ class SyncService {
     }
   }
 
-  /// Start periodic background sync (deprecated - use BackgroundSyncService instead)
-  @Deprecated('Use BackgroundSyncService for periodic sync')
-  void startPeriodicSync() {
-    _periodicSyncTimer?.cancel();
-    _periodicSyncTimer = Timer.periodic(syncInterval, (_) {
-      syncNow();
-    });
-    // AppLogger.info('SyncService: Started periodic sync (every ${syncInterval.inSeconds} seconds)');
-  }
-
-  /// Stop periodic background sync (deprecated - use BackgroundSyncService instead)
-  @Deprecated('Use BackgroundSyncService for periodic sync')
-  void stopPeriodicSync() {
-    _periodicSyncTimer?.cancel();
-    _periodicSyncTimer = null;
-    // AppLogger.info('SyncService: Stopped periodic sync');
-  }
-
   /// Perform immediate sync with CalDAV server
-  Future<Result<SyncResult>> syncNow() async {
+  Future<Result<SyncResult>> syncAllActiveCaldav() async {
     if (_status == SyncStatus.syncing) {
       // AppLogger.debug('SyncService: Sync already in progress, skipping');
       return Result.failure(Failure(
@@ -272,66 +258,12 @@ class SyncService {
         for (final calendar in selectedCalendars) {
           //AppLogger.debug('🔄 SyncService: Processing calendar ${calendar.path}');
           
-          // Étape 1: Obtenir le sync-token actuel du serveur
-          final serverSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
-          
-          await serverSyncTokenResult.when(
-            success: (serverSyncToken) async {
-              final localSyncToken = calendar.syncToken;
-              
-              //AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: $localSyncToken, Server: $serverSyncToken');
-              
-              
-              if (localSyncToken != serverSyncToken) {
-                //AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing from server');
-                await _syncFromServer(caldavService, calendar, serverSyncToken, errors);
-                syncedItems++;
-              }
-              
-              // TEST 2: queue non vide → pousser modifications vers serveur
-              final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
-              if (hasQueuedOperations) {
-                //AppLogger.debug('🔄 SyncService: Queue has operations - pushing to server');
-                await _processSyncQueueForCalendar(caldavService, calendar.path, errors);
-                
-                // Récupérer le nouveau sync-token après push
-                final newServerSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
-                await newServerSyncTokenResult.when(
-                  success: (newServerSyncToken) async {
-                    if (newServerSyncToken != serverSyncToken) {
-                      //AppLogger.debug('🔄 SyncService: Server sync-token updated after push: $newServerSyncToken');
-                      // Mettre à jour le calendrier avec le nouveau token
-                      final updatedCalendar = calendar.copyWith(
-                        syncToken: newServerSyncToken,
-                        lastSyncAt: DateTime.now(),
-                      );
-                      await _calendarRepository.save(updatedCalendar);
-                    }
-                  },
-                  failure: (failure) async {
-                    AppLogger.warning('🔄 SyncService: Could not get updated sync token after push: ${failure.message}');
-                  },
-                );
-                syncedItems++;
-              }
-              
-              // Si aucun des deux tests n'est vrai, rien à faire
-              if (localSyncToken == serverSyncToken && !hasQueuedOperations) {
-                //AppLogger.debug('🔄 SyncService: No changes needed for ${calendar.path}');
-              }
-            },
-            failure: (failure) async {
-              AppLogger.warning('🔄 SyncService: Could not get server sync token for ${calendar.path}: ${failure.message}');
-              // Fallback: traiter la queue si elle existe
-              final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
-              if (hasQueuedOperations) {
-                //AppLogger.debug('🔄 SyncService: Fallback - processing queue without sync token verification');
-                await _processSyncQueueForCalendar(caldavService, calendar.path, errors);
-              }
-              errors.add('Could not verify sync state for ${calendar.path}: ${failure.message}');
-              failedItems++;
-            },
-          );
+          final calendarResult = await _syncCalendar(caldavService, calendar, errors);
+          if (calendarResult) {
+            syncedItems++;
+          } else {
+            failedItems++;
+          }
           
           _progressController.add(0.2 + (0.6 * (selectedCalendars.indexOf(calendar) + 1) / selectedCalendars.length));
         }
@@ -362,6 +294,78 @@ class SyncService {
         stackTrace: stackTrace,
       ));
     }
+  }
+
+  /// Sync a single calendar with the server
+  /// Returns true if sync was successful, false if it failed
+  Future<bool> _syncCalendar(CalDAVService caldavService, TaskCalendar calendar, List<String> errors) async {
+    // Étape 1: Obtenir le sync-token actuel du serveur
+    final serverSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
+    
+    return await serverSyncTokenResult.when(
+      success: (serverSyncToken) async {
+        final localSyncToken = calendar.syncToken;
+        
+        //AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: $localSyncToken, Server: $serverSyncToken');
+        
+        if (localSyncToken != serverSyncToken) {
+          //AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing from server');
+          await _syncFromServer(caldavService, calendar, serverSyncToken, errors);
+          return true;
+        }
+        
+        // TEST 2: queue non vide → pousser modifications vers serveur
+        final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
+        if (hasQueuedOperations) {
+          //AppLogger.debug('🔄 SyncService: Queue has operations - pushing to server');
+          await _processSyncQueueForCalendar(caldavService, calendar.path, errors);
+          
+          // Récupérer le nouveau sync-token après push
+          final newServerSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
+          await newServerSyncTokenResult.when(
+            success: (newServerSyncToken) async {
+              if (newServerSyncToken != serverSyncToken) {
+                //AppLogger.debug('🔄 SyncService: Server sync-token updated after push: $newServerSyncToken');
+                // Mettre à jour le calendrier avec le nouveau token
+                final updatedCalendar = calendar.copyWith(
+                  syncToken: newServerSyncToken,
+                  lastSyncAt: DateTime.now(),
+                );
+                await _calendarRepository.save(updatedCalendar);
+              }
+            },
+            failure: (failure) async {
+              AppLogger.warning('🔄 SyncService: Could not get updated sync token after push: ${failure.message}');
+            },
+          );
+          return true;
+        }
+        
+        // Si aucun des deux tests n'est vrai, rien à faire
+        if (localSyncToken == serverSyncToken && !hasQueuedOperations) {
+          //AppLogger.debug('🔄 SyncService: No changes needed for ${calendar.path}');
+        }
+        
+        return true;
+      },
+      failure: (failure) async {
+        AppLogger.warning('🔄 SyncService: Could not get server sync token for ${calendar.path}: ${failure.message}');
+        // Fallback: traiter la queue si elle existe
+        final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
+        if (hasQueuedOperations) {
+          //AppLogger.debug('🔄 SyncService: Fallback - processing queue without sync token verification');
+          await _processSyncQueueForCalendar(caldavService, calendar.path, errors);
+        }
+        errors.add('Could not verify sync state for ${calendar.path}: ${failure.message}');
+        return false;
+      },
+    );
+  }
+
+  /// Public method to sync a single calendar (for use by monitor/services)
+  Future<bool> syncCalendar(CaldavAccount account, TaskCalendar calendar, List<String> errors) async {
+    final caldavService = CalDAVService(account: account);
+    return _syncCalendar(caldavService, calendar, errors);
   }
 
   /// Process a single sync queue item
@@ -558,7 +562,7 @@ class SyncService {
     // Use Future.microtask to avoid blocking the current operation
     Future.microtask(() async {
       try {
-        final result = await syncNow();
+        final result = await syncAllActiveCaldav();
         result.when(
           success: (syncResult) {
             // Sync completed successfully
@@ -618,33 +622,17 @@ class SyncService {
   /// Get current sync token from server for a calendar
   Future<Result<String>> _getServerSyncToken(CalDAVService caldavService, TaskCalendar calendar) async {
     try {
-      // Use WebDAVClient to get sync token
-      final webdavClient = WebDAVClient.fromAccount(caldavService.account);
-      
-      final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
-<D:propfind xmlns:D="DAV:">
-  <D:prop>
-    <D:sync-token />
-  </D:prop>
-</D:propfind>''';
-
-      final result = await webdavClient.propfind(calendar.path, body: propfindBody, depth: 0);
-      return await result.when(
-        success: (response) async {
-          if (response.statusCode == 207) {
-            final syncToken = XMLResponseParser.extractSyncToken(response.body);
-            if (syncToken != null) {
-              return Result.success(syncToken);
-            } else {
-              return Result.failure(Failure(
-                message: 'No sync token found in response',
-                exception: Exception('Missing sync token'),
-              ));
-            }
+      // Use CalDAVService to get both sync token and ETag
+      final propertiesResult = await caldavService.getCalendarProperties(calendar);
+      return await propertiesResult.when(
+        success: (updatedCalendar) async {
+          final syncToken = updatedCalendar.syncToken;
+          if (syncToken != null) {
+            return Result.success(syncToken);
           } else {
             return Result.failure(Failure(
-              message: 'PROPFIND failed with status ${response.statusCode}',
-              exception: Exception('HTTP ${response.statusCode}'),
+              message: 'No sync token found in response',
+              exception: Exception('Missing sync token'),
             ));
           }
         },
@@ -664,7 +652,7 @@ class SyncService {
     try {
       //AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
       
-      // Use BackgroundSyncService logic for incremental sync
+      // Use CalDAVMonitor logic for incremental sync
       final webdavClient = WebDAVClient.fromAccount(caldavService.account);
       
       // Check if calendar exists on server before attempting sync
@@ -734,6 +722,9 @@ class SyncService {
         lastSyncAt: DateTime.now(),
       );
       await _calendarRepository.save(updatedCalendar);
+      
+      // Load categories from the updated calendar data
+      await _categoryRepository.loadCategoriesFromCalendar(updatedCalendar);
       
     } catch (e, stackTrace) {
       AppLogger.error('SyncService: Failed to sync from server for ${calendar.path}', e, stackTrace);
@@ -1283,7 +1274,7 @@ class SyncService {
 
   /// Dispose resources
   void dispose() {
-    // Note: No periodic sync to stop - BackgroundSyncService handles this
+    // Note: No periodic sync to stop - CalDAVMonitor handles this
     _statusController.close();
     _progressController.close();
     // AppLogger.info('SyncService: Disposed');

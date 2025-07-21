@@ -42,7 +42,7 @@ class AddTaskCommand extends ParameterizedCommand<Task, AddTaskParams> {
       summary: params.summary,
       description: params.description ?? '',
       due: params.due,
-      categories: params.categories,
+      categoryIds: params.categories,
       projectPath: params.projectPath,
       organizer: organizer,
     );
