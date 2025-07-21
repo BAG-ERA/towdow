@@ -152,19 +152,41 @@ class _SharedProjectsTestScreenState extends ConsumerState<SharedProjectsTestScr
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              DropdownButton<String>(
-                                hint: const Text('Choose a project'),
-                                isExpanded: true,
+                              DropdownButtonFormField<TaskCalendar>(
+                                value: null, // Always start with null to avoid conflicts
+                                decoration: const InputDecoration(
+                                  labelText: 'Select Project',
+                                  border: OutlineInputBorder(),
+                                ),
+                                hint: const Text('Choose a project to test sharing'),
                                 items: projects.map((project) {
-                                  final uuid = _extractProjectPathFromCalendarPath(project.path);
-                                  return DropdownMenuItem<String>(
-                                    value: uuid,
-                                    child: Text('${project.displayName} ($uuid)'),
+                                  final projectPath = _extractProjectPathFromCalendarPath(project.path);
+                                  return DropdownMenuItem<TaskCalendar>(
+                                    value: project,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          project.displayName,
+                                          style: const TextStyle(fontWeight: FontWeight.w500),
+                                        ),
+                                        Text(
+                                          'Path: $projectPath',
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   );
                                 }).toList(),
-                                onChanged: (uuid) {
-                                  if (uuid != null) {
-                                    _projectPathController.text = uuid;
+                                onChanged: (project) {
+                                  if (project != null) {
+                                    final projectPath = _extractProjectPathFromCalendarPath(project.path);
+                                    setState(() {
+                                      _projectPathController.text = projectPath;
+                                    });
                                   }
                                 },
                               ),
@@ -201,9 +223,10 @@ class _SharedProjectsTestScreenState extends ConsumerState<SharedProjectsTestScr
                   TextField(
                     controller: _emailController,
                     decoration: const InputDecoration(
-                      labelText: 'Target User Email',
-                      hintText: 'e.g., user@example.com',
+                      labelText: 'Target User Email(s)',
+                      hintText: 'e.g., user@example.com or user1@example.com, user2@example.com',
                       border: OutlineInputBorder(),
+                      helperText: 'For "Set Members": use comma-separated list of emails',
                     ),
                     keyboardType: TextInputType.emailAddress,
                   ),
@@ -233,6 +256,13 @@ class _SharedProjectsTestScreenState extends ConsumerState<SharedProjectsTestScr
                     onPressed: _isLoading ? null : _testAddMember,
                     icon: const Icon(Icons.person_add),
                     label: const Text('Add Project Member'),
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _testSetMembers,
+                    icon: const Icon(Icons.group_add),
+                    label: const Text('Set Project Members'),
                   ),
                   
                   const SizedBox(height: 8),
@@ -427,6 +457,50 @@ class _SharedProjectsTestScreenState extends ConsumerState<SharedProjectsTestScr
     }
   }
 
+  Future<void> _testSetMembers() async {
+    if (_sharingService == null) return;
+    
+    final projectPath = _projectPathController.text.trim();
+    final email = _emailController.text.trim();
+    
+    if (projectPath.isEmpty || email.isEmpty) {
+      setState(() {
+        _result = 'Error: Project path and email are required';
+      });
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+      _result = '';
+    });
+    
+    try {
+      // Parse email list (comma-separated)
+      final emails = email.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      
+      final result = await _sharingService!.setProjectMembers(
+        projectPath: projectPath,
+        memberEmails: emails,
+      );
+      
+      setState(() {
+        _result = result.when(
+          success: (_) => 'Success: Set ${emails.length} members for project',
+          failure: (failure) => 'Error: ${failure.message}',
+        );
+      });
+    } catch (e) {
+      setState(() {
+        _result = 'Exception: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _testGetSharedWithMe() async {
     if (_sharingService == null) return;
     
@@ -543,17 +617,9 @@ class _SharedProjectsTestScreenState extends ConsumerState<SharedProjectsTestScr
 
   /// Extract project path (UUID) from calendar path
   String _extractProjectPathFromCalendarPath(String calendarPath) {
-    // Calendar paths typically look like: /calendars/username/uuid/
-    // Extract the UUID part
+    // Calendar paths typically look like: /calendars/username/uuid/ or /user-uuid/project-uuid/
+    // Extract the UUID part - we want the last UUID in the path
     final segments = calendarPath.split('/').where((s) => s.isNotEmpty).toList();
-    
-    // Look for a UUID pattern (8-4-4-4-12 format)
-    for (final segment in segments) {
-      if (RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(segment)) {
-        return segment;
-      }
-    }
-    
-    return '';
+    return segments.isNotEmpty ? segments.last : '';
   }
 } 

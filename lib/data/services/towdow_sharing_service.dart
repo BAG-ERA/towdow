@@ -59,7 +59,7 @@ class TowDowSharingService {
     _baseUrl = '${serverUri.scheme}://${serverUri.host}${serverUri.hasPort ? ':${serverUri.port}' : ''}';
   }
 
-  /// Add a project member (PUT /share/{project_path})
+  /// Add a project member (POST /share/{project_path})
   Future<Result<void>> addProjectMember({
     required String projectPath,
     required String targetUserEmail,
@@ -74,18 +74,12 @@ class TowDowSharingService {
       headers['Content-Type'] = 'application/json';
       
       final requestBody = {
-        'projectPath': projectPath,
+        'targetUserEmail': targetUserEmail,
         'allTasks': allTasks,
         'projectRight': projectRight,
-        'targetUserEmail': targetUserEmail,
       };
       
-      // Debug logging
-      AppLogger.info('TowDowSharingService: Request URL: $url');
-      AppLogger.info('TowDowSharingService: Request body: ${jsonEncode(requestBody)}');
-      AppLogger.info('TowDowSharingService: Request headers: $headers');
-      
-      final response = await http.put(
+      final response = await http.post(
         url,
         headers: headers,
         body: jsonEncode(requestBody),
@@ -114,21 +108,20 @@ class TowDowSharingService {
   /// Set project member list (PUT /share/{project_path})
   Future<Result<void>> setProjectMembers({
     required String projectPath,
-    required List<SharedProjectMember> members,
+    required List<String> memberEmails,
   }) async {
     try {
-      AppLogger.info('TowDowSharingService: Setting ${members.length} members for project $projectPath');
+      AppLogger.info('TowDowSharingService: Setting ${memberEmails.length} members for project $projectPath');
       
       final url = Uri.parse('$_baseUrl/share/${Uri.encodeComponent(projectPath)}');
       final headers = await _client.getAuthHeaders();
       headers['Content-Type'] = 'application/json';
       
-      final requestBody = members.map((m) => m.toJson()).toList();
-      
+      // Send list of email addresses
       final response = await http.put(
         url,
         headers: headers,
-        body: jsonEncode(requestBody),
+        body: jsonEncode(memberEmails),
       );
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
