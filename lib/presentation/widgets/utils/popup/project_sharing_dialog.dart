@@ -108,13 +108,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
             const SizedBox(width: 8),
             ElevatedButton(
               onPressed: state.isSaving ? null : () => _addMember(notifier),
-              child: state.isSaving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Add'),
+              child: const Text('Add'),
             ),
           ],
         ),
@@ -156,27 +150,61 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
           const SizedBox(height: 16),
         ],
         
-        // Members list header
+        // Members list header with save/discard actions
         Row(
           children: [
-            const Text(
-              'Current members:',
-              style: TextStyle(fontWeight: FontWeight.w500),
+            Text(
+              'Members (${state.editedMembers.length}):',
+              style: const TextStyle(fontWeight: FontWeight.w500),
             ),
+            if (state.hasUnsavedChanges) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Unsaved',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+            ],
             const Spacer(),
-            if (state.members.isNotEmpty)
+            if (state.hasUnsavedChanges) ...[
+              TextButton(
+                onPressed: state.isSaving ? null : () => notifier.discardChanges(),
+                child: const Text('Discard'),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: state.isSaving ? null : () => _saveChanges(notifier),
+                child: state.isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Save'),
+              ),
+            ] else ...[
               TextButton.icon(
                 onPressed: state.isSaving ? null : () => notifier.refresh(),
                 icon: const Icon(Icons.refresh, size: 16),
                 label: const Text('Refresh'),
               ),
+            ],
           ],
         ),
         const SizedBox(height: 8),
         
-        // Members list
+        // Members list (showing edited members)
         Expanded(
-          child: state.members.isEmpty
+          child: state.editedMembers.isEmpty
               ? const Center(
                   child: Text(
                     'No members yet.\nAdd an email address above to share this project.',
@@ -185,17 +213,50 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                   ),
                 )
               : ListView.builder(
-                  itemCount: state.members.length,
+                  itemCount: state.editedMembers.length,
                   itemBuilder: (context, index) {
-                    final member = state.members[index];
+                    final member = state.editedMembers[index];
+                    final isNew = !state.members.any((m) => m.targetUserEmail == member.targetUserEmail);
+                    
                     return ListTile(
-                      leading: const Icon(Icons.person),
-                      title: Text(member.targetUserEmail),
-                      subtitle: Text('Access: ${member.projectRight}'),
+                      leading: Icon(
+                        Icons.person,
+                        color: isNew ? Theme.of(context).colorScheme.primary : null,
+                      ),
+                      title: Text(
+                        member.targetUserEmail,
+                        style: isNew ? TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ) : null,
+                      ),
+                      subtitle: Row(
+                        children: [
+                          Text('Access: ${member.projectRight}'),
+                          if (isNew) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'NEW',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                       trailing: IconButton(
                         icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: state.isSaving ? null : () => _removeMember(notifier, member),
-                        tooltip: 'Remove access',
+                        onPressed: state.isSaving ? null : () => notifier.removeMemberFromEdit(member),
+                        tooltip: 'Remove from list',
                       ),
                     );
                   },
@@ -205,53 +266,26 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
     );
   }
 
-  void _addMember(ProjectSharingViewModel notifier) async {
+  void _addMember(ProjectSharingViewModel notifier) {
     final email = _emailController.text.trim();
     
-    await notifier.addMember(email);
+    notifier.addMemberToEdit(email);
     
-    // Clear the text field on successful addition
+    // Clear the text field if no error
     final state = ref.read(projectSharingViewModelProvider);
-    if (!state.isSaving && state.error == null) {
+    if (state.error == null) {
       _emailController.clear();
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully shared project with $email')),
-        );
-      }
     }
   }
 
-  void _removeMember(ProjectSharingViewModel notifier, member) async {
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Access'),
-        content: Text('Remove ${member.targetUserEmail} from this project?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    await notifier.removeMember(member);
+  void _saveChanges(ProjectSharingViewModel notifier) async {
+    await notifier.saveChanges();
     
-    // Show success message
+    // Show success message if no error
     final state = ref.read(projectSharingViewModelProvider);
-    if (!state.isSaving && state.error == null && mounted) {
+    if (state.error == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Removed ${member.targetUserEmail} from project')),
+        const SnackBar(content: Text('Project sharing updated successfully')),
       );
     }
   }

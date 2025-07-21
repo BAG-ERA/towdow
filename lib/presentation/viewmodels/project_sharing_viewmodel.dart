@@ -3,7 +3,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task_calendar.dart';
-import '../../data/models/caldav_account.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/services/towdow_sharing_service.dart';
 import '../../core/logger.dart';
@@ -15,8 +14,10 @@ class ProjectSharingState {
   final String? error;
   final TaskCalendar? currentProject;
   final List<SharedProjectMember> members;
+  final List<SharedProjectMember> editedMembers; // Local editing list
   final bool supportsSharing;
   final String? currentUserEmail;
+  final bool hasUnsavedChanges;
 
   const ProjectSharingState({
     this.isLoading = false,
@@ -24,8 +25,10 @@ class ProjectSharingState {
     this.error,
     this.currentProject,
     this.members = const [],
+    this.editedMembers = const [],
     this.supportsSharing = false,
     this.currentUserEmail,
+    this.hasUnsavedChanges = false,
   });
 
   ProjectSharingState copyWith({
@@ -34,8 +37,10 @@ class ProjectSharingState {
     String? error,
     TaskCalendar? currentProject,
     List<SharedProjectMember>? members,
+    List<SharedProjectMember>? editedMembers,
     bool? supportsSharing,
     String? currentUserEmail,
+    bool? hasUnsavedChanges,
   }) {
     return ProjectSharingState(
       isLoading: isLoading ?? this.isLoading,
@@ -43,8 +48,10 @@ class ProjectSharingState {
       error: error,
       currentProject: currentProject ?? this.currentProject,
       members: members ?? this.members,
+      editedMembers: editedMembers ?? this.editedMembers,
       supportsSharing: supportsSharing ?? this.supportsSharing,
       currentUserEmail: currentUserEmail ?? this.currentUserEmail,
+      hasUnsavedChanges: hasUnsavedChanges ?? this.hasUnsavedChanges,
     );
   }
 
@@ -60,6 +67,9 @@ class ProjectSharingState {
     final segments = currentProject!.path.split('/').where((s) => s.isNotEmpty).toList();
     return segments.isNotEmpty ? segments.last : '';
   }
+
+  /// Get list of emails from edited members for UI display
+  List<String> get editedMemberEmails => editedMembers.map((m) => m.targetUserEmail).toList();
 }
 
 // Project Sharing ViewModel
@@ -151,6 +161,8 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
           state = state.copyWith(
             isLoading: false,
             members: members,
+            editedMembers: List.from(members), // Initialize edited list with current members
+            hasUnsavedChanges: false,
           );
         },
         failure: (failure) {
@@ -174,95 +186,124 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
     }
   }
 
-  /// Add a member to the project
-  Future<void> addMember(String email) async {
-    if (_sharingService == null || state.projectPath.isEmpty) {
-      state = state.copyWith(error: 'Cannot add member: sharing not available');
-      return;
-    }
-
+  /// Add a member to the local edited list (does not save immediately)
+  void addMemberToEdit(String email) {
     if (email.trim().isEmpty || !email.contains('@')) {
       state = state.copyWith(error: 'Please enter a valid email address');
       return;
     }
 
-    AppLogger.debug('ProjectSharingViewModel: Adding member $email to project ${state.projectPath}');
+    final trimmedEmail = email.trim();
+    
+    // Check if member already exists
+    if (state.editedMembers.any((m) => m.targetUserEmail == trimmedEmail)) {
+      state = state.copyWith(error: 'Member $trimmedEmail is already in the list');
+      return;
+    }
+
+    AppLogger.debug('ProjectSharingViewModel: Adding member $trimmedEmail to edit list');
+    
+    // Create new member (we'll use current user as source for consistency)
+    final newMember = SharedProjectMember(
+      projectPath: state.projectPath,
+      allTasks: true,
+      projectRight: 'W', // Default write access
+      sourceUserEmail: state.currentUserEmail ?? '',
+      targetUserEmail: trimmedEmail,
+    );
+
+    final updatedEditedMembers = [...state.editedMembers, newMember];
+    
+    state = state.copyWith(
+      editedMembers: updatedEditedMembers,
+      hasUnsavedChanges: !_listsEqual(state.members, updatedEditedMembers),
+      error: null,
+    );
+  }
+
+  /// Remove a member from the local edited list (does not save immediately)
+  void removeMemberFromEdit(SharedProjectMember member) {
+    AppLogger.debug('ProjectSharingViewModel: Removing member ${member.targetUserEmail} from edit list');
+    
+    final updatedEditedMembers = state.editedMembers.where((m) => m.targetUserEmail != member.targetUserEmail).toList();
+    
+    state = state.copyWith(
+      editedMembers: updatedEditedMembers,
+      hasUnsavedChanges: !_listsEqual(state.members, updatedEditedMembers),
+      error: null,
+    );
+  }
+
+  /// Save all changes to the server using setProjectMembers
+  Future<void> saveChanges() async {
+    if (_sharingService == null || state.projectPath.isEmpty) {
+      state = state.copyWith(error: 'Cannot save: sharing not available');
+      return;
+    }
+
+    if (!state.hasUnsavedChanges) {
+      AppLogger.debug('ProjectSharingViewModel: No changes to save');
+      return;
+    }
+
+    AppLogger.debug('ProjectSharingViewModel: Saving ${state.editedMembers.length} members to project ${state.projectPath}');
     
     state = state.copyWith(isSaving: true, error: null);
 
     try {
-      final result = await _sharingService!.addProjectMember(
+      // Get list of target emails for the API
+      final memberEmails = state.editedMembers.map((m) => m.targetUserEmail).toList();
+      
+      final result = await _sharingService!.setProjectMembers(
         projectPath: state.projectPath,
-        targetUserEmail: email.trim(),
+        memberEmails: memberEmails,
       );
 
       await result.when(
         success: (_) async {
-          AppLogger.debug('ProjectSharingViewModel: Successfully added member $email');
+          AppLogger.debug('ProjectSharingViewModel: Successfully saved member changes');
           
-          // Reload members to get updated list
+          // Reload from server to get the latest state
           await _loadProjectMembers();
           
           state = state.copyWith(isSaving: false);
         },
         failure: (failure) async {
-          AppLogger.error('ProjectSharingViewModel: Failed to add member: ${failure.message}');
+          AppLogger.error('ProjectSharingViewModel: Failed to save changes: ${failure.message}');
           state = state.copyWith(
             isSaving: false,
-            error: 'Failed to add member: ${failure.message}',
+            error: 'Failed to save changes: ${failure.message}',
           );
         },
       );
     } catch (e, stackTrace) {
-      AppLogger.error('ProjectSharingViewModel: Exception adding member', e, stackTrace);
+      AppLogger.error('ProjectSharingViewModel: Exception saving changes', e, stackTrace);
       state = state.copyWith(
         isSaving: false,
-        error: 'Error adding member: $e',
+        error: 'Error saving changes: $e',
       );
     }
   }
 
-  /// Remove a member from the project
-  Future<void> removeMember(SharedProjectMember member) async {
-    if (_sharingService == null || state.projectPath.isEmpty) {
-      state = state.copyWith(error: 'Cannot remove member: sharing not available');
-      return;
-    }
-
-    AppLogger.debug('ProjectSharingViewModel: Removing member ${member.targetUserEmail} from project ${state.projectPath}');
+  /// Discard local changes and revert to server state
+  void discardChanges() {
+    AppLogger.debug('ProjectSharingViewModel: Discarding local changes');
     
-    state = state.copyWith(isSaving: true, error: null);
+    state = state.copyWith(
+      editedMembers: List.from(state.members),
+      hasUnsavedChanges: false,
+      error: null,
+    );
+  }
 
-    try {
-      final result = await _sharingService!.removeProjectMember(
-        projectPath: state.projectPath,
-        targetUserEmail: member.targetUserEmail,
-      );
-
-      await result.when(
-        success: (_) async {
-          AppLogger.debug('ProjectSharingViewModel: Successfully removed member ${member.targetUserEmail}');
-          
-          // Reload members to get updated list
-          await _loadProjectMembers();
-          
-          state = state.copyWith(isSaving: false);
-        },
-        failure: (failure) async {
-          AppLogger.error('ProjectSharingViewModel: Failed to remove member: ${failure.message}');
-          state = state.copyWith(
-            isSaving: false,
-            error: 'Failed to remove member: ${failure.message}',
-          );
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('ProjectSharingViewModel: Exception removing member', e, stackTrace);
-      state = state.copyWith(
-        isSaving: false,
-        error: 'Error removing member: $e',
-      );
-    }
+  /// Compare two lists of members for equality
+  bool _listsEqual(List<SharedProjectMember> list1, List<SharedProjectMember> list2) {
+    if (list1.length != list2.length) return false;
+    
+    final emails1 = list1.map((m) => m.targetUserEmail).toSet();
+    final emails2 = list2.map((m) => m.targetUserEmail).toSet();
+    
+    return emails1.containsAll(emails2) && emails2.containsAll(emails1);
   }
 
   /// Refresh the member list
@@ -280,7 +321,7 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
     state = state.copyWith(error: null);
   }
 
-  /// Exit share for the current user
+  /// Exit share for the current user (kept for future use)
   Future<void> exitShare() async {
     if (_sharingService == null || state.projectPath.isEmpty) {
       state = state.copyWith(error: 'Cannot exit share: sharing not available');
