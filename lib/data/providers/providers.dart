@@ -44,8 +44,10 @@ import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/category_viewmodel.dart';
 import '../../presentation/viewmodels/project_kanban_viewmodel.dart';
+import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
 import '../services/kanban_service.dart';
 import '../../app.dart';
+import '../services/towdow_sharing_service.dart';
 
 // Local storage service provider
 // This must be overridden in main.dart with an initialized instance
@@ -164,6 +166,11 @@ final externalCalendarSyncServiceProvider = Provider<ExternalCalendarSyncService
     calendarRepository,
     eventRepository,
   );
+});
+
+// TowDow sharing service provider
+final towdowSharingServiceProvider = Provider.family<TowDowSharingService, CaldavAccount>((ref, account) {
+  return TowDowSharingService(account: account);
 });
 
 // Global navigator key for session expiry navigation
@@ -394,6 +401,12 @@ final projectKanbanViewModelProvider = StateNotifierProvider.family<ProjectKanba
   // Initialize with project path
   viewModel.initialize(projectPath);
   return viewModel;
+});
+
+// Project Sharing ViewModel provider
+final projectSharingViewModelProvider = StateNotifierProvider<ProjectSharingViewModel, ProjectSharingState>((ref) {
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return ProjectSharingViewModel(accountRepository);
 });
 
 // Account status providers

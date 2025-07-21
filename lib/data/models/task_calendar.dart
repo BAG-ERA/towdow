@@ -238,6 +238,10 @@ extension TaskCalendarSharing on TaskCalendar {
     return currentUser.isNotEmpty && ownerUser.isNotEmpty && currentUser != ownerUser;
   }
 
+  /// Computed property: Check if this project is shared with others  
+  /// This is a project I own but have shared with other users
+  bool get isSharedWithOthers => sharedWithMembers.isNotEmpty;
+
   /// Extract username from calendar path or owner field
   String _extractUserFromPath(String path) {
     // Handle different CalDAV path formats:

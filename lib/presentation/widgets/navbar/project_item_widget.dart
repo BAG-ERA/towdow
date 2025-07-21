@@ -11,6 +11,7 @@ import '../adaptive_app_layout.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../utils/popup/move_to_domain_dialog.dart';
+import '../utils/popup/project_sharing_dialog.dart';
 import 'drag_state_provider.dart';
 
 /// Data class for drag and drop operations
@@ -247,6 +248,14 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
   }
 
   List<PopupMenuEntry<String>> _buildMenuItems(BuildContext context) {
+    // Check if current account supports sharing
+    final accountAsync = ref.watch(activeAccountProvider);
+    final supportsSharing = accountAsync.when(
+      data: (account) => account?.providerType == 'towdow_cloud' || account?.providerType == 'towdow_selfhosted',
+      loading: () => false,
+      error: (_, __) => false,
+    );
+
     return [
       PopupMenuItem<String>(
         value: 'move_to_domain',
@@ -262,6 +271,29 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
           ],
         ),
       ),
+      // Share option - only for TowDow accounts
+      if (supportsSharing) ...[
+        PopupMenuItem<String>(
+          value: 'share_project',
+          child: Row(
+            children: [
+              Icon(
+                Icons.share,
+                size: 16,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Share project',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+      ],
       PopupMenuItem<String>(
         value: 'archive_project',
         child: Row(
@@ -303,6 +335,9 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       case 'move_to_domain':
         _showMoveToDomainDialog(context);
         break;
+      case 'share_project':
+        _showProjectSharingDialog(context);
+        break;
       case 'archive_project':
         _handleArchiveProject(context);
         break;
@@ -316,6 +351,13 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
     showDialog(
       context: context,
       builder: (context) => MoveToDomainDialog(project: widget.project),
+    );
+  }
+
+  void _showProjectSharingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => ProjectSharingDialog(project: widget.project),
     );
   }
 
