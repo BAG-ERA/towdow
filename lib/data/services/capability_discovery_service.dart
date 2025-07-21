@@ -302,6 +302,7 @@ class CapabilityDiscoveryService {
     <FLOWIT:owner/>
     <FLOWIT:template/>
     <FLOWIT:status/>
+    <FLOWIT:kanban/>
   </D:prop>
 </D:propfind>''';
 
@@ -433,7 +434,9 @@ class CapabilityDiscoveryService {
         final flowitOwner = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
         final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
         final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
+        final flowitKanban = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
         AppLogger.debug('CapabilityDiscovery: Status extraction result: $flowitStatus');
+        AppLogger.debug('CapabilityDiscovery: Kanban extraction result: $flowitKanban');
         
         if (supportsTodos) {
           AppLogger.debug('CapabilityDiscovery: Found VTODO calendar: $displayName at $href with domain: $domain, status: $flowitStatus');
@@ -447,6 +450,7 @@ class CapabilityDiscoveryService {
             flowitOwner: flowitOwner,
             flowitTemplate: flowitTemplate,
             flowitStatus: flowitStatus,
+            flowitKanban: flowitKanban,
           ));
         }
       }

@@ -4,7 +4,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/local_storage_service.dart';
 import '../services/sync_service.dart';
-import '../services/background_sync_service.dart';
 import '../services/domain_service.dart';
 import '../services/status_service.dart';
 import '../repositories/task_repository.dart';
@@ -15,12 +14,14 @@ import '../repositories/user_repository.dart';
 import '../repositories/external_account_repository.dart';
 import '../repositories/external_calendar_repository.dart';
 import '../repositories/external_event_repository.dart';
+import '../repositories/category_repository.dart';
 import '../models/task.dart';
 import '../models/task_calendar.dart';
 import '../models/caldav_account.dart';
 import '../models/external_caldav_account.dart';
 import '../models/external_calendar.dart';
 import '../models/calendar_event.dart';
+import '../models/category.dart';
 import '../services/caldav_service.dart';
 import '../services/external_caldav_service.dart';
 import '../services/external_sync_service.dart';
@@ -29,17 +30,21 @@ import '../services/offline_file_service.dart';
 import '../services/file_upload_queue_service.dart';
 import '../services/connection_monitor_service.dart';
 import '../services/user_sync_service.dart';
+import '../services/caldav_monitor.dart';
 import '../../core/app_lifecycle_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../presentation/viewmodels/task_viewmodel.dart';
 import '../../presentation/viewmodels/caldav_settings_viewmodel.dart';
-import '../../presentation/viewmodels/navbar_sync_viewmodel.dart';
+
 import '../../presentation/viewmodels/project_list_viewmodel.dart';
 import '../../presentation/viewmodels/validator_viewmodel.dart';
 import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
+import '../../presentation/viewmodels/category_viewmodel.dart';
+import '../../presentation/viewmodels/project_kanban_viewmodel.dart';
+import '../services/kanban_service.dart';
 import '../../app.dart';
 
 // Local storage service provider
@@ -85,6 +90,23 @@ final externalCalendarRepositoryProvider = Provider<ExternalCalendarRepository>(
 final externalEventRepositoryProvider = Provider<ExternalEventRepository>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
   return LocalExternalEventRepository(storageService);
+});
+
+// Category repository provider
+final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return CategoryRepository(calendarRepository, accountRepository);
+});
+
+// Kanban service provider
+final kanbanServiceProvider = Provider<KanbanService>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return KanbanService(
+    calendarRepository: calendarRepository,
+    accountRepository: accountRepository,
+  );
 });
 
 // CalDAV service provider  
@@ -173,34 +195,37 @@ void handleSessionExpired([ProviderRef? ref]) {
   }
 }
 
-// Background sync service provider
-final backgroundSyncServiceProvider = Provider<BackgroundSyncService>((ref) {
-  final taskRepository = ref.watch(taskRepositoryProvider);
-  final accountRepository = ref.watch(accountRepositoryProvider);
-  final calendarRepository = ref.watch(calendarRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  
-  return BackgroundSyncService(
-    taskRepository: taskRepository,
-    accountRepository: accountRepository,
-    calendarRepository: calendarRepository,
-    syncService: syncService,
-    onSessionExpired: (_) => handleSessionExpired(ref),
-  );
-});
-
 // Sync service provider
 final syncServiceProvider = Provider<SyncService>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
   final localStorage = ref.watch(localStorageServiceProvider);
   
   return SyncService(
     taskRepository: taskRepository,
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
+    categoryRepository: categoryRepository,
     localStorage: localStorage,
+  );
+});
+
+// CalDAV Monitor provider
+final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
+  final syncService = ref.watch(syncServiceProvider);
+  
+  return CalDAVMonitor(
+    accountRepository: accountRepository,
+    calendarRepository: calendarRepository,
+    categoryRepository: categoryRepository,
+    connectionMonitorService: connectionMonitorService,
+    syncService: syncService,
   );
 });
 
@@ -243,16 +268,17 @@ final appLifecycleManagerProvider = Provider<AppLifecycleManager>((ref) {
 final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final lifecycleManager = ref.watch(appLifecycleManagerProvider);
   final syncService = ref.watch(syncServiceProvider);
-  final backgroundSyncService = ref.watch(backgroundSyncServiceProvider);
   final externalSyncService = ref.watch(externalCalendarSyncServiceProvider);
   final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final userSyncService = ref.watch(userSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
 
+  final caldavMonitor = ref.watch(caldavMonitorProvider);
+
   final result = await lifecycleManager.initialize(
     syncService: syncService,
-    backgroundSyncService: backgroundSyncService,
+    caldavMonitor: caldavMonitor,
     externalSyncService: externalSyncService,
     fileUploadQueueService: fileUploadQueueService,
     connectionMonitorService: connectionMonitorService,
@@ -290,11 +316,7 @@ final caldavSettingsViewModelProvider = StateNotifierProvider<CaldavSettingsView
   return CaldavSettingsViewModel(accountRepository, calendarRepository);
 });
 
-final navbarSyncViewModelProvider = StateNotifierProvider<NavbarSyncViewModel, NavbarSyncState>((ref) {
-  final accountRepository = ref.watch(accountRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  return NavbarSyncViewModel(accountRepository, syncService);
-});
+
 
 final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
@@ -344,6 +366,34 @@ final taskMediaAttachmentViewModelProvider = StateNotifierProvider.family<TaskMe
     fileUploadQueueService,
     syncService,
   );
+});
+
+// Category ViewModel provider
+final categoryViewModelProvider = StateNotifierProvider<CategoryViewModel, CategoryViewModelState>((ref) {
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
+  return CategoryViewModel(categoryRepository);
+});
+
+// Category ViewModel provider for specific project
+final projectCategoryViewModelProvider = StateNotifierProvider.family<CategoryViewModel, CategoryViewModelState, String>((ref, projectPath) {
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final viewModel = CategoryViewModel(categoryRepository);
+  // Initialize with project path
+  viewModel.initialize(projectPath);
+  return viewModel;
+});
+
+// Project Kanban ViewModel provider for specific project
+final projectKanbanViewModelProvider = StateNotifierProvider.family<ProjectKanbanViewModel, ProjectKanbanState, String>((ref, projectPath) {
+  final kanbanService = ref.watch(kanbanServiceProvider);
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final viewModel = ProjectKanbanViewModel(
+    kanbanService,
+    categoryRepository,
+  );
+  // Initialize with project path
+  viewModel.initialize(projectPath);
+  return viewModel;
 });
 
 // Account status providers
@@ -501,7 +551,9 @@ final anytimeTasksProvider = StreamProvider<List<Task>>((ref) {
 // Unified project-specific tasks provider
 final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, projectPath) {
   final taskRepository = ref.read(taskRepositoryProvider);
-  return taskRepository.watchTasks().map((allTasks) {
+  final categoryRepository = ref.read(categoryRepositoryProvider);
+  
+  return taskRepository.watchTasks().asyncMap((allTasks) async {
     // Encode special characters in the project path to match encoded storage format
     final encodedProjectPath = projectPath.replaceAll('@', '%40');
     
@@ -510,9 +562,32 @@ final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, pro
         .where((task) => task.projectPath == encodedProjectPath)
         .toList();
     
-
+    // Get project categories to filter task categoryIds
+    final projectCategoriesResult = await categoryRepository.getProjectCategories(encodedProjectPath);
+    final projectCategories = await projectCategoriesResult.when(
+      success: (categories) async => categories,
+      failure: (_) async => <Category>[],
+    );
     
-    return projectTasks;
+    // Create a set of valid category IDs for this project
+    final validCategoryIds = projectCategories.map((cat) => cat.id).toSet();
+    
+    // Filter out invalid category IDs from tasks
+    final filteredTasks = projectTasks.map((task) {
+      final validTaskCategoryIds = task.categoryIds
+          .where((categoryId) => validCategoryIds.contains(categoryId))
+          .toList();
+      
+      // Only update the task if category IDs were filtered out
+      if (validTaskCategoryIds.length != task.categoryIds.length) {
+        AppLogger.debug('TaskProvider: Filtered categories for task ${task.summary}: '
+                       'from ${task.categoryIds} to $validTaskCategoryIds');
+        return task.copyWith(categoryIds: validTaskCategoryIds);
+      }
+      return task;
+    }).toList();
+    
+    return filteredTasks;
   });
 });
 
@@ -543,7 +618,7 @@ final currentSyncStatusProvider = Provider<SyncStatus>((ref) {
 // Manual sync trigger provider
 final manualSyncProvider = FutureProvider.autoDispose<SyncResult>((ref) async {
   final syncService = ref.watch(syncServiceProvider);
-  final result = await syncService.syncNow();
+        final result = await syncService.syncAllActiveCaldav();
   return result.when(
     success: (syncResult) => syncResult,
     failure: (failure) => throw Exception(failure.message),
@@ -653,8 +728,8 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   final filteredTasks = allTasks.where((task) {
     final summaryMatch = task.summary.toLowerCase().contains(searchLower);
     final descriptionMatch = task.description != null && task.description!.toLowerCase().contains(searchLower);
-    final categoriesMatch = task.categories.any(
-      (category) => category.toLowerCase().contains(searchLower),
+    final categoriesMatch = task.categoryIds.any(
+      (categoryId) => categoryId.toLowerCase().contains(searchLower),
     );
     
     return summaryMatch || descriptionMatch || categoriesMatch;

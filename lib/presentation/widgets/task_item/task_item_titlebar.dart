@@ -181,7 +181,7 @@ class _TaskItemTitlebarState extends State<TaskItemTitlebar> {
     }
     
     // Categories indicator
-    if (widget.task.categories.isNotEmpty) {
+    if (widget.task.categoryIds.isNotEmpty) {
       indicators.add(
         Icon(
           Icons.label_rounded,

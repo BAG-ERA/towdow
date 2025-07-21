@@ -79,7 +79,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
         summary: summary,
         description: description,
         due: due,
-        categories: categories,
+        categoryIds: categories,
         projectPath: encodedProjectPath,
         organizer: organizer,
       );

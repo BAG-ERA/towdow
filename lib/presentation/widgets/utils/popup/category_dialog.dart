@@ -1,18 +1,21 @@
 // Category management dialog for adding, editing, and removing task categories
-// Provides an interface for managing task categorization
+// Provides an interface for managing task categorization with search and improved UX
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/task.dart';
+import '../../../../data/models/category.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../core/logger.dart';
+import '../../../../core/theme/chart_theme.dart';
+import '../../../widgets/task_item/chips/category_chip.dart';
 
-/// Dialog for managing task categories
+/// Dialog for managing task categories with enhanced search and editing capabilities
 class CategoryDialog extends ConsumerStatefulWidget {
   final Task task;
   final Function(Task) onTaskUpdated;
-  final String? projectPath; // Optional project path to get all categories from the project
+  final String? projectPath;
 
   const CategoryDialog({
     super.key,
@@ -26,25 +29,26 @@ class CategoryDialog extends ConsumerStatefulWidget {
 }
 
 class _CategoryDialogState extends ConsumerState<CategoryDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _categoryController = TextEditingController();
-  late List<String> _categories;
+  final _searchController = TextEditingController();
+  late List<String> _selectedCategoryIds;
   bool _isLoading = false;
-
+  String _searchQuery = '';
+  
   @override
   void initState() {
     super.initState();
-    _categories = List.from(widget.task.categories);
+    _selectedCategoryIds = List.from(widget.task.categoryIds);
     
-    // Add listener to update UI when text changes
-    _categoryController.addListener(() {
-      setState(() {});
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.trim();
+      });
     });
   }
 
   @override
   void dispose() {
-    _categoryController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -54,11 +58,9 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
       focusNode: FocusNode(),
       onKeyEvent: (KeyEvent event) {
         if (event is KeyDownEvent) {
-          // Handle Escape to close dialog
           if (event.logicalKey == LogicalKeyboardKey.escape && !_isLoading) {
             Navigator.of(context).pop();
           }
-          // Handle Ctrl+Enter or Cmd+Enter to save
           else if (event.logicalKey == LogicalKeyboardKey.enter && 
                    (HardwareKeyboard.instance.isControlPressed || 
                     HardwareKeyboard.instance.isMetaPressed) && !_isLoading) {
@@ -67,40 +69,50 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         }
       },
       child: AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.label_rounded),
-            SizedBox(width: 12),
-            Text('Manage Categories'),
-          ],
-        ),
+        title: const Text('Manage Categories'),
         content: SizedBox(
-          width: MediaQuery.of(context).size.width > 600 ? 400 : MediaQuery.of(context).size.width * 0.9,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Task: ${widget.task.summary}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Task: ${widget.task.summary}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
-                const SizedBox(height: 16),
-                
-                // Create category form at the top
-                _buildAddCategoryForm(),
-                
-                const SizedBox(height: 16),
-                
-                // Project categories section (if projectPath is provided)
-                if (widget.projectPath != null) ...[
-                  _buildProjectCategoriesSection(),
-                ],
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Search bar
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search categories...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Categories list with constrained height
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: _buildCategoriesList(),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -108,7 +120,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: _isLoading ? null : _saveCategories,
             child: _isLoading
                 ? const SizedBox(
@@ -123,230 +135,697 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
     );
   }
 
-  Widget _buildCategoryChip(String category) {
-    return Chip(
-      label: Text(
-        category,
-        style: const TextStyle(fontSize: 12),
-      ),
-      deleteIcon: Icon(
-        Icons.close,
-        size: 16,
-        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-      ),
-      onDeleted: () => _removeCategory(category),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    );
-  }
+  Widget _buildCategoriesList() {
+    if (widget.projectPath == null) {
+      return const Center(
+        child: Text('No project path provided'),
+      );
+    }
 
-  Widget _buildProjectCategoriesSection() {
     return Consumer(
       builder: (context, ref, child) {
-        final tasksAsync = ref.watch(projectTasksProvider(widget.projectPath!));
+        final categoryViewModel = ref.watch(projectCategoryViewModelProvider(widget.projectPath!));
+        final availableCategories = categoryViewModel.projectCategories;
         
-        return tasksAsync.when(
-          data: (tasks) {
-            // Get all unique categories from tasks in the project
-            final Set<String> allCategories = {};
-            for (final task in tasks) {
-              allCategories.addAll(task.categories);
-            }
-            
-            final categoriesList = allCategories.toList()..sort();
-            
-            // Filter out categories that are already added to current task
-            final availableCategories = categoriesList
-                .where((category) => !_categories.contains(category))
+        if (categoryViewModel.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // Filter categories based on search query
+        final filteredCategories = _searchQuery.isEmpty
+            ? availableCategories
+            : availableCategories
+                .where((category) => category.name.toLowerCase().contains(_searchQuery.toLowerCase()))
                 .toList();
+
+        // Separate selected and available categories
+        final selectedCategories = filteredCategories
+            .where((category) => _selectedCategoryIds.contains(category.id))
+            .toList();
+        final availableCategoriesFiltered = filteredCategories
+            .where((category) => !_selectedCategoryIds.contains(category.id))
+            .toList();
+
+        // Check if we need to show "Create new category" button
+        final exactMatch = availableCategoriesFiltered.any(
+          (category) => category.name.toLowerCase() == _searchQuery.toLowerCase()
+        );
+        final showCreateButton = _searchQuery.isNotEmpty && !exactMatch;
+
+        return ListView(
+          shrinkWrap: true,
+          children: [
+            // Show create button if search doesn't match existing categories
+            if (showCreateButton) ...[
+              _buildCreateCategoryItem(),
+              const SizedBox(height: 8),
+            ],
             
-            // Filter categories based on input field content
-            final searchQuery = _categoryController.text.trim().toLowerCase();
-            final filteredCategories = searchQuery.isEmpty 
-                ? availableCategories 
-                : availableCategories
-                    .where((category) => category.toLowerCase().contains(searchQuery))
-                    .toList();
+            // Selected categories section
+            if (selectedCategories.isNotEmpty) ...[
+              _buildSectionHeader('Selected Categories', selectedCategories.length),
+              const SizedBox(height: 4),
+              ...selectedCategories.map((category) => _buildCategoryItem(category, isSelected: true)),
+              const SizedBox(height: 16),
+            ],
             
-            if (filteredCategories.isEmpty) {
-              return const SizedBox.shrink();
-            }
+            // Available categories section
+            if (availableCategoriesFiltered.isNotEmpty) ...[
+              _buildSectionHeader('Available Categories', availableCategoriesFiltered.length),
+              const SizedBox(height: 4),
+              ...availableCategoriesFiltered.map((category) => _buildCategoryItem(category, isSelected: false)),
+            ],
             
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                Text(
-                  searchQuery.isEmpty 
-                      ? 'Categories used in this project:'
-                      : 'Matching categories:',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: filteredCategories.map((category) => 
-                    ActionChip(
-                      label: Text(
-                        category,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      onPressed: () => _addCategoryDirectly(category),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            // Empty state when no categories match search
+            if (selectedCategories.isEmpty && availableCategoriesFiltered.isEmpty && !showCreateButton) ...[
+              const SizedBox(height: 16),
+              Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.search_off_rounded,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                     ),
-                  ).toList(),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No categories found',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Try adjusting your search or create a new category',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            );
-          },
-          loading: () => const SizedBox.shrink(),
-          error: (_, __) => const SizedBox.shrink(),
+              ),
+            ],
+          ],
         );
       },
     );
   }
 
-  Widget _buildAddCategoryForm() {
-    return Form(
-      key: _formKey,
+  Widget _buildSectionHeader(String title, int count) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          Expanded(
-            child: TextFormField(
-              controller: _categoryController,
-              decoration: InputDecoration(
-                hintText: 'Enter category name',
-                border: const OutlineInputBorder(),
-                isDense: true,
-                prefixIcon: _categories.isNotEmpty 
-                    ? Padding(
-                        padding: const EdgeInsets.only(left: 8.0, right: 8.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: _categories.map((category) => _buildCategoryChip(category)).toList(),
-                            ),
-                          ],
-                        ),
-                      )
-                    : null,
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Category cannot be empty';
-                }
-                if (_categories.contains(value.trim())) {
-                  return 'Category already exists';
-                }
-                return null;
-              },
-              onFieldSubmitted: (_) => _addCategory(),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
-          if (!_isExactMatch() && _categoryController.text.trim().isNotEmpty) ...[
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: _addCategory,
-              child: Text(_getButtonText()),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-          ],
+            child: Text(
+              count.toString(),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  void _addCategory() {
-    if (_formKey.currentState?.validate() == true) {
-      final category = _categoryController.text.trim();
-      setState(() {
-        _categories.add(category);
-        _categoryController.clear();
-      });
-      AppLogger.info('CategoryDialog: Added category "$category"');
-      HapticFeedback.lightImpact();
-    }
+  Widget _buildCreateCategoryItem() {
+    return ListTile(
+      leading: Icon(
+        Icons.add_circle_outline,
+        color: Theme.of(context).colorScheme.primary,
+        size: 20,
+      ),
+      title: Text(
+        'Create "$_searchQuery"',
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        'Create new category',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+      ),
+      onTap: () => _showCreateCategoryDialog(_searchQuery),
+    );
   }
 
-  void _addCategoryDirectly(String category) {
+  Widget _buildCategoryItem(Category category, {required bool isSelected}) {
+    return ListTile(
+      leading: CategoryChip(
+        categoryId: category.id,
+        projectPath: widget.projectPath,
+      ),
+      title: Text(
+        isSelected ? 'Click to remove' : 'Click to add',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+        ),
+      ),
+      trailing: PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert),
+        onSelected: (value) => _handleCategoryAction(category, value),
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: 'remove_from_project',
+            child: ListTile(
+              leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
+              title: const Text('Remove from project'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          PopupMenuItem(
+            value: 'edit_name',
+            child: ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Change name'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          PopupMenuItem(
+            value: 'edit_color',
+            child: ListTile(
+              leading: const Icon(Icons.palette),
+              title: const Text('Change color'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ],
+      ),
+      onTap: () => _toggleCategory(category.id),
+    );
+  }
+
+  void _toggleCategory(String categoryId) {
     setState(() {
-      _categories.add(category);
+      if (_selectedCategoryIds.contains(categoryId)) {
+        _selectedCategoryIds.remove(categoryId);
+      } else {
+        _selectedCategoryIds.add(categoryId);
+      }
     });
-    AppLogger.info('CategoryDialog: Added category "$category" directly');
     HapticFeedback.lightImpact();
   }
 
-  bool _isExactMatch() {
-    final inputText = _categoryController.text.trim();
-    if (inputText.isEmpty) return false;
-    
-    // Check if the input exactly matches any existing category in current task (case-insensitive)
-    final isMatch = _categories.any((category) => 
-        category.toLowerCase() == inputText.toLowerCase());
-    
-    AppLogger.debug('CategoryDialog: Input "$inputText" exact match: $isMatch (categories: $_categories)');
-    return isMatch;
-  }
-
-  String _getButtonText() {
-    final inputText = _categoryController.text.trim();
-    if (inputText.isEmpty) {
-      return 'Add new';
+  void _handleCategoryAction(Category category, String action) {
+    switch (action) {
+      case 'remove_from_project':
+        _removeCategoryFromProject(category);
+        break;
+      case 'edit_name':
+        _showEditNameDialog(category);
+        break;
+      case 'edit_color':
+        _showEditColorDialog(category);
+        break;
     }
-    return 'Create "$inputText"';
   }
 
-  void _removeCategory(String category) {
-    setState(() {
-      _categories.remove(category);
-    });
-    AppLogger.info('CategoryDialog: Removed category "$category"');
-    HapticFeedback.lightImpact();
+  void _removeCategoryFromProject(Category category) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Category'),
+        content: Text(
+          'Remove "${category.name}" from this project?\n\n'
+          'This will also remove it from all tasks in this project.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _deleteCategoryFromProject(category);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _saveCategories() async {
-    setState(() => _isLoading = true);
-    
+  Future<void> _deleteCategoryFromProject(Category category) async {
+    if (widget.projectPath == null) return;
+
     try {
+      final categoryViewModel = ref.read(projectCategoryViewModelProvider(widget.projectPath!).notifier);
+      await categoryViewModel.deleteCategory(category.id);
+      
+      // Remove from selected categories if it was selected
+      setState(() {
+        _selectedCategoryIds.remove(category.id);
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Removed "${category.name}" from project')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to remove category: $e')),
+        );
+      }
+    }
+  }
+
+  void _showEditNameDialog(Category category) {
+    final controller = TextEditingController(text: category.name);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Category Name'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Update the name for "${category.name}".',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Category name *',
+                  hintText: 'Enter new category name',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final newName = controller.text.trim();
+              if (newName.isNotEmpty && newName != category.name) {
+                Navigator.of(context).pop();
+                await _updateCategoryName(category, newName);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateCategoryName(Category category, String newName) async {
+    if (widget.projectPath == null) return;
+
+    try {
+      final categoryViewModel = ref.read(projectCategoryViewModelProvider(widget.projectPath!).notifier);
+      final updatedCategory = category.copyWith(name: newName);
+      await categoryViewModel.updateCategory(updatedCategory);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Updated category name to "$newName"')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update category: $e')),
+        );
+      }
+    }
+  }
+
+  void _showEditColorDialog(Category category) {
+    Color selectedColor = category.colorValue;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit Category Color'),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Choose a color for "${category.name}".',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Color preview
+                Center(
+                  child: Container(
+                    width: 80,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: selectedColor.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: selectedColor),
+                    ),
+                    child: Center(
+                      child: Text(
+                        category.name,
+                        style: TextStyle(
+                          color: selectedColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Color picker
+                _buildColorPicker(selectedColor, (color) {
+                  setDialogState(() {
+                    selectedColor = color;
+                  });
+                }),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _updateCategoryColor(category, selectedColor);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColorPicker(Color selectedColor, Function(Color) onColorSelected) {
+    // Use FlowIt chart color series for consistent branding
+    final colors = [
+      FlowItColors.primary,           // Blue Medium
+      FlowItColors.waterGreen,        // Water Green
+      FlowItColors.violet,            // Violet
+      FlowItColors.greenApple,        // Green Apple
+      FlowItColors.yellowDark,        // Yellow Dark
+      FlowItColors.pink,              // Pink
+      FlowItColors.coral,             // Coral
+      FlowItColors.greenAnis,         // Green Anis
+    ];
+    
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        // Predefined colors
+        ...colors.map((color) {
+          final isSelected = selectedColor.value == color.value;
+          return GestureDetector(
+            onTap: () => onColorSelected(color),
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: isSelected 
+                    ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3)
+                    : Border.all(color: Colors.grey.shade300),
+              ),
+            ),
+          );
+        }),
+        
+        // Custom color button
+        GestureDetector(
+          onTap: () => _showCustomColorDialog(onColorSelected),
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey.shade400),
+              color: Colors.grey.shade100,
+            ),
+            child: const Icon(Icons.add_rounded, size: 20),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showCustomColorDialog(Function(Color) onColorSelected) {
+    final controller = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Custom Color'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Enter a hex color code for your custom color.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Hex color *',
+                  hintText: 'e.g., FF5733',
+                  border: OutlineInputBorder(),
+                  prefixText: '#',
+                ),
+                onChanged: (value) {
+                  // Remove # if user adds it
+                  if (value.startsWith('#')) {
+                    controller.text = value.substring(1);
+                    controller.selection = TextSelection.fromPosition(
+                      TextPosition(offset: controller.text.length),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final hexColor = controller.text.trim();
+              if (hexColor.length == 6) {
+                try {
+                  final color = Color(int.parse('FF$hexColor', radix: 16));
+                  Navigator.of(context).pop();
+                  onColorSelected(color);
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invalid hex color format')),
+                  );
+                }
+              }
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateCategoryColor(Category category, Color newColor) async {
+    if (widget.projectPath == null) return;
+
+    try {
+      final categoryViewModel = ref.read(projectCategoryViewModelProvider(widget.projectPath!).notifier);
+      final updatedCategory = category.copyWith(color: newColor.value);
+      await categoryViewModel.updateCategory(updatedCategory);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Updated category color')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update category: $e')),
+        );
+      }
+    }
+  }
+
+  void _showCreateCategoryDialog(String initialName) {
+    final nameController = TextEditingController(text: initialName);
+    Color selectedColor = FlowItColors.primary;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Create New Category'),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Create a new category for organizing tasks.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Category name *',
+                    hintText: 'e.g., Urgent, In Progress, Review',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Color:',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                _buildColorPicker(selectedColor, (color) {
+                  setDialogState(() {
+                    selectedColor = color;
+                  });
+                }),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final name = nameController.text.trim();
+                if (name.isNotEmpty) {
+                  Navigator.of(context).pop();
+                  await _createCategory(name, selectedColor);
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createCategory(String name, Color color) async {
+    if (widget.projectPath == null) return;
+
+    try {
+      setState(() => _isLoading = true);
+      
+      final categoryViewModel = ref.read(projectCategoryViewModelProvider(widget.projectPath!).notifier);
+      await categoryViewModel.createCategory(
+        name: name,
+        color: color,
+        projectPath: widget.projectPath,
+      );
+      
+      // Clear search to show the new category
+      _searchController.clear();
+      setState(() {
+        _searchQuery = '';
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Created category "$name"')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create category: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveCategories() async {
+    try {
+      setState(() => _isLoading = true);
+      
       final updatedTask = widget.task.copyWith(
-        categories: _categories,
+        categoryIds: _selectedCategoryIds,
         lastModified: DateTime.now(),
       );
       
       widget.onTaskUpdated(updatedTask);
-      AppLogger.info('CategoryDialog: Updated task categories to: $_categories');
       
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_categories.isEmpty 
-                ? 'All categories removed'
-                : 'Categories updated: ${_categories.join(', ')}'
-            ),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
       }
     } catch (e) {
-      AppLogger.error('CategoryDialog: Error updating categories', e);
+      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating categories: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 3),
-          ),
+          SnackBar(content: Text('Failed to save categories: $e')),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
       }
     }
   }
