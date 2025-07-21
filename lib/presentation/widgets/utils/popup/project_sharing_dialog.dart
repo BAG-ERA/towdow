@@ -82,6 +82,52 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600]),
             ),
+            const SizedBox(height: 16),
+            // Debug section
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Debug Info:', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text('Current User: ${state.currentUserEmail ?? 'Unknown'}'),
+                  Text('Project Path: ${state.projectPath}'),
+                  if (state.currentProject != null) ...[
+                    Text('Shared With Field: "${state.currentProject!.sharedWith}"'),
+                    Text('Last Sync: ${state.currentProject!.lastSyncAt?.toString() ?? 'Never'}'),
+                  ],
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      // Get the active account to show provider type
+                      final accountRepo = ref.read(accountRepositoryProvider);
+                      final result = await accountRepo.getActiveAccount();
+                      result.when(
+                        success: (account) {
+                          final providerType = account?.providerType ?? 'Unknown';
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Account Provider Type: $providerType')),
+                          );
+                        },
+                        failure: (failure) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: ${failure.message}')),
+                          );
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.info),
+                    label: const Text('Show Account Info'),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       );

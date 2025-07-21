@@ -17,7 +17,7 @@ import 'local_storage_service.dart';
 import 'webdav_client.dart';
 import 'parsers/xml_response_parser.dart';
 import 'parsers/vtodo_parser.dart';
-import 'towdow_sharing_service.dart';
+import 'share_service.dart';
 
 enum SyncOperation {
   create,
@@ -728,7 +728,9 @@ class SyncService {
       await _categoryRepository.loadCategoriesFromCalendar(updatedCalendar);
       
       // Update sharing information if supported
+      AppLogger.info('SyncService: About to update sharing information for calendar ${updatedCalendar.path}');
       await _updateSharingInformation(caldavService.account, updatedCalendar);
+      AppLogger.info('SyncService: Finished updating sharing information for calendar ${updatedCalendar.path}');
       
     } catch (e, stackTrace) {
       AppLogger.error('SyncService: Failed to sync from server for ${calendar.path}', e, stackTrace);
@@ -1280,12 +1282,14 @@ class SyncService {
   Future<void> _updateSharingInformation(CaldavAccount account, TaskCalendar calendar) async {
     try {
       // Only update sharing info for TowDow Cloud and self-hosted accounts
-      final sharingService = TowDowSharingService(account: account);
+      final sharingService = ShareService(account: account);
       if (!sharingService.supportsSharing) {
+        AppLogger.debug('SyncService: Skipping sharing update - account type ${account.providerType} does not support sharing');
         return;
       }
       
       AppLogger.info('SyncService: Updating sharing information for calendar ${calendar.path}');
+      AppLogger.debug('SyncService: Account: ${account.username}@${account.serverUrl}, Provider: ${account.providerType}');
       
       // Extract project path from calendar path (UUID part)
       final projectPath = _extractProjectPathFromCalendarPath(calendar.path);
@@ -1294,22 +1298,35 @@ class SyncService {
         return;
       }
       
+      AppLogger.debug('SyncService: Extracted project path: $projectPath');
+      AppLogger.debug('SyncService: Calling ShareService.getProjectMembers...');
+      
       // Get current sharing members from API
       final membersResult = await sharingService.getProjectMembers(projectPath);
       await membersResult.when(
         success: (members) async {
+          AppLogger.info('SyncService: Successfully fetched ${members.length} shared members from API');
+          for (int i = 0; i < members.length; i++) {
+            final member = members[i];
+            AppLogger.debug('SyncService: Member $i: ${member.targetUserEmail} (${member.projectRight}) from ${member.sourceUserEmail}');
+          }
+          
           // Convert SharedProjectMember objects to JSON for storage
           final membersJson = members.map((member) => member.toJson()).toList();
+          AppLogger.debug('SyncService: Converting members to JSON: $membersJson');
           
           // Update calendar with sharing information
           final updatedCalendar = calendar.withSharedWith(membersJson);
-          await _calendarRepository.save(updatedCalendar);
+          AppLogger.debug('SyncService: Updated calendar sharedWith field: "${updatedCalendar.sharedWith}"');
           
-          AppLogger.info('SyncService: Updated sharing info for ${calendar.path} - ${members.length} members');
+          await _calendarRepository.save(updatedCalendar);
+          AppLogger.info('SyncService: Successfully saved sharing info for ${calendar.path} - ${members.length} members');
         },
         failure: (failure) async {
           // Log the error but don't fail the sync - sharing is optional
           AppLogger.warning('SyncService: Failed to get sharing info for ${calendar.path}: ${failure.message}');
+          AppLogger.debug('SyncService: Sharing API error code: ${failure.code}');
+          AppLogger.debug('SyncService: Sharing API error details: ${failure.exception}');
         },
       );
     } catch (e, stackTrace) {

@@ -4,9 +4,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/logger.dart';
 import '../../../data/providers/providers.dart';
-import '../../../data/services/towdow_sharing_service.dart';
+import '../../../data/services/share_service.dart';
 import '../../../data/models/task_calendar.dart';
 
 class SharedProjectsTestScreen extends ConsumerStatefulWidget {
@@ -21,7 +20,7 @@ class _SharedProjectsTestScreenState extends ConsumerState<SharedProjectsTestScr
   final _emailController = TextEditingController();
   bool _isLoading = false;
   String _result = '';
-  TowDowSharingService? _sharingService;
+  ShareService? _sharingService;
 
   @override
   void initState() {
@@ -57,7 +56,7 @@ class _SharedProjectsTestScreenState extends ConsumerState<SharedProjectsTestScr
 
           // Initialize sharing service with the account
           if (_sharingService == null) {
-            _sharingService = TowDowSharingService(account: account);
+            _sharingService = ShareService(account: account);
           }
 
           if (!_sharingService!.supportsSharing) {

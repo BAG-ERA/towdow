@@ -3,9 +3,12 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task_calendar.dart';
+import '../../data/models/shared_project_member.dart';
 import '../../data/repositories/account_repository.dart';
-import '../../data/services/towdow_sharing_service.dart';
+import '../../data/repositories/calendar_repository.dart';
+import '../../data/services/sync_service.dart';
 import '../../core/logger.dart';
+import '../../data/services/caldav_service.dart'; // Added import for CalDAVService
 
 // Project Sharing ViewModel State
 class ProjectSharingState {
@@ -72,56 +75,65 @@ class ProjectSharingState {
   List<String> get editedMemberEmails => editedMembers.map((m) => m.targetUserEmail).toList();
 }
 
-// Project Sharing ViewModel
 class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
   final AccountRepository _accountRepository;
-  TowDowSharingService? _sharingService;
+  final CalendarRepository _calendarRepository;
+  final SyncService _syncService;
 
-  ProjectSharingViewModel(this._accountRepository) : super(const ProjectSharingState());
+  ProjectSharingViewModel(this._accountRepository, this._calendarRepository, this._syncService) : super(const ProjectSharingState());
 
   /// Initialize the view model for a specific project
   Future<void> initializeForProject(TaskCalendar project) async {
     AppLogger.debug('ProjectSharingViewModel: Initializing for project ${project.displayName}');
+    AppLogger.debug('ProjectSharingViewModel: Project path: ${project.path}');
     
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(
+      isLoading: true,
+      error: null,
+      currentProject: project,
+    );
 
     try {
-      // Get active account
+      // Get active account to check if sharing is supported
       final accountResult = await _accountRepository.getActiveAccount();
       await accountResult.when(
         success: (account) async {
-          if (account == null) {
+          if (account != null) {
+            AppLogger.debug('ProjectSharingViewModel: Found active account: ${account.username}@${account.serverUrl}');
+            AppLogger.debug('ProjectSharingViewModel: Account provider type: ${account.providerType}');
+            
+            // Check if account supports sharing
+            final supportsSharing = account.providerType == 'towdow_cloud' || account.providerType == 'towdow_selfhosted';
+            AppLogger.debug('ProjectSharingViewModel: Supports sharing: $supportsSharing');
+            
+            state = state.copyWith(
+              supportsSharing: supportsSharing,
+              currentUserEmail: account.email ?? account.username,
+            );
+            
+            if (supportsSharing) {
+              // Load sharing data from the calendar (already fetched during sync)
+              await _loadProjectMembers();
+            } else {
+              AppLogger.warning('ProjectSharingViewModel: Sharing not supported for provider type: ${account.providerType}');
+              state = state.copyWith(
+                isLoading: false,
+                error: 'Sharing is only available for TowDow Cloud and self-hosted accounts',
+              );
+            }
+          } else {
+            AppLogger.warning('ProjectSharingViewModel: No active account found');
             state = state.copyWith(
               isLoading: false,
               error: 'No active account found',
             );
-            return;
-          }
-
-          // Initialize sharing service
-          _sharingService = TowDowSharingService(account: account);
-          
-          state = state.copyWith(
-            currentProject: project,
-            supportsSharing: _sharingService!.supportsSharing,
-            currentUserEmail: account.email ?? account.username,
-          );
-
-          // Load project members if sharing is supported
-          if (_sharingService!.supportsSharing) {
-            await _loadProjectMembers();
-          } else {
-            state = state.copyWith(
-              isLoading: false,
-              error: 'Sharing not supported for ${account.providerType} accounts',
-            );
           }
         },
         failure: (failure) async {
-          AppLogger.error('ProjectSharingViewModel: Failed to get active account', failure.exception, failure.stackTrace);
+          AppLogger.error('ProjectSharingViewModel: Failed to get active account: ${failure.message}');
           state = state.copyWith(
             isLoading: false,
-            error: 'Failed to get account: ${failure.message}',
+            error: 'Failed to get account information: ${failure.message}',
           );
         },
       );
@@ -129,56 +141,51 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
       AppLogger.error('ProjectSharingViewModel: Exception during initialization', e, stackTrace);
       state = state.copyWith(
         isLoading: false,
-        error: 'Failed to initialize sharing: $e',
+        error: 'Error initializing sharing: $e',
       );
     }
   }
 
-  /// Load project members from the server
+  /// Load project members from local calendar data
   Future<void> _loadProjectMembers() async {
-    if (_sharingService == null || state.projectPath.isEmpty) {
+    if (state.currentProject == null) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Cannot load members: invalid project path',
+        error: 'Cannot load members: no project selected',
       );
       return;
     }
 
     try {
-      AppLogger.debug('ProjectSharingViewModel: Loading members for project ${state.projectPath}');
-      AppLogger.debug('ProjectSharingViewModel: Using sharing service: ${_sharingService.runtimeType}');
+      AppLogger.debug('ProjectSharingViewModel: Loading members from local calendar data for project ${state.projectPath}');
+      AppLogger.debug('ProjectSharingViewModel: Project path: ${state.currentProject!.path}');
+      AppLogger.debug('ProjectSharingViewModel: Raw sharedWith field: "${state.currentProject!.sharedWith}"');
       
-      final result = await _sharingService!.getProjectMembers(state.projectPath);
-
-      result.when(
-        success: (members) {
-          AppLogger.debug('ProjectSharingViewModel: Successfully parsed ${members.length} members');
-          for (int i = 0; i < members.length; i++) {
-            final member = members[i];
-            AppLogger.debug('ProjectSharingViewModel: Member $i: ${member.targetUserEmail} (${member.projectRight}) from ${member.sourceUserEmail}');
-          }
-          
-          state = state.copyWith(
-            isLoading: false,
-            members: members,
-            editedMembers: List.from(members), // Initialize edited list with current members
-            hasUnsavedChanges: false,
-          );
-        },
-        failure: (failure) {
-          AppLogger.error('ProjectSharingViewModel: Failed to load members: ${failure.message}');
-          AppLogger.error('ProjectSharingViewModel: Failure exception: ${failure.exception}');
-          if (failure.stackTrace != null) {
-            AppLogger.error('ProjectSharingViewModel: Stack trace: ${failure.stackTrace}');
-          }
-          state = state.copyWith(
-            isLoading: false,
-            error: 'Failed to load members: ${failure.message}',
-          );
-        },
+      // Get shared members from local calendar data
+      final members = state.currentProject!.sharedWithMembers.map((memberJson) {
+        AppLogger.debug('ProjectSharingViewModel: Processing member JSON: $memberJson');
+        return SharedProjectMember.fromJson(memberJson);
+      }).toList();
+      
+      AppLogger.debug('ProjectSharingViewModel: Successfully loaded ${members.length} members from local data');
+      for (int i = 0; i < members.length; i++) {
+        final member = members[i];
+        AppLogger.debug('ProjectSharingViewModel: Member $i: ${member.targetUserEmail} (${member.projectRight}) from ${member.sourceUserEmail}');
+      }
+      
+      // Also log some debugging info about the calendar
+      AppLogger.debug('ProjectSharingViewModel: Calendar display name: ${state.currentProject!.displayName}');
+      AppLogger.debug('ProjectSharingViewModel: Calendar sync token: ${state.currentProject!.syncToken}');
+      AppLogger.debug('ProjectSharingViewModel: Calendar last sync: ${state.currentProject!.lastSyncAt}');
+      
+      state = state.copyWith(
+        isLoading: false,
+        members: members,
+        editedMembers: List.from(members), // Initialize edited list with current members
+        hasUnsavedChanges: false,
       );
     } catch (e, stackTrace) {
-      AppLogger.error('ProjectSharingViewModel: Exception loading members', e, stackTrace);
+      AppLogger.error('ProjectSharingViewModel: Exception loading members from local data', e, stackTrace);
       state = state.copyWith(
         isLoading: false,
         error: 'Error loading members: $e',
@@ -234,10 +241,10 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
     );
   }
 
-  /// Save all changes to the server using setProjectMembers
+  /// Save all changes using calendar repository + CalDAV service direct call
   Future<void> saveChanges() async {
-    if (_sharingService == null || state.projectPath.isEmpty) {
-      state = state.copyWith(error: 'Cannot save: sharing not available');
+    if (state.currentProject == null) {
+      state = state.copyWith(error: 'Cannot save: no project selected');
       return;
     }
 
@@ -251,25 +258,81 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
     state = state.copyWith(isSaving: true, error: null);
 
     try {
-      // Get list of target emails for the API
-      final memberEmails = state.editedMembers.map((m) => m.targetUserEmail).toList();
-      
-      final result = await _sharingService!.setProjectMembers(
-        projectPath: state.projectPath,
-        memberEmails: memberEmails,
-      );
+      // Convert edited members to JSON format for TaskCalendar
+      final membersJson = state.editedMembers.map((member) => member.toJson()).toList();
 
-      await result.when(
+      // Update calendar with new sharing data (optimistic UI)
+      final updatedCalendar = state.currentProject!.withSharedWith(membersJson);
+      
+      // Save calendar locally first
+      final saveResult = await _calendarRepository.save(updatedCalendar);
+      
+      await saveResult.when(
         success: (_) async {
-          AppLogger.debug('ProjectSharingViewModel: Successfully saved member changes');
+          AppLogger.debug('ProjectSharingViewModel: Calendar sharing data saved locally');
           
-          // Reload from server to get the latest state
-          await _loadProjectMembers();
-          
-          state = state.copyWith(isSaving: false);
+          // Get active account to call CalDAV service directly
+          final accountResult = await _accountRepository.getActiveAccount();
+          await accountResult.when(
+            success: (account) async {
+              if (account == null) {
+                AppLogger.warning('ProjectSharingViewModel: No active account found, skipping server sync');
+                // Still update state as local save succeeded
+                state = state.copyWith(
+                  isSaving: false,
+                  currentProject: updatedCalendar,
+                  members: List.from(state.editedMembers),
+                  hasUnsavedChanges: false,
+                  error: 'Saved locally - account not found',
+                );
+                return;
+              }
+              
+              AppLogger.debug('ProjectSharingViewModel: Calling CalDAV updateCalendarProperties for sharing sync');
+              
+              // Create CalDAV service and sync to server (similar to StatusService/DomainService)
+              final caldavService = CalDAVService(account: account);
+              final updateResult = await caldavService.updateCalendarProperties(updatedCalendar);
+              
+              await updateResult.when(
+                success: (_) async {
+                  AppLogger.debug('ProjectSharingViewModel: Successfully synced sharing data to server');
+                  
+                  // Update state with success
+                  state = state.copyWith(
+                    isSaving: false,
+                    currentProject: updatedCalendar,
+                    members: List.from(state.editedMembers),
+                    hasUnsavedChanges: false,
+                  );
+                },
+                failure: (failure) async {
+                  AppLogger.error('ProjectSharingViewModel: Failed to sync sharing data to server: ${failure.message}');
+                  // Still update state as local save succeeded - will retry during next sync
+                  state = state.copyWith(
+                    isSaving: false,
+                    currentProject: updatedCalendar,
+                    members: List.from(state.editedMembers),
+                    hasUnsavedChanges: false,
+                    error: 'Saved locally - server sync failed, will retry automatically',
+                  );
+                },
+              );
+            },
+            failure: (failure) async {
+              AppLogger.error('ProjectSharingViewModel: Failed to get active account: ${failure.message}');
+              state = state.copyWith(
+                isSaving: false,
+                currentProject: updatedCalendar,
+                members: List.from(state.editedMembers),
+                hasUnsavedChanges: false,
+                error: 'Saved locally - failed to get account for server sync',
+              );
+            },
+          );
         },
         failure: (failure) async {
-          AppLogger.error('ProjectSharingViewModel: Failed to save changes: ${failure.message}');
+          AppLogger.error('ProjectSharingViewModel: Failed to save sharing changes locally: ${failure.message}');
           state = state.copyWith(
             isSaving: false,
             error: 'Failed to save changes: ${failure.message}',
@@ -296,6 +359,70 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
     );
   }
 
+  /// Refresh the member list from local calendar data
+  Future<void> refresh() async {
+    if (state.currentProject == null) return;
+    
+    AppLogger.debug('ProjectSharingViewModel: Refreshing member list');
+    
+    state = state.copyWith(error: null);
+    
+    try {
+      // Reload calendar from repository to get latest sharing data
+      final calendarResult = await _calendarRepository.getById(state.currentProject!.path);
+      await calendarResult.when(
+        success: (calendar) async {
+          if (calendar != null) {
+            // Update current project and reload members
+            state = state.copyWith(currentProject: calendar);
+            await _loadProjectMembers();
+          } else {
+            state = state.copyWith(error: 'Project not found');
+          }
+        },
+        failure: (failure) async {
+          AppLogger.error('ProjectSharingViewModel: Failed to reload calendar: ${failure.message}');
+          state = state.copyWith(error: 'Failed to refresh: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectSharingViewModel: Exception during refresh', e, stackTrace);
+      state = state.copyWith(error: 'Error refreshing: $e');
+    }
+  }
+
+  /// Clear any errors
+  void clearError() {
+    state = state.copyWith(error: null);
+  }
+
+  /// Exit share for the current user (placeholder - not implemented yet)
+  Future<void> exitShare() async {
+    if (state.projectPath.isEmpty) {
+      state = state.copyWith(error: 'Cannot exit share: project path is empty');
+      return;
+    }
+
+    AppLogger.debug('ProjectSharingViewModel: Exit share for project ${state.projectPath}');
+    
+    state = state.copyWith(isSaving: true, error: null);
+
+    try {
+      // TODO: Implement exit share functionality
+      // This would require removing the current user from the sharing list
+      // and potentially triggering a sync to update the server
+      
+      state = state.copyWith(isSaving: false);
+      AppLogger.debug('ProjectSharingViewModel: Exit share functionality not yet implemented');
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectSharingViewModel: Exception exiting share', e, stackTrace);
+      state = state.copyWith(
+        isSaving: false,
+        error: 'Error exiting share: $e',
+      );
+    }
+  }
+
   /// Compare two lists of members for equality
   bool _listsEqual(List<SharedProjectMember> list1, List<SharedProjectMember> list2) {
     if (list1.length != list2.length) return false;
@@ -304,56 +431,5 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
     final emails2 = list2.map((m) => m.targetUserEmail).toSet();
     
     return emails1.containsAll(emails2) && emails2.containsAll(emails1);
-  }
-
-  /// Refresh the member list
-  Future<void> refresh() async {
-    if (state.currentProject == null) return;
-    
-    AppLogger.debug('ProjectSharingViewModel: Refreshing member list');
-    
-    state = state.copyWith(error: null);
-    await _loadProjectMembers();
-  }
-
-  /// Clear any errors
-  void clearError() {
-    state = state.copyWith(error: null);
-  }
-
-  /// Exit share for the current user (kept for future use)
-  Future<void> exitShare() async {
-    if (_sharingService == null || state.projectPath.isEmpty) {
-      state = state.copyWith(error: 'Cannot exit share: sharing not available');
-      return;
-    }
-
-    AppLogger.debug('ProjectSharingViewModel: Exiting share for project ${state.projectPath}');
-    
-    state = state.copyWith(isSaving: true, error: null);
-
-    try {
-      final result = await _sharingService!.exitShare(state.projectPath);
-
-      await result.when(
-        success: (_) async {
-          AppLogger.debug('ProjectSharingViewModel: Successfully exited share');
-          state = state.copyWith(isSaving: false);
-        },
-        failure: (failure) async {
-          AppLogger.error('ProjectSharingViewModel: Failed to exit share: ${failure.message}');
-          state = state.copyWith(
-            isSaving: false,
-            error: 'Failed to exit share: ${failure.message}',
-          );
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('ProjectSharingViewModel: Exception exiting share', e, stackTrace);
-      state = state.copyWith(
-        isSaving: false,
-        error: 'Error exiting share: $e',
-      );
-    }
   }
 } 
