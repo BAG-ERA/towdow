@@ -43,7 +43,11 @@ class WebDAVResponse {
 /// Exception thrown when the refresh token is expired or invalid.
 class RefreshTokenExpiredException implements Exception {
   final String message;
-  RefreshTokenExpiredException([this.message = "Refresh token expired, please log in again."]);
+
+  RefreshTokenExpiredException([
+    this.message = "Refresh token expired, please log in again.",
+  ]);
+
   @override
   String toString() => message;
 }
@@ -62,7 +66,12 @@ abstract class WebDAVClient {
   static WebDAVClient fromAccount(
     CaldavAccount account, {
     Duration timeout = const Duration(seconds: 30),
-    void Function(String accessToken, String? refreshToken, DateTime? tokenExpiry)? onTokenRefresh,
+    void Function(
+      String accessToken,
+      String? refreshToken,
+      DateTime? tokenExpiry,
+    )?
+    onTokenRefresh,
   }) {
     switch (account.providerType) {
       case 'custom':
@@ -83,8 +92,21 @@ abstract class WebDAVClient {
           onTokenRefresh: onTokenRefresh,
           timeout: timeout,
         );
+      case 'towdow_self_hosted':
+        return WebDAVClientKeycloak(
+          serverUrl: account.serverUrl,
+          accessToken: account.accessToken ?? '',
+          refreshToken: account.refreshToken,
+          tokenExpiry: account.tokenExpiry,
+          clientId: account.clientId,
+          issuerUrl: account.issuerUrl,
+          onTokenRefresh: onTokenRefresh,
+          timeout: timeout,
+        );
       default:
-        throw UnsupportedError('Unsupported providerType: \'${account.providerType}\'');
+        throw UnsupportedError(
+          'Unsupported providerType: \'${account.providerType}\'',
+        );
     }
   }
 
@@ -93,7 +115,7 @@ abstract class WebDAVClient {
   /// Build URI correctly handling absolute vs relative paths
   Uri _buildUri(String path) {
     final serverUri = Uri.parse(serverUrl);
-    
+
     if (path.startsWith('/')) {
       // Absolute path - use server's host but replace the path completely
       return Uri(
@@ -109,7 +131,8 @@ abstract class WebDAVClient {
   }
 
   /// Protected getter for common headers (including auth)
-  Future<Map<String, String>> get _commonHeaders async => await getAuthHeaders();
+  Future<Map<String, String>> get _commonHeaders async =>
+      await getAuthHeaders();
 
   /// PROPFIND method - RFC 4918 Section 9.1
   /// Used for capability discovery and resource listing
@@ -120,12 +143,9 @@ abstract class WebDAVClient {
   }) async {
     try {
       // AppLogger.debug('WebDAVClient: PROPFIND $path (depth: $depth)');
-      
+
       final uri = _buildUri(path);
-      final headers = {
-        ...await _commonHeaders,
-        'Depth': depth.toString(),
-      };
+      final headers = {...await _commonHeaders, 'Depth': depth.toString()};
 
       final request = http.Request('PROPFIND', uri)
         ..headers.addAll(headers)
@@ -133,7 +153,7 @@ abstract class WebDAVClient {
 
       final streamedResponse = await request.send().timeout(timeout);
       final responseBody = await streamedResponse.stream.bytesToString();
-      
+
       final result = WebDAVResponse(
         statusCode: streamedResponse.statusCode,
         headers: streamedResponse.headers,
@@ -144,11 +164,13 @@ abstract class WebDAVClient {
       return Result.success(result);
     } catch (e, stackTrace) {
       AppLogger.error('WebDAVClient: PROPFIND failed', e, stackTrace);
-      return Result.failure(Failure(
-        message: 'PROPFIND request failed: $e',
-        exception: e is Exception ? e : Exception(e.toString()),
-        stackTrace: stackTrace,
-      ));
+      return Result.failure(
+        Failure(
+          message: 'PROPFIND request failed: $e',
+          exception: e is Exception ? e : Exception(e.toString()),
+          stackTrace: stackTrace,
+        ),
+      );
     }
   }
 
@@ -157,14 +179,14 @@ abstract class WebDAVClient {
   Future<Result<WebDAVResponse>> options(String path) async {
     try {
       // AppLogger.debug('WebDAVClient: OPTIONS $path');
-      
+
       final uri = _buildUri(path);
       final request = http.Request('OPTIONS', uri)
         ..headers.addAll(await _commonHeaders);
 
       final streamedResponse = await request.send().timeout(timeout);
       final responseBody = await streamedResponse.stream.bytesToString();
-      
+
       final result = WebDAVResponse(
         statusCode: streamedResponse.statusCode,
         headers: streamedResponse.headers,
@@ -175,11 +197,13 @@ abstract class WebDAVClient {
       return Result.success(result);
     } catch (e, stackTrace) {
       AppLogger.error('WebDAVClient: OPTIONS failed', e, stackTrace);
-      return Result.failure(Failure(
-        message: 'OPTIONS request failed: $e',
-        exception: e is Exception ? e : Exception(e.toString()),
-        stackTrace: stackTrace,
-      ));
+      return Result.failure(
+        Failure(
+          message: 'OPTIONS request failed: $e',
+          exception: e is Exception ? e : Exception(e.toString()),
+          stackTrace: stackTrace,
+        ),
+      );
     }
   }
 
@@ -188,9 +212,10 @@ abstract class WebDAVClient {
   Future<Result<WebDAVResponse>> get(String path) async {
     try {
       // AppLogger.debug('WebDAVClient: GET $path');
-      
+
       final uri = _buildUri(path);
-      final response = await http.get(uri, headers: await _commonHeaders)
+      final response = await http
+          .get(uri, headers: await _commonHeaders)
           .timeout(timeout);
 
       final result = WebDAVResponse(
@@ -203,24 +228,30 @@ abstract class WebDAVClient {
       return Result.success(result);
     } catch (e, stackTrace) {
       AppLogger.error('WebDAVClient: GET failed', e, stackTrace);
-      return Result.failure(Failure(
-        message: 'GET request failed: $e',
-        exception: e is Exception ? e : Exception(e.toString()),
-        stackTrace: stackTrace,
-      ));
+      return Result.failure(
+        Failure(
+          message: 'GET request failed: $e',
+          exception: e is Exception ? e : Exception(e.toString()),
+          stackTrace: stackTrace,
+        ),
+      );
     }
   }
 
   /// PUT method - RFC 2616 Section 9.6
   /// Used to create/update calendar objects
-  Future<Result<WebDAVResponse>> put(String path, String body, {String? etag}) async {
+  Future<Result<WebDAVResponse>> put(
+    String path,
+    String body, {
+    String? etag,
+  }) async {
     try {
       AppLogger.info('WebDAVClient: PUT $path');
       AppLogger.debug('WebDAVClient: PUT body: $body');
-      
+
       final uri = _buildUri(path);
       AppLogger.info('WebDAVClient: PUT URI: $uri');
-      
+
       final headers = {
         ...await _commonHeaders,
         'Content-Type': 'text/calendar; charset=utf-8',
@@ -233,7 +264,8 @@ abstract class WebDAVClient {
 
       AppLogger.debug('WebDAVClient: PUT headers: $headers');
 
-      final response = await http.put(uri, headers: headers, body: body)
+      final response = await http
+          .put(uri, headers: headers, body: body)
           .timeout(timeout);
 
       final result = WebDAVResponse(
@@ -247,11 +279,13 @@ abstract class WebDAVClient {
       return Result.success(result);
     } catch (e, stackTrace) {
       AppLogger.error('WebDAVClient: PUT failed', e, stackTrace);
-      return Result.failure(Failure(
-        message: 'PUT request failed: $e',
-        exception: e is Exception ? e : Exception(e.toString()),
-        stackTrace: stackTrace,
-      ));
+      return Result.failure(
+        Failure(
+          message: 'PUT request failed: $e',
+          exception: e is Exception ? e : Exception(e.toString()),
+          stackTrace: stackTrace,
+        ),
+      );
     }
   }
 
@@ -260,7 +294,7 @@ abstract class WebDAVClient {
   Future<Result<WebDAVResponse>> delete(String path, {String? etag}) async {
     try {
       // AppLogger.debug('WebDAVClient: DELETE $path');
-      
+
       final uri = _buildUri(path);
       final headers = Map<String, String>.from(await _commonHeaders);
 
@@ -269,7 +303,8 @@ abstract class WebDAVClient {
         headers['If-Match'] = etag;
       }
 
-      final response = await http.delete(uri, headers: headers)
+      final response = await http
+          .delete(uri, headers: headers)
           .timeout(timeout);
 
       final result = WebDAVResponse(
@@ -282,11 +317,13 @@ abstract class WebDAVClient {
       return Result.success(result);
     } catch (e, stackTrace) {
       AppLogger.error('WebDAVClient: DELETE failed', e, stackTrace);
-      return Result.failure(Failure(
-        message: 'DELETE request failed: $e',
-        exception: e is Exception ? e : Exception(e.toString()),
-        stackTrace: stackTrace,
-      ));
+      return Result.failure(
+        Failure(
+          message: 'DELETE request failed: $e',
+          exception: e is Exception ? e : Exception(e.toString()),
+          stackTrace: stackTrace,
+        ),
+      );
     }
   }
 
@@ -295,16 +332,17 @@ abstract class WebDAVClient {
   Future<Result<WebDAVResponse>> report(String path, String body) async {
     try {
       // AppLogger.debug('WebDAVClient: REPORT $path');
-      
+
       final uri = _buildUri(path);
       final request = http.Request('REPORT', uri)
         ..headers.addAll(await _commonHeaders)
-        ..headers['Depth'] = '1'  // CalDAV requires Depth: 1 for calendar-query
+        ..headers['Depth'] =
+            '1' // CalDAV requires Depth: 1 for calendar-query
         ..body = body;
 
       final streamedResponse = await request.send().timeout(timeout);
       final responseBody = await streamedResponse.stream.bytesToString();
-      
+
       final result = WebDAVResponse(
         statusCode: streamedResponse.statusCode,
         headers: streamedResponse.headers,
@@ -315,33 +353,35 @@ abstract class WebDAVClient {
       return Result.success(result);
     } catch (e, stackTrace) {
       AppLogger.error('WebDAVClient: REPORT failed', e, stackTrace);
-      return Result.failure(Failure(
-        message: 'REPORT request failed: $e',
-        exception: e is Exception ? e : Exception(e.toString()),
-        stackTrace: stackTrace,
-      ));
+      return Result.failure(
+        Failure(
+          message: 'REPORT request failed: $e',
+          exception: e is Exception ? e : Exception(e.toString()),
+          stackTrace: stackTrace,
+        ),
+      );
     }
   }
 
-  /// MKCALENDAR method - RFC 4791 Section 5.3.1  
+  /// MKCALENDAR method - RFC 4791 Section 5.3.1
   /// Used to create new calendar collections
   Future<Result<WebDAVResponse>> mkcalendar(String path, String body) async {
     try {
       // AppLogger.debug('WebDAVClient: MKCALENDAR $path');
-      
+
       final uri = _buildUri(path);
       final headers = {
         ...await _commonHeaders,
         'Content-Type': 'application/xml; charset=utf-8',
       };
-      
+
       final request = http.Request('MKCALENDAR', uri)
         ..headers.addAll(headers)
         ..body = body;
 
       final streamedResponse = await request.send().timeout(timeout);
       final responseBody = await streamedResponse.stream.bytesToString();
-      
+
       final result = WebDAVResponse(
         statusCode: streamedResponse.statusCode,
         headers: streamedResponse.headers,
@@ -352,11 +392,13 @@ abstract class WebDAVClient {
       return Result.success(result);
     } catch (e, stackTrace) {
       AppLogger.error('WebDAVClient: MKCALENDAR failed', e, stackTrace);
-      return Result.failure(Failure(
-        message: 'MKCALENDAR request failed: $e',
-        exception: e is Exception ? e : Exception(e.toString()),
-        stackTrace: stackTrace,
-      ));
+      return Result.failure(
+        Failure(
+          message: 'MKCALENDAR request failed: $e',
+          exception: e is Exception ? e : Exception(e.toString()),
+          stackTrace: stackTrace,
+        ),
+      );
     }
   }
 
@@ -366,45 +408,50 @@ abstract class WebDAVClient {
     try {
       AppLogger.info('WebDAVClient: PROPPATCH $path');
       AppLogger.debug('WebDAVClient: PROPPATCH body: $body');
-      
+
       final uri = _buildUri(path);
       AppLogger.info('WebDAVClient: PROPPATCH URI: $uri');
-      
+
       final headers = {
         ...await _commonHeaders,
         'Content-Type': 'application/xml; charset=utf-8',
       };
-      
+
       AppLogger.debug('WebDAVClient: PROPPATCH headers: $headers');
-      
+
       final request = http.Request('PROPPATCH', uri)
         ..headers.addAll(headers)
         ..body = body;
 
       final streamedResponse = await request.send().timeout(timeout);
       final responseBody = await streamedResponse.stream.bytesToString();
-      
+
       final result = WebDAVResponse(
         statusCode: streamedResponse.statusCode,
         headers: streamedResponse.headers,
         body: responseBody,
       );
 
-      AppLogger.info('WebDAVClient: PROPPATCH response ${streamedResponse.statusCode}');
+      AppLogger.info(
+        'WebDAVClient: PROPPATCH response ${streamedResponse.statusCode}',
+      );
       AppLogger.debug('WebDAVClient: PROPPATCH response body: $responseBody');
       return Result.success(result);
     } catch (e, stackTrace) {
       AppLogger.error('WebDAVClient: PROPPATCH failed', e, stackTrace);
-      return Result.failure(Failure(
-        message: 'PROPPATCH request failed: $e',
-        exception: e is Exception ? e : Exception(e.toString()),
-        stackTrace: stackTrace,
-      ));
+      return Result.failure(
+        Failure(
+          message: 'PROPPATCH request failed: $e',
+          exception: e is Exception ? e : Exception(e.toString()),
+          stackTrace: stackTrace,
+        ),
+      );
     }
   }
 
   /// Default PROPFIND body for basic resource discovery
-  static const String _defaultPropfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
+  static const String _defaultPropfindBody =
+      '''<?xml version="1.0" encoding="utf-8" ?>
 <D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:FLOWIT="https://flowit.app/ns/">
   <D:prop>
     <D:resourcetype />
@@ -449,7 +496,12 @@ class WebDAVClientKeycloak extends WebDAVClient {
   DateTime? tokenExpiry;
   final String? clientId;
   final String? issuerUrl;
-  final void Function(String accessToken, String? refreshToken, DateTime? tokenExpiry)? onTokenRefresh;
+  final void Function(
+    String accessToken,
+    String? refreshToken,
+    DateTime? tokenExpiry,
+  )?
+  onTokenRefresh;
 
   WebDAVClientKeycloak({
     required super.serverUrl,
@@ -465,22 +517,21 @@ class WebDAVClientKeycloak extends WebDAVClient {
   bool get _isTokenExpired {
     if (tokenExpiry == null) return false;
     // Add a 1 minute buffer
-    return DateTime.now().isAfter(tokenExpiry!.subtract(const Duration(minutes: 1)));
+    return DateTime.now().isAfter(
+      tokenExpiry!.subtract(const Duration(minutes: 1)),
+    );
   }
 
   @override
   Future<Map<String, String>> getAuthHeaders() async {
-    if (_isTokenExpired && refreshToken != null && clientId != null && issuerUrl != null) {
+    if (_isTokenExpired &&
+        refreshToken != null &&
+        clientId != null &&
+        issuerUrl != null) {
       try {
         final issuer = await Issuer.discover(Uri.parse(issuerUrl!));
-        final client = Client(
-          issuer,
-          clientId!,
-          clientSecret: ""
-        );
-        final credential = client.createCredential(
-          refreshToken: refreshToken,
-        );
+        final client = Client(issuer, clientId!, clientSecret: "");
+        final credential = client.createCredential(refreshToken: refreshToken);
         final tokenResponse = await credential.getTokenResponse();
         accessToken = tokenResponse.accessToken!;
         refreshToken = tokenResponse.refreshToken ?? refreshToken;
@@ -491,7 +542,11 @@ class WebDAVClientKeycloak extends WebDAVClient {
           onTokenRefresh!(accessToken, refreshToken, tokenExpiry);
         }
       } catch (e, st) {
-        AppLogger.error('WebDAVClientKeycloak: Failed to refresh access token', e, st);
+        AppLogger.error(
+          'WebDAVClientKeycloak: Failed to refresh access token',
+          e,
+          st,
+        );
         // If the error is due to invalid_grant or similar, throw our custom exception
         throw RefreshTokenExpiredException();
       }

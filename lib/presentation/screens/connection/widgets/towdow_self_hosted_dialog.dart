@@ -26,9 +26,17 @@ class _TowdowSelfHostedDialogState extends BaseAuthDialogState<TowdowSelfHostedD
         style: TextStyle(fontSize: 14, color: Colors.grey),
       ),
       const SizedBox(height: 24),
-      buildServerConfigFields(),
-      const SizedBox(height: 24),
-      buildConnectButton(loginState),
+      Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            buildServerConfigFields(),
+            const SizedBox(height: 24),
+            buildConnectButton(loginState),
+          ],
+        ),
+      ),
     ];
   }
 

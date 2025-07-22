@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:towdow_app/core/logger.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../viewmodels/login_viewmodel.dart';
 import 'calendar_selection_screen.dart';
@@ -89,8 +90,19 @@ abstract class BaseAuthDialogState<T extends BaseAuthDialog> extends ConsumerSta
   }
 
   Future<void> _authenticateAndConnect() async {
-    if (!formKey.currentState!.validate()) return;
+    AppLogger.info("_authenticateAndConnect called");
+    // Ensure form validation works correctly
+    if (formKey.currentState == null) {
+      AppLogger.error("Form key state is null");
+      return;
+    }
 
+    if (!formKey.currentState!.validate()) {
+      AppLogger.info("Form validation failed");
+      return;
+    }
+
+    AppLogger.info("Form validated, proceeding with authentication");
     await ref.read(loginViewModelProvider.notifier).authenticateWithSelfHosted(
       issuerUrl: _issuerUrlController.text.trim(),
       clientId: _clientIdController.text.trim(),
