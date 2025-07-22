@@ -13,8 +13,6 @@ import '../repositories/category_repository.dart';
 import 'connection_monitor_service.dart';
 import 'sync_service.dart';
 import 'caldav_service.dart';
-import 'webdav_client.dart';
-import 'parsers/xml_response_parser.dart';
 
 class CalDAVMonitor {
   // Dependencies - focused on calendar monitoring
@@ -26,7 +24,7 @@ class CalDAVMonitor {
 
   // Dynamic interval configuration
   static const Duration _minInterval = Duration(seconds: 2);
-  static const Duration _maxInterval = Duration(seconds: 40);
+  static const Duration _maxInterval = Duration(seconds: 4);
   static const Duration _initialInterval = Duration(seconds: 10);
   static const double _changeMultiplier = 0.5; // Divide by 2 when change detected
   static const double _noChangeMultiplier = 1.5; // Multiply by 1.5 when no change
@@ -139,8 +137,6 @@ class CalDAVMonitor {
               // Update interval based on changes detected
               _updateInterval(changesDetected);
               
-              // Update last sync time for all calendars
-              await _updateLastSyncTime(calendars);
               
               if (changesDetected) {
                 AppLogger.debug('CalDAVMonitor: Changes detected, interval adjusted to ${_currentInterval.inSeconds}s');
@@ -187,46 +183,65 @@ class CalDAVMonitor {
     try {
       final caldavService = CalDAVService(account: account);
       
-      // Get both sync token and ETag using CalDAVService
-      final serverPropertiesResult = await caldavService.getCalendarProperties(calendar);
-      return await serverPropertiesResult.when(
-        success: (updatedCalendar) async {
-          final localSyncToken = calendar.syncToken;
-          final localEtag = calendar.etag;
-          final serverSyncToken = updatedCalendar.syncToken;
-          final serverEtag = updatedCalendar.etag;
-          
-          // Check sync tokens first
-          if (localSyncToken != serverSyncToken) {
-            // Sync tokens differ - delegate to SyncService
-            AppLogger.debug('CalDAVMonitor: Sync token differs for ${calendar.displayName}, delegating to SyncService');
-            await _syncService.syncCalendar(account, calendar, []);
-            return true;
-          } else if (localEtag != serverEtag) {
-            // Sync tokens are equal but ETags differ - resync calendar information
-            AppLogger.debug('CalDAVMonitor: ETag differs for ${calendar.displayName}, resyncing calendar info');
-            final resyncResult = await caldavService.getCalendarProperties(calendar);
-            await resyncResult.when(
-              success: (updatedCalendar) async {
-                // Save the updated calendar to repository
-                await _calendarRepository.save(updatedCalendar);
-                
-                // Load categories from the updated calendar data
-                await _categoryRepository.loadCategoriesFromCalendar(updatedCalendar);
-                
-                AppLogger.debug('CalDAVMonitor: Calendar info resynced successfully for ${calendar.displayName}');
-              },
-              failure: (failure) async {
-                AppLogger.warning('CalDAVMonitor: Failed to resync calendar info for ${calendar.displayName}: ${failure.message}');
-              },
-            );
-            return true;
+                      // Get fresh calendar data from repository to ensure we have current state
+      AppLogger.debug('CalDAVMonitor: About to retrieve fresh calendar from repository for ${calendar.path}');
+      final freshCalendarResult = await _calendarRepository.getById(calendar.path);
+      await freshCalendarResult.when(
+        success: (freshCalendar) async {
+          if (freshCalendar == null) {
+            AppLogger.warning('CalDAVMonitor: Calendar not found in repository: ${calendar.path}');
+            return false;
           }
           
-          return false; // No changes detected
+          // Use fresh calendar data from repository
+          final currentCalendar = freshCalendar;
+          AppLogger.debug('CalDAVMonitor: Retrieved fresh calendar from repository: ${currentCalendar.path}');
+          AppLogger.debug('CalDAVMonitor: Repository sync token: ${currentCalendar.syncToken ?? "(null)"}');
+          AppLogger.debug('CalDAVMonitor: Repository ETag: ${currentCalendar.etag ?? "(null)"}');
+          AppLogger.debug('CalDAVMonitor: Repository lastSyncAt: ${currentCalendar.lastSyncAt}');
+          
+                    // Get both sync token and ETag using CalDAVService
+          final serverPropertiesResult = await caldavService.getCalendarProperties(currentCalendar);
+          return await serverPropertiesResult.when(
+            success: (updatedCalendar) async {
+              final localSyncToken = currentCalendar.syncToken;
+              final localEtag = currentCalendar.etag;
+              final serverSyncToken = updatedCalendar.syncToken;
+              final serverEtag = updatedCalendar.etag;
+          
+              // Log sync token comparison for debugging
+              AppLogger.info('CalDAVMonitor: Sync token comparison for ${currentCalendar.displayName}:');
+              AppLogger.info('CalDAVMonitor:   Local sync token:  ${localSyncToken ?? "(null)"}');
+              AppLogger.info('CalDAVMonitor:   Server sync token: ${serverSyncToken ?? "(null)"}');
+              AppLogger.info('CalDAVMonitor:   Local ETag:       ${localEtag ?? "(null)"}');
+              AppLogger.info('CalDAVMonitor:   Server ETag:      ${serverEtag ?? "(null)"}');
+              
+              // Check sync tokens first
+              if (localSyncToken != serverSyncToken) {
+                // Sync tokens differ - delegate to SyncService
+                AppLogger.info('CalDAVMonitor: Sync tokens differ for ${currentCalendar.displayName}, delegating to SyncService');
+                await _syncService.syncCalendar(account, currentCalendar, []);
+                
+                // After sync, just return true - let the sync service handle all saving
+                AppLogger.info('CalDAVMonitor: Sync completed for ${currentCalendar.displayName}');
+                return true;
+              } else if (localEtag != serverEtag) {
+                // Sync tokens are equal but ETags differ - delegate to sync service
+                AppLogger.info('CalDAVMonitor: ETag differs for ${currentCalendar.displayName}, delegating to SyncService');
+                await _syncService.syncCalendar(account, currentCalendar, []);
+                return true;
+              }
+              
+              return false; // No changes detected
+            },
+            failure: (failure) async {
+              AppLogger.warning('CalDAVMonitor: Could not get server properties for ${currentCalendar.displayName}: ${failure.message}');
+              return false;
+            },
+          );
         },
         failure: (failure) async {
-          AppLogger.warning('CalDAVMonitor: Could not get server properties for ${calendar.displayName}: ${failure.message}');
+          AppLogger.warning('CalDAVMonitor: Could not get fresh calendar from repository: ${failure.message}');
           return false;
         },
       );
@@ -234,6 +249,7 @@ class CalDAVMonitor {
       AppLogger.error('CalDAVMonitor: Failed to check changes for ${calendar.displayName}', e, stackTrace);
       return false;
     }
+    return false; // Fallback return
   }
 
   /// Update interval based on whether changes were detected

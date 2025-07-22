@@ -2,17 +2,12 @@
 // Provides read-only CalDAV operations for VEVENT synchronization
 // Based on RFC 4791 for CalDAV and RFC 5545 for iCalendar
 
-import 'dart:math' as math;
-
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/external_caldav_account.dart';
 import '../models/external_calendar.dart';
 import '../models/calendar_event.dart';
-import '../models/caldav_account.dart';
-
 import 'webdav_client.dart';
-import 'capability_discovery_service.dart';
 import 'parsers/vevent_parser.dart';
 import 'parsers/xml_response_parser.dart';
 

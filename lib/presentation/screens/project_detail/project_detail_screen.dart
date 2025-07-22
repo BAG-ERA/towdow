@@ -22,9 +22,12 @@ import '../../widgets/project_detail/project_kanban_view.dart';
 import '../../widgets/utils/editable_title.dart';
 import '../../../data/services/webdav_client.dart';
 
-// Provider for a specific project/calendar
+// Provider for a specific project/calendar that automatically refreshes when repository data changes
 final projectProvider = FutureProvider.family<TaskCalendar?, String>((ref, projectPath) async {
-  final calendarRepository = ref.read(calendarRepositoryProvider);
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  
+  // Also watch the calendar list stream to trigger refresh when any calendar changes
+  ref.watch(calendarListProvider);
   
   // Encode special characters in the project path to match storage format
   final encodedProjectPath = projectPath.replaceAll('@', '%40');

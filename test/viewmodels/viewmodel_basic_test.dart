@@ -47,8 +47,6 @@ void main() {
       viewModel = ProjectListViewModel(
         mockCalendarRepository,
         mockTaskRepository,
-        mockSyncService,
-        mockDomainService,
         mockAccountRepository,
         mockUserRepository,
       );

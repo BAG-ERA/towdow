@@ -534,7 +534,7 @@ class CalDAVService {
             if (responses.isNotEmpty) {
               final responseData = responses.first;
               
-              // Update the calendar with new properties
+              // Update the calendar with new properties (only non-null values)
               final updatedCalendar = calendar.copyWith(
                 etag: responseData['getetag'],
                 syncToken: responseData['sync-token'],
@@ -548,6 +548,14 @@ class CalDAVService {
                 lastSyncAt: DateTime.now(),
               );
               
+              AppLogger.debug('CalDAVService: etag: ${responseData['getetag']}');
+              AppLogger.debug('CalDAVService: displayName: ${responseData['displayname']}');
+              AppLogger.debug('CalDAVService: description: ${responseData['calendar-description']}');
+              AppLogger.debug('CalDAVService: flowitDomain: ${responseData['flowit-domain']}');
+              AppLogger.debug('CalDAVService: flowitStatus: ${responseData['flowit-status']}');
+              AppLogger.debug('CalDAVService: flowitKanban: ${responseData['flowit-kanban']}');
+              AppLogger.debug('CalDAVService: projectCategories: ${responseData['flowit-categories']}');
+              AppLogger.debug('CalDAVService: sharedWith: ${responseData['flowit-sharedWith']}');
               AppLogger.debug('CalDAVService: Calendar info resynced successfully');
               return Result.success(updatedCalendar);
             } else {

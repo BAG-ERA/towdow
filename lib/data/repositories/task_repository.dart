@@ -5,6 +5,7 @@ import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/task.dart';
 import '../services/local_storage_service.dart';
+import '../services/sync_service.dart';
 
 // Abstract repository interface
 abstract class TaskRepository {
@@ -17,13 +18,22 @@ abstract class TaskRepository {
   Future<Result<void>> save(Task task);
   Future<Result<void>> delete(String uid);
   Stream<List<Task>> watchTasks();
+  
+  // Internal methods for sync operations (don't trigger sync)
+  Future<Result<void>> saveFromSync(Task task);
 }
 
 // Local implementation using Hive
 class LocalTaskRepository implements TaskRepository {
   final LocalStorageService _storageService;
+  SyncService? _syncService;
 
   LocalTaskRepository(this._storageService);
+  
+  // Allow sync service to be injected after creation
+  void setSyncService(SyncService syncService) {
+    _syncService = syncService;
+  }
 
   @override
   Future<Result<List<Task>>> getAll() async {
@@ -106,12 +116,63 @@ class LocalTaskRepository implements TaskRepository {
 
   @override
   Future<Result<void>> save(Task task) async {
-    return await _storageService.put(LocalStorageService.tasksBoxName, task.uid, task);
+    // Check if task already exists to determine operation type
+    final existingTaskResult = await getById(task.uid);
+    final isNewTask = existingTaskResult.when(
+      success: (existingTask) => existingTask == null,
+      failure: (_) => true, // Assume new if we can't check
+    );
+    
+    // Save to local storage first (offline-first)
+    final saveResult = await _storageService.put(LocalStorageService.tasksBoxName, task.uid, task);
+    
+    // Queue sync if sync service is available and task has project path
+    if (saveResult is Success && _syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
+      final syncData = <String, dynamic>{
+        'calendarUid': task.projectPath,
+        'taskUid': task.uid,
+      };
+      
+      // Use appropriate operation type
+      final operation = isNewTask ? SyncOperation.create : SyncOperation.update;
+      _syncService!.queueSyncOperation(
+        operation,
+        task.uid,
+        syncData,
+      );
+    }
+    
+    return saveResult;
   }
 
   @override
   Future<Result<void>> delete(String uid) async {
-    return await _storageService.delete(LocalStorageService.tasksBoxName, uid);
+    // Get task before deletion for sync operation
+    final taskResult = await getById(uid);
+    final taskToDelete = taskResult.when(
+      success: (task) => task,
+      failure: (_) => null,
+    );
+    
+    // Delete from local storage first (offline-first)
+    final deleteResult = await _storageService.delete(LocalStorageService.tasksBoxName, uid);
+    
+    // Queue sync if sync service is available and task had project path
+    if (deleteResult is Success && _syncService != null && taskToDelete != null && 
+        taskToDelete.projectPath != null && taskToDelete.projectPath!.isNotEmpty) {
+      final syncData = <String, dynamic>{
+        'calendarUid': taskToDelete.projectPath,
+        'taskUid': uid,
+      };
+      
+      _syncService!.queueSyncOperation(
+        SyncOperation.delete,
+        uid,
+        syncData,
+      );
+    }
+    
+    return deleteResult;
   }
 
   @override
@@ -132,5 +193,10 @@ class LocalTaskRepository implements TaskRepository {
             failure: (_) => <Task>[],
           );
         });
+  }
+
+  @override
+  Future<Result<void>> saveFromSync(Task task) async {
+    return await _storageService.put(LocalStorageService.tasksBoxName, task.uid, task);
   }
 } 

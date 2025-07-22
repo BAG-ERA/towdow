@@ -8,7 +8,6 @@ import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
 import 'local_storage_service.dart';
-import 'caldav_service.dart';
 import 'sync_service.dart';
 
 /// Service for managing project domains and domain-related operations

@@ -34,7 +34,7 @@ void main() {
       mockTaskRepository = MockTaskRepository();
       mockAccountRepository = MockAccountRepository();
       mockSyncService = MockSyncService();
-      taskViewModel = TaskViewModel(mockTaskRepository, mockAccountRepository, mockSyncService);
+      taskViewModel = TaskViewModel(mockTaskRepository, mockAccountRepository);
     });
 
     tearDown(() {

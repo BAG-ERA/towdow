@@ -7,7 +7,6 @@ import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/external_caldav_account.dart';
 import '../models/external_calendar.dart';
-import '../models/calendar_event.dart';
 import '../repositories/external_account_repository.dart';
 import '../repositories/external_calendar_repository.dart';
 import '../repositories/external_event_repository.dart';

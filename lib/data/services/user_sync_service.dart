@@ -7,7 +7,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import '../../core/result.dart';
 import '../../core/logger.dart';
-import '../models/caldav_account.dart';
 import '../models/user_preferences.dart';
 import '../models/external_caldav_account.dart';
 import '../repositories/user_repository.dart';

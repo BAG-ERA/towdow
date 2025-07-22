@@ -78,7 +78,51 @@ class LocalCalendarRepository implements CalendarRepository {
 
   @override
   Future<Result<void>> save(TaskCalendar calendar) async {
-    return await _storageService.put(LocalStorageService.calendarsBoxName, calendar.path, calendar);
+    AppLogger.info('🗄️ CalendarRepository: SAVE ATTEMPT for ${calendar.path}');
+    AppLogger.info('🗄️ CalendarRepository:   DisplayName to save: "${calendar.displayName}"');
+    AppLogger.info('🗄️ CalendarRepository:   Description to save: "${calendar.description}"');
+    AppLogger.info('🗄️ CalendarRepository:   ETag to save: ${calendar.etag ?? "(null)"}');
+    AppLogger.info('🗄️ CalendarRepository:   SyncToken to save: ${calendar.syncToken ?? "(null)"}');
+    AppLogger.info('🗄️ CalendarRepository:   LastSyncAt to save: ${calendar.lastSyncAt}');
+    AppLogger.info('🗄️ CalendarRepository:   LastModified to save: ${calendar.lastModified}');
+    
+    final result = await _storageService.put(LocalStorageService.calendarsBoxName, calendar.path, calendar);
+    
+    return await result.when(
+      success: (_) async {
+        AppLogger.info('🗄️ CalendarRepository: SAVE SUCCESS - verifying storage');
+        
+        // Immediate verification read
+        final verifyResult = await _storageService.get<TaskCalendar>(LocalStorageService.calendarsBoxName, calendar.path);
+        await verifyResult.when(
+          success: (retrievedCalendar) async {
+            AppLogger.info('🗄️ CalendarRepository: VERIFY READ RESULT:');
+            AppLogger.info('🗄️ CalendarRepository:   Retrieved DisplayName: "${retrievedCalendar?.displayName ?? "(null)"}"');
+            AppLogger.info('🗄️ CalendarRepository:   Retrieved Description: "${retrievedCalendar?.description ?? "(null)"}"');
+            AppLogger.info('🗄️ CalendarRepository:   Retrieved ETag: ${retrievedCalendar?.etag ?? "(null)"}');
+            AppLogger.info('🗄️ CalendarRepository:   Retrieved SyncToken: ${retrievedCalendar?.syncToken ?? "(null)"}');
+            AppLogger.info('🗄️ CalendarRepository:   Retrieved LastSyncAt: ${retrievedCalendar?.lastSyncAt}');
+            AppLogger.info('🗄️ CalendarRepository:   Retrieved LastModified: ${retrievedCalendar?.lastModified}');
+            
+            if (retrievedCalendar?.etag != calendar.etag) {
+              AppLogger.error('🗄️ CalendarRepository: ❌ ETag MISMATCH! Expected: ${calendar.etag}, Got: ${retrievedCalendar?.etag}');
+            }
+            if (retrievedCalendar?.syncToken != calendar.syncToken) {
+              AppLogger.error('🗄️ CalendarRepository: ❌ SyncToken MISMATCH! Expected: ${calendar.syncToken}, Got: ${retrievedCalendar?.syncToken}');
+            }
+          },
+          failure: (failure) async {
+            AppLogger.error('🗄️ CalendarRepository: ❌ VERIFY READ FAILED: ${failure.message}');
+          },
+        );
+        
+        return Result.success(null);
+      },
+      failure: (failure) async {
+        AppLogger.error('🗄️ CalendarRepository: ❌ SAVE FAILED: ${failure.message}');
+        return Result.failure(failure);
+      },
+    );
   }
 
   @override

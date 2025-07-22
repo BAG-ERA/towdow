@@ -69,8 +69,6 @@ void main() {
         final viewModel = ProjectListViewModel(
           mockCalendarRepository,
           mockTaskRepository,
-          mockSyncService,
-          mockDomainService,
           mockAccountRepository,
           mockUserRepository,
         );
@@ -119,8 +117,6 @@ void main() {
         final viewModel = ProjectListViewModel(
           mockCalendarRepository,
           mockTaskRepository,
-          mockSyncService,
-          mockDomainService,
           mockAccountRepository,
           mockUserRepository,
         );
@@ -155,8 +151,6 @@ void main() {
         final viewModel = ProjectListViewModel(
           mockCalendarRepository,
           mockTaskRepository,
-          mockSyncService,
-          mockDomainService,
           mockAccountRepository,
           mockUserRepository,
         );
@@ -270,7 +264,9 @@ void main() {
         final calendarRepo = LocalCalendarRepository(mockStorage);
         final taskRepo = LocalTaskRepository(mockStorage);
 
-        // Mock successful storage deletion
+        // Mock successful storage operations
+        when(mockStorage.get(LocalStorageService.tasksBoxName, 'task1'))
+            .thenAnswer((_) async => const Result<Task?>.success(null)); // Task not found, which is fine for delete
         when(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1'))
             .thenAnswer((_) async => const Result.success(null));
         when(mockStorage.delete(LocalStorageService.tasksBoxName, 'task1'))

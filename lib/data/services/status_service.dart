@@ -6,18 +6,15 @@ import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
-import '../repositories/account_repository.dart';
 import 'local_storage_service.dart';
-import 'caldav_service.dart';
 import 'sync_service.dart';
 
 /// Service for managing project statuses and status-related operations
 class StatusService {
   final CalendarRepository _calendarRepository;
   final LocalStorageService _localStorageService;
-  final AccountRepository _accountRepository;
 
-  StatusService(this._calendarRepository, this._localStorageService, this._accountRepository);
+  StatusService(this._calendarRepository, this._localStorageService);
 
   /// Create a new status
   Future<Result<void>> createStatus(String status) async {

@@ -57,7 +57,7 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
   final String _taskUid;
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
-  final SyncService? _syncService;
+  // SyncService removed - sync now handled by repository
   final OfflineFileService _offlineFileService;
   final FileUploadQueueService _fileUploadQueueService;
   
@@ -69,9 +69,8 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
     this._taskRepository,
     this._accountRepository,
     this._offlineFileService,
-    this._fileUploadQueueService, [
-    this._syncService,
-  ]) : super(const MediaValidatorState());
+    this._fileUploadQueueService,
+  ) : super(const MediaValidatorState());
 
   /// Get encryption key for a specific validator
   Future<String> _getValidatorEncryptionKey(String validatorId) async {
@@ -495,27 +494,7 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
 
   /// Queue sync operation for updated task
   Future<void> _queueSyncOperation(dynamic task) async {
-    if (_syncService != null && task.projectPath != null && task.projectPath.isNotEmpty) {
-      final syncData = <String, dynamic>{
-        'calendarUid': task.projectPath,
-        'taskUid': task.uid,
-      };
-      
-      final syncResult = await _syncService!.queueSyncOperation(
-        SyncOperation.update,
-        task.uid,
-        syncData,
-      );
-      
-      await syncResult.when(
-        success: (_) async {
-          AppLogger.debug('MediaValidatorViewModel: Queued sync for ${task.uid}');
-        },
-        failure: (failure) async {
-          AppLogger.warning('MediaValidatorViewModel: Failed to queue sync: ${failure.message}');
-        },
-      );
-    }
+    // Sync is now handled by repository
   }
 
   /// Get image data for display (for thumbnails and full-screen viewing)
@@ -600,6 +579,5 @@ final mediaValidatorViewModelProvider = StateNotifierProvider.family<MediaValida
     ref.watch(accountRepositoryProvider),
     ref.watch(offlineFileServiceProvider),
     ref.watch(fileUploadQueueServiceProvider),
-    ref.watch(syncServiceProvider),
   ),
 ); 

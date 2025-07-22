@@ -7,8 +7,6 @@ import '../../data/services/capability_discovery_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../data/repositories/external_account_repository.dart';
-import '../../data/repositories/external_calendar_repository.dart';
 import '../../data/services/local_storage_service.dart';
 import '../../data/services/user_sync_service.dart';
 import '../../data/providers/providers.dart';

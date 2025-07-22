@@ -15,6 +15,7 @@ import '../repositories/external_account_repository.dart';
 import '../repositories/external_calendar_repository.dart';
 import '../repositories/external_event_repository.dart';
 import '../repositories/category_repository.dart';
+import '../repositories/kanban_repository.dart';
 import '../models/task.dart';
 import '../models/task_calendar.dart';
 import '../models/caldav_account.dart';
@@ -109,6 +110,12 @@ final kanbanServiceProvider = Provider<KanbanService>((ref) {
     calendarRepository: calendarRepository,
     accountRepository: accountRepository,
   );
+});
+
+// Kanban repository provider
+final kanbanRepositoryProvider = Provider<KanbanRepository>((ref) {
+  final kanbanService = ref.watch(kanbanServiceProvider);
+  return LocalKanbanRepository(kanbanService);
 });
 
 // CalDAV service provider  
@@ -211,13 +218,20 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   final localStorage = ref.watch(localStorageServiceProvider);
   
   // Initialize singleton instance
-  return SyncService(
+  final syncService = SyncService(
     taskRepository: taskRepository,
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
     categoryRepository: categoryRepository,
     localStorage: localStorage,
   );
+  
+  // Inject sync service into repository for sync coordination
+  if (taskRepository is LocalTaskRepository) {
+    taskRepository.setSyncService(syncService);
+  }
+  
+  return syncService;
 });
 
 // CalDAV Monitor provider
@@ -250,7 +264,7 @@ final statusServiceProvider = Provider<StatusService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final localStorageService = ref.watch(localStorageServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
-  return StatusService(calendarRepository, localStorageService, accountRepository);
+  return StatusService(calendarRepository, localStorageService);
 });
 
 // Export/Import service provider
@@ -314,8 +328,7 @@ final appLifecycleStateProvider = StreamProvider<FlowItAppState>((ref) {
 final taskViewModelProvider = StateNotifierProvider<TaskViewModel, TaskViewModelState>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  return TaskViewModel(taskRepository, accountRepository, syncService);
+  return TaskViewModel(taskRepository, accountRepository);
 });
 
 final caldavSettingsViewModelProvider = StateNotifierProvider<CaldavSettingsViewModel, CaldavSettingsState>((ref) {
@@ -329,18 +342,15 @@ final caldavSettingsViewModelProvider = StateNotifierProvider<CaldavSettingsView
 final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final taskRepository = ref.watch(taskRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  final domainService = ref.watch(domainServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final userRepository = ref.watch(userRepositoryProvider);
-  return ProjectListViewModel(calendarRepository, taskRepository, syncService, domainService, accountRepository, userRepository);
+  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository);
 });
 
 final validatorViewModelProvider = StateNotifierProvider.family<ValidatorViewModel, ValidatorViewModelState, String>((ref, taskUid) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  return ValidatorViewModel(taskRepository, accountRepository, syncService);
+  return ValidatorViewModel(taskRepository, accountRepository);
 });
 
 // Task file attachment ViewModel provider for managing file attachments per task
@@ -349,13 +359,11 @@ final taskFileAttachmentViewModelProvider = StateNotifierProvider.family<TaskFil
   final accountRepository = ref.watch(accountRepositoryProvider);
   final offlineFileService = ref.watch(offlineFileServiceProvider);
   final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
-  final syncService = ref.watch(syncServiceProvider);
   return TaskFileAttachmentViewModel(
     taskRepository: taskRepository,
     accountRepository: accountRepository,
     offlineFileService: offlineFileService,
     fileUploadQueueService: fileUploadQueueService,
-    syncService: syncService,
   );
 });
 
@@ -365,14 +373,12 @@ final taskMediaAttachmentViewModelProvider = StateNotifierProvider.family<TaskMe
   final accountRepository = ref.watch(accountRepositoryProvider);
   final offlineFileService = ref.watch(offlineFileServiceProvider);
   final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
-  final syncService = ref.watch(syncServiceProvider);
   return TaskMediaAttachmentViewModel(
     taskUid,
     taskRepository,
     accountRepository,
     offlineFileService,
     fileUploadQueueService,
-    syncService,
   );
 });
 
@@ -393,10 +399,10 @@ final projectCategoryViewModelProvider = StateNotifierProvider.family<CategoryVi
 
 // Project Kanban ViewModel provider for specific project
 final projectKanbanViewModelProvider = StateNotifierProvider.family<ProjectKanbanViewModel, ProjectKanbanState, String>((ref, projectPath) {
-  final kanbanService = ref.watch(kanbanServiceProvider);
+  final kanbanRepository = ref.watch(kanbanRepositoryProvider);
   final categoryRepository = ref.watch(categoryRepositoryProvider);
   final viewModel = ProjectKanbanViewModel(
-    kanbanService,
+    kanbanRepository,
     categoryRepository,
   );
   // Initialize with project path

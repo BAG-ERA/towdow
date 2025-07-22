@@ -13,7 +13,7 @@ import '../../data/models/kanban.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/models/category.dart';
 import '../../data/repositories/category_repository.dart';
-import '../../data/services/kanban_service.dart';
+import '../../data/repositories/kanban_repository.dart';
 
 part 'project_kanban_viewmodel.freezed.dart';
 
@@ -34,13 +34,13 @@ class ProjectKanbanState with _$ProjectKanbanState {
 }
 
 /// ViewModel for project kanban management operations
-/// Handles UI state management and delegates business logic to KanbanService
+/// Handles UI state management and delegates business logic to KanbanRepository
 class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
-  final KanbanService _kanbanService;
+  final KanbanRepository _kanbanRepository;
   final CategoryRepository _categoryRepository;
 
   ProjectKanbanViewModel(
-    this._kanbanService,
+    this._kanbanRepository,
     this._categoryRepository,
   ) : super(const ProjectKanbanState());
 
@@ -67,10 +67,10 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     }
   }
 
-  /// Load kanban configurations for the project using the service
+  /// Load kanban configurations for the project using the repository
   Future<void> _loadKanbans(String projectPath) async {
     try {
-      final kanbansResult = await _kanbanService.loadKanbansForProject(projectPath);
+      final kanbansResult = await _kanbanRepository.getProjectKanbans(projectPath);
       
       await kanbansResult.when(
         success: (kanbans) async {
@@ -127,7 +127,7 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     try {
       AppLogger.info('ProjectKanbanViewModel: Creating kanban "$title"');
 
-      final kanbanResult = await _kanbanService.createKanban(
+      final kanbanResult = await _kanbanRepository.createKanban(
         projectPath: state.projectPath!,
         title: title,
         orderedList: orderedList,
@@ -176,7 +176,7 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     try {
       AppLogger.info('ProjectKanbanViewModel: Updating kanban "${updatedKanban.title}"');
 
-      final kanbanResult = await _kanbanService.updateKanban(
+      final kanbanResult = await _kanbanRepository.updateKanban(
         projectPath: state.projectPath!,
         updatedKanban: updatedKanban,
       );
@@ -222,7 +222,7 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     try {
       AppLogger.info('ProjectKanbanViewModel: Deleting kanban "$title"');
 
-      final deleteResult = await _kanbanService.deleteKanban(
+      final deleteResult = await _kanbanRepository.deleteKanban(
         projectPath: state.projectPath!,
         title: title,
       );

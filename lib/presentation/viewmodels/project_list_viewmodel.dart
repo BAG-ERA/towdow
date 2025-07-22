@@ -7,12 +7,7 @@ import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../data/services/sync_service.dart';
-import '../../data/services/domain_service.dart';
-import '../../data/services/caldav_service.dart';
-import '../../data/models/user_preferences.dart';
 import '../../core/logger.dart';
-import '../../data/services/caldav_service.dart';
 
 // Project with associated statistics
 class ProjectWithStats {
@@ -286,19 +281,29 @@ enum ProjectSort {
 class ProjectListViewModel extends StateNotifier<ProjectListState> {
   final CalendarRepository _calendarRepository;
   final TaskRepository _taskRepository;
-  final SyncService _syncService;
-  final DomainService _domainService;
+  // DomainService removed - domain operations now handled by repository
   final AccountRepository _accountRepository;
   final UserRepository _userRepository;
 
   ProjectListViewModel(
     this._calendarRepository,
     this._taskRepository,
-    this._syncService,
-    this._domainService,
     this._accountRepository,
     this._userRepository,
-  ) : super(const ProjectListState());
+  ) : super(const ProjectListState()) {
+    // Listen to calendar repository changes and update state automatically
+    _startListeningToRepositoryChanges();
+  }
+
+  /// Start listening to repository changes for automatic UI updates
+  void _startListeningToRepositoryChanges() {
+    // Listen to calendar repository stream for automatic updates
+    _calendarRepository.watchCalendars().listen((calendars) {
+      AppLogger.info('ProjectListViewModel: Repository stream update - ${calendars.length} calendars');
+      // Automatically reload projects when repository data changes
+      loadProjects();
+    });
+  }
 
   /// Initialize the view model
   Future<void> initialize() async {
@@ -421,19 +426,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     state = state.copyWith(isRefreshing: true, error: null);
     
     try {
-      // Trigger sync first
-      final syncResult = await _syncService.syncAllActiveCaldav();
-      await syncResult.when(
-        success: (_) async {
-          // AppLogger.info('ProjectListViewModel: Sync completed, reloading projects');
-        },
-        failure: (failure) async {
-          AppLogger.warning('ProjectListViewModel: Sync failed during refresh', failure.exception, failure.stackTrace);
-          // Continue with local refresh even if sync failed
-        },
-      );
-      
-      // Reload projects
+      // Reload projects - sync is handled by repositories
       await loadProjects();
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Exception during refresh', e, stackTrace);
@@ -483,52 +476,28 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     try {
       state = state.copyWith(error: null);
       
-             // Get active account to use CalDAV service for calendar creation
-       final accountResult = await _accountRepository.getActiveAccount();
-       await accountResult.when(
-         success: (account) async {
-           if (account != null) {
-             // Use CalDAV service for all calendar creation (it handles UUID generation)
-             final caldavService = CalDAVService(account: account);
-             final createResult = await caldavService.createCalendar(
+             // Create calendar through repository (handles sync internally)
+             final calendar = TaskCalendarFactory.createNew(
+               path: '/temp/${DateTime.now().millisecondsSinceEpoch}', // Will be updated by repository
                displayName: name,
                description: description,
              );
              
-             await createResult.when(
-               success: (calendar) async {
-                 AppLogger.info('ProjectListViewModel: Calendar created successfully via CalDAV service');
+             final result = await _calendarRepository.save(calendar);
+             await result.when(
+               success: (_) async {
+                 AppLogger.info('ProjectListViewModel: Calendar created successfully');
                  
-                 // Save calendar locally
-                 final result = await _calendarRepository.save(calendar);
-                 await result.when(
-                   success: (_) async {
-                     // Add to user ordering
-                     await _addProjectToUserOrder(calendar.path);
-                     // Reload projects to show the new one
-                     await loadProjects();
-                   },
-                   failure: (failure) async {
-                     AppLogger.error('ProjectListViewModel: Failed to save project locally', failure.exception, failure.stackTrace);
-                     state = state.copyWith(error: 'Failed to save project: ${failure.message}');
-                   },
-                 );
+                 // Add to user ordering
+                 await _addProjectToUserOrder(calendar.path);
+                 // Reload projects to show the new one
+                 await loadProjects();
                },
                failure: (failure) async {
-                 AppLogger.error('ProjectListViewModel: Failed to create project via CalDAV service', failure.exception, failure.stackTrace);
-                 state = state.copyWith(error: 'Failed to create project: ${failure.message}');
+                 AppLogger.error('ProjectListViewModel: Failed to save project locally', failure.exception, failure.stackTrace);
+                 state = state.copyWith(error: 'Failed to save project: ${failure.message}');
                },
              );
-           } else {
-             AppLogger.error('ProjectListViewModel: No active account found');
-             state = state.copyWith(error: 'No active CalDAV account found');
-           }
-         },
-         failure: (failure) async {
-           AppLogger.error('ProjectListViewModel: Failed to get active account', failure.exception, failure.stackTrace);
-           state = state.copyWith(error: 'Failed to get active account: ${failure.message}');
-         },
-       );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Exception creating project', e, stackTrace);
       state = state.copyWith(error: 'Failed to create project: $e');
@@ -551,35 +520,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
             return; // Already deleted
           }
 
-          // Delete from server first (if we have an active account)
-          try {
-            final accountResult = await _accountRepository.getActiveAccount();
-            await accountResult.when(
-              success: (account) async {
-                if (account != null) {
-                  final caldavService = CalDAVService(account: account);
-                  final serverDeleteResult = await caldavService.deleteCalendar(calendar.path);
-                  
-                  serverDeleteResult.when(
-                    success: (_) {
-                      AppLogger.info('ProjectListViewModel: Project deleted from server successfully');
-                    },
-                    failure: (failure) {
-                      AppLogger.warning('ProjectListViewModel: Failed to delete project from server: ${failure.message}');
-                      // Continue with local deletion even if server deletion fails
-                    },
-                  );
-                }
-              },
-              failure: (failure) {
-                AppLogger.warning('ProjectListViewModel: No active account, skipping server deletion');
-              },
-            );
-          } catch (e) {
-            AppLogger.warning('ProjectListViewModel: Server deletion failed, continuing with local deletion: $e');
-          }
-
-          // Delete locally
+          // Delete through repository (handles sync internally)
           final result = await _calendarRepository.delete(projectPath);
           await result.when(
             success: (_) async {
@@ -690,16 +631,31 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     try {
       state = state.copyWith(error: null);
       
-      final result = await _domainService.assignDomainToCalendar(projectPath, domain);
-      await result.when(
-        success: (_) async {
-          // AppLogger.info('ProjectListViewModel: Domain assigned successfully');
-          // Reload projects to reflect the change
-          await loadProjects();
+      // Domain assignment is handled by repository updates
+      final calendarResult = await _calendarRepository.getById(projectPath);
+      await calendarResult.when(
+        success: (calendar) async {
+          if (calendar != null) {
+            final updatedCalendar = calendar.copyWith(flowitDomain: domain);
+            final result = await _calendarRepository.save(updatedCalendar);
+            await result.when(
+              success: (_) async {
+                // Reload projects to reflect the change
+                await loadProjects();
+              },
+              failure: (failure) async {
+                AppLogger.error('ProjectListViewModel: Failed to assign domain', failure.exception, failure.stackTrace);
+                state = state.copyWith(error: 'Failed to assign domain: ${failure.message}');
+              },
+            );
+          } else {
+            AppLogger.error('ProjectListViewModel: Project not found for domain assignment');
+            state = state.copyWith(error: 'Project not found');
+          }
         },
         failure: (failure) async {
-          AppLogger.error('ProjectListViewModel: Failed to assign domain', failure.exception, failure.stackTrace);
-          state = state.copyWith(error: 'Failed to assign domain: ${failure.message}');
+          AppLogger.error('ProjectListViewModel: Failed to get project for domain assignment', failure.exception, failure.stackTrace);
+          state = state.copyWith(error: 'Failed to get project: ${failure.message}');
         },
       );
     } catch (e, stackTrace) {

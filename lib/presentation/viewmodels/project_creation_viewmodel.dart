@@ -1,13 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/logger.dart';
 import '../../core/result.dart';
 import '../../data/models/caldav_account.dart';
 import '../../data/models/task_calendar.dart';
-import '../../data/services/caldav_service.dart';
-import '../../data/services/domain_service.dart';
-import '../../data/repositories/account_repository.dart';
-import '../../data/repositories/calendar_repository.dart';
 import '../../data/providers/providers.dart';
 
 // ----- STATE -----
@@ -59,86 +56,59 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
         throw Exception('No active CalDAV account found');
       }
 
-      TaskCalendar? createdCalendar;
-
-      // Try to create on server first
+      // Create calendar using CalDAV service
       final caldavService = _ref.read(caldavServiceProvider(account!));
       final createResult = await caldavService.createCalendar(
         displayName: name,
         description: description,
       );
-
+      
+      TaskCalendar? createdCalendar;
       bool wasCreatedLocally = false;
-      await createResult.when(
-        success: (calendar) async {
-          AppLogger.info('ProjectCreationViewModel: Successfully created calendar on server');
+      
+      createResult.when(
+        success: (calendar) {
+          AppLogger.info('ProjectCreationViewModel: Successfully created calendar');
           createdCalendar = calendar;
         },
-        failure: (failure) async {
-          AppLogger.warning('ProjectCreationViewModel: Server creation failed: ${failure.message}');
+        failure: (failure) {
+          AppLogger.warning('ProjectCreationViewModel: Calendar creation failed: ${failure.message}');
           wasCreatedLocally = true;
-          
-          // Use CalDAV service to generate calendar path (centralized UUID generation)
-          final pathResult = await caldavService.generateCalendarPath();
-          await pathResult.when(
-            success: (localPath) async {
-              AppLogger.info('ProjectCreationViewModel: Creating local calendar with server-compatible path: $localPath');
-              
-              createdCalendar = TaskCalendarFactory.createNew(
-                path: localPath,
-                displayName: name,
-                description: description,
-              );
-            },
-            failure: (pathFailure) async {
-              AppLogger.error('ProjectCreationViewModel: Failed to generate calendar path: ${pathFailure.message}');
-              throw Exception('Failed to generate calendar path: ${pathFailure.message}');
-            },
-          );
+          throw Exception('Failed to create calendar: ${failure.message}');
         },
       );
 
       if (createdCalendar == null) {
-        throw Exception('Failed to create calendar both on server and locally');
+        throw Exception('Failed to create calendar');
       }
 
-      // Save calendar locally
-      final calendarRepo = _ref.read(calendarRepositoryProvider);
-      final saveRes = await calendarRepo.save(createdCalendar!);
-      await saveRes.when(
-        success: (_) async {
-          AppLogger.info('ProjectCreationViewModel: Calendar saved locally successfully');
-          
-          // Assign domain if provided
-          if (domain != null && domain.isNotEmpty) {
-            final domainService = _ref.read(domainServiceProvider);
-            final res = await domainService.assignDomainToCalendar(createdCalendar!.path, domain);
-            res.when(
-              success: (_) {
-                AppLogger.info('ProjectCreationViewModel: Domain assigned successfully');
-              },
-              failure: (f) {
-                AppLogger.warning('ProjectCreationViewModel: Domain assignment failed: ${f.message}');
-                // Don't fail the whole operation for domain assignment
-              },
-            );
-          }
-          
-          // Invalidate providers so UI refreshes
-          _ref.invalidate(projectListProvider);
-          _ref.invalidate(calendarListProvider);
-          _ref.invalidate(activeCalendarListProvider);
-          
-          AppLogger.info('ProjectCreationViewModel: Project creation completed successfully');
-          
-          // Update state to indicate success
-          state = state.copyWith(
-            isLoading: false, 
-            error: null,
-            wasCreatedLocally: wasCreatedLocally,
-          );
-        },
-        failure: (f) => throw Exception('Save calendar failed: ${f.message}'),
+      // Assign domain if provided
+      if (domain != null && domain.isNotEmpty) {
+        final domainService = _ref.read(domainServiceProvider);
+        final res = await domainService.assignDomainToCalendar(createdCalendar!.path, domain);
+        res.when(
+          success: (_) {
+            AppLogger.info('ProjectCreationViewModel: Domain assigned successfully');
+          },
+          failure: (f) {
+            AppLogger.warning('ProjectCreationViewModel: Domain assignment failed: ${f.message}');
+            // Don't fail the whole operation for domain assignment
+          },
+        );
+      }
+      
+      // Invalidate providers so UI refreshes
+      _ref.invalidate(projectListProvider);
+      _ref.invalidate(calendarListProvider);
+      _ref.invalidate(activeCalendarListProvider);
+      
+      AppLogger.info('ProjectCreationViewModel: Project creation completed successfully');
+      
+      // Update state to indicate success
+      state = state.copyWith(
+        isLoading: false, 
+        error: null,
+        wasCreatedLocally: wasCreatedLocally,
       );
       
     } catch (e, st) {
