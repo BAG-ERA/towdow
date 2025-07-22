@@ -77,6 +77,7 @@ class LoginViewModel extends StateNotifier<LoginState> {
       issuerUrl: "https://auth.towdow.app/realms/towdow",
       clientId: "radicale-api",
       serverUrl: "https://api.towdow.app",
+      providerType: "towdow_cloud",
     );
   }
 
@@ -90,6 +91,7 @@ class LoginViewModel extends StateNotifier<LoginState> {
       issuerUrl: issuerUrl,
       clientId: clientId,
       serverUrl: serverUrl,
+      providerType: 'towdow_self_hosted',
     );
   }
 
@@ -97,6 +99,7 @@ class LoginViewModel extends StateNotifier<LoginState> {
     required String issuerUrl,
     required String clientId,
     required String serverUrl,
+    String providerType = 'towdow_cloud',
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -150,7 +153,7 @@ class LoginViewModel extends StateNotifier<LoginState> {
       // Create account
       final account = CaldavAccount(
         id: const Uuid().v4(),
-        providerType: 'towdow_cloud',
+        providerType: providerType,
         serverUrl: serverUrl,
         username: email ?? '',
         accessToken: token.accessToken,
