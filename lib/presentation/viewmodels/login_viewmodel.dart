@@ -10,7 +10,9 @@
 //
 // Follows MVVM architecture with proper dependency injection
 
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:openid_client/openid_client_io.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
@@ -46,12 +48,12 @@ class LoginState {
     bool? hasExistingUserData,
     CalDAVCapabilities? capabilities,
   }) => LoginState(
-        isLoading: isLoading ?? this.isLoading,
-        error: error,
-        account: account ?? this.account,
-        hasExistingUserData: hasExistingUserData ?? this.hasExistingUserData,
-        capabilities: capabilities ?? this.capabilities,
-      );
+    isLoading: isLoading ?? this.isLoading,
+    error: error,
+    account: account ?? this.account,
+    hasExistingUserData: hasExistingUserData ?? this.hasExistingUserData,
+    capabilities: capabilities ?? this.capabilities,
+  );
 }
 
 // Login ViewModel
@@ -64,10 +66,10 @@ class LoginViewModel extends StateNotifier<LoginState> {
     required AccountRepository accountRepository,
     required UserSyncService userSyncService,
     required ExternalCalendarSyncService externalSyncService,
-  })  : _accountRepository = accountRepository,
-        _userSyncService = userSyncService,
-        _externalSyncService = externalSyncService,
-        super(const LoginState());
+  }) : _accountRepository = accountRepository,
+       _userSyncService = userSyncService,
+       _externalSyncService = externalSyncService,
+       super(const LoginState());
 
   /// Authenticate with TowDow Cloud using fixed configuration
   Future<void> authenticateWithTowDowCloud() async {
@@ -75,6 +77,7 @@ class LoginViewModel extends StateNotifier<LoginState> {
       issuerUrl: "https://auth.towdow.app/realms/towdow",
       clientId: "radicale-api",
       serverUrl: "https://api.towdow.app",
+      providerType: "towdow_cloud",
     );
   }
 
@@ -88,6 +91,7 @@ class LoginViewModel extends StateNotifier<LoginState> {
       issuerUrl: issuerUrl,
       clientId: clientId,
       serverUrl: serverUrl,
+      providerType: 'towdow_self_hosted',
     );
   }
 
@@ -95,6 +99,7 @@ class LoginViewModel extends StateNotifier<LoginState> {
     required String issuerUrl,
     required String clientId,
     required String serverUrl,
+    String providerType = 'towdow_cloud',
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -148,7 +153,7 @@ class LoginViewModel extends StateNotifier<LoginState> {
       // Create account
       final account = CaldavAccount(
         id: const Uuid().v4(),
-        providerType: 'towdow_cloud',
+        providerType: providerType,
         serverUrl: serverUrl,
         username: email ?? '',
         accessToken: token.accessToken,
@@ -174,7 +179,9 @@ class LoginViewModel extends StateNotifier<LoginState> {
       final hasExistingData = syncDownloadResult.when(
         success: (hasData) => hasData,
         failure: (failure) {
-          AppLogger.warning('Login: Failed to check for existing user data: ${failure.message}');
+          AppLogger.warning(
+            'Login: Failed to check for existing user data: ${failure.message}',
+          );
           return false;
         },
       );
@@ -184,11 +191,19 @@ class LoginViewModel extends StateNotifier<LoginState> {
         try {
           final syncResult = await _externalSyncService.syncAllAccounts();
           syncResult.when(
-            success: (_) => AppLogger.info('Login: External calendar sync completed successfully'),
-            failure: (failure) => AppLogger.warning('Login: External calendar sync failed: ${failure.message}'),
+            success: (_) => AppLogger.info(
+              'Login: External calendar sync completed successfully',
+            ),
+            failure: (failure) => AppLogger.warning(
+              'Login: External calendar sync failed: ${failure.message}',
+            ),
           );
         } catch (e, stackTrace) {
-          AppLogger.error('Login: Failed to trigger external calendar sync', e, stackTrace);
+          AppLogger.error(
+            'Login: Failed to trigger external calendar sync',
+            e,
+            stackTrace,
+          );
         }
 
         state = state.copyWith(
@@ -201,7 +216,6 @@ class LoginViewModel extends StateNotifier<LoginState> {
 
       // No existing data, test connection for capability discovery
       await _testConnectionAndDiscoverCapabilities(account);
-
     } catch (e, stackTrace) {
       AppLogger.error('Login: Authentication failed', e, stackTrace);
       state = state.copyWith(
@@ -211,7 +225,9 @@ class LoginViewModel extends StateNotifier<LoginState> {
     }
   }
 
-  Future<void> _testConnectionAndDiscoverCapabilities(CaldavAccount account) async {
+  Future<void> _testConnectionAndDiscoverCapabilities(
+    CaldavAccount account,
+  ) async {
     try {
       final caldavService = CalDAVService(account: account);
       final testResult = await caldavService.testConnection();
@@ -245,16 +261,148 @@ class LoginViewModel extends StateNotifier<LoginState> {
     state = state.copyWith(error: null);
   }
 
+  /// Authenticate with credentials (for web platform)
+  Future<void> authenticateWebTowDowCloud({
+    required String email,
+    required String password,
+  }) async {
+    return authenticateWebSelfHosted(
+      email: email,
+      password: password,
+      serverUrl: "https://api.towdow.app",
+      issuerUrl: "https://auth.towdow.app/realms/towdow",
+      clientId: "radicale-api",
+    );
+  }
+
+  /// Authenticate with self-hosted credentials (for web platform)
+  Future<void> authenticateWebSelfHosted({
+    required String email,
+    required String password,
+    required String serverUrl,
+    required String issuerUrl,
+    required String clientId,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      // Extract the tokenEndpoint from the issuer URL
+      final tokenEndpoint = "$issuerUrl/protocol/openid-connect/token";
+
+      // Make direct token request
+      final response = await http.post(
+        Uri.parse(tokenEndpoint),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'grant_type': 'password',
+          'client_id': clientId,
+          'username': email,
+          'password': password,
+          'scope': 'openid profile email offline_access',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Authentication failed: ${response.statusCode} ${response.reasonPhrase}',
+        );
+      }
+
+      final tokenData = jsonDecode(response.body);
+
+      // Create account
+      final account = CaldavAccount(
+        id: const Uuid().v4(),
+        providerType: serverUrl == "https://api.towdow.app"
+            ? 'towdow_cloud'
+            : 'towdow_self_hosted',
+        serverUrl: serverUrl,
+        username: email,
+        accessToken: tokenData['access_token'],
+        refreshToken: tokenData['refresh_token'],
+        tokenExpiry: DateTime.now().add(
+          Duration(seconds: tokenData['expires_in']),
+        ),
+        clientId: clientId,
+        issuerUrl: issuerUrl,
+        firstName: null,
+        // Would need to decode JWT token to get these
+        lastName: null,
+        email: email,
+        createdAt: DateTime.now(),
+        lastSyncAt: DateTime.now(),
+        isActive: true,
+      );
+
+      // Save account temporarily for user sync check
+      await _accountRepository.save(account);
+
+      // Check for existing user data
+      final syncDownloadResult = await _userSyncService.downloadUserData();
+      final hasExistingData = syncDownloadResult.when(
+        success: (hasData) => hasData,
+        failure: (failure) {
+          AppLogger.warning(
+            'Login: Failed to check for existing user data: ${failure.message}',
+          );
+          return false;
+        },
+      );
+
+      if (hasExistingData) {
+        // Trigger external calendar sync
+        try {
+          final syncResult = await _externalSyncService.syncAllAccounts();
+          syncResult.when(
+            success: (_) => AppLogger.info(
+              'Login: External calendar sync completed successfully',
+            ),
+            failure: (failure) => AppLogger.warning(
+              'Login: External calendar sync failed: ${failure.message}',
+            ),
+          );
+        } catch (e, stackTrace) {
+          AppLogger.error(
+            'Login: Failed to trigger external calendar sync',
+            e,
+            stackTrace,
+          );
+        }
+
+        state = state.copyWith(
+          account: account,
+          hasExistingUserData: true,
+          isLoading: false,
+        );
+        return;
+      }
+
+      // No existing data, test connection for capability discovery
+      await _testConnectionAndDiscoverCapabilities(account);
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Login: Authentication with credentials failed',
+        e,
+        stackTrace,
+      );
+      state = state.copyWith(
+        error: 'Authentication failed: ${e.toString()}',
+        isLoading: false,
+      );
+    }
+  }
+
   void reset() {
     state = const LoginState();
   }
 }
 
 // Provider
-final loginViewModelProvider = StateNotifierProvider.autoDispose<LoginViewModel, LoginState>(
-  (ref) => LoginViewModel(
-    accountRepository: ref.read(accountRepositoryProvider),
-    userSyncService: ref.read(userSyncServiceProvider),
-    externalSyncService: ref.read(externalCalendarSyncServiceProvider),
-  ),
-);
+final loginViewModelProvider =
+    StateNotifierProvider.autoDispose<LoginViewModel, LoginState>(
+      (ref) => LoginViewModel(
+        accountRepository: ref.read(accountRepositoryProvider),
+        userSyncService: ref.read(userSyncServiceProvider),
+        externalSyncService: ref.read(externalCalendarSyncServiceProvider),
+      ),
+    );

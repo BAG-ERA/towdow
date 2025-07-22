@@ -1,9 +1,9 @@
-﻿// Local storage service using Hive for offline-first data persistence
+// Local storage service using Hive for offline-first data persistence
 // Provides generic CRUD operations for all FlowIt models
 
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/caldav_account.dart';
@@ -53,11 +53,17 @@ class LocalStorageService {
     try {
       // AppLogger.info('LocalStorageService: Initializing Hive boxes');
 
-      // Initialize Hive with a platform-specific path
+
       // In test environment, Hive is already initialized
       if (!Hive.isBoxOpen(tasksBoxName)) {
-        final appDocumentDir = await getApplicationDocumentsDirectory();
-        Hive.init(appDocumentDir.path);
+        // Initialize Hive with a platform-specific path
+        if (kIsWeb) {
+          await Hive.initFlutter();
+        } else {
+          final appDocumentDir = await getApplicationDocumentsDirectory();
+          Hive.init(appDocumentDir.path);
+        }
+
       }
       
       // Try to open boxes, but handle corrupted data gracefully

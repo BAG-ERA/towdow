@@ -1,0 +1,9 @@
+{
+  "name": "Towdow Flutter",
+  "short_name": "Towdow",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "description": "A new Flutter project."
+} 
