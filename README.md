@@ -1,6 +1,19 @@
 # TowDow_app
 
+## local development
 
+### Web
+
+When running flutter in your browser for local test (ex. ```flutter run -d chrome```) you MUST authorise the origin in KeyCloak to prevent CORS errors.
+For TowDow Cloud we allow the following origins for test:
+* http://localhost:36123
+* http://127.0.0.1:8080
+* http://127.0.0.1:8000
+
+to run the application locally use this command:
+```shell
+flutter run -d chrome --web-port=36123
+```
 
 ## configuring CI
 
