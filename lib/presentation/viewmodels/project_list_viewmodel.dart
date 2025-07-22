@@ -299,7 +299,6 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   void _startListeningToRepositoryChanges() {
     // Listen to calendar repository stream for automatic updates
     _calendarRepository.watchCalendars().listen((calendars) {
-      AppLogger.info('ProjectListViewModel: Repository stream update - ${calendars.length} calendars');
       // Automatically reload projects when repository data changes
       loadProjects();
     });

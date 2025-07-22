@@ -212,51 +212,8 @@ class LocalStorageService {
     // Generic put item in a box
   Future<Result<void>> put<T>(String boxName, String key, T item) async {
     try {
-      AppLogger.info('💾 LocalStorageService: PUT item with key $key in $boxName');
-      
-      // Debug TaskCalendar specifically
-      if (item is TaskCalendar) {
-        AppLogger.info('💾 LocalStorageService:   TaskCalendar DisplayName: "${item.displayName}"');
-        AppLogger.info('💾 LocalStorageService:   TaskCalendar Description: "${item.description}"');
-        AppLogger.info('💾 LocalStorageService:   TaskCalendar ETag: ${item.etag ?? "(null)"}');
-        AppLogger.info('💾 LocalStorageService:   TaskCalendar SyncToken: ${item.syncToken ?? "(null)"}');
-        AppLogger.info('💾 LocalStorageService:   TaskCalendar LastSyncAt: ${item.lastSyncAt}');
-        AppLogger.info('💾 LocalStorageService:   TaskCalendar LastModified: ${item.lastModified}');
-      }
-      
       final box = _getBox(boxName);
       await box.put(key, item);
-      
-      AppLogger.info('💾 LocalStorageService: PUT SUCCESS for $key in $boxName');
-      
-      // Immediate verification read for TaskCalendar
-      if (item is TaskCalendar) {
-        final retrievedItem = box.get(key);
-        if (retrievedItem is TaskCalendar) {
-          AppLogger.info('💾 LocalStorageService: IMMEDIATE VERIFY READ:');
-          AppLogger.info('💾 LocalStorageService:   Verified DisplayName: "${retrievedItem.displayName}"');
-          AppLogger.info('💾 LocalStorageService:   Verified Description: "${retrievedItem.description}"');
-          AppLogger.info('💾 LocalStorageService:   Verified ETag: ${retrievedItem.etag ?? "(null)"}');
-          AppLogger.info('💾 LocalStorageService:   Verified SyncToken: ${retrievedItem.syncToken ?? "(null)"}');
-          AppLogger.info('💾 LocalStorageService:   Verified LastSyncAt: ${retrievedItem.lastSyncAt}');
-          AppLogger.info('💾 LocalStorageService:   Verified LastModified: ${retrievedItem.lastModified}');
-          
-          if (retrievedItem.displayName != item.displayName) {
-            AppLogger.error('💾 LocalStorageService: ❌ HIVE DISPLAYNAME MISMATCH! Expected: "${item.displayName}", Got: "${retrievedItem.displayName}"');
-          }
-          if (retrievedItem.description != item.description) {
-            AppLogger.error('💾 LocalStorageService: ❌ HIVE DESCRIPTION MISMATCH! Expected: "${item.description}", Got: "${retrievedItem.description}"');
-          }
-          if (retrievedItem.etag != item.etag) {
-            AppLogger.error('💾 LocalStorageService: ❌ HIVE ETag MISMATCH! Expected: ${item.etag}, Got: ${retrievedItem.etag}');
-          }
-          if (retrievedItem.syncToken != item.syncToken) {
-            AppLogger.error('💾 LocalStorageService: ❌ HIVE SyncToken MISMATCH! Expected: ${item.syncToken}, Got: ${retrievedItem.syncToken}');
-          }
-        } else {
-          AppLogger.error('💾 LocalStorageService: ❌ Retrieved item is not TaskCalendar: ${retrievedItem.runtimeType}');
-        }
-      }
       
       return const Result.success(null);
     } catch (e, stackTrace) {

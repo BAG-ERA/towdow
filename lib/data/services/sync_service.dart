@@ -382,25 +382,10 @@ class SyncService {
                 attendees: serverCalendar.attendees.isNotEmpty ? serverCalendar.attendees : calendar.attendees,
               );
               
-              AppLogger.debug('🔄 SyncService: After copyWith for ETag update:');
-              AppLogger.debug('🔄 SyncService:   Updated ETag: ${updatedCalendar.etag ?? "(null)"}');
-              
               final saveResult = await _calendarRepository.save(updatedCalendar);
               await saveResult.when(
                 success: (_) async {
                   AppLogger.info('🔄 SyncService: Calendar ${calendar.path} ETag updated successfully');
-                  
-                  // Verify the ETag save
-                  final verifyResult = await _calendarRepository.getByPath(calendar.path);
-                  await verifyResult.when(
-                    success: (verifiedCalendar) async {
-                      AppLogger.debug('🔄 SyncService: ETag VERIFICATION - Retrieved calendar:');
-                      AppLogger.debug('🔄 SyncService:   Verified ETag: ${verifiedCalendar?.etag ?? "(null)"}');
-                    },
-                    failure: (failure) async {
-                      AppLogger.error('🔄 SyncService: ETag VERIFICATION FAILED: ${failure.message}');
-                    },
-                  );
                 },
                 failure: (failure) async {
                   AppLogger.error('🔄 SyncService: Failed to save ETag update: ${failure.message}');
@@ -926,10 +911,6 @@ class SyncService {
         success: (serverCalendar) async {
           // Update calendar with new sync token and ETag
           AppLogger.info('🔄 SyncService: Updating calendar ${calendar.path}');
-          AppLogger.info('🔄 SyncService:   Original ETag: ${calendar.etag ?? "(null)"}');
-          AppLogger.info('🔄 SyncService:   Original sync token: ${calendar.syncToken ?? "(null)"}');
-          AppLogger.info('🔄 SyncService:   New sync token: ${newSyncToken ?? "(null)"}');
-          AppLogger.info('🔄 SyncService:   New ETag: ${serverCalendar.etag ?? "(null)"}');
           
           final updatedCalendar = calendar.copyWith(
             syncToken: newSyncToken,
@@ -948,30 +929,14 @@ class SyncService {
             attendees: serverCalendar.attendees,
           );
           
-          // Debug the copyWith result
-          AppLogger.info('🔄 SyncService: After copyWith:');
-          AppLogger.info('🔄 SyncService:   Updated ETag: ${updatedCalendar.etag ?? "(null)"}');
-          AppLogger.info('🔄 SyncService:   Updated sync token: ${updatedCalendar.syncToken ?? "(null)"}');
-          AppLogger.info('🔄 SyncService:   Updated lastSyncAt: ${updatedCalendar.lastSyncAt}');
+
           
           final saveResult = await _calendarRepository.save(updatedCalendar);
           await saveResult.when(
             success: (_) async {
               AppLogger.info('🔄 SyncService: Calendar ${calendar.path} sync token and ETag updated successfully');
               
-              // Verify the save by retrieving the calendar again
-              final verifyResult = await _calendarRepository.getByPath(calendar.path);
-              await verifyResult.when(
-                success: (verifiedCalendar) async {
-                  AppLogger.info('🔄 SyncService: VERIFICATION - Retrieved calendar after save:');
-                  AppLogger.info('🔄 SyncService:   Verified ETag: ${verifiedCalendar?.etag ?? "(null)"}');
-                  AppLogger.info('🔄 SyncService:   Verified sync token: ${verifiedCalendar?.syncToken ?? "(null)"}');
-                  AppLogger.info('🔄 SyncService:   Verified lastSyncAt: ${verifiedCalendar?.lastSyncAt}');
-                },
-                failure: (failure) async {
-                  AppLogger.error('🔄 SyncService: VERIFICATION FAILED - Could not retrieve calendar after save: ${failure.message}');
-                },
-              );
+
             },
             failure: (failure) async {
               AppLogger.error('🔄 SyncService: Failed to save calendar ${calendar.path}: ${failure.message}');
