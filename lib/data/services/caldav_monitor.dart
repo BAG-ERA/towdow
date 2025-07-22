@@ -18,13 +18,12 @@ class CalDAVMonitor {
   // Dependencies - focused on calendar monitoring
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
-  final CategoryRepository _categoryRepository;
   final ConnectionMonitorService _connectionMonitorService;
   final SyncService _syncService;
 
   // Dynamic interval configuration
-  static const Duration _minInterval = Duration(seconds: 2);
-  static const Duration _maxInterval = Duration(seconds: 4);
+  static const Duration _minInterval = Duration(seconds: 1);
+  static const Duration _maxInterval = Duration(seconds: 40);
   static const Duration _initialInterval = Duration(seconds: 10);
   static const double _changeMultiplier = 0.5; // Divide by 2 when change detected
   static const double _noChangeMultiplier = 1.5; // Multiply by 1.5 when no change
@@ -42,7 +41,6 @@ class CalDAVMonitor {
     required SyncService syncService,
   })  : _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
-        _categoryRepository = categoryRepository,
         _connectionMonitorService = connectionMonitorService,
         _syncService = syncService;
 
@@ -186,7 +184,7 @@ class CalDAVMonitor {
                       // Get fresh calendar data from repository to ensure we have current state
       AppLogger.debug('CalDAVMonitor: About to retrieve fresh calendar from repository for ${calendar.path}');
       final freshCalendarResult = await _calendarRepository.getById(calendar.path);
-      await freshCalendarResult.when(
+      return await freshCalendarResult.when(
         success: (freshCalendar) async {
           if (freshCalendar == null) {
             AppLogger.warning('CalDAVMonitor: Calendar not found in repository: ${calendar.path}');
@@ -249,7 +247,6 @@ class CalDAVMonitor {
       AppLogger.error('CalDAVMonitor: Failed to check changes for ${calendar.displayName}', e, stackTrace);
       return false;
     }
-    return false; // Fallback return
   }
 
   /// Update interval based on whether changes were detected
@@ -282,19 +279,6 @@ class CalDAVMonitor {
       _performChangeMonitoring();
     });
   }
-
-  /// Update last sync time for all calendars
-  Future<void> _updateLastSyncTime(List<TaskCalendar> calendars) async {
-    try {
-      for (final calendar in calendars) {
-        final updatedCalendar = calendar.copyWith(lastSyncAt: DateTime.now());
-        await _calendarRepository.save(updatedCalendar);
-      }
-    } catch (e, stackTrace) {
-      AppLogger.error('CalDAVMonitor: Failed to update last sync time', e, stackTrace);
-    }
-  }
-
   /// Check if monitoring is active
   bool get isMonitoring => _isMonitoring;
 
