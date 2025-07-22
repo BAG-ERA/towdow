@@ -2,6 +2,7 @@
 // Allows users to connect to TowDow Cloud using OAuth2 authentication
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -169,7 +170,8 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
         textAlign: TextAlign.center,
       ),
       const SizedBox(height: 24),
-      Form(
+              AutofillGroup(
+        child: Form(
         key: _formKey,
         child: Column(
           children: [
@@ -181,6 +183,7 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
                 prefixIcon: Icon(Icons.email_outlined),
               ),
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.username, AutofillHints.email],
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your email';
@@ -200,6 +203,7 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
                 prefixIcon: Icon(Icons.lock_outline),
               ),
               obscureText: true,
+              autofillHints: const [AutofillHints.password],
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your password';
@@ -226,6 +230,7 @@ class _FlowitCloudDialogState extends ConsumerState<FlowitCloudDialog> {
             ),
           ],
         ),
+      ),
       ),
     ];
   }
