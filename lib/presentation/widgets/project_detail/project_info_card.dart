@@ -325,40 +325,11 @@ class _ProjectSharingStatus extends ConsumerWidget {
 
     // Get current account to check if project is shared with me
     final currentAccount = accountAsync.asData?.value;
-    final calendarHome = currentAccount?.calendarHome;
+    final userPrincipal = currentAccount?.principal;
     
-    // Check if project is shared with me by comparing current user with project owner
-    bool isSharedWithMe = false;
-    if (calendarHome != null && calendarHome.isNotEmpty) {
-      // Extract username from calendar home path
-      final pathSegments = calendarHome.split('/').where((s) => s.isNotEmpty).toList();
-      String currentUser = '';
-      if (pathSegments.length >= 2) {
-        final calendarIndex = pathSegments.indexOf('calendars');
-        if (calendarIndex >= 0 && calendarIndex + 1 < pathSegments.length) {
-          currentUser = pathSegments[calendarIndex + 1];
-        } else if (pathSegments.length >= 2) {
-          currentUser = pathSegments[1];
-        }
-      }
-      
-      // Extract owner from project
-      final ownerPath = project.flowitOwner ?? project.path;
-      final ownerSegments = ownerPath.split('/').where((s) => s.isNotEmpty).toList();
-      String ownerUser = '';
-      if (ownerSegments.length >= 2) {
-        final calendarIndex = ownerSegments.indexOf('calendars');
-        if (calendarIndex >= 0 && calendarIndex + 1 < ownerSegments.length) {
-          ownerUser = ownerSegments[calendarIndex + 1];
-        } else if (ownerSegments.length >= 2) {
-          ownerUser = ownerSegments[1];
-        }
-      }
-      
-      isSharedWithMe = currentUser.isNotEmpty && ownerUser.isNotEmpty && currentUser != ownerUser;
-    }
-    
-    final isSharedWithOthers = project.sharedWithMembers.isNotEmpty;
+    // Use existing methods to check sharing status
+    final isSharedWithMe = project.isSharedWithMe(userPrincipal);
+    final isSharedWithOthers = project.isSharedWithOthers;
 
     if (!isSharedWithMe && !isSharedWithOthers) {
       // Project is not shared - show quick share button

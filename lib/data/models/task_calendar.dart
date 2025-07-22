@@ -245,14 +245,12 @@ extension TaskCalendarSharing on TaskCalendar {
   bool get isSharedWith => sharedWithMembers.isNotEmpty;
 
   /// Check if project is shared with me (owner != current user)
-  bool isSharedWithMe(String? currentCalendarHome) {
-    if (currentCalendarHome == null || currentCalendarHome.isEmpty) return false;
+  bool isSharedWithMe(String? currentUserPrincipal) {
+    if (currentUserPrincipal == null || currentUserPrincipal.isEmpty) return false;
+    if (flowitOwner == null || flowitOwner!.isEmpty) return false;
     
-    // Extract username from calendar home path
-    final currentUser = _extractUserFromPath(currentCalendarHome);
-    final ownerUser = flowitOwner != null ? _extractUserFromPath(flowitOwner!) : _extractUserFromPath(path);
-    
-    return currentUser.isNotEmpty && ownerUser.isNotEmpty && currentUser != ownerUser;
+    // Compare the project's flowitOwner directly with the user's principal
+    return flowitOwner != currentUserPrincipal;
   }
 
   /// Computed property: Check if this project is shared with others  
@@ -264,23 +262,8 @@ extension TaskCalendarSharing on TaskCalendar {
     // Handle different CalDAV path formats:
     // /calendars/username/ or /principals/users/username/ or similar
     final segments = path.split('/').where((s) => s.isNotEmpty).toList();
-    
-    if (segments.length >= 2) {
-      // Look for common patterns: calendars/username or principals/users/username
-      final calendarIndex = segments.indexOf('calendars');
-      final principalIndex = segments.indexOf('principals');
-      
-      if (calendarIndex >= 0 && calendarIndex + 1 < segments.length) {
-        return segments[calendarIndex + 1];
-      } else if (principalIndex >= 0 && principalIndex + 2 < segments.length) {
-        return segments[principalIndex + 2]; // principals/users/username
-      } else if (segments.length >= 2) {
-        // Fallback: use second segment
-        return segments[1];
-      }
-    }
-    
-    return '';
+    final userPath = segments.length >= 2 ? segments.first : '';
+    return userPath;
   }
 
   /// Get list of users this project is shared with
