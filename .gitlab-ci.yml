@@ -1,5 +1,6 @@
 stages:
   - prepare
+  - test
   - build
   - release
 
@@ -60,6 +61,17 @@ variables:
 #      when: always
 #    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 #      when: manual
+
+test:
+  stage: test
+  image: $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - flutter pub get
+    - dart run build_runner build --delete-conflicting-outputs
+    - flutter test
 
 build_appimage:
   stage: build
