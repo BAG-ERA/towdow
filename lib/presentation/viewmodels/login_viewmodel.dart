@@ -10,7 +10,9 @@
 //
 // Follows MVVM architecture with proper dependency injection
 
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:openid_client/openid_client_io.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
@@ -243,6 +245,103 @@ class LoginViewModel extends StateNotifier<LoginState> {
 
   void clearError() {
     state = state.copyWith(error: null);
+  }
+
+  /// Authenticate with credentials (for web platform)
+  Future<void> authenticateWithCredentials({
+    required String email,
+    required String password,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      // Use fixed TowDow Cloud configuration
+      final serverUrl = "https://api.towdow.app";
+      final tokenEndpoint = "https://auth.towdow.app/realms/towdow/protocol/openid-connect/token";
+
+      // Make direct token request
+      final response = await http.post(
+        Uri.parse(tokenEndpoint),
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: {
+          'grant_type': 'password',
+          'client_id': 'radicale-api',
+          'username': email,
+          'password': password,
+          'scope': 'openid profile email offline_access',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Authentication failed: ${response.statusCode} ${response.reasonPhrase}');
+      }
+
+      final tokenData = jsonDecode(response.body);
+
+      // Create account
+      final account = CaldavAccount(
+        id: const Uuid().v4(),
+        providerType: 'towdow_cloud',
+        serverUrl: serverUrl,
+        username: email,
+        accessToken: tokenData['access_token'],
+        refreshToken: tokenData['refresh_token'],
+        tokenExpiry: DateTime.now().add(Duration(seconds: tokenData['expires_in'])),
+        clientId: 'radicale-api',
+        issuerUrl: 'https://auth.towdow.app/realms/towdow',
+        firstName: null, // Would need to decode JWT token to get these
+        lastName: null,
+        email: email,
+        createdAt: DateTime.now(),
+        lastSyncAt: DateTime.now(),
+        isActive: true,
+      );
+
+      // Save account temporarily for user sync check
+      await _accountRepository.save(account);
+
+      // Check for existing user data
+      final syncDownloadResult = await _userSyncService.downloadUserData();
+      final hasExistingData = syncDownloadResult.when(
+        success: (hasData) => hasData,
+        failure: (failure) {
+          AppLogger.warning('Login: Failed to check for existing user data: ${failure.message}');
+          return false;
+        },
+      );
+
+      if (hasExistingData) {
+        // Trigger external calendar sync
+        try {
+          final syncResult = await _externalSyncService.syncAllAccounts();
+          syncResult.when(
+            success: (_) => AppLogger.info('Login: External calendar sync completed successfully'),
+            failure: (failure) => AppLogger.warning('Login: External calendar sync failed: ${failure.message}'),
+          );
+        } catch (e, stackTrace) {
+          AppLogger.error('Login: Failed to trigger external calendar sync', e, stackTrace);
+        }
+
+        state = state.copyWith(
+          account: account,
+          hasExistingUserData: true,
+          isLoading: false,
+        );
+        return;
+      }
+
+      // No existing data, test connection for capability discovery
+      await _testConnectionAndDiscoverCapabilities(account);
+
+    } catch (e, stackTrace) {
+      AppLogger.error('Login: Authentication with credentials failed', e, stackTrace);
+      state = state.copyWith(
+        error: 'Authentication failed: ${e.toString()}',
+        isLoading: false,
+      );
+    }
   }
 
   void reset() {
