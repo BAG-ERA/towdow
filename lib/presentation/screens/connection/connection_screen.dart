@@ -4,8 +4,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'widgets/custom_caldav_dialog.dart';
-import 'widgets/towdow-cloud_dialog.dart';
-import 'widgets/towdow-self-hosted_dialog.dart';
+import 'widgets/towdow_cloud_dialog.dart';
+import 'widgets/towdow_self_hosted_dialog.dart';
 
 class ConnectionScreen extends ConsumerWidget {
   const ConnectionScreen({super.key});
@@ -44,7 +44,7 @@ class ConnectionScreen extends ConsumerWidget {
               onTap: () {
                 showDialog(
                   context: context,
-                  builder: (context) => const FlowitCloudDialog(),
+                  builder: (context) => const TowdowCloudDialog(),
                 );
               },
             ),
