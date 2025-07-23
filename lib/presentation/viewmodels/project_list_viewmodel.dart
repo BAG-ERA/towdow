@@ -1,6 +1,7 @@
 ﻿// Project List ViewModel for managing project list with sync state
 // Handles project loading, filtering, and synchronization tracking
 
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/repositories/calendar_repository.dart';
@@ -284,6 +285,9 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   // DomainService removed - domain operations now handled by repository
   final AccountRepository _accountRepository;
   final UserRepository _userRepository;
+  
+  // Stream subscription for repository changes
+  StreamSubscription? _calendarSubscription;
 
   ProjectListViewModel(
     this._calendarRepository,
@@ -298,15 +302,27 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   /// Start listening to repository changes for automatic UI updates
   void _startListeningToRepositoryChanges() {
     // Listen to calendar repository stream for automatic updates
-    _calendarRepository.watchCalendars().listen((calendars) {
-      // Automatically reload projects when repository data changes
-      loadProjects();
+    _calendarSubscription = _calendarRepository.watchCalendars().listen((calendars) {
+      // Only reload if the ViewModel is still mounted
+      if (mounted) {
+        loadProjects();
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    // Cancel the stream subscription to prevent memory leaks
+    _calendarSubscription?.cancel();
+    super.dispose();
   }
 
   /// Initialize the view model
   Future<void> initialize() async {
     // AppLogger.info('ProjectListViewModel: Initializing');
+    
+    // Check if still mounted before updating state
+    if (!mounted) return;
     
     state = state.copyWith(isLoading: true, error: null);
     
@@ -315,16 +331,22 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
       // AppLogger.info('ProjectListViewModel: Initialized successfully');
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Failed to initialize', e, stackTrace);
-      state = state.copyWith(
-        isLoading: false,
-        error: 'Failed to initialize: $e',
-      );
+      // Check if still mounted before updating state
+      if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Failed to initialize: $e',
+        );
+      }
     }
   }
 
   /// Load all projects with their statistics
   Future<void> loadProjects() async {
     // AppLogger.info('ProjectListViewModel: Loading projects');
+    
+    // Check if still mounted before proceeding
+    if (!mounted) return;
     
     try {
       // Load all calendars (projects)
@@ -338,6 +360,9 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           final projectsWithStats = <ProjectWithStats>[];
           
           for (final calendar in calendars) {
+            // Check if still mounted before each async operation
+            if (!mounted) return;
+            
             try {
               final tasksResult = await _taskRepository.getByProject(calendar.path);
               
@@ -379,6 +404,9 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
             }
           }
           
+          // Check if still mounted before updating state
+          if (!mounted) return;
+          
           // Calculate overall statistics
           final totalProjects = projectsWithStats.length;
           final completedProjects = projectsWithStats.where((p) => p.stats.progressPercentage == 100).length;
@@ -401,26 +429,35 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         },
         failure: (failure) async {
           AppLogger.error('ProjectListViewModel: Failed to load calendars', failure.exception, failure.stackTrace);
-          state = state.copyWith(
-            isLoading: false,
-            isRefreshing: false,
-            error: 'Failed to load projects: ${failure.message}',
-          );
+          // Check if still mounted before updating state
+          if (mounted) {
+            state = state.copyWith(
+              isLoading: false,
+              isRefreshing: false,
+              error: 'Failed to load projects: ${failure.message}',
+            );
+          }
         },
       );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Exception loading projects', e, stackTrace);
-      state = state.copyWith(
-        isLoading: false,
-        isRefreshing: false,
-        error: 'Failed to load projects: $e',
-      );
+      // Check if still mounted before updating state
+      if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          error: 'Failed to load projects: $e',
+        );
+      }
     }
   }
 
   /// Refresh projects list (pull-to-refresh)
   Future<void> refresh() async {
     // AppLogger.info('ProjectListViewModel: Refreshing projects');
+    
+    // Check if still mounted before updating state
+    if (!mounted) return;
     
     state = state.copyWith(isRefreshing: true, error: null);
     
@@ -429,38 +466,53 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
       await loadProjects();
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Exception during refresh', e, stackTrace);
-      state = state.copyWith(
-        isRefreshing: false,
-        error: 'Failed to refresh: $e',
-      );
+      // Check if still mounted before updating state
+      if (mounted) {
+        state = state.copyWith(
+          isRefreshing: false,
+          error: 'Failed to refresh: $e',
+        );
+      }
     }
   }
 
   /// Set search query
   void setSearchQuery(String query) {
     // AppLogger.info('ProjectListViewModel: Setting search query: "$query"');
-    state = state.copyWith(searchQuery: query);
+    // Check if still mounted before updating state
+    if (mounted) {
+      state = state.copyWith(searchQuery: query);
+    }
   }
 
   /// Set project filter
   void setFilter(ProjectFilter filter) {
     // AppLogger.info('ProjectListViewModel: Setting filter: $filter');
-    state = state.copyWith(filter: filter);
+    // Check if still mounted before updating state
+    if (mounted) {
+      state = state.copyWith(filter: filter);
+    }
   }
 
   /// Set project sort order
   void setSortBy(ProjectSort sortBy) {
     // AppLogger.info('ProjectListViewModel: Setting sort: $sortBy');
-    state = state.copyWith(sortBy: sortBy);
+    // Check if still mounted before updating state
+    if (mounted) {
+      state = state.copyWith(sortBy: sortBy);
+    }
   }
 
   /// Clear search and filters
   void clearFilters() {
     // AppLogger.info('ProjectListViewModel: Clearing filters');
-    state = state.copyWith(
-      searchQuery: '',
-      filter: ProjectFilter.all,
-    );
+    // Check if still mounted before updating state
+    if (mounted) {
+      state = state.copyWith(
+        searchQuery: '',
+        filter: ProjectFilter.all,
+      );
+    }
   }
 
   /// Create a new project
@@ -471,6 +523,9 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     List<String> categories = const [],
   }) async {
     // AppLogger.info('ProjectListViewModel: Creating project: $name');
+    
+    // Check if still mounted before proceeding
+    if (!mounted) return;
     
     try {
       state = state.copyWith(error: null);
@@ -494,18 +549,27 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
                },
                failure: (failure) async {
                  AppLogger.error('ProjectListViewModel: Failed to save project locally', failure.exception, failure.stackTrace);
-                 state = state.copyWith(error: 'Failed to save project: ${failure.message}');
+                 // Check if still mounted before updating state
+                 if (mounted) {
+                   state = state.copyWith(error: 'Failed to save project: ${failure.message}');
+                 }
                },
              );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Exception creating project', e, stackTrace);
-      state = state.copyWith(error: 'Failed to create project: $e');
+      // Check if still mounted before updating state
+      if (mounted) {
+        state = state.copyWith(error: 'Failed to create project: $e');
+      }
     }
   }
 
   /// Delete a project
   Future<void> deleteProject(String projectPath) async {
     AppLogger.info('ProjectListViewModel: Deleting project: $projectPath');
+    
+    // Check if still mounted before proceeding
+    if (!mounted) return;
     
     try {
       state = state.copyWith(error: null);
@@ -532,24 +596,36 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
             },
             failure: (failure) async {
               AppLogger.error('ProjectListViewModel: Failed to delete project locally', failure.exception, failure.stackTrace);
-              state = state.copyWith(error: 'Failed to delete project: ${failure.message}');
+              // Check if still mounted before updating state
+              if (mounted) {
+                state = state.copyWith(error: 'Failed to delete project: ${failure.message}');
+              }
             },
           );
         },
         failure: (failure) async {
           AppLogger.error('ProjectListViewModel: Failed to get project for deletion', failure.exception, failure.stackTrace);
-          state = state.copyWith(error: 'Failed to delete project: ${failure.message}');
+          // Check if still mounted before updating state
+          if (mounted) {
+            state = state.copyWith(error: 'Failed to delete project: ${failure.message}');
+          }
         },
       );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Exception deleting project', e, stackTrace);
-      state = state.copyWith(error: 'Failed to delete project: $e');
+      // Check if still mounted before updating state
+      if (mounted) {
+        state = state.copyWith(error: 'Failed to delete project: $e');
+      }
     }
   }
 
   /// Clear any errors
   void clearError() {
-    state = state.copyWith(error: null);
+    // Check if still mounted before updating state
+    if (mounted) {
+      state = state.copyWith(error: null);
+    }
   }
 
   /// Get project by ID
@@ -602,20 +678,29 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   /// Set domain filter
   void setDomainFilter(String? domain) {
     // AppLogger.info('ProjectListViewModel: Setting domain filter: ${domain ?? "All"}');
-    state = state.copyWith(selectedDomain: domain);
+    // Check if still mounted before updating state
+    if (mounted) {
+      state = state.copyWith(selectedDomain: domain);
+    }
   }
 
   /// Toggle domain grouping
   void toggleDomainGrouping() {
     // AppLogger.info('ProjectListViewModel: Toggling domain grouping');
-    state = state.copyWith(isDomainGroupingEnabled: !state.isDomainGroupingEnabled);
+    // Check if still mounted before updating state
+    if (mounted) {
+      state = state.copyWith(isDomainGroupingEnabled: !state.isDomainGroupingEnabled);
+    }
   }
 
   /// Toggle domain expansion state
   void toggleDomainExpansion(String domain) {
-    final newExpandedState = Map<String, bool>.from(state.domainExpandedState);
-    newExpandedState[domain] = !(newExpandedState[domain] ?? true);
-    state = state.copyWith(domainExpandedState: newExpandedState);
+    // Check if still mounted before updating state
+    if (mounted) {
+      final newExpandedState = Map<String, bool>.from(state.domainExpandedState);
+      newExpandedState[domain] = !(newExpandedState[domain] ?? true);
+      state = state.copyWith(domainExpandedState: newExpandedState);
+    }
   }
 
   /// Get domain expansion state
@@ -626,6 +711,9 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   /// Assign domain to project
   Future<void> assignDomainToProject(String projectPath, String? domain) async {
     // AppLogger.info('ProjectListViewModel: Assigning domain "$domain" to project $projectPath');
+    
+    // Check if still mounted before proceeding
+    if (!mounted) return;
     
     try {
       state = state.copyWith(error: null);
@@ -644,28 +732,43 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
               },
               failure: (failure) async {
                 AppLogger.error('ProjectListViewModel: Failed to assign domain', failure.exception, failure.stackTrace);
-                state = state.copyWith(error: 'Failed to assign domain: ${failure.message}');
+                // Check if still mounted before updating state
+                if (mounted) {
+                  state = state.copyWith(error: 'Failed to assign domain: ${failure.message}');
+                }
               },
             );
           } else {
             AppLogger.error('ProjectListViewModel: Project not found for domain assignment');
-            state = state.copyWith(error: 'Project not found');
+            // Check if still mounted before updating state
+            if (mounted) {
+              state = state.copyWith(error: 'Project not found');
+            }
           }
         },
         failure: (failure) async {
           AppLogger.error('ProjectListViewModel: Failed to get project for domain assignment', failure.exception, failure.stackTrace);
-          state = state.copyWith(error: 'Failed to get project: ${failure.message}');
+          // Check if still mounted before updating state
+          if (mounted) {
+            state = state.copyWith(error: 'Failed to get project: ${failure.message}');
+          }
         },
       );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Exception assigning domain', e, stackTrace);
-      state = state.copyWith(error: 'Failed to assign domain: $e');
+      // Check if still mounted before updating state
+      if (mounted) {
+        state = state.copyWith(error: 'Failed to assign domain: $e');
+      }
     }
   }
 
   /// Reorder project to a new position in the user's custom ordering
   Future<void> reorderProject(String projectPath, int newIndex) async {
     AppLogger.info('ProjectListViewModel: Reordering project $projectPath to index $newIndex');
+    
+    // Check if still mounted before proceeding
+    if (!mounted) return;
     
     try {
       state = state.copyWith(error: null);
@@ -681,19 +784,28 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         },
         failure: (failure) async {
           AppLogger.error('ProjectListViewModel: Failed to reorder project', failure.exception, failure.stackTrace);
-          state = state.copyWith(error: 'Failed to reorder project: ${failure.message}');
+          // Check if still mounted before updating state
+          if (mounted) {
+            state = state.copyWith(error: 'Failed to reorder project: ${failure.message}');
+          }
         },
       );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectListViewModel: Exception reordering project', e, stackTrace);
-      state = state.copyWith(error: 'Failed to reorder project: $e');
+      // Check if still mounted before updating state
+      if (mounted) {
+        state = state.copyWith(error: 'Failed to reorder project: $e');
+      }
     }
   }
 
   /// Set custom sort order as the default
   Future<void> setCustomSortOrder() async {
     AppLogger.info('ProjectListViewModel: Switching to custom sort order');
-    state = state.copyWith(sortBy: ProjectSort.custom);
+    // Check if still mounted before updating state
+    if (mounted) {
+      state = state.copyWith(sortBy: ProjectSort.custom);
+    }
   }
 
   /// Get projects in user-defined order (for custom sorting)

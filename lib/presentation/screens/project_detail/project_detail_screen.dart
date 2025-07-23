@@ -63,10 +63,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   @override
   void dispose() {
-    // Clear mobile providers when leaving the screen
-    ref.read(mobileTitleProvider.notifier).state = null;
-    ref.read(mobileProjectProvider.notifier).state = null;
-    ref.read(mobileProjectUpdateProvider.notifier).state = null;
+    // Note: Mobile providers are automatically cleaned up when the widget tree is disposed
+    // No need to manually clear them here as it can cause disposal errors
     super.dispose();
   }
 
