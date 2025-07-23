@@ -16,13 +16,13 @@ enum AuthDialogType {
   selfHosted
 }
 
-abstract class BaseAuthDialog extends ConsumerStatefulWidget {
+abstract class BaseCloudAuthDialog extends ConsumerStatefulWidget {
   final AuthDialogType type;
 
-  const BaseAuthDialog({required this.type, super.key});
+  const BaseCloudAuthDialog({required this.type, super.key});
 }
 
-abstract class BaseAuthDialogState<T extends BaseAuthDialog> extends ConsumerState<T> {
+abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends ConsumerState<T> {
   // Make controllers protected so subclasses can access them
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -61,10 +61,6 @@ abstract class BaseAuthDialogState<T extends BaseAuthDialog> extends ConsumerSta
       });
     }
 
-    // Set default values for self-hosted if needed
-    if (widget.type == AuthDialogType.selfHosted) {
-      _clientIdController.text = 'radicale-api'; // Default client ID
-    }
   }
 
   Future<void> _login() async {
@@ -98,7 +94,7 @@ abstract class BaseAuthDialogState<T extends BaseAuthDialog> extends ConsumerSta
     }
 
     if (!formKey.currentState!.validate()) {
-      AppLogger.info("Form validation failed");
+      AppLogger.error("Form validation failed");
       return;
     }
 

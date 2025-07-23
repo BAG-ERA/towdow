@@ -5,16 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../viewmodels/login_viewmodel.dart';
-import 'base_auth_dialog.dart';
+import 'cloud_auth_dialog.dart';
 
-class TowdowCloudDialog extends BaseAuthDialog {
+class TowdowCloudDialog extends BaseCloudAuthDialog {
   const TowdowCloudDialog({super.key}) : super(type: AuthDialogType.cloud);
 
   @override
   ConsumerState<TowdowCloudDialog> createState() => _TowdowCloudDialogState();
 }
 
-class _TowdowCloudDialogState extends BaseAuthDialogState<TowdowCloudDialog> {
+class _TowdowCloudDialogState extends BaseCloudAuthDialogState<TowdowCloudDialog> {
   @override
   String getDialogTitle() => 'TowDow Cloud';
 
