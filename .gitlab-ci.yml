@@ -210,7 +210,7 @@ release:
         - name: "Towdow Windows zip"
           url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/runner/Release/towdow_app-$CI_COMMIT_TAG.zip"
         - name: "Towdow web"
-          url: "$CI_PROJECT_URL/-/jobs/WEB_JOB_ID/artifacts/file/build/web_${CI_COMMIT_TAG}.tar.gz"
+          url: "$CI_PROJECT_URL/-/jobs/$WEB_JOB_ID/artifacts/file/build/web_${CI_COMMIT_TAG}.tar.gz"
 
 deploy_web:
   stage: release
