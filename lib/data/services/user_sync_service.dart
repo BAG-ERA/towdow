@@ -88,14 +88,30 @@ class UserSyncService {
       final sharedProjectsResult = await shareService.getProjectsSharedWithMe();
       return await sharedProjectsResult.when(
         success: (sharedMembers) async {
-          // Convert to SharedWithMeProject objects
+          // Get current user preferences to preserve existing acknowledgments
+          final currentPreferencesResult = await _userRepository.getUserPreferences();
+          final currentAcknowledgments = <String, bool>{};
+          
+          await currentPreferencesResult.when(
+            success: (currentPreferences) async {
+              // Build map of existing acknowledgments
+              for (final existingProject in currentPreferences.sharedWithMeProjects) {
+                currentAcknowledgments[existingProject.projectId] = existingProject.ack;
+              }
+            },
+            failure: (_) async {
+              // If we can't get current preferences, continue with defaults
+            },
+          );
+
+          // Convert to SharedWithMeProject objects, preserving acknowledgments
           final sharedProjects = sharedMembers.map((member) => 
             SharedWithMeProject.fromSharedProjectMember(
               projectPath: member.projectPath,
               allTasks: member.allTasks,
               projectRight: member.projectRight,
               sourceUserEmail: member.sourceUserEmail,
-              ack: false, // Default to unacknowledged
+              ack: currentAcknowledgments[member.projectPath] ?? false, // Preserve existing ack or default to false
             )
           ).toList();
 
@@ -232,13 +248,6 @@ class UserSyncService {
         ));
       }
 
-      // Update shared projects before uploading
-      final sharedProjectsResult = await updateSharedProjects();
-      sharedProjectsResult.when(
-        success: (_) => AppLogger.debug('UserSyncService: Shared projects updated before upload'),
-        failure: (failure) => AppLogger.warning('UserSyncService: Failed to update shared projects before upload: ${failure.message}'),
-      );
-
       // Get active account for S3 access
       final accountResult = await _accountRepository.getActiveAccount();
       final account = accountResult.when(
@@ -248,7 +257,7 @@ class UserSyncService {
 
       if (account == null) {
         return Result.failure(Failure(
-          message: 'No active account available',
+          message: 'No active account for S3 sync',
           exception: Exception('No account'),
         ));
       }
@@ -269,7 +278,6 @@ class UserSyncService {
       }
 
       _lastSyncTime = DateTime.now();
-      AppLogger.info('UserSyncService: User data upload completed successfully');
       return Result.success(null);
 
     } catch (e, stackTrace) {
