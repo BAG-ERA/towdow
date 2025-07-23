@@ -211,3 +211,23 @@ release:
           url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/runner/Release/towdow_app-$CI_COMMIT_TAG.zip"
         - name: "Towdow web"
           url: "$CI_PROJECT_URL/-/jobs/WEB_JOB_ID/artifacts/file/build/web_${CI_COMMIT_TAG}.tar.gz"
+
+deploy_web:
+  stage: release
+  image: alpine:latest
+  needs:
+    - job: build_web
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan -H web.towdow.app >> ~/.ssh/known_hosts
+  script:
+    - tar -zxf "build/web_${CI_COMMIT_TAG}.tar.gz"
+    - scp -r build/web debian@web.towdow.app:flutter_web/build/
+    - ssh debian@web.towdow.app "docker restart flutter-web"
