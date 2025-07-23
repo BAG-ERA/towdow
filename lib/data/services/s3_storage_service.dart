@@ -543,6 +543,29 @@ class S3StorageService {
     );
   }
 
+  /// Get current etag for a file
+  Future<Result<String?>> getCurrentEtag({
+    required String key,
+    required bool isPrivate,
+  }) async {
+    final fileInfoResult = await getFileInfo(key: key, isPrivate: isPrivate);
+    return fileInfoResult.when(
+      success: (fileInfo) {
+        AppLogger.debug('S3StorageService.getCurrentEtag: Retrieved etag for $key: ${fileInfo.etag}');
+        return Result.success(fileInfo.etag);
+      },
+      failure: (failure) {
+        // If file doesn't exist, return null instead of error
+        if (failure.message.contains('NotFound') || failure.message.contains('NoSuchKey')) {
+          AppLogger.debug('S3StorageService.getCurrentEtag: File $key not found, returning null etag');
+          return Result.success(null);
+        }
+        AppLogger.error('S3StorageService.getCurrentEtag: Failed to get etag for $key: ${failure.message}');
+        return Result.failure(failure);
+      },
+    );
+  }
+
   /// Generate a user-specific path prefix  
   String getUserPrefix() {
     // Use JWT 'sub' claim as user identifier (matches bucket permissions: {jwt_sub}/)

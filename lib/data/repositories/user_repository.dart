@@ -20,6 +20,10 @@ abstract class UserRepository {
   Future<Result<void>> acknowledgeSharedProject(String projectId);
   Stream<UserPreferences> watchUserPreferences();
   
+  // Etag methods for S3 sync tracking
+  Future<Result<String?>> getEtag();
+  Future<Result<void>> setEtag(String? etag);
+  
   // Set sync trigger callback for UserSyncService
   void setSyncTrigger(Future<void> Function() triggerSync);
 }
@@ -167,14 +171,45 @@ class LocalUserRepository implements UserRepository {
 
   @override
   Future<Result<void>> acknowledgeSharedProject(String projectId) async {
-    final preferencesResult = await getUserPreferences();
-    return await preferencesResult.when(
-      success: (preferences) async {
-        final updatedPreferences = preferences.acknowledgeSharedProject(projectId);
-        AppLogger.info('LocalUserRepository: Acknowledging shared project $projectId');
-        return await saveUserPreferences(updatedPreferences);
+    final currentPrefs = await getUserPreferences();
+    return currentPrefs.when(
+      success: (prefs) async {
+        final updatedProjects = prefs.sharedWithMeProjects
+            .map((project) => project.projectId == projectId 
+                ? project.copyWith(ack: true) 
+                : project)
+            .toList();
+        
+        final updatedPrefs = prefs.copyWith(sharedWithMeProjects: updatedProjects);
+        final saveResult = await saveUserPreferences(updatedPrefs);
+        
+        // Trigger sync after updating acknowledgment
+        await _triggerSyncIfAvailable();
+        
+        return saveResult;
       },
-      failure: (failure) async => Result.failure(failure),
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<String?>> getEtag() async {
+    final preferencesResult = await getUserPreferences();
+    return preferencesResult.when(
+      success: (prefs) => Result.success(prefs.etag),
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<void>> setEtag(String? etag) async {
+    final currentPrefs = await getUserPreferences();
+    return currentPrefs.when(
+      success: (prefs) async {
+        final updatedPrefs = prefs.copyWith(etag: etag);
+        return await saveUserPreferences(updatedPrefs);
+      },
+      failure: (failure) => Result.failure(failure),
     );
   }
 

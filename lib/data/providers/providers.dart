@@ -255,6 +255,9 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
   final accountRepository = ref.watch(accountRepositoryProvider);
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final userRepository = ref.watch(userRepositoryProvider);
+  final externalAccountRepository = ref.watch(externalAccountRepositoryProvider);
+  final externalCalendarRepository = ref.watch(externalCalendarRepositoryProvider);
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final syncService = ref.watch(syncServiceProvider);
   
@@ -262,6 +265,9 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
     categoryRepository: categoryRepository,
+    userRepository: userRepository,
+    externalAccountRepository: externalAccountRepository,
+    externalCalendarRepository: externalCalendarRepository,
     connectionMonitorService: connectionMonitorService,
     syncService: syncService,
   );
