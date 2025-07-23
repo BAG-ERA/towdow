@@ -5,7 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/caldav_account.dart';
+import '../../../data/models/user_preferences.dart';
 import '../../../data/providers/providers.dart';
+import '../../../core/logger.dart';
+import '../../../core/result.dart';
 
 import '../utils/enhanced_text_field.dart';
 import '../utils/popup/project_sharing_dialog.dart';
@@ -511,30 +515,114 @@ class _ProjectSharingStatus extends ConsumerWidget {
   void _showLeaveProjectDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Leave Shared Project'),
-        content: Text('Are you sure you want to stop accessing "${project.displayName}"? You will no longer be able to view or edit this project.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // TODO: Implement exit share functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Exit share functionality not yet implemented')),
-              );
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Leave'),
-          ),
-        ],
+      builder: (context) => Consumer(
+        builder: (context, ref, child) {
+          return AlertDialog(
+            title: const Text('Leave Shared Project'),
+            content: Text('Are you sure you want to stop accessing "${project.displayName}"? You will no longer be able to view or edit this project.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => _handleExitShare(context, ref),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('Leave'),
+              ),
+            ],
+          );
+        },
       ),
     );
+  }
+
+  Future<void> _handleExitShare(BuildContext context, WidgetRef ref) async {
+    try {
+      AppLogger.info('ProjectInfoCard: Starting exit share for project: ${project.displayName}');
+      
+      // Get active account and call exit share (optional - continue even if fails)
+      final accountRepository = ref.read(accountRepositoryProvider);
+      final accountResult = await accountRepository.getActiveAccount();
+      if (accountResult is Success<CaldavAccount?> && accountResult.data != null) {
+        final account = accountResult.data!;
+        final shareService = ref.read(shareServiceProvider(account));
+        await shareService.exitShare(project.uid);
+        AppLogger.info('ProjectInfoCard: Exit share completed on server');
+      }
+      
+      // Always clean up local data
+      AppLogger.info('ProjectInfoCard: Cleaning up local data for project: ${project.path}');
+      
+      try {
+        // Remove project from calendar repository
+        AppLogger.info('ProjectInfoCard: Step 1 - Deleting from calendar repository');
+        final calendarRepository = ref.read(calendarRepositoryProvider);
+        await calendarRepository.delete(project.path);
+        AppLogger.info('ProjectInfoCard: Step 1 completed - Deleted project from calendar repository');
+      } catch (e) {
+        AppLogger.error('ProjectInfoCard: Step 1 failed - Calendar deletion error: $e');
+      }
+      
+      try {
+        // Remove all tasks
+        AppLogger.info('ProjectInfoCard: Step 2 - Getting and deleting tasks');
+        final taskRepository = ref.read(taskRepositoryProvider);
+        final projectTasksResult = await taskRepository.getByProject(project.path);
+        if (projectTasksResult is Success<List<Task>>) {
+          final tasks = projectTasksResult.data;
+          AppLogger.info('ProjectInfoCard: Step 2 - Found ${tasks.length} tasks to delete');
+          for (final task in tasks) {
+            await taskRepository.delete(task.uid);
+          }
+          AppLogger.info('ProjectInfoCard: Step 2 completed - Deleted ${tasks.length} tasks');
+        } else {
+          AppLogger.info('ProjectInfoCard: Step 2 - No tasks found or failed to get tasks');
+        }
+      } catch (e) {
+        AppLogger.error('ProjectInfoCard: Step 2 failed - Task deletion error: $e');
+      }
+      
+      try {
+        // Remove from user preferences
+        AppLogger.info('ProjectInfoCard: Step 3 - Updating user preferences');
+        final userRepository = ref.read(userRepositoryProvider);
+        final preferencesResult = await userRepository.getUserPreferences();
+        if (preferencesResult is Success<UserPreferences>) {
+          final preferences = preferencesResult.data;
+          final updatedSharedProjects = preferences.sharedWithMeProjects
+              .where((sharedProject) => sharedProject.projectId != project.path)
+              .toList();
+          await userRepository.updateSharedWithMeProjects(updatedSharedProjects);
+          AppLogger.info('ProjectInfoCard: Step 3 completed - Updated user preferences');
+        } else {
+          AppLogger.info('ProjectInfoCard: Step 3 - Failed to get user preferences');
+        }
+      } catch (e) {
+        AppLogger.error('ProjectInfoCard: Step 3 failed - User preferences error: $e');
+      }
+      
+      // Refresh UI
+      ref.invalidate(calendarListProvider);
+      ref.invalidate(projectListProvider);
+      ref.invalidate(userPreferencesProvider);
+      
+      AppLogger.info('ProjectInfoCard: Exit share cleanup completed successfully');
+      
+      // Close dialog and navigate to home
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close dialog
+        // Navigate to home page - remove all routes and go to root
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectInfoCard: Error during exit share', e, stackTrace);
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close dialog on error
+      }
+    }
   }
 
 
