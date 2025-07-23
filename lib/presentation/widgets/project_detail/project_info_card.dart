@@ -323,66 +323,66 @@ class _ProjectSharingStatus extends ConsumerWidget {
       return const SizedBox.shrink(); // Don't show anything if sharing is not supported
     }
 
-    // Get current account to check if project is shared with me
-    final currentAccount = accountAsync.asData?.value;
-    final userPrincipal = currentAccount?.principal;
-    
-    // Use existing methods to check sharing status
-    final isSharedWithMe = project.isSharedWithMe(userPrincipal);
-    final isSharedWithOthers = project.isSharedWithOthers;
+         // Use FutureBuilder to handle async sharing check
+     return FutureBuilder<String>(
+       future: project.isSharedWithMeBy(ref),
+       builder: (context, snapshot) {
+         final sharedWithMeBy = snapshot.data ?? '';
+         final isSharedWithMe = sharedWithMeBy.isNotEmpty;
+         final isSharedWithOthers = project.isSharedWithOthers;
 
-    if (!isSharedWithMe && !isSharedWithOthers) {
-      // Project is not shared - show quick share button
-      return Row(
-        children: [
-          Icon(
-            Icons.people_outline,
-            size: 16,
-            color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.6),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'Private project',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-            ),
-          ),
-          const Spacer(),
-          TextButton.icon(
-            onPressed: () => _showSharingDialog(context),
-            icon: const Icon(Icons.share, size: 16),
-            label: const Text('Share'),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            ),
-          ),
-        ],
-      );
-    }
-
-    // Project is shared - show sharing status
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+         if (!isSharedWithMe && !isSharedWithOthers) {
+          // Project is not shared - show quick share button
+          return Row(
             children: [
               Icon(
-                isSharedWithMe ? Icons.people : Icons.share,
+                Icons.people_outline,
                 size: 16,
-                color: Theme.of(context).colorScheme.primary,
+                color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.6),
               ),
               const SizedBox(width: 8),
+              Text(
+                'Private project',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _showSharingDialog(context),
+                icon: const Icon(Icons.share, size: 16),
+                label: const Text('Share'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                ),
+              ),
+            ],
+          );
+        }
+
+        // Project is shared - show sharing status
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isSharedWithMe ? Icons.people : Icons.share,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   isSharedWithMe 
-                      ? 'Shared with you by ${_getOwnerEmail()}' 
+                      ? 'Shared with you by $sharedWithMeBy' 
                       : 'Shared with ${project.sharedWithEmails.length} ${project.sharedWithEmails.length == 1 ? 'person' : 'people'}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSecondaryContainer,
@@ -452,6 +452,8 @@ class _ProjectSharingStatus extends ConsumerWidget {
         ],
       ),
     );
+      },
+    );
   }
 
   void _showSharingDialog(BuildContext context) {
@@ -490,10 +492,6 @@ class _ProjectSharingStatus extends ConsumerWidget {
     );
   }
 
-  String _getOwnerEmail() {
-    // Extract owner email from flowitOwner or path
-    return project.flowitOwner ?? 'Unknown';
-  }
 
   String _formatEmail(String email) {
     // Show just the name part if it's an email

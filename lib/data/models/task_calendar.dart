@@ -5,9 +5,11 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:hive/hive.dart';
 import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'task.dart';
 import 'attendee.dart';
 import 'category.dart';
+import '../providers/providers.dart';
 
 part 'task_calendar.freezed.dart';
 part 'task_calendar.g.dart';
@@ -244,13 +246,24 @@ extension TaskCalendarSharing on TaskCalendar {
   /// Check if project is shared with others
   bool get isSharedWith => sharedWithMembers.isNotEmpty;
 
-  /// Check if project is shared with me (owner != current user)
-  bool isSharedWithMe(String? currentUserPrincipal) {
-    if (currentUserPrincipal == null || currentUserPrincipal.isEmpty) return false;
-    if (flowitOwner == null || flowitOwner!.isEmpty) return false;
-    
-    // Compare the project's flowitOwner directly with the user's principal
-    return flowitOwner != currentUserPrincipal;
+  /// Check if project is shared with me and return the source user email
+  /// Returns empty string if not shared, otherwise returns sourceUserEmail
+  Future<String> isSharedWithMeBy(WidgetRef ref) async {
+    try {
+      final userRepository = ref.read(userRepositoryProvider);
+      final preferencesResult = await userRepository.getUserPreferences();
+      
+      return preferencesResult.when(
+        success: (preferences) {
+          final sharedProject = preferences.getSharedProject(uid);
+          return sharedProject?.sourceUserEmail ?? '';
+        },
+        failure: (_) => '',
+      );
+    } catch (e) {
+      // Fallback to empty string if anything goes wrong
+      return '';
+    }
   }
 
   /// Computed property: Check if this project is shared with others  

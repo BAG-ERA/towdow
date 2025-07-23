@@ -2,6 +2,8 @@
 // Includes project ordering and future user preference options
 
 import 'package:hive/hive.dart';
+import 'package:logger/web.dart';
+import 'shared_with_me_project.dart';
 
 part 'user_preferences.g.dart';
 
@@ -25,6 +27,9 @@ class UserPreferences extends HiveObject {
   @HiveField(5)
   final List<String> syncedProjects; // Projects marked for S3 sync
 
+  @HiveField(6)
+  final List<SharedWithMeProject> sharedWithMeProjects; // Projects shared with me
+
   UserPreferences({
     this.projectOrder = const [],
     this.preferredTheme,
@@ -32,6 +37,7 @@ class UserPreferences extends HiveObject {
     this.defaultProjectView,
     this.customSettings,
     this.syncedProjects = const [],
+    this.sharedWithMeProjects = const [],
   });
 
   /// Create a copy with updated values
@@ -42,6 +48,7 @@ class UserPreferences extends HiveObject {
     String? defaultProjectView,
     Map<String, dynamic>? customSettings,
     List<String>? syncedProjects,
+    List<SharedWithMeProject>? sharedWithMeProjects,
   }) {
     return UserPreferences(
       projectOrder: projectOrder ?? this.projectOrder,
@@ -50,6 +57,7 @@ class UserPreferences extends HiveObject {
       defaultProjectView: defaultProjectView ?? this.defaultProjectView,
       customSettings: customSettings ?? this.customSettings,
       syncedProjects: syncedProjects ?? this.syncedProjects,
+      sharedWithMeProjects: sharedWithMeProjects ?? this.sharedWithMeProjects,
     );
   }
 
@@ -62,6 +70,7 @@ class UserPreferences extends HiveObject {
       defaultProjectView: 'list',
       customSettings: const {},
       syncedProjects: const [],
+      sharedWithMeProjects: const [],
     );
   }
 
@@ -122,8 +131,38 @@ class UserPreferences extends HiveObject {
     return copyWith(syncedProjects: projects);
   }
 
+  /// Update shared with me projects list
+  UserPreferences withSharedWithMeProjects(List<SharedWithMeProject> projects) {
+    return copyWith(sharedWithMeProjects: projects);
+  }
+
+  /// Check if a project is shared with me
+  bool isProjectSharedWithMe(String projectId) {
+    return sharedWithMeProjects.any((project) => project.projectId == projectId);
+  }
+
+  /// Get shared project details if it exists
+  SharedWithMeProject? getSharedProject(String projectId) {
+    try {
+      return sharedWithMeProjects.firstWhere((project) => project.projectId == projectId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Acknowledge a shared project
+  UserPreferences acknowledgeSharedProject(String projectId) {
+    final updatedProjects = sharedWithMeProjects.map((project) {
+      if (project.projectId == projectId) {
+        return project.acknowledge();
+      }
+      return project;
+    }).toList();
+    return copyWith(sharedWithMeProjects: updatedProjects);
+  }
+
   @override
   String toString() {
-    return 'UserPreferences(projectOrder: $projectOrder, theme: $preferredTheme, notifications: $enableNotifications, syncedProjects: ${syncedProjects.length})';
+    return 'UserPreferences(projectOrder: $projectOrder, theme: $preferredTheme, notifications: $enableNotifications, syncedProjects: ${syncedProjects.length}, sharedWithMe: ${sharedWithMeProjects.length})';
   }
 } 

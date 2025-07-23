@@ -167,6 +167,23 @@ class AppLifecycleManager {
       if (_userSyncService != null) {
         AppLogger.debug('AppLifecycleManager: Starting UserSyncService periodic sync');
         _userSyncService!.startPeriodicSync(interval: const Duration(hours: 2)); // Check every 2 hours for user data updates
+        
+        // Fetch shared projects on startup
+        AppLogger.debug('AppLifecycleManager: Fetching shared projects on startup');
+        try {
+          final sharedProjectsResult = await _userSyncService!.updateSharedProjects();
+          sharedProjectsResult.when(
+            success: (_) {
+              AppLogger.info('AppLifecycleManager: Shared projects fetched successfully on startup');
+            },
+            failure: (failure) {
+              AppLogger.warning('AppLifecycleManager: Failed to fetch shared projects on startup: ${failure.message}');
+            },
+          );
+        } catch (e) {
+          AppLogger.warning('AppLifecycleManager: Error fetching shared projects on startup: $e');
+        }
+        
         AppLogger.info('AppLifecycleManager: UserSyncService started successfully');
       }
 
@@ -307,6 +324,23 @@ class AppLifecycleManager {
       if (_syncService != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Triggering sync on app resume');
         _syncService!.syncAllActiveCaldav();
+      }
+      
+      // Update shared projects when app resumes
+      if (_userSyncService != null) {
+        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Updating shared projects on app resume');
+        _userSyncService!.updateSharedProjects().then((result) {
+          result.when(
+            success: (_) {
+              // AppLogger.debug('AppLifecycleManager: Shared projects updated successfully on app resume');
+            },
+            failure: (failure) {
+              AppLogger.warning('AppLifecycleManager: Failed to update shared projects on app resume: ${failure.message}');
+            },
+          );
+        }).catchError((e) {
+          AppLogger.warning('AppLifecycleManager: Error updating shared projects on app resume: $e');
+        });
       }
     }
   }

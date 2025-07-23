@@ -5,6 +5,7 @@
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/user_preferences.dart';
+import '../models/shared_with_me_project.dart';
 import '../services/local_storage_service.dart';
 
 // Abstract repository interface
@@ -15,6 +16,8 @@ abstract class UserRepository {
   Future<Result<void>> addProjectToOrder(String projectUid);
   Future<Result<void>> removeProjectFromOrder(String projectUid);
   Future<Result<void>> reorderProject(String projectUid, int newIndex);
+  Future<Result<void>> updateSharedWithMeProjects(List<SharedWithMeProject> projects);
+  Future<Result<void>> acknowledgeSharedProject(String projectId);
   Stream<UserPreferences> watchUserPreferences();
 }
 
@@ -39,7 +42,7 @@ class LocalUserRepository implements UserRepository {
           AppLogger.info('LocalUserRepository: No user preferences found, returning defaults');
           return Result.success(UserPreferences.defaultPreferences());
         }
-        AppLogger.info('LocalUserRepository: Loaded user preferences with ${preferences.projectOrder.length} project orders');
+        AppLogger.info('LocalUserRepository: Loaded user preferences with ${preferences.projectOrder.length} project orders and ${preferences.sharedWithMeProjects.length} shared projects');
         return Result.success(preferences);
       },
       failure: (failure) {
@@ -52,7 +55,7 @@ class LocalUserRepository implements UserRepository {
 
   @override
   Future<Result<void>> saveUserPreferences(UserPreferences preferences) async {
-    AppLogger.info('LocalUserRepository: Saving user preferences with ${preferences.projectOrder.length} project orders');
+    AppLogger.info('LocalUserRepository: Saving user preferences with ${preferences.projectOrder.length} project orders and ${preferences.sharedWithMeProjects.length} shared projects');
     return await _storageService.put(
       LocalStorageService.userPreferencesBoxName,
       _userPreferencesKey,
@@ -106,6 +109,32 @@ class LocalUserRepository implements UserRepository {
       success: (preferences) async {
         final updatedPreferences = preferences.reorderProject(projectUid, newIndex);
         AppLogger.info('LocalUserRepository: Reordering project $projectUid to index $newIndex');
+        return await saveUserPreferences(updatedPreferences);
+      },
+      failure: (failure) async => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<void>> updateSharedWithMeProjects(List<SharedWithMeProject> projects) async {
+    final preferencesResult = await getUserPreferences();
+    return await preferencesResult.when(
+      success: (preferences) async {
+        final updatedPreferences = preferences.withSharedWithMeProjects(projects);
+        AppLogger.info('LocalUserRepository: Updating shared with me projects: ${projects.length} projects');
+        return await saveUserPreferences(updatedPreferences);
+      },
+      failure: (failure) async => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<void>> acknowledgeSharedProject(String projectId) async {
+    final preferencesResult = await getUserPreferences();
+    return await preferencesResult.when(
+      success: (preferences) async {
+        final updatedPreferences = preferences.acknowledgeSharedProject(projectId);
+        AppLogger.info('LocalUserRepository: Acknowledging shared project $projectId');
         return await saveUserPreferences(updatedPreferences);
       },
       failure: (failure) async => Result.failure(failure),
