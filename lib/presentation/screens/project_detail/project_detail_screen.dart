@@ -79,11 +79,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     // Update mobile providers when project data is available
     projectAsync.whenData((project) {
-      if (project != null && !isDesktop) {
+      if (project != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          ref.read(mobileTitleProvider.notifier).state = project.displayName;
-          ref.read(mobileProjectProvider.notifier).state = project;
-          ref.read(mobileProjectUpdateProvider.notifier).state = _updateProject;
+          // Update mobile providers if on mobile
+          if (!isDesktop) {
+            ref.read(mobileTitleProvider.notifier).state = project.displayName;
+            ref.read(mobileProjectProvider.notifier).state = project;
+            ref.read(mobileProjectUpdateProvider.notifier).state = _updateProject;
+          }
+          
+          // Auto-acknowledge shared project when viewing project detail
+          _acknowledgeSharedProjectIfNeeded(project);
         });
       }
     });
@@ -912,6 +918,40 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           ),
         );
       }
+    }
+  }
+
+  /// Auto-acknowledge shared project when user views project detail
+  Future<void> _acknowledgeSharedProjectIfNeeded(TaskCalendar project) async {
+    try {
+      final userRepository = ref.read(userRepositoryProvider);
+      final preferencesResult = await userRepository.getUserPreferences();
+      
+      await preferencesResult.when(
+        success: (preferences) async {
+          final sharedProject = preferences.getSharedProject(project.uid);
+          
+          // Only acknowledge if project is shared with me and not yet acknowledged
+          if (sharedProject != null && !sharedProject.ack) {
+            AppLogger.info('ProjectDetailScreen: Auto-acknowledging shared project ${project.displayName}');
+            
+            final acknowledgeResult = await userRepository.acknowledgeSharedProject(project.uid);
+            await acknowledgeResult.when(
+              success: (_) {
+                AppLogger.info('ProjectDetailScreen: Successfully acknowledged shared project ${project.displayName}');
+              },
+              failure: (failure) {
+                AppLogger.warning('ProjectDetailScreen: Failed to acknowledge shared project ${project.displayName}: ${failure.message}');
+              },
+            );
+          }
+        },
+        failure: (failure) async {
+          AppLogger.warning('ProjectDetailScreen: Failed to get user preferences for acknowledgment: ${failure.message}');
+        },
+      );
+    } catch (e) {
+      AppLogger.error('ProjectDetailScreen: Exception during shared project acknowledgment: $e');
     }
   }
 } 

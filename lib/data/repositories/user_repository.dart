@@ -19,14 +19,39 @@ abstract class UserRepository {
   Future<Result<void>> updateSharedWithMeProjects(List<SharedWithMeProject> projects);
   Future<Result<void>> acknowledgeSharedProject(String projectId);
   Stream<UserPreferences> watchUserPreferences();
+  
+  // Set sync trigger callback for UserSyncService
+  void setSyncTrigger(Future<void> Function() triggerSync);
 }
 
 // Local implementation using Hive
 class LocalUserRepository implements UserRepository {
   final LocalStorageService _storageService;
   static const String _userPreferencesKey = 'user_preferences';
+  
+  // Sync trigger callback
+  Future<void> Function()? _triggerSync;
 
   LocalUserRepository(this._storageService);
+  
+  @override
+  void setSyncTrigger(Future<void> Function() triggerSync) {
+    _triggerSync = triggerSync;
+  }
+  
+  // Helper method to trigger sync after user preference changes
+  Future<void> _triggerSyncIfAvailable() async {
+    if (_triggerSync != null) {
+      try {
+        AppLogger.debug('LocalUserRepository: Triggering user data sync to S3');
+        await _triggerSync!();
+      } catch (e) {
+        AppLogger.warning('LocalUserRepository: Failed to trigger sync: $e');
+      }
+    } else {
+      AppLogger.debug('LocalUserRepository: No sync trigger available - changes saved locally only');
+    }
+  }
 
   @override
   Future<Result<UserPreferences>> getUserPreferences() async {
@@ -56,11 +81,23 @@ class LocalUserRepository implements UserRepository {
   @override
   Future<Result<void>> saveUserPreferences(UserPreferences preferences) async {
     AppLogger.info('LocalUserRepository: Saving user preferences with ${preferences.projectOrder.length} project orders and ${preferences.sharedWithMeProjects.length} shared projects');
-    return await _storageService.put(
+    final result = await _storageService.put(
       LocalStorageService.userPreferencesBoxName,
       _userPreferencesKey,
       preferences,
     );
+    
+    // Trigger sync after successful save
+    await result.when(
+      success: (_) async {
+        await _triggerSyncIfAvailable();
+      },
+      failure: (_) async {
+        // Don't trigger sync if save failed
+      },
+    );
+    
+    return result;
   }
 
   @override

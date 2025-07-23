@@ -266,6 +266,26 @@ extension TaskCalendarSharing on TaskCalendar {
     }
   }
 
+  /// Check if this project is a new unacknowledged shared project
+  /// Returns true if project is shared with me but not yet acknowledged
+  Future<bool> hasNewSharedProjectNotification(WidgetRef ref) async {
+    try {
+      final userRepository = ref.read(userRepositoryProvider);
+      final preferencesResult = await userRepository.getUserPreferences();
+      
+      return preferencesResult.when(
+        success: (preferences) {
+          final sharedProject = preferences.getSharedProject(uid);
+          return sharedProject != null && !sharedProject.ack;
+        },
+        failure: (_) => false,
+      );
+    } catch (e) {
+      // Fallback to false if anything goes wrong
+      return false;
+    }
+  }
+
   /// Computed property: Check if this project is shared with others  
   /// This is a project I own but have shared with other users
   bool get isSharedWithOthers => sharedWithMembers.isNotEmpty;

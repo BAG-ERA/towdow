@@ -106,16 +106,49 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
                       ),
                     
                     Expanded(
-                      child: Text(
-                        widget.project.displayName,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.onPrimaryContainer
-                              : Theme.of(context).colorScheme.onSurface,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.project.displayName,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                color: isSelected
+                                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                                    : Theme.of(context).colorScheme.onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          
+                          // New shared project notification icon
+                          Consumer(
+                            builder: (context, ref, child) {
+                              final notificationAsync = ref.watch(projectSharedNotificationProvider(widget.project.uid));
+                              
+                              return notificationAsync.when(
+                                data: (hasNotification) {
+                                  if (!hasNotification) return const SizedBox.shrink();
+                                  
+                                  return Padding(
+                                    padding: const EdgeInsets.only(left: 6),
+                                    child: Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.primary,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                loading: () => const SizedBox.shrink(),
+                                error: (_, __) => const SizedBox.shrink(),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
                 

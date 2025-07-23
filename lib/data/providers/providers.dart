@@ -49,6 +49,7 @@ import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
 import '../services/kanban_service.dart';
 import '../../app.dart';
 import '../services/share_service.dart';
+import '../models/user_preferences.dart';
 
 // Local storage service provider
 // This must be overridden in main.dart with an initialized instance
@@ -77,6 +78,32 @@ final accountRepositoryProvider = Provider<AccountRepository>((ref) {
 final userRepositoryProvider = Provider<UserRepository>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
   return LocalUserRepository(storageService);
+});
+
+// User sync service provider
+final userSyncServiceProvider = Provider<UserSyncService>((ref) {
+  return UserSyncService(
+    userRepository: ref.watch(userRepositoryProvider),
+    externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
+    externalCalendarRepository: ref.watch(externalCalendarRepositoryProvider),
+    accountRepository: ref.watch(accountRepositoryProvider),
+    calendarRepository: ref.watch(calendarRepositoryProvider),
+  );
+});
+
+// User repository sync setup provider - sets up sync trigger after all providers are created
+final userRepositorySyncSetupProvider = Provider<void>((ref) {
+  final userRepository = ref.watch(userRepositoryProvider);
+  final userSyncService = ref.watch(userSyncServiceProvider);
+  
+  // Set up sync trigger after both providers are available
+  if (userRepository is LocalUserRepository) {
+    userRepository.setSyncTrigger(() async {
+      await userSyncService.uploadUserData();
+    });
+  }
+  
+  return;
 });
 
 // External calendar repository providers
@@ -149,17 +176,6 @@ final fileUploadQueueServiceProvider = Provider<FileUploadQueueService>((ref) {
 // Connection monitor service provider
 final connectionMonitorServiceProvider = Provider<ConnectionMonitorService>((ref) {
   return ConnectionMonitorService();
-});
-
-// User sync service provider
-final userSyncServiceProvider = Provider<UserSyncService>((ref) {
-  return UserSyncService(
-    userRepository: ref.watch(userRepositoryProvider),
-    externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
-    externalCalendarRepository: ref.watch(externalCalendarRepositoryProvider),
-    accountRepository: ref.watch(accountRepositoryProvider),
-    calendarRepository: ref.watch(calendarRepositoryProvider),
-  );
 });
 
 // External calendar sync service provider
@@ -295,6 +311,9 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final userSyncService = ref.watch(userSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
+  
+  // Initialize user repository sync setup
+  ref.watch(userRepositorySyncSetupProvider);
 
   final caldavMonitor = ref.watch(caldavMonitorProvider);
 
@@ -758,4 +777,40 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   }).toList();
   
   return filteredTasks;
+});
+
+// Project sharing notification provider - reactive to user preferences changes
+final projectSharedNotificationProvider = Provider.family<AsyncValue<bool>, String>((ref, projectId) {
+  final userPreferencesAsync = ref.watch(userPreferencesProvider);
+  
+  return userPreferencesAsync.when(
+    data: (preferences) {
+      final sharedProject = preferences.getSharedProject(projectId);
+      final hasNotification = sharedProject != null && !sharedProject.ack;
+      return AsyncValue.data(hasNotification);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (error, stackTrace) => AsyncValue.error(error, stackTrace),
+  );
+});
+
+// Shared project source provider - reactive to user preferences changes  
+final projectSharedByProvider = Provider.family<AsyncValue<String>, String>((ref, projectId) {
+  final userPreferencesAsync = ref.watch(userPreferencesProvider);
+  
+  return userPreferencesAsync.when(
+    data: (preferences) {
+      final sharedProject = preferences.getSharedProject(projectId);
+      final sourceEmail = sharedProject?.sourceUserEmail ?? '';
+      return AsyncValue.data(sourceEmail);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (error, stackTrace) => AsyncValue.error(error, stackTrace),
+  );
+});
+
+// User preferences provider - watches user repository for changes
+final userPreferencesProvider = StreamProvider<UserPreferences>((ref) {
+  final userRepository = ref.watch(userRepositoryProvider);
+  return userRepository.watchUserPreferences();
 });

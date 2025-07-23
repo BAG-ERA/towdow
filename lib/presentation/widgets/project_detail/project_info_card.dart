@@ -323,135 +323,180 @@ class _ProjectSharingStatus extends ConsumerWidget {
       return const SizedBox.shrink(); // Don't show anything if sharing is not supported
     }
 
-         // Use FutureBuilder to handle async sharing check
-     return FutureBuilder<String>(
-       future: project.isSharedWithMeBy(ref),
-       builder: (context, snapshot) {
-         final sharedWithMeBy = snapshot.data ?? '';
-         final isSharedWithMe = sharedWithMeBy.isNotEmpty;
-         final isSharedWithOthers = project.isSharedWithOthers;
+    // Use Consumer to handle reactive sharing check
+    return Consumer(
+      builder: (context, ref, child) {
+        final sharedByAsync = ref.watch(projectSharedByProvider(project.uid));
+        
+        return sharedByAsync.when(
+          data: (sharedWithMeBy) {
+            final isSharedWithMe = sharedWithMeBy.isNotEmpty;
+            final isSharedWithOthers = project.isSharedWithOthers;
 
-         if (!isSharedWithMe && !isSharedWithOthers) {
-          // Project is not shared - show quick share button
-          return Row(
-            children: [
-              Icon(
-                Icons.people_outline,
-                size: 16,
-                color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.6),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Private project',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-                ),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () => _showSharingDialog(context),
-                icon: const Icon(Icons.share, size: 16),
-                label: const Text('Share'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                ),
-              ),
-            ],
-          );
-        }
-
-        // Project is shared - show sharing status
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+            if (!isSharedWithMe && !isSharedWithOthers) {
+              // Project is not shared - show quick share button
+              return Row(
                 children: [
                   Icon(
-                    isSharedWithMe ? Icons.people : Icons.share,
+                    Icons.people_outline,
                     size: 16,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.6),
                   ),
                   const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  isSharedWithMe 
-                      ? 'Shared with you by $sharedWithMeBy' 
-                      : 'Shared with ${project.sharedWithEmails.length} ${project.sharedWithEmails.length == 1 ? 'person' : 'people'}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSecondaryContainer,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              if (!isSharedWithMe) ...[
-                TextButton(
-                  onPressed: () => _showSharingDialog(context),
-                  child: Text(
-                    'Manage',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-              ] else ...[
-                TextButton(
-                  onPressed: () => _showExitShareDialog(context),
-                  child: Text(
-                    'Leave',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          if (isSharedWithOthers && project.sharedWithEmails.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: project.sharedWithEmails.take(3).map((email) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _formatEmail(email),
+                  Text(
+                    'Private project',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-            if (project.sharedWithEmails.length > 3)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  '+${project.sharedWithEmails.length - 3} more',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSecondaryContainer.withValues(alpha: 0.8),
-                    fontSize: 11,
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => _showSharingDialog(context),
+                    icon: const Icon(Icons.share, size: 16),
+                    label: const Text('Share'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    ),
                   ),
+                ],
+              );
+            }
+
+            // Project is shared - show sharing status
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                  width: 1,
                 ),
               ),
-          ],
-        ],
-      ),
-    );
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Sharing status header
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.people,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          isSharedWithMe 
+                              ? 'Shared with you by $sharedWithMeBy' 
+                              : 'Shared with ${project.sharedWithEmails.length} ${project.sharedWithEmails.length == 1 ? 'person' : 'people'}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      // Three-dot menu for sharing actions
+                      PopupMenuButton<String>(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          Icons.more_horiz,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onSecondaryContainer.withValues(alpha: 0.7),
+                        ),
+                        tooltip: 'Sharing options',
+                        onSelected: (value) {
+                          switch (value) {
+                            case 'manage':
+                              _showSharingDialog(context);
+                              break;
+                            case 'leave':
+                              if (isSharedWithMe) {
+                                _showLeaveProjectDialog(context);
+                              }
+                              break;
+                          }
+                        },
+                        itemBuilder: (BuildContext context) => [
+                          if (!isSharedWithMe) ...[
+                            const PopupMenuItem<String>(
+                              value: 'manage',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.manage_accounts, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('Manage sharing'),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if (isSharedWithMe) ...[
+                            const PopupMenuItem<String>(
+                              value: 'leave',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.exit_to_app, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('Leave project'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                  
+                  // Show shared members for projects I own
+                  if (isSharedWithOthers && project.sharedWithEmails.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: project.sharedWithEmails.take(3).map((email) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            _formatEmail(email),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 11,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    if (project.sharedWithEmails.length > 3) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '+ ${project.sharedWithEmails.length - 3} more',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSecondaryContainer.withValues(alpha: 0.7),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            );
+          },
+          loading: () => const SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          error: (error, stackTrace) => const SizedBox.shrink(),
+        );
       },
     );
   }
@@ -463,7 +508,7 @@ class _ProjectSharingStatus extends ConsumerWidget {
     );
   }
 
-  void _showExitShareDialog(BuildContext context) {
+  void _showLeaveProjectDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
