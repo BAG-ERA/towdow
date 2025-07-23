@@ -3,12 +3,15 @@
 
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/logger.dart';
 import '../../data/models/task_calendar.dart';
+import '../../data/models/task.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../core/logger.dart';
+import '../../data/services/user_sync_service.dart';
+import '../../data/providers/providers.dart';
 
 // Project with associated statistics
 class ProjectWithStats {
@@ -285,6 +288,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   // DomainService removed - domain operations now handled by repository
   final AccountRepository _accountRepository;
   final UserRepository _userRepository;
+  final UserSyncService _userSyncService;
   
   // Stream subscription for repository changes
   StreamSubscription? _calendarSubscription;
@@ -294,6 +298,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     this._taskRepository,
     this._accountRepository,
     this._userRepository,
+    this._userSyncService,
   ) : super(const ProjectListState()) {
     // Listen to calendar repository changes and update state automatically
     _startListeningToRepositoryChanges();
@@ -729,6 +734,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
               success: (_) async {
                 // Reload projects to reflect the change
                 await loadProjects();
+                // Trigger immediate sync after domain assignment
+                await _triggerImmediateSync();
               },
               failure: (failure) async {
                 AppLogger.error('ProjectListViewModel: Failed to assign domain', failure.exception, failure.stackTrace);
@@ -781,6 +788,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           if (state.sortBy == ProjectSort.custom) {
             await loadProjects();
           }
+          // Trigger immediate sync after reordering
+          await _triggerImmediateSync();
         },
         failure: (failure) async {
           AppLogger.error('ProjectListViewModel: Failed to reorder project', failure.exception, failure.stackTrace);
@@ -941,6 +950,11 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     } catch (e) {
       AppLogger.warning('ProjectListViewModel: Exception removing project from user order: $e');
     }
+  }
+
+  /// Trigger immediate sync after reordering
+  Future<void> _triggerImmediateSync() async {
+    await _userSyncService.uploadUserData();
   }
 
   /// Build domain groups from projects

@@ -18,6 +18,7 @@ import '../../data/models/task_calendar.dart';
 import '../../data/services/caldav_service.dart';
 import '../../data/services/status_service.dart';
 import '../../data/services/local_storage_service.dart';
+import '../../data/services/user_sync_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/user_repository.dart';
@@ -68,16 +69,19 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
   final UserRepository _userRepository;
+  final UserSyncService _userSyncService;
   final void Function()? _onInvalidateProjectList;
 
   CalDAVManagementViewModel({
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
     required UserRepository userRepository,
+    required UserSyncService userSyncService,
     void Function()? onInvalidateProjectList,
   })  : _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
         _userRepository = userRepository,
+        _userSyncService = userSyncService,
         _onInvalidateProjectList = onInvalidateProjectList,
         super(const CalDAVManagementState());
 
@@ -228,6 +232,9 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     
     // Update user preferences with new project order
     _updateUserPreferencesProjectOrder();
+    
+    // Trigger immediate sync for calendar selection change
+    _triggerImmediateSync();
   }
 
   /// Check if a calendar is selected
@@ -247,6 +254,9 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     
     // Update user preferences with new project order
     _updateUserPreferencesProjectOrder();
+    
+    // Trigger immediate sync for calendar selection change
+    _triggerImmediateSync();
   }
 
   /// Deselect all calendars
@@ -258,6 +268,9 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     
     // Update user preferences with new project order
     _updateUserPreferencesProjectOrder();
+    
+    // Trigger immediate sync for calendar selection change  
+    _triggerImmediateSync();
   }
 
   /// Delete a calendar from the server and local storage
@@ -433,6 +446,27 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     }
   }
 
+  /// Trigger immediate user preferences sync when selections change
+  Future<void> _triggerImmediateSync() async {
+    try {
+      if (state.currentAccount == null) return;
+      
+      AppLogger.info('CalDAVManagement: Triggering immediate user preferences sync');
+      final result = await _userSyncService.uploadUserData();
+      
+      result.when(
+        success: (_) {
+          AppLogger.info('CalDAVManagement: User preferences synced successfully');
+        },
+        failure: (failure) {
+          AppLogger.warning('CalDAVManagement: Failed to sync user preferences: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVManagement: Error during immediate sync', e, stackTrace);
+    }
+  }
+
   /// Clear existing calendars and save selected calendars as local projects
   Future<void> _createProjectsForSelectedCalendars() async {
     // First, clear all existing calendars using repository
@@ -490,6 +524,7 @@ final caldavManagementViewModelProvider = StateNotifierProvider.autoDispose<CalD
     accountRepository: ref.read(accountRepositoryProvider),
     calendarRepository: ref.read(calendarRepositoryProvider),
     userRepository: ref.read(userRepositoryProvider),
+    userSyncService: ref.read(userSyncServiceProvider),
     onInvalidateProjectList: () => ref.invalidate(projectListProvider),
   ),
 ); 

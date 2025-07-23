@@ -344,7 +344,8 @@ final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel,
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final userRepository = ref.watch(userRepositoryProvider);
-  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository);
+  final userSyncService = ref.watch(userSyncServiceProvider);
+  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository, userSyncService);
 });
 
 final validatorViewModelProvider = StateNotifierProvider.family<ValidatorViewModel, ValidatorViewModelState, String>((ref, taskUid) {
