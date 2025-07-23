@@ -32,7 +32,7 @@ class CalDAVMonitor {
   final SyncService _syncService;
 
   // Dynamic interval configuration
-  static const Duration _minInterval = Duration(seconds: 1);
+  static const Duration _minInterval = Duration(seconds: 2);
   static const Duration _maxInterval = Duration(seconds: 40);
   static const Duration _initialInterval = Duration(seconds: 10);
   static const double _changeMultiplier = 0.5; // Divide by 2 when change detected
