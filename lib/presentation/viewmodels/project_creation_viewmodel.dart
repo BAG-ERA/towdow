@@ -1,8 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../core/logger.dart';
-import '../../core/result.dart';
 import '../../data/models/caldav_account.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/providers/providers.dart';
@@ -12,22 +10,26 @@ class ProjectCreationState {
   final bool isLoading;
   final String? error;
   final bool wasCreatedLocally;
+  final String? createdProjectPath; // Add this to track the created project path
 
   const ProjectCreationState({
     this.isLoading = false, 
     this.error,
     this.wasCreatedLocally = false,
+    this.createdProjectPath, // Add this parameter
   });
 
   ProjectCreationState copyWith({
     bool? isLoading, 
     String? error,
     bool? wasCreatedLocally,
+    String? createdProjectPath, // Add this parameter
   }) =>
       ProjectCreationState(
         isLoading: isLoading ?? this.isLoading,
         error: error,
         wasCreatedLocally: wasCreatedLocally ?? this.wasCreatedLocally,
+        createdProjectPath: createdProjectPath ?? this.createdProjectPath, // Add this line
       );
 }
 
@@ -41,14 +43,14 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
     required String description,
     String? domain,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, error: null, createdProjectPath: null);
 
     try {
       // Get active account
       final accountRepository = _ref.read(accountRepositoryProvider);
       final accountResult = await accountRepository.getActiveAccount();
       CaldavAccount? account;
-      await accountResult.when(
+      accountResult.when(
         success: (acc) => account = acc,
         failure: (f) => throw Exception('No account: ${f.message}'),
       );
@@ -82,6 +84,19 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
         throw Exception('Failed to create calendar');
       }
 
+      // Save the created calendar to repository to add it to sync list
+      final calendarRepository = _ref.read(calendarRepositoryProvider);
+      final saveResult = await calendarRepository.save(createdCalendar!);
+      saveResult.when(
+        success: (_) {
+          AppLogger.info('ProjectCreationViewModel: Calendar saved to repository successfully');
+        },
+        failure: (failure) {
+          AppLogger.warning('ProjectCreationViewModel: Failed to save calendar to repository: ${failure.message}');
+          // Don't fail the whole operation for repository save failure
+        },
+      );
+
       // Assign domain if provided
       if (domain != null && domain.isNotEmpty) {
         final domainService = _ref.read(domainServiceProvider);
@@ -102,13 +117,18 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
       _ref.invalidate(calendarListProvider);
       _ref.invalidate(activeCalendarListProvider);
       
-      AppLogger.info('ProjectCreationViewModel: Project creation completed successfully');
+      // Also refresh the project list view model to ensure it picks up the new project
+      final projectListViewModel = _ref.read(projectListViewModelProvider.notifier);
+      await projectListViewModel.refresh();
       
-      // Update state to indicate success
+      AppLogger.info('ProjectCreationViewModel: Project created successfully');
+      
+      // Update state to indicate success and store the created project path
       state = state.copyWith(
         isLoading: false, 
         error: null,
         wasCreatedLocally: wasCreatedLocally,
+        createdProjectPath: createdCalendar!.path,
       );
       
     } catch (e, st) {
@@ -117,6 +137,7 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
         isLoading: false, 
         error: e.toString(),
         wasCreatedLocally: false,
+        createdProjectPath: null, // Clear project path on error
       );
     }
   }
