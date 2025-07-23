@@ -235,7 +235,7 @@ class ShareService {
     try {
       AppLogger.info('ShareService: Exiting share for project $projectPath');
       
-      final url = Uri.parse('$_baseUrl/exitShare/${Uri.encodeComponent(projectPath)}');
+      final url = Uri.parse('$_baseUrl/exitShare/$projectPath');
       final headers = await _client.getAuthHeaders();
       
       final response = await http.post(url, headers: headers);
