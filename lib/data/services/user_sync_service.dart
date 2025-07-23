@@ -58,7 +58,7 @@ class UserSyncService {
   }
 
   /// Fetch and update shared projects from server
-  Future<Result<void>> updateSharedProjects() async {
+  Future<Result<void>> updateSharedProjects({bool duringDownload = false}) async {
     try {
       AppLogger.info('UserSyncService: Updating shared projects from server');
       
@@ -116,7 +116,9 @@ class UserSyncService {
           ).toList();
 
           // Update user repository with shared projects
-          final updateResult = await _userRepository.updateSharedWithMeProjects(sharedProjects);
+          final updateResult = duringDownload 
+              ? await _userRepository.updateSharedWithMeProjectsWithoutSync(sharedProjects)
+              : await _userRepository.updateSharedWithMeProjects(sharedProjects);
           return await updateResult.when(
             success: (_) async {
               AppLogger.info('UserSyncService: Successfully updated ${sharedProjects.length} shared projects');
@@ -301,12 +303,8 @@ class UserSyncService {
         return Result.success(false);
       }
 
-      // Update shared projects from server
-      final sharedProjectsResult = await updateSharedProjects();
-      sharedProjectsResult.when(
-        success: (_) => AppLogger.debug('UserSyncService: Shared projects updated during download'),
-        failure: (failure) => AppLogger.warning('UserSyncService: Failed to update shared projects during download: ${failure.message}'),
-      );
+      // Note: Shared projects update removed from download to keep downloads read-only
+      // Shared projects should be updated through separate sync operations, not during download
 
       // Get active account for S3 access
       final accountResult = await _accountRepository.getActiveAccount();
@@ -436,12 +434,25 @@ class UserSyncService {
           try {
             final jsonString = utf8.decode(data);
             final preferences = _deserializeUserPreferences(jsonString);
-            await _userRepository.saveUserPreferences(preferences);
             
-            // Activate calendars from project order
-            await _activateCalendarsFromProjectOrder(preferences);
+            // Get the current etag from S3 after successful download
+            final etagResult = await s3Service.getCurrentEtag(
+              key: _getUserPreferencesPath(s3Service),
+              isPrivate: true,
+            );
+            final currentEtag = etagResult.when(
+              success: (etag) => etag,
+              failure: (_) => null,
+            );
             
-            AppLogger.info('UserSyncService: Downloaded and saved user preferences with ${preferences.projectOrder.length} active projects');
+            // Save preferences with the current etag to avoid sync loops
+            final preferencesWithEtag = preferences.copyWith(etag: currentEtag);
+            await _userRepository.saveUserPreferencesWithoutSync(preferencesWithEtag);
+            
+            // Note: Calendar activation is not done during download to keep downloads read-only
+            // Calendar activation should happen through user actions or separate sync operations
+            
+            AppLogger.info('UserSyncService: Downloaded and saved user preferences with ${preferences.projectOrder.length} active projects and etag: $currentEtag');
             return Result.success(true);
           } catch (e, stackTrace) {
             AppLogger.error('UserSyncService: Failed to parse downloaded preferences', e, stackTrace);
@@ -521,7 +532,17 @@ class UserSyncService {
             final jsonString = utf8.decode(data);
             final (accounts, calendars) = _deserializeExternalCredentials(jsonString);
             
-            // Save each account
+            // Get the current etag from S3 after successful download
+            final etagResult = await s3Service.getCurrentEtag(
+              key: _getExternalCredentialsPath(s3Service),
+              isPrivate: true,
+            );
+            final currentEtag = etagResult.when(
+              success: (etag) => etag,
+              failure: (_) => null,
+            );
+            
+            // Save each account (no longer need to save individual etags)
             for (final account in accounts) {
               await _externalAccountRepository.save(account);
             }
@@ -531,7 +552,12 @@ class UserSyncService {
               await _externalCalendarRepository.save(calendar);
             }
             
-            AppLogger.info('UserSyncService: Downloaded and saved ${accounts.length} external accounts and ${calendars.length} calendars');
+            // Save the global credentials file etag
+            if (currentEtag != null) {
+              await _externalAccountRepository.setCredentialsFileEtag(currentEtag);
+            }
+            
+            AppLogger.info('UserSyncService: Downloaded and saved ${accounts.length} external accounts and ${calendars.length} calendars with etag: $currentEtag');
             return Result.success(true);
           } catch (e, stackTrace) {
             AppLogger.error('UserSyncService: Failed to parse downloaded credentials', e, stackTrace);

@@ -26,6 +26,12 @@ abstract class UserRepository {
   
   // Set sync trigger callback for UserSyncService
   void setSyncTrigger(Future<void> Function() triggerSync);
+  
+  // Internal method for sync operations (don't trigger sync)
+  Future<Result<void>> saveUserPreferencesWithoutSync(UserPreferences preferences);
+  
+  // Internal method for sync operations (don't trigger sync)
+  Future<Result<void>> updateSharedWithMeProjectsWithoutSync(List<SharedWithMeProject> projects);
 }
 
 // Local implementation using Hive
@@ -207,7 +213,7 @@ class LocalUserRepository implements UserRepository {
     return currentPrefs.when(
       success: (prefs) async {
         final updatedPrefs = prefs.copyWith(etag: etag);
-        return await saveUserPreferences(updatedPrefs);
+        return await saveUserPreferencesWithoutSync(updatedPrefs);
       },
       failure: (failure) => Result.failure(failure),
     );
@@ -231,5 +237,28 @@ class LocalUserRepository implements UserRepository {
             failure: (_) => UserPreferences.defaultPreferences(),
           );
         });
+  }
+
+  @override
+  Future<Result<void>> saveUserPreferencesWithoutSync(UserPreferences preferences) async {
+    AppLogger.info('LocalUserRepository: Saving user preferences without triggering sync: ${preferences.projectOrder.length} project orders and ${preferences.sharedWithMeProjects.length} shared projects');
+    final result = await _storageService.put(
+      LocalStorageService.userPreferencesBoxName,
+      _userPreferencesKey,
+      preferences,
+    );
+    return result;
+  }
+
+  @override
+  Future<Result<void>> updateSharedWithMeProjectsWithoutSync(List<SharedWithMeProject> projects) async {
+    final currentPrefs = await getUserPreferences();
+    return currentPrefs.when(
+      success: (prefs) async {
+        final updatedPrefs = prefs.copyWith(sharedWithMeProjects: projects);
+        return await saveUserPreferencesWithoutSync(updatedPrefs);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
   }
 } 

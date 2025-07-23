@@ -363,10 +363,7 @@ class CalDAVMonitor {
                   success: (hasData) async {
                     if (hasData) {
                       AppLogger.info('CalDAVMonitor: Successfully downloaded updated user preferences');
-                      // Update local etag to match remote
-                      if (remoteEtag != null) {
-                        await _userRepository.setEtag(remoteEtag);
-                      }
+                      // Etag is now updated automatically by UserSyncService
                     } else {
                       AppLogger.info('CalDAVMonitor: No user preferences data found on server');
                     }
@@ -378,10 +375,7 @@ class CalDAVMonitor {
               },
               failure: (failure) async {
                 AppLogger.warning('CalDAVMonitor: Could not get file info for user preferences: ${failure.message}');
-                // Still update the etag to avoid repeated checks
-                if (remoteEtag != null) {
-                  await _userRepository.setEtag(remoteEtag);
-                }
+                // No need to update etag manually - let sync handle it
               },
             );
             
@@ -406,111 +400,71 @@ class CalDAVMonitor {
     try {
       bool anyChanges = false;
       
-      // Get all external accounts
-      final accountsResult = await _externalAccountRepository.getActiveAccounts();
-      await accountsResult.when(
-        success: (accounts) async {
-          final s3Service = S3StorageService(account: account);
-          final userPrefix = s3Service.getUserPrefix();
+      // Get the global credentials file etag (similar to user preferences)
+      final localEtagResult = await _externalAccountRepository.getCredentialsFileEtag();
+      final localEtag = localEtagResult.when(
+        success: (etag) => etag,
+        failure: (_) => null,
+      );
+      
+      final s3Service = S3StorageService(account: account);
+      final userPrefix = s3Service.getUserPrefix();
+      
+      // Check external credentials file
+      final credentialsKey = '${userPrefix}external_credentials.json';
+      final remoteEtagResult = await s3Service.getCurrentEtag(key: credentialsKey, isPrivate: true);
+      
+      await remoteEtagResult.when(
+        success: (remoteEtag) async {
+          AppLogger.debug('CalDAVMonitor: External credentials etag comparison:');
+          AppLogger.debug('  Local etag:  ${localEtag ?? "(null)"}');
+          AppLogger.debug('  Remote etag: ${remoteEtag ?? "(null)"}');
           
-          // Check external credentials file
-          final credentialsKey = '${userPrefix}external_credentials.json';
-          final remoteEtagResult = await s3Service.getCurrentEtag(key: credentialsKey, isPrivate: true);
-          
-          await remoteEtagResult.when(
-            success: (remoteEtag) async {
-              // For external accounts, we check if any local account etag differs from remote
-              // Since they're stored together, we use a simple approach
-              bool shouldSync = false;
-              
-              if (accounts.isEmpty && remoteEtag != null) {
-                // No local accounts but remote file exists - should download
-                shouldSync = true;
-                AppLogger.info('CalDAVMonitor: No local external accounts but remote file exists, should download');
-              } else {
-                // Check if any local account has different or missing etag
-                for (final externalAccount in accounts) {
-                  final localEtagResult = await _externalAccountRepository.getEtag(externalAccount.id);
-                  final localEtag = localEtagResult.when(
-                    success: (etag) => etag,
-                    failure: (_) => null,
-                  );
-                  
-                  if (localEtag != remoteEtag) {
-                    shouldSync = true;
-                    AppLogger.debug('CalDAVMonitor: External account ${externalAccount.id} etag differs (local: $localEtag, remote: $remoteEtag)');
-                    break;
-                  }
-                }
-              }
-              
-              if (shouldSync) {
-                AppLogger.info('CalDAVMonitor: External credentials etags differ, triggering download');
+          if (localEtag != remoteEtag) {
+            AppLogger.info('CalDAVMonitor: External credentials etags differ, triggering download');
+            
+            // Get file info for conflict resolution
+            final fileInfoResult = await s3Service.getFileInfo(key: credentialsKey, isPrivate: true);
+            await fileInfoResult.when(
+              success: (fileInfo) async {
+                AppLogger.debug('CalDAVMonitor: Remote credentials file last modified: ${fileInfo.lastModified}');
                 
-                // Get file info for conflict resolution
-                final fileInfoResult = await s3Service.getFileInfo(key: credentialsKey, isPrivate: true);
-                await fileInfoResult.when(
-                  success: (fileInfo) async {
-                    AppLogger.debug('CalDAVMonitor: Remote credentials file last modified: ${fileInfo.lastModified}');
-                    
-                    // Create UserSyncService and trigger download
-                    final userSyncService = UserSyncService(
-                      userRepository: _userRepository,
-                      externalAccountRepository: _externalAccountRepository,
-                      externalCalendarRepository: _externalCalendarRepository,
-                      accountRepository: _accountRepository,
-                      calendarRepository: _calendarRepository,
-                    );
-                    
-                    final downloadResult = await userSyncService.downloadUserData();
-                    await downloadResult.when(
-                      success: (hasData) async {
-                        if (hasData) {
-                          AppLogger.info('CalDAVMonitor: Successfully downloaded updated external credentials');
-                          // Update all local accounts with the new etag
-                          final updatedAccountsResult = await _externalAccountRepository.getAll();
-                          await updatedAccountsResult.when(
-                            success: (updatedAccounts) async {
-                              for (final updatedAccount in updatedAccounts) {
-                                if (remoteEtag != null) {
-                                  await _externalAccountRepository.setEtag(updatedAccount.id, remoteEtag);
-                                }
-                              }
-                            },
-                            failure: (_) async {
-                              AppLogger.warning('CalDAVMonitor: Could not update etags for external accounts after sync');
-                            },
-                          );
-                        } else {
-                          AppLogger.info('CalDAVMonitor: No external credentials data found on server');
-                        }
-                      },
-                      failure: (failure) async {
-                        AppLogger.error('CalDAVMonitor: Failed to download external credentials: ${failure.message}');
-                      },
-                    );
-                  },
-                  failure: (failure) async {
-                    AppLogger.warning('CalDAVMonitor: Could not get file info for external credentials: ${failure.message}');
-                    // Still update etags to avoid repeated checks
-                    for (final externalAccount in accounts) {
-                      if (remoteEtag != null) {
-                        await _externalAccountRepository.setEtag(externalAccount.id, remoteEtag);
-                      }
-                    }
-                  },
+                // Create UserSyncService and trigger download
+                final userSyncService = UserSyncService(
+                  userRepository: _userRepository,
+                  externalAccountRepository: _externalAccountRepository,
+                  externalCalendarRepository: _externalCalendarRepository,
+                  accountRepository: _accountRepository,
+                  calendarRepository: _calendarRepository,
                 );
                 
-                anyChanges = true;
-              }
-            },
-            failure: (failure) async {
-              AppLogger.warning('CalDAVMonitor: Could not get remote etag for external credentials: ${failure.message}');
-            },
-          );
+                final downloadResult = await userSyncService.downloadUserData();
+                await downloadResult.when(
+                  success: (hasData) async {
+                    if (hasData) {
+                      AppLogger.info('CalDAVMonitor: Successfully downloaded updated external credentials');
+                      // Etag is now updated automatically by UserSyncService
+                    } else {
+                      AppLogger.info('CalDAVMonitor: No external credentials data found on server');
+                    }
+                  },
+                  failure: (failure) async {
+                    AppLogger.error('CalDAVMonitor: Failed to download external credentials: ${failure.message}');
+                  },
+                );
+              },
+              failure: (failure) async {
+                AppLogger.warning('CalDAVMonitor: Could not get file info for external credentials: ${failure.message}');
+                // No need to update etag manually - let sync handle it
+              },
+            );
+            anyChanges = true;
+          } else {
+            AppLogger.debug('CalDAVMonitor: External credentials etags match, no sync needed');
+          }
         },
         failure: (failure) async {
-          AppLogger.warning('CalDAVMonitor: Could not get external accounts: ${failure.message}');
+          AppLogger.warning('CalDAVMonitor: Could not get remote etag for external credentials: ${failure.message}');
         },
       );
       
@@ -666,4 +620,4 @@ class CalDAVMonitor {
   void dispose() {
     stop();
   }
-} 
+}

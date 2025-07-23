@@ -38,6 +38,10 @@ abstract class ExternalAccountRepository {
   // Etag methods for S3 sync tracking
   Future<Result<String?>> getEtag(String id);
   Future<Result<void>> setEtag(String id, String? etag);
+  
+  // Global file etag methods for external credentials file sync tracking
+  Future<Result<String?>> getCredentialsFileEtag();
+  Future<Result<void>> setCredentialsFileEtag(String? etag);
 }
 
 // Local implementation using Hive
@@ -258,6 +262,16 @@ class LocalExternalAccountRepository implements ExternalAccountRepository {
       },
       failure: (failure) => Result.failure(failure),
     );
+  }
+
+  @override
+  Future<Result<String?>> getCredentialsFileEtag() async {
+    return await _storageService.get<String>(_boxName, 'credentials_file_etag');
+  }
+
+  @override
+  Future<Result<void>> setCredentialsFileEtag(String? etag) async {
+    return await _storageService.put(_boxName, 'credentials_file_etag', etag);
   }
 }
 
