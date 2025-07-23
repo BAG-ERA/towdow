@@ -44,6 +44,10 @@ void main() {
       mockAccountRepository = MockAccountRepository();
       mockUserRepository = MockUserRepository();
 
+      // Add stub for watchCalendars method
+      when(mockCalendarRepository.watchCalendars())
+          .thenAnswer((_) => Stream.empty());
+
       viewModel = ProjectListViewModel(
         mockCalendarRepository,
         mockTaskRepository,

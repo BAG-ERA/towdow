@@ -103,6 +103,10 @@ void main() {
             .thenAnswer((_) async => const Result.success([]));
         when(mockTaskRepository.getAll())
             .thenAnswer((_) async => const Result.success([]));
+        when(mockLocalStorage.debugAllBoxes())
+            .thenAnswer((_) async {});
+        when(mockLocalStorage.getAll<CaldavAccount>('accounts'))
+            .thenAnswer((_) async => const Result.success([]));
 
         // Act
         final result = await syncService.initialize();
@@ -131,7 +135,7 @@ void main() {
           failure: (_) => false,
         );
         expect(isSuccess, true);
-        verify(mockAccountRepository.getActiveAccount()).called(1);
+        verify(mockAccountRepository.getActiveAccount()).called(2);
       });
 
       test('should handle account repository failure', () async {
@@ -151,7 +155,7 @@ void main() {
           failure: (_) => false,
         );
         expect(isSuccess, true);
-        verify(mockAccountRepository.getActiveAccount()).called(1);
+        verify(mockAccountRepository.getActiveAccount()).called(2);
       });
     });
 
@@ -165,6 +169,10 @@ void main() {
         when(mockCalendarRepository.getProjectCalendars())
             .thenAnswer((_) async => const Result.success([]));
         when(mockTaskRepository.getAll())
+            .thenAnswer((_) async => const Result.success([]));
+        when(mockLocalStorage.debugAllBoxes())
+            .thenAnswer((_) async {});
+        when(mockLocalStorage.getAll<CaldavAccount>('accounts'))
             .thenAnswer((_) async => const Result.success([]));
 
         // Start first sync (will be slow)

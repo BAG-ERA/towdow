@@ -87,6 +87,10 @@ void main() {
       // Mock the storage service
       when(mockStorage.getAll<Task>(LocalStorageService.tasksBoxName))
           .thenAnswer((_) async => Result.success(tasksWithAttendees));
+      
+      // Add stub for get method used during delete operations
+      when(mockStorage.get<Task>(any, any))
+          .thenAnswer((_) async => const Result.success(null));
 
       // Test getting all tasks
       final allResult = await repository.getAll();

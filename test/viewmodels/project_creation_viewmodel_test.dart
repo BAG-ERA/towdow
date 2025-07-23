@@ -141,9 +141,8 @@ void main() {
       
       final state = container.read(projectCreationViewModelProvider);
       expect(state.isLoading, false);
-      // When calendar creation fails, viewmodel creates local calendar and tries to save it
-      // The error comes from the save operation, not the creation
-      expect(state.error, contains('Save calendar failed: Calendar save failed'));
+      // When calendar creation fails, the error message reflects the creation failure
+      expect(state.error, contains('Failed to create calendar: Calendar creation failed'));
     });
 
     test('createProject with domain creates domain first', () async {
@@ -221,7 +220,7 @@ void main() {
       
       final state = container.read(projectCreationViewModelProvider);
       expect(state.isLoading, false);
-      expect(state.error, contains('Save calendar failed: Calendar save failed'));
+      expect(state.error, contains('Failed to create calendar: Calendar save failed'));
     });
   });
 } 

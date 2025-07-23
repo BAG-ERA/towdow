@@ -53,7 +53,7 @@ void main() {
         categoryRepository: mockCategoryRepository,
         localStorage: mockLocalStorage,
       );
-      taskViewModel = TaskViewModel(mockTaskRepository, mockAccountRepository, syncService);
+      taskViewModel = TaskViewModel(mockTaskRepository, mockAccountRepository);
 
       final testCalendar = TaskCalendarFactory.createNew(
         path: '/calendars/test/calendar/',

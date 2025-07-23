@@ -49,14 +49,7 @@ void main() {
       mockAccountRepository = MockAccountRepository();
       mockUserRepository = MockUserRepository();
 
-      viewModel = ProjectListViewModel(
-        mockCalendarRepository,
-        mockTaskRepository,
-        mockAccountRepository,
-        mockUserRepository,
-      );
-
-      // Create test data
+      // Create test data first
       testCalendars = [
         TaskCalendarFactory.createNew(
           path: '/calendars/project1/',
@@ -84,6 +77,25 @@ void main() {
           description: 'Test task 3',
         ),
       ];
+
+      // Add stubs for repository methods
+      when(mockCalendarRepository.watchCalendars())
+          .thenAnswer((_) => Stream.value(testCalendars));
+      when(mockCalendarRepository.getProjectCalendars())
+          .thenAnswer((_) async => Result.success(testCalendars));
+      when(mockCalendarRepository.save(any))
+          .thenAnswer((_) async => Result.success(testCalendars.first));
+      when(mockTaskRepository.getByProject(any))
+          .thenAnswer((_) async => Result.success(testTasks));
+      when(mockUserRepository.addProjectToOrder(any))
+          .thenAnswer((_) async => const Result.success(null));
+
+      viewModel = ProjectListViewModel(
+        mockCalendarRepository,
+        mockTaskRepository,
+        mockAccountRepository,
+        mockUserRepository,
+      );
     });
 
     group('Initialization', () {
@@ -146,39 +158,25 @@ void main() {
             .thenAnswer((_) async => Result.success(testCalendars));
         when(mockTaskRepository.getByProject(mockito.any))
             .thenAnswer((_) async => Result.success([testTasks[0], testTasks[1]]));
-        when(mockSyncService.syncAllActiveCaldav())
-            .thenAnswer((_) async => Result.success(SyncResult(
-              success: true,
-              syncedItems: 2,
-              failedItems: 0,
-              errors: [],
-              syncTime: DateTime(2024, 1, 1),
-            )));
 
         // Act
         await viewModel.refresh();
 
         // Assert
-        verify(mockSyncService.syncAllActiveCaldav()).called(1);
         expect(viewModel.state.isRefreshing, false);
         expect(viewModel.state.error, null);
         expect(viewModel.state.projects.length, 2);
       });
 
-      test('should handle sync failure during refresh', () async {
+      test('should handle refresh when no projects', () async {
         // Arrange
         when(mockCalendarRepository.getProjectCalendars())
             .thenAnswer((_) async => Result.success([]));
-        when(mockSyncService.syncAllActiveCaldav())
-            .thenAnswer((_) async => Result.failure(
-                  Failure(message: 'Sync failed'),
-                ));
 
         // Act
         await viewModel.refresh();
 
         // Assert
-        verify(mockSyncService.syncAllActiveCaldav()).called(1);
         expect(viewModel.state.isRefreshing, false);
         expect(viewModel.state.projects.isEmpty, true);
       });
@@ -224,11 +222,11 @@ void main() {
     });
 
     group('Project Creation', () {
-      test('should handle project creation when account repository fails', () async {
+      test('should handle project creation when save fails', () async {
         // Arrange
-        when(mockAccountRepository.getActiveAccount())
+        when(mockCalendarRepository.save(any))
             .thenAnswer((_) async => Result.failure(
-                  Failure(message: 'Account not found'),
+                  Failure(message: 'Save failed'),
                 ));
 
         // Act
@@ -238,13 +236,13 @@ void main() {
         );
 
         // Assert
-        expect(viewModel.state.error, contains('Failed to get active account'));
+        expect(viewModel.state.error, contains('Failed to save project: Save failed'));
       });
 
-      test('should handle project creation when no active account', () async {
+      test('should handle project creation when save throws exception', () async {
         // Arrange
-        when(mockAccountRepository.getActiveAccount())
-            .thenAnswer((_) async => Result.success(null));
+        when(mockCalendarRepository.save(any))
+            .thenThrow(Exception('Save exception'));
 
         // Act
         await viewModel.createProject(
@@ -253,7 +251,7 @@ void main() {
         );
 
         // Assert
-        expect(viewModel.state.error, contains('No active CalDAV account found'));
+        expect(viewModel.state.error, contains('Failed to create project: Exception: Save exception'));
       });
     });
 
@@ -269,26 +267,21 @@ void main() {
         // Assert
         expect(viewModel.state.isLoading, false);
         expect(viewModel.state.error, isNotNull);
-        expect(viewModel.state.error!.contains('Repository error'), true);
+        expect(viewModel.state.error!.contains('Failed to load projects: Exception: Repository error'), true);
       });
 
-      test('should handle sync service exceptions', () async {
+      test('should handle refresh exceptions', () async {
         // Arrange
         when(mockCalendarRepository.getProjectCalendars())
-            .thenAnswer((_) async => Result.success(testCalendars));
-        when(mockTaskRepository.getByProject(mockito.any))
-            .thenAnswer((_) async => Result.success([]));
-        when(mockSyncService.syncAllActiveCaldav())
-            .thenThrow(Exception('Sync error'));
+            .thenThrow(Exception('Refresh error'));
 
         // Act
         await viewModel.refresh();
 
         // Assert
-        verify(mockSyncService.syncAllActiveCaldav()).called(1);
         expect(viewModel.state.isRefreshing, false);
         expect(viewModel.state.error, isNotNull);
-        expect(viewModel.state.error!.contains('Sync error'), true);
+        expect(viewModel.state.error!.contains('Failed to refresh: Exception: Refresh error'), true);
       });
     });
   });

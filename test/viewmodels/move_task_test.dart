@@ -220,11 +220,8 @@ void main() {
         expect(taskViewModel.state.isLoading, false);
         expect(taskViewModel.state.error, null);
         
-        // Verify task was saved
+        // Verify task was saved (sync is now handled by repository)
         verify(mockTaskRepository.save(any)).called(1);
-        
-        // Verify sync operations were queued
-        verify(mockSyncService.queueSyncOperation(any, any, any)).called(2);
       });
 
       test('should handle move with sync data correctly', () async {
@@ -253,7 +250,7 @@ void main() {
         await taskViewModel.moveTask(originalTask, targetCalendarUid);
 
         // Assert
-        verify(mockSyncService.queueSyncOperation(any, any, any)).called(2); // Called twice: once for delete, once for create
+        verify(mockTaskRepository.save(any)).called(1); // Task is saved with new project path
       });
 
       test('should handle move without sync service', () async {
@@ -287,9 +284,6 @@ void main() {
         
         // Verify task was saved locally
         verify(mockTaskRepository.save(any)).called(1);
-        
-        // Verify no sync operations were queued
-        verifyNever(mockSyncService.queueSyncOperation(any, any, any));
       });
 
       test('should handle move with invalid calendar UIDs', () async {
@@ -312,10 +306,9 @@ void main() {
         expect(taskViewModel.state.isLoading, false);
         // The code may call save even with invalid UIDs, so we allow it
         verify(mockTaskRepository.save(any)).called(1);
-        verifyNever(mockSyncService.queueSyncOperation(any, any, any));
       });
 
-      test('should handle move with sync service failure', () async {
+      test('should handle move with repository failure', () async {
         // Arrange
         final sourceProjectPath = 'calendar-1';
         final targetCalendarUid = 'calendar-2';
@@ -332,22 +325,17 @@ void main() {
         );
 
         when(mockTaskRepository.save(any))
-            .thenAnswer((_) async => const Result.success(null));
-        
-        when(mockSyncService.queueSyncOperation(any, any, any))
-            .thenAnswer((_) async => Result.failure(const Failure(message: 'Sync failed')));
+            .thenAnswer((_) async => Result.failure(const Failure(message: 'Repository failed')));
 
         // Act
         await taskViewModel.moveTask(originalTask, targetCalendarUid);
 
         // Assert
         expect(taskViewModel.state.isLoading, false);
+        expect(taskViewModel.state.error, 'Repository failed');
         
-        // Verify task was still saved locally despite sync failure
+        // Verify task save was attempted
         verify(mockTaskRepository.save(any)).called(1);
-        
-        // Verify sync operations were attempted
-        verify(mockSyncService.queueSyncOperation(any, any, any)).called(2);
       });
     });
   });
