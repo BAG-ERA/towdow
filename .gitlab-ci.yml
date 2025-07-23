@@ -156,6 +156,25 @@ prepare_release:
     paths:
       - release_notes.txt
 
+build_web:
+  stage: build
+  image: $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - echo "WEB_JOB_ID=$CI_JOB_ID" > build.env
+    - echo "CI_PIPELINE_IID=$CI_PIPELINE_IID" >> build.env
+    - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+    - flutter build web --release
+    - tar zcf" build/web_${CI_COMMIT_TAG}.tar.gz" build/web
+  artifacts:
+    paths:
+      - "build/web.tar.gz"
+    expire_in: 1 week
+    reports:
+      dotenv: build.env
+
+
 release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
@@ -186,3 +205,5 @@ release:
           url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/installer/Release/TowdowApp-x86_64-$CI_COMMIT_TAG-Installer.exe"
         - name: "Towdow Windows zip"
           url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/runner/Release/towdow_app-$CI_COMMIT_TAG.zip"
+        - name: "Towdow web"
+          url: "$CI_PROJECT_URL/-/jobs/WEB_JOB_ID/artifacts/file/build/web.tar.gz"
