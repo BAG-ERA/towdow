@@ -11,6 +11,9 @@ import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/category_repository.dart';
+import 'package:towdow_app/data/repositories/user_repository.dart';
+import 'package:towdow_app/data/repositories/external_account_repository.dart';
+import 'package:towdow_app/data/repositories/external_calendar_repository.dart';
 import 'package:towdow_app/data/services/caldav_monitor.dart';
 import 'package:towdow_app/data/services/connection_monitor_service.dart';
 import 'package:towdow_app/data/services/sync_service.dart';
@@ -23,6 +26,9 @@ import 'caldav_monitor_test.mocks.dart';
   AccountRepository,
   CalendarRepository,
   CategoryRepository,
+  UserRepository,
+  ExternalAccountRepository,
+  ExternalCalendarRepository,
   ConnectionMonitorService,
   SyncService,
   WebDAVClient,
@@ -33,21 +39,30 @@ void main() {
     late MockAccountRepository mockAccountRepository;
     late MockCalendarRepository mockCalendarRepository;
     late MockCategoryRepository mockCategoryRepository;
-    late MockConnectionMonitorService mockConnectionMonitor;
+    late MockUserRepository mockUserRepository;
+    late MockExternalAccountRepository mockExternalAccountRepository;
+    late MockExternalCalendarRepository mockExternalCalendarRepository;
+    late MockConnectionMonitorService mockConnectionMonitorService;
     late MockSyncService mockSyncService;
 
     setUp(() {
       mockAccountRepository = MockAccountRepository();
       mockCalendarRepository = MockCalendarRepository();
       mockCategoryRepository = MockCategoryRepository();
-      mockConnectionMonitor = MockConnectionMonitorService();
+      mockUserRepository = MockUserRepository();
+      mockExternalAccountRepository = MockExternalAccountRepository();
+      mockExternalCalendarRepository = MockExternalCalendarRepository();
+      mockConnectionMonitorService = MockConnectionMonitorService();
       mockSyncService = MockSyncService();
 
       monitor = CalDAVMonitor(
         accountRepository: mockAccountRepository,
         calendarRepository: mockCalendarRepository,
         categoryRepository: mockCategoryRepository,
-        connectionMonitorService: mockConnectionMonitor,
+        userRepository: mockUserRepository,
+        externalAccountRepository: mockExternalAccountRepository,
+        externalCalendarRepository: mockExternalCalendarRepository,
+        connectionMonitorService: mockConnectionMonitorService,
         syncService: mockSyncService,
       );
     });
@@ -64,7 +79,7 @@ void main() {
 
       test('should start monitoring successfully', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(null),
         );
@@ -81,7 +96,7 @@ void main() {
 
       test('should not start if already monitoring', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(null),
         );
@@ -109,7 +124,7 @@ void main() {
     group('Connection Monitoring', () {
       test('should skip monitoring when no internet connection', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.disconnected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.disconnected);
 
         // Act
         await monitor.start();
@@ -120,7 +135,7 @@ void main() {
 
       test('should skip monitoring when no active account', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(null),
         );
@@ -136,7 +151,7 @@ void main() {
     group('Queue Processing', () {
       test('should process queued operations when connected', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
@@ -169,7 +184,7 @@ void main() {
 
       test('should handle queue processing failure gracefully', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
@@ -201,7 +216,7 @@ void main() {
     group('Dynamic Interval Adjustment', () {
       test('should decrease interval when changes are detected', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
@@ -235,7 +250,7 @@ void main() {
 
       test('should increase interval when no changes are detected', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
@@ -273,11 +288,14 @@ void main() {
           accountRepository: mockAccountRepository,
           calendarRepository: mockCalendarRepository,
           categoryRepository: mockCategoryRepository,
-          connectionMonitorService: mockConnectionMonitor,
+          userRepository: mockUserRepository,
+          externalAccountRepository: mockExternalAccountRepository,
+          externalCalendarRepository: mockExternalCalendarRepository,
+          connectionMonitorService: mockConnectionMonitorService,
           syncService: mockSyncService,
         );
 
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
@@ -311,7 +329,7 @@ void main() {
 
       test('should respect maximum interval limit', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
@@ -347,7 +365,7 @@ void main() {
     group('Error Handling', () {
       test('should handle account repository failure gracefully', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.failure(Failure(
             message: 'Account repository error',
@@ -364,7 +382,7 @@ void main() {
 
       test('should handle calendar repository failure gracefully', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
@@ -391,7 +409,7 @@ void main() {
 
       test('should handle sync service failure gracefully', () async {
         // Arrange
-        when(mockConnectionMonitor.currentStatus).thenReturn(ConnectionStatus.connected);
+        when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',

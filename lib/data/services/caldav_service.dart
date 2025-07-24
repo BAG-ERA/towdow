@@ -16,6 +16,7 @@ import 'webdav_client.dart';
 import 'capability_discovery_service.dart';
 import 'parsers/vtodo_parser.dart';
 import 'parsers/xml_response_parser.dart';
+import 'share_service.dart';
 
 class CalDAVService {
   final CaldavAccount account;
@@ -395,6 +396,7 @@ class CalDAVService {
     <FLOWIT:template/>
     <FLOWIT:status/>
     <FLOWIT:categories/>
+    <FLOWIT:sharedWith/>
   </D:prop>
 </D:propfind>''';
 
@@ -518,6 +520,7 @@ class CalDAVService {
     <FLOWIT:status />
     <FLOWIT:kanban />
     <FLOWIT:categories />
+    <FLOWIT:sharedWith />
   </D:prop>
 </D:propfind>''';
 
@@ -531,7 +534,7 @@ class CalDAVService {
             if (responses.isNotEmpty) {
               final responseData = responses.first;
               
-              // Update the calendar with new properties
+              // Update the calendar with new properties (only non-null values)
               final updatedCalendar = calendar.copyWith(
                 etag: responseData['getetag'],
                 syncToken: responseData['sync-token'],
@@ -541,10 +544,11 @@ class CalDAVService {
                 flowitStatus: responseData['flowit-status'],
                 flowitKanban: responseData['flowit-kanban'] ?? calendar.flowitKanban,
                 projectCategories: responseData['flowit-categories'] ?? calendar.projectCategories,
+                sharedWith: responseData['flowit-sharedWith'] ?? calendar.sharedWith,
                 lastSyncAt: DateTime.now(),
               );
               
-              AppLogger.debug('CalDAVService: Calendar info resynced successfully');
+              
               return Result.success(updatedCalendar);
             } else {
               return Result.failure(Failure(
@@ -728,6 +732,13 @@ class CalDAVService {
           
           if (response.statusCode == 207 || response.statusCode == 200) {
             AppLogger.info('CalDAVService: Calendar WebDAV properties updated successfully');
+            
+            // SHARING SYNC INTEGRATION: 
+            // Update sharing information on TowDow API if this calendar has sharing data
+            // TODO: Remove this if we implement sharing as CalDAV properties instead
+            // @see https://gitlab.com/towdow/towdow-infra/-/issues/1 - extend caldav protocol with sharedwith field
+            await _syncSharingToTowDowAPI(calendar);
+            
             return Result.success(null);
           } else {
             final errorMsg = 'PROPPATCH returned ${response.statusCode}: ${responseBody.isNotEmpty ? responseBody : "No error details"}';
@@ -749,6 +760,63 @@ class CalDAVService {
         message: 'Exception during calendar update: $e',
         code: 'EXCEPTION',
       ));
+    }
+  }
+
+  /// Sync sharing information to TowDow sharing API
+  /// This integrates sharing updates with the PROPPATCH flow
+  Future<void> _syncSharingToTowDowAPI(TaskCalendar calendar) async {
+    try {
+      // Only sync sharing for TowDow accounts that support sharing
+      if (account.providerType != 'towdow_cloud' && account.providerType != 'towdow_selfhosted') {
+        AppLogger.debug('CalDAVService: Skipping sharing sync - account type ${account.providerType} does not support sharing');
+        return;
+      }
+
+      // Check if calendar has sharing data to sync
+      if (calendar.sharedWithMembers.isEmpty) {
+        AppLogger.debug('CalDAVService: No sharing data to sync for calendar ${calendar.path}');
+        return;
+      }
+
+      AppLogger.info('CalDAVService: Syncing sharing data to TowDow API for calendar ${calendar.path}');
+      
+      // Create sharing service instance
+      final sharingService = ShareService(account: account);
+      
+      // Extract project path (UUID) from calendar path
+      final projectPath = calendar.uid;
+      
+      if (projectPath.isEmpty) {
+        AppLogger.warning('CalDAVService: Could not extract project path from ${calendar.path}');
+        return;
+      }
+      
+      AppLogger.debug('CalDAVService: Extracted project path: $projectPath');
+      
+      // Get member emails for the API from SharedProjectMember objects
+      final memberEmails = calendar.sharedWithMembers.map((member) => member['targetUserEmail'] as String).toList();
+      
+      // Call setProjectMembers to sync the current sharing state
+      final result = await sharingService.setProjectMembers(
+        projectPath: projectPath,
+        memberEmails: memberEmails,
+      );
+
+      await result.when(
+        success: (_) async {
+          AppLogger.info('CalDAVService: Successfully synced sharing data to TowDow API for calendar ${calendar.path}');
+        },
+        failure: (failure) async {
+          // Don't fail the entire PROPPATCH operation if sharing sync fails
+          // This ensures calendar properties are still updated even if sharing API is down
+          AppLogger.error('CalDAVService: Failed to sync sharing data to TowDow API: ${failure.message}');
+          AppLogger.error('CalDAVService: Sharing sync will be retried during next sync operation');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVService: Exception during sharing sync to TowDow API', e, stackTrace);
+      // Don't propagate the exception - sharing sync is secondary to PROPPATCH
     }
   }
 
@@ -790,6 +858,11 @@ class CalDAVService {
       xml.writeln('      <FLOWIT:categories><![CDATA[${calendar.projectCategories}]]></FLOWIT:categories>');
     }
     
+    // Set shared project members as JSON
+    if (calendar.sharedWith.isNotEmpty && calendar.sharedWith != '[]') {
+      xml.writeln('      <FLOWIT:sharedWith><![CDATA[${calendar.sharedWith}]]></FLOWIT:sharedWith>');
+    }
+    
     xml.writeln('    </D:prop>');
     xml.writeln('  </D:set>');
     
@@ -797,7 +870,8 @@ class CalDAVService {
     if ((calendar.flowitDomain == null || calendar.flowitDomain!.isEmpty) || 
         (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) ||
         (calendar.flowitKanban.isEmpty || calendar.flowitKanban == '[]') ||
-        (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]')) {
+        (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') ||
+        (calendar.sharedWith.isEmpty || calendar.sharedWith == '[]')) {
       xml.writeln('  <D:remove>');
       xml.writeln('    <D:prop>');
       
@@ -815,6 +889,10 @@ class CalDAVService {
       
       if (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') {
         xml.writeln('      <FLOWIT:categories/>');
+      }
+      
+      if (calendar.sharedWith.isEmpty || calendar.sharedWith == '[]') {
+        xml.writeln('      <FLOWIT:sharedWith/>');
       }
       
       xml.writeln('    </D:prop>');

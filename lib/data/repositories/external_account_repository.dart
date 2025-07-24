@@ -34,6 +34,14 @@ abstract class ExternalAccountRepository {
   Future<Result<void>> setActive(String id, bool active);
   Future<Result<List<ExternalCaldavAccount>>> getAccountsWithErrors();
   Future<Result<List<ExternalCaldavAccount>>> getAccountsNeedingRefresh();
+  
+  // Etag methods for S3 sync tracking
+  Future<Result<String?>> getEtag(String id);
+  Future<Result<void>> setEtag(String id, String? etag);
+  
+  // Global file etag methods for external credentials file sync tracking
+  Future<Result<String?>> getCredentialsFileEtag();
+  Future<Result<void>> setCredentialsFileEtag(String? etag);
 }
 
 // Local implementation using Hive
@@ -226,6 +234,44 @@ class LocalExternalAccountRepository implements ExternalAccountRepository {
       },
       failure: (failure) => Result.failure(failure),
     );
+  }
+
+  @override
+  Future<Result<String?>> getEtag(String id) async {
+    final getResult = await getById(id);
+    return getResult.when(
+      success: (account) => Result.success(account?.etag),
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<void>> setEtag(String id, String? etag) async {
+    final getResult = await getById(id);
+    return getResult.when(
+      success: (account) async {
+        if (account != null) {
+          final updatedAccount = account.withEtag(etag);
+          return await save(updatedAccount);
+        } else {
+          return Result.failure(Failure(
+            message: 'Account not found: $id',
+            exception: Exception('Account not found'),
+          ));
+        }
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<String?>> getCredentialsFileEtag() async {
+    return await _storageService.get<String>(_boxName, 'credentials_file_etag');
+  }
+
+  @override
+  Future<Result<void>> setCredentialsFileEtag(String? etag) async {
+    return await _storageService.put(_boxName, 'credentials_file_etag', etag);
   }
 }
 

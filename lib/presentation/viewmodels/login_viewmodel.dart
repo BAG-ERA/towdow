@@ -234,8 +234,17 @@ class LoginViewModel extends StateNotifier<LoginState> {
 
       await testResult.when(
         success: (capabilities) async {
+          // Update account with discovered principal and calendarHome
+          final updatedAccount = account.copyWith(
+            principal: capabilities.principal,
+            calendarHome: capabilities.calendarHome,
+          );
+          
+          // Save the updated account with principal and calendarHome
+          await _accountRepository.save(updatedAccount);
+          
           state = state.copyWith(
-            account: account,
+            account: updatedAccount,
             capabilities: capabilities,
             hasExistingUserData: false,
             isLoading: false,

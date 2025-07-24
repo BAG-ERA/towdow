@@ -5,8 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
-import '../../../core/theme/chart_theme.dart';
+import '../../../data/models/caldav_account.dart';
+import '../../../data/models/user_preferences.dart';
+import '../../../data/providers/providers.dart';
+import '../../../core/logger.dart';
+import '../../../core/result.dart';
+
 import '../utils/enhanced_text_field.dart';
+import '../utils/popup/project_sharing_dialog.dart';
 
 class ProjectInfoCard extends ConsumerWidget {
   final TaskCalendar? project;
@@ -69,6 +75,11 @@ class ProjectInfoCard extends ConsumerWidget {
             project: project!,
             onProjectUpdated: onProjectUpdated,
           ),
+          
+          const SizedBox(height: 12),
+
+          // Sharing status section
+          _ProjectSharingStatus(project: project!),
           
           const SizedBox(height: 12),
           // Dynamic stats based on actual tasks
@@ -293,5 +304,333 @@ class _EditableProjectDescriptionState extends State<_EditableProjectDescription
     setState(() {
       _isEditing = false;
     });
+  }
+}
+
+// Project sharing status widget
+class _ProjectSharingStatus extends ConsumerWidget {
+  final TaskCalendar project;
+
+  const _ProjectSharingStatus({required this.project});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Check if account supports sharing
+    final accountAsync = ref.watch(activeAccountProvider);
+    final supportsSharing = accountAsync.when(
+      data: (account) => account?.providerType == 'towdow_cloud' || account?.providerType == 'towdow_selfhosted',
+      loading: () => false,
+      error: (_, __) => false,
+    );
+
+    if (!supportsSharing) {
+      return const SizedBox.shrink(); // Don't show anything if sharing is not supported
+    }
+
+    // Use Consumer to handle reactive sharing check
+    return Consumer(
+      builder: (context, ref, child) {
+        final sharedByAsync = ref.watch(projectSharedByProvider(project.uid));
+        
+        return sharedByAsync.when(
+          data: (sharedWithMeBy) {
+            final isSharedWithMe = sharedWithMeBy.isNotEmpty;
+            final isSharedWithOthers = project.isSharedWithOthers;
+
+            if (!isSharedWithMe && !isSharedWithOthers) {
+              // Project is not shared - show quick share button
+              return Row(
+                children: [
+                  Icon(
+                    Icons.people_outline,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Private project',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => _showSharingDialog(context),
+                    icon: const Icon(Icons.share, size: 16),
+                    label: const Text('Share'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            // Project is shared - show sharing status
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Sharing status header
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.people,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          isSharedWithMe 
+                              ? 'Shared with you by $sharedWithMeBy' 
+                              : 'Shared with ${project.sharedWithEmails.length} ${project.sharedWithEmails.length == 1 ? 'person' : 'people'}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      // Three-dot menu for sharing actions
+                      PopupMenuButton<String>(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          Icons.more_horiz,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onSecondaryContainer.withValues(alpha: 0.7),
+                        ),
+                        tooltip: 'Sharing options',
+                        onSelected: (value) {
+                          switch (value) {
+                            case 'manage':
+                              _showSharingDialog(context);
+                              break;
+                            case 'leave':
+                              if (isSharedWithMe) {
+                                _showLeaveProjectDialog(context);
+                              }
+                              break;
+                          }
+                        },
+                        itemBuilder: (BuildContext context) => [
+                          if (!isSharedWithMe) ...[
+                            const PopupMenuItem<String>(
+                              value: 'manage',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.manage_accounts, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('Manage sharing'),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if (isSharedWithMe) ...[
+                            const PopupMenuItem<String>(
+                              value: 'leave',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.exit_to_app, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('Leave project'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                  
+                  // Show shared members for projects I own
+                  if (isSharedWithOthers && project.sharedWithEmails.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: project.sharedWithEmails.take(3).map((email) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            _formatEmail(email),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 11,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    if (project.sharedWithEmails.length > 3) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '+ ${project.sharedWithEmails.length - 3} more',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSecondaryContainer.withValues(alpha: 0.7),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            );
+          },
+          loading: () => const SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          error: (error, stackTrace) => const SizedBox.shrink(),
+        );
+      },
+    );
+  }
+
+  void _showSharingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => ProjectSharingDialog(project: project),
+    );
+  }
+
+  void _showLeaveProjectDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Consumer(
+        builder: (context, ref, child) {
+          return AlertDialog(
+            title: const Text('Leave Shared Project'),
+            content: Text('Are you sure you want to stop accessing "${project.displayName}"? You will no longer be able to view or edit this project.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => _handleExitShare(context, ref),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('Leave'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _handleExitShare(BuildContext context, WidgetRef ref) async {
+    try {
+      AppLogger.info('ProjectInfoCard: Starting exit share for project: ${project.displayName}');
+      
+      // Get active account and call exit share (optional - continue even if fails)
+      final accountRepository = ref.read(accountRepositoryProvider);
+      final accountResult = await accountRepository.getActiveAccount();
+      if (accountResult is Success<CaldavAccount?> && accountResult.data != null) {
+        final account = accountResult.data!;
+        final shareService = ref.read(shareServiceProvider(account));
+        await shareService.exitShare(project.uid);
+        AppLogger.info('ProjectInfoCard: Exit share completed on server');
+      }
+      
+      // Always clean up local data
+      AppLogger.info('ProjectInfoCard: Cleaning up local data for project: ${project.path}');
+      
+      try {
+        // Remove project from calendar repository
+        AppLogger.info('ProjectInfoCard: Step 1 - Deleting from calendar repository');
+        final calendarRepository = ref.read(calendarRepositoryProvider);
+        await calendarRepository.delete(project.path);
+        AppLogger.info('ProjectInfoCard: Step 1 completed - Deleted project from calendar repository');
+      } catch (e) {
+        AppLogger.error('ProjectInfoCard: Step 1 failed - Calendar deletion error: $e');
+      }
+      
+      try {
+        // Remove all tasks
+        AppLogger.info('ProjectInfoCard: Step 2 - Getting and deleting tasks');
+        final taskRepository = ref.read(taskRepositoryProvider);
+        final projectTasksResult = await taskRepository.getByProject(project.path);
+        if (projectTasksResult is Success<List<Task>>) {
+          final tasks = projectTasksResult.data;
+          AppLogger.info('ProjectInfoCard: Step 2 - Found ${tasks.length} tasks to delete');
+          for (final task in tasks) {
+            await taskRepository.delete(task.uid);
+          }
+          AppLogger.info('ProjectInfoCard: Step 2 completed - Deleted ${tasks.length} tasks');
+        } else {
+          AppLogger.info('ProjectInfoCard: Step 2 - No tasks found or failed to get tasks');
+        }
+      } catch (e) {
+        AppLogger.error('ProjectInfoCard: Step 2 failed - Task deletion error: $e');
+      }
+      
+      try {
+        // Remove from user preferences
+        AppLogger.info('ProjectInfoCard: Step 3 - Updating user preferences');
+        final userRepository = ref.read(userRepositoryProvider);
+        final preferencesResult = await userRepository.getUserPreferences();
+        if (preferencesResult is Success<UserPreferences>) {
+          final preferences = preferencesResult.data;
+          final updatedSharedProjects = preferences.sharedWithMeProjects
+              .where((sharedProject) => sharedProject.projectId != project.path)
+              .toList();
+          await userRepository.updateSharedWithMeProjects(updatedSharedProjects);
+          AppLogger.info('ProjectInfoCard: Step 3 completed - Updated user preferences');
+        } else {
+          AppLogger.info('ProjectInfoCard: Step 3 - Failed to get user preferences');
+        }
+      } catch (e) {
+        AppLogger.error('ProjectInfoCard: Step 3 failed - User preferences error: $e');
+      }
+      
+      // Refresh UI
+      ref.invalidate(calendarListProvider);
+      ref.invalidate(projectListProvider);
+      ref.invalidate(userPreferencesProvider);
+      
+      AppLogger.info('ProjectInfoCard: Exit share cleanup completed successfully');
+      
+      // Close dialog and navigate to home
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close dialog
+        // Navigate to home page - remove all routes and go to root
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectInfoCard: Error during exit share', e, stackTrace);
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close dialog on error
+      }
+    }
+  }
+
+
+  String _formatEmail(String email) {
+    // Show just the name part if it's an email
+    if (email.contains('@')) {
+      return email.split('@').first;
+    }
+    return email;
   }
 } 

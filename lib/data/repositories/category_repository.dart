@@ -7,6 +7,7 @@ import '../models/category.dart';
 import '../models/task_calendar.dart';
 import 'calendar_repository.dart';
 import '../services/caldav_service.dart';
+import '../services/sync_service.dart';
 import 'account_repository.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
@@ -395,7 +396,7 @@ class CategoryRepository {
     }
   }
 
-  /// Syncs categories to the CalDAV server for a specific calendar.
+  /// Syncs categories to the CalDAV server using queue for offline resilience.
   /// This method follows the same pattern as DomainService and StatusService.
   Future<Result<void>> _syncCategoryToServer(TaskCalendar calendar) async {
     try {
@@ -403,48 +404,36 @@ class CategoryRepository {
       AppLogger.info('CategoryRepository: Calendar path: ${calendar.path}');
       AppLogger.info('CategoryRepository: Categories value: ${calendar.projectCategories}');
       
-      // Get active account
-      final accountResult = await _accountRepository.getActiveAccount();
-      return accountResult.when(
-        success: (account) async {
-          if (account == null) {
-            AppLogger.warning('CategoryRepository: No active account found, skipping server sync');
-            return Result.success(null); // Still success since local save worked
-          }
-          
-          AppLogger.info('CategoryRepository: Found active account: ${account.username}@${account.serverUrl}');
-          
-          // Create CalDAV service instance
-          final caldavService = CalDAVService(account: account);
-          AppLogger.info('CategoryRepository: Created CalDAV service, calling updateCalendarProperties...');
-          
-          // Update calendar properties on server
-          final updateResult = await caldavService.updateCalendarProperties(calendar);
-          
-          return updateResult.when(
-            success: (_) {
-              AppLogger.info('CategoryRepository: *** Successfully synced categories to server ***');
-              return Result.success(null);
-            },
-            failure: (failure) {
-              AppLogger.error('CategoryRepository: Failed to sync categories to server: ${failure.message}');
-              AppLogger.error('CategoryRepository: Failure code: ${failure.code}');
-              // Don't fail the entire operation since local save succeeded
-              // The sync will be retried during next full sync
-              return Result.success(null);
-            },
-          );
-        },
-        failure: (failure) {
-          AppLogger.error('CategoryRepository: Failed to get active account for server sync: ${failure.message}');
-          AppLogger.error('CategoryRepository: Account failure code: ${failure.code}');
-          // Don't fail the entire operation since local save succeeded
-          return Result.success(null);
-        },
-      );
+      // Always use sync queue for offline resilience
+      final syncService = SyncService.instance;
+      if (syncService != null) {
+        AppLogger.debug('CategoryRepository: Queuing calendar update for category sync');
+        final queueResult = await syncService.queueCalendarUpdate(calendar.path);
+        
+        return await queueResult.when(
+          success: (_) async {
+            AppLogger.info('CategoryRepository: *** Successfully queued category sync to server ***');
+            return Result.success(null);
+          },
+          failure: (failure) async {
+            AppLogger.error('CategoryRepository: Failed to queue category sync: ${failure.message}');
+            return Result.failure(failure);
+          },
+        );
+      } else {
+        AppLogger.error('CategoryRepository: SyncService singleton not initialized - cannot queue update');
+        return Result.failure(Failure(
+          message: 'SyncService not initialized',
+          exception: Exception('SyncService singleton not available'),
+        ));
+      }
     } catch (e, stackTrace) {
       AppLogger.error('CategoryRepository: Exception during category sync', e, stackTrace);
-      return Result.success(null); // Don't fail the entire operation
+      return Result.failure(Failure(
+        message: 'Failed to sync category to server: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
     }
   }
 } 

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/caldav_account.dart';
+import '../models/task_calendar.dart';
 
 class LocalStorageService {
   static const String tasksBoxName = 'tasks';
@@ -184,7 +185,7 @@ class LocalStorageService {
           } else if (value is Map && T == Map<String, dynamic>) {
             // Handle Map<dynamic, dynamic> to Map<String, dynamic> conversion
             final convertedMap = <String, dynamic>{};
-            (value as Map).forEach((key, val) {
+            value.forEach((key, val) {
               convertedMap[key.toString()] = val;
             });
             items.add(convertedMap as T);
@@ -208,15 +209,12 @@ class LocalStorageService {
     }
   }
 
-  // Generic put item in a box
+    // Generic put item in a box
   Future<Result<void>> put<T>(String boxName, String key, T item) async {
     try {
-      // AppLogger.debug('LocalStorageService: Putting item with key $key in $boxName');
-      
       final box = _getBox(boxName);
       await box.put(key, item);
       
-              // AppLogger.debug('LocalStorageService: Successfully put item $key in $boxName');
       return const Result.success(null);
     } catch (e, stackTrace) {
       AppLogger.error('LocalStorageService: Failed to put item $key in $boxName', e, stackTrace);

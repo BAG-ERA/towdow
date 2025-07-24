@@ -20,12 +20,14 @@ import '../../widgets/project_detail/project_info_card.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/project_detail/project_kanban_view.dart';
 import '../../widgets/utils/editable_title.dart';
-import '../../../data/services/caldav_service.dart';
 import '../../../data/services/webdav_client.dart';
 
-// Provider for a specific project/calendar
+// Provider for a specific project/calendar that automatically refreshes when repository data changes
 final projectProvider = FutureProvider.family<TaskCalendar?, String>((ref, projectPath) async {
-  final calendarRepository = ref.read(calendarRepositoryProvider);
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  
+  // Also watch the calendar list stream to trigger refresh when any calendar changes
+  ref.watch(calendarListProvider);
   
   // Encode special characters in the project path to match storage format
   final encodedProjectPath = projectPath.replaceAll('@', '%40');
@@ -61,10 +63,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   @override
   void dispose() {
-    // Clear mobile providers when leaving the screen
-    ref.read(mobileTitleProvider.notifier).state = null;
-    ref.read(mobileProjectProvider.notifier).state = null;
-    ref.read(mobileProjectUpdateProvider.notifier).state = null;
+    // Note: Mobile providers are automatically cleaned up when the widget tree is disposed
+    // No need to manually clear them here as it can cause disposal errors
     super.dispose();
   }
 
@@ -79,11 +79,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     // Update mobile providers when project data is available
     projectAsync.whenData((project) {
-      if (project != null && !isDesktop) {
+      if (project != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          ref.read(mobileTitleProvider.notifier).state = project.displayName;
-          ref.read(mobileProjectProvider.notifier).state = project;
-          ref.read(mobileProjectUpdateProvider.notifier).state = _updateProject;
+          // Update mobile providers if on mobile
+          if (!isDesktop) {
+            ref.read(mobileTitleProvider.notifier).state = project.displayName;
+            ref.read(mobileProjectProvider.notifier).state = project;
+            ref.read(mobileProjectUpdateProvider.notifier).state = _updateProject;
+          }
+          
+          // Auto-acknowledge shared project when viewing project detail
+          _acknowledgeSharedProjectIfNeeded(project);
         });
       }
     });
@@ -858,88 +864,49 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     }
   }
 
-  /// Sync project metadata changes to CalDAV server
+  /// Sync project metadata changes to server via repository
   Future<void> _syncProjectToServer(TaskCalendar project) async {
     AppLogger.info('ProjectDetail: _syncProjectToServer method entered for project: ${project.displayName}');
     
     try {
       AppLogger.info('ProjectDetail: Starting server sync for project: ${project.displayName}');
       
-      // Get active account
-      final accountRepository = ref.read(accountRepositoryProvider);
-      AppLogger.info('ProjectDetail: Getting active account from repository...');
-      final accountResult = await accountRepository.getActiveAccount();
-      AppLogger.info('ProjectDetail: Account result obtained, processing...');
+      // Use repository for proper MVVM architecture - it handles account management internally
+      final calendarRepository = ref.read(calendarRepositoryProvider);
+      AppLogger.info('ProjectDetail: Calling repository updateCalendarProperties...');
+      final syncResult = await calendarRepository.updateCalendarProperties(project);
       
-      await accountResult.when(
-        success: (account) async {
-          if (account == null) {
-            AppLogger.warning('ProjectDetail: No active account found, skipping server sync');
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('⚠️ No CalDAV account found - changes saved locally only'),
-                  backgroundColor: Colors.orange,
-                ),
-              );
-            }
-            return;
+      await syncResult.when(
+        success: (_) {
+          AppLogger.info('ProjectDetail: Successfully synced project metadata to server');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('☁️ Project synced to server'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
           }
-          
-          AppLogger.info('ProjectDetail: Found active account: ${account.username}@${account.serverUrl}');
-          
-          // Create CalDAV service and sync to server
-          final caldavService = CalDAVService(account: account);
-          AppLogger.info('ProjectDetail: Calling CalDAV updateCalendarProperties...');
-          final syncResult = await caldavService.updateCalendarProperties(project);
-          
-          await syncResult.when(
-            success: (_) {
-              AppLogger.info('ProjectDetail: Successfully synced project metadata to server');
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('☁️ Project synced to server'),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              }
-            },
-            failure: (failure) {
-              AppLogger.error('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('❌ Server sync failed: ${failure.message}'),
-                    backgroundColor: Colors.red,
-                    duration: const Duration(seconds: 5),
-                    action: SnackBarAction(
-                      label: 'Retry',
-                      textColor: Colors.white,
-                      onPressed: () => _syncProjectToServer(project),
-                    ),
-                  ),
-                );
-              }
-            },
-          );
         },
         failure: (failure) {
-          AppLogger.warning('ProjectDetail: No active account found, skipping server sync: ${failure.message}');
+          AppLogger.error('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('⚠️ Account error: ${failure.message}'),
-                backgroundColor: Colors.orange,
+                content: Text('❌ Server sync failed: ${failure.message}'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
+                action: SnackBarAction(
+                  label: 'Retry',
+                  textColor: Colors.white,
+                  onPressed: () => _syncProjectToServer(project),
+                ),
               ),
             );
           }
         },
       );
-    } on RefreshTokenExpiredException catch (_) {
-      handleSessionExpired();
-      return;
     } catch (e, stackTrace) {
       AppLogger.error('ProjectDetail: Exception during server sync', e, stackTrace);
       if (mounted) {
@@ -951,6 +918,40 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           ),
         );
       }
+    }
+  }
+
+  /// Auto-acknowledge shared project when user views project detail
+  Future<void> _acknowledgeSharedProjectIfNeeded(TaskCalendar project) async {
+    try {
+      final userRepository = ref.read(userRepositoryProvider);
+      final preferencesResult = await userRepository.getUserPreferences();
+      
+      await preferencesResult.when(
+        success: (preferences) async {
+          final sharedProject = preferences.getSharedProject(project.uid);
+          
+          // Only acknowledge if project is shared with me and not yet acknowledged
+          if (sharedProject != null && !sharedProject.ack) {
+            AppLogger.info('ProjectDetailScreen: Auto-acknowledging shared project ${project.displayName}');
+            
+            final acknowledgeResult = await userRepository.acknowledgeSharedProject(project.uid);
+            await acknowledgeResult.when(
+              success: (_) {
+                AppLogger.info('ProjectDetailScreen: Successfully acknowledged shared project ${project.displayName}');
+              },
+              failure: (failure) {
+                AppLogger.warning('ProjectDetailScreen: Failed to acknowledge shared project ${project.displayName}: ${failure.message}');
+              },
+            );
+          }
+        },
+        failure: (failure) async {
+          AppLogger.warning('ProjectDetailScreen: Failed to get user preferences for acknowledgment: ${failure.message}');
+        },
+      );
+    } catch (e) {
+      AppLogger.error('ProjectDetailScreen: Exception during shared project acknowledgment: $e');
     }
   }
 } 

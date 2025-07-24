@@ -7,8 +7,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import '../../core/result.dart';
 import '../../core/logger.dart';
-import '../models/caldav_account.dart';
 import '../models/user_preferences.dart';
+import '../models/shared_with_me_project.dart';
 import '../models/external_caldav_account.dart';
 import '../repositories/user_repository.dart';
 import '../repositories/external_account_repository.dart';
@@ -19,6 +19,7 @@ import '../models/task_calendar.dart';
 import '../models/external_calendar.dart';
 import 'caldav_service.dart';
 import 's3_storage_service.dart';
+import 'share_service.dart';
 
 /// Service for synchronizing user preferences and external credentials to S3
 class UserSyncService {
@@ -54,6 +55,94 @@ class UserSyncService {
       },
       failure: (_) => false,
     );
+  }
+
+  /// Fetch and update shared projects from server
+  Future<Result<void>> updateSharedProjects({bool duringDownload = false}) async {
+    try {
+      AppLogger.info('UserSyncService: Updating shared projects from server');
+      
+      // Get active account
+      final accountResult = await _accountRepository.getActiveAccount();
+      final account = accountResult.when(
+        success: (acc) => acc,
+        failure: (_) => null,
+      );
+
+      if (account == null) {
+        AppLogger.warning('UserSyncService: No active account available for shared projects update');
+        return Result.failure(Failure(
+          message: 'No active account available',
+          exception: Exception('No account'),
+        ));
+      }
+
+      // Check if account supports sharing
+      final shareService = ShareService(account: account);
+      if (!shareService.supportsSharing) {
+        AppLogger.info('UserSyncService: Account does not support sharing, skipping shared projects update');
+        return Result.success(null);
+      }
+
+      // Fetch shared projects from server
+      final sharedProjectsResult = await shareService.getProjectsSharedWithMe();
+      return await sharedProjectsResult.when(
+        success: (sharedMembers) async {
+          // Get current user preferences to preserve existing acknowledgments
+          final currentPreferencesResult = await _userRepository.getUserPreferences();
+          final currentAcknowledgments = <String, bool>{};
+          
+          await currentPreferencesResult.when(
+            success: (currentPreferences) async {
+              // Build map of existing acknowledgments
+              for (final existingProject in currentPreferences.sharedWithMeProjects) {
+                currentAcknowledgments[existingProject.projectId] = existingProject.ack;
+              }
+            },
+            failure: (_) async {
+              // If we can't get current preferences, continue with defaults
+            },
+          );
+
+          // Convert to SharedWithMeProject objects, preserving acknowledgments
+          final sharedProjects = sharedMembers.map((member) => 
+            SharedWithMeProject.fromSharedProjectMember(
+              projectPath: member.projectPath,
+              allTasks: member.allTasks,
+              projectRight: member.projectRight,
+              sourceUserEmail: member.sourceUserEmail,
+              ack: currentAcknowledgments[member.projectPath] ?? false, // Preserve existing ack or default to false
+            )
+          ).toList();
+
+          // Update user repository with shared projects
+          final updateResult = duringDownload 
+              ? await _userRepository.updateSharedWithMeProjectsWithoutSync(sharedProjects)
+              : await _userRepository.updateSharedWithMeProjects(sharedProjects);
+          return await updateResult.when(
+            success: (_) async {
+              AppLogger.info('UserSyncService: Successfully updated ${sharedProjects.length} shared projects');
+              return Result.success(null);
+            },
+            failure: (failure) async {
+              AppLogger.error('UserSyncService: Failed to save shared projects: ${failure.message}');
+              return Result.failure(failure);
+            },
+          );
+        },
+        failure: (failure) async {
+          AppLogger.error('UserSyncService: Failed to fetch shared projects: ${failure.message}');
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('UserSyncService: Exception updating shared projects', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Exception updating shared projects: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
   }
 
   /// Activate calendars from downloaded project order
@@ -170,7 +259,7 @@ class UserSyncService {
 
       if (account == null) {
         return Result.failure(Failure(
-          message: 'No active account available',
+          message: 'No active account for S3 sync',
           exception: Exception('No account'),
         ));
       }
@@ -191,7 +280,6 @@ class UserSyncService {
       }
 
       _lastSyncTime = DateTime.now();
-      AppLogger.info('UserSyncService: User data upload completed successfully');
       return Result.success(null);
 
     } catch (e, stackTrace) {
@@ -214,6 +302,9 @@ class UserSyncService {
         AppLogger.info('UserSyncService: Sync not available for this account type');
         return Result.success(false);
       }
+
+      // Note: Shared projects update removed from download to keep downloads read-only
+      // Shared projects should be updated through separate sync operations, not during download
 
       // Get active account for S3 access
       final accountResult = await _accountRepository.getActiveAccount();
@@ -343,12 +434,25 @@ class UserSyncService {
           try {
             final jsonString = utf8.decode(data);
             final preferences = _deserializeUserPreferences(jsonString);
-            await _userRepository.saveUserPreferences(preferences);
             
-            // Activate calendars from project order
-            await _activateCalendarsFromProjectOrder(preferences);
+            // Get the current etag from S3 after successful download
+            final etagResult = await s3Service.getCurrentEtag(
+              key: _getUserPreferencesPath(s3Service),
+              isPrivate: true,
+            );
+            final currentEtag = etagResult.when(
+              success: (etag) => etag,
+              failure: (_) => null,
+            );
             
-            AppLogger.info('UserSyncService: Downloaded and saved user preferences with ${preferences.projectOrder.length} active projects');
+            // Save preferences with the current etag to avoid sync loops
+            final preferencesWithEtag = preferences.copyWith(etag: currentEtag);
+            await _userRepository.saveUserPreferencesWithoutSync(preferencesWithEtag);
+            
+            // Note: Calendar activation is not done during download to keep downloads read-only
+            // Calendar activation should happen through user actions or separate sync operations
+            
+            AppLogger.info('UserSyncService: Downloaded and saved user preferences with ${preferences.projectOrder.length} active projects and etag: $currentEtag');
             return Result.success(true);
           } catch (e, stackTrace) {
             AppLogger.error('UserSyncService: Failed to parse downloaded preferences', e, stackTrace);
@@ -428,7 +532,17 @@ class UserSyncService {
             final jsonString = utf8.decode(data);
             final (accounts, calendars) = _deserializeExternalCredentials(jsonString);
             
-            // Save each account
+            // Get the current etag from S3 after successful download
+            final etagResult = await s3Service.getCurrentEtag(
+              key: _getExternalCredentialsPath(s3Service),
+              isPrivate: true,
+            );
+            final currentEtag = etagResult.when(
+              success: (etag) => etag,
+              failure: (_) => null,
+            );
+            
+            // Save each account (no longer need to save individual etags)
             for (final account in accounts) {
               await _externalAccountRepository.save(account);
             }
@@ -438,7 +552,12 @@ class UserSyncService {
               await _externalCalendarRepository.save(calendar);
             }
             
-            AppLogger.info('UserSyncService: Downloaded and saved ${accounts.length} external accounts and ${calendars.length} calendars');
+            // Save the global credentials file etag
+            if (currentEtag != null) {
+              await _externalAccountRepository.setCredentialsFileEtag(currentEtag);
+            }
+            
+            AppLogger.info('UserSyncService: Downloaded and saved ${accounts.length} external accounts and ${calendars.length} calendars with etag: $currentEtag');
             return Result.success(true);
           } catch (e, stackTrace) {
             AppLogger.error('UserSyncService: Failed to parse downloaded credentials', e, stackTrace);
@@ -479,6 +598,13 @@ class UserSyncService {
       'defaultProjectView': preferences.defaultProjectView,
       'customSettings': preferences.customSettings,
       'syncedProjects': preferences.syncedProjects,
+      'sharedWithMeProjects': preferences.sharedWithMeProjects.map((project) => {
+        'projectId': project.projectId,
+        'allTasks': project.allTasks,
+        'projectRight': project.projectRight,
+        'sourceUserEmail': project.sourceUserEmail,
+        'ack': project.ack,
+      }).toList(),
     };
     return jsonEncode(json);
   }
@@ -486,6 +612,20 @@ class UserSyncService {
   /// Deserialize user preferences from JSON
   UserPreferences _deserializeUserPreferences(String jsonString) {
     final json = jsonDecode(jsonString) as Map<String, dynamic>;
+    
+    // Handle shared projects deserialization
+    final sharedProjectsJson = json['sharedWithMeProjects'] as List<dynamic>? ?? [];
+    final sharedProjects = sharedProjectsJson.map((projectJson) {
+      final projectMap = projectJson as Map<String, dynamic>;
+      return SharedWithMeProject(
+        projectId: projectMap['projectId'] as String,
+        allTasks: projectMap['allTasks'] as bool,
+        projectRight: projectMap['projectRight'] as String,
+        sourceUserEmail: projectMap['sourceUserEmail'] as String,
+        ack: projectMap['ack'] as bool? ?? false,
+      );
+    }).toList();
+    
     return UserPreferences(
       projectOrder: (json['projectOrder'] as List<dynamic>?)?.cast<String>() ?? [],
       preferredTheme: json['preferredTheme'] as String?,
@@ -493,6 +633,7 @@ class UserSyncService {
       defaultProjectView: json['defaultProjectView'] as String?,
       customSettings: json['customSettings'] as Map<String, dynamic>?,
       syncedProjects: (json['syncedProjects'] as List<dynamic>?)?.cast<String>() ?? [],
+      sharedWithMeProjects: sharedProjects,
     );
   }
 

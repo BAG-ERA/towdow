@@ -66,20 +66,19 @@ class ValidatorViewModelState {
 class ValidatorViewModel extends StateNotifier<ValidatorViewModelState> {
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
-  final SyncService? _syncService;
   
   // Commands
   late final UpdateValidatorStateCommand _updateValidatorCommand;
   late final AddValidatorFromTemplateCommand _addValidatorCommand;
   late final RemoveValidatorCommand _removeValidatorCommand;
 
-  ValidatorViewModel(this._taskRepository, this._accountRepository, [this._syncService]) 
+  ValidatorViewModel(this._taskRepository, this._accountRepository) 
       : super(const ValidatorViewModelState()) {
     
     // Initialize commands
-    _updateValidatorCommand = UpdateValidatorStateCommand(_taskRepository, _syncService);
-    _addValidatorCommand = AddValidatorFromTemplateCommand(_taskRepository, _accountRepository, _syncService);
-    _removeValidatorCommand = RemoveValidatorCommand(_taskRepository, _accountRepository, _syncService);
+    _updateValidatorCommand = UpdateValidatorStateCommand(_taskRepository);
+    _addValidatorCommand = AddValidatorFromTemplateCommand(_taskRepository, _accountRepository);
+    _removeValidatorCommand = RemoveValidatorCommand(_taskRepository, _accountRepository);
   }
 
   /// Load validators for a specific task

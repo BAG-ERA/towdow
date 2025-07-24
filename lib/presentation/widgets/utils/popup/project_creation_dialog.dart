@@ -4,9 +4,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart'; // Add this import for navigation
 import '../../../../core/logger.dart';
 import '../../../../core/theme/chart_theme_usage.dart';
 import '../../../../data/providers/providers.dart';
+import '../../../../app.dart'; // Add this import for globalNavigatorKey
 import 'domain_creation_dialog.dart';
 import '../enhanced_text_field.dart';
 import '../../../viewmodels/project_creation_viewmodel.dart';
@@ -122,7 +124,7 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
                 subtitle: selectedDomain != null 
                     ? Text(
                         'Selected: $selectedDomain',
-                        style: context.domainNameStyle?.copyWith(
+                        style: context.domainNameStyle.copyWith(
                           fontSize: 12,
                         ),
                       )
@@ -273,10 +275,9 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
     );
 
     final state = ref.read(projectCreationViewModelProvider);
+    AppLogger.info('ProjectCreation: Create project completed. Error: ${state.error}, ProjectPath: ${state.createdProjectPath}');
+    
     if (state.error == null && mounted) {
-      // Give the providers a moment to refresh before closing the dialog
-      await Future.delayed(const Duration(milliseconds: 100));
-      
       if (mounted) {
         Navigator.of(context).pop(projectName);
         
@@ -298,6 +299,16 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
             duration: state.wasCreatedLocally ? const Duration(seconds: 4) : const Duration(seconds: 2),
           ),
         );
+
+        // Navigate to the created project's detail page if we have the project path
+        if (state.createdProjectPath != null) {
+          // Navigate using global navigator key with a short delay
+          final projectPath = state.createdProjectPath!;
+          Future.delayed(const Duration(milliseconds: 400), () {
+            final encodedPath = Uri.encodeComponent(projectPath);
+            globalNavigatorKey.currentContext?.go('/project/$encodedPath');
+          });
+        }
       }
     } else if (state.error != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

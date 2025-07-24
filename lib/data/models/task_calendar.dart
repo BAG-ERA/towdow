@@ -5,9 +5,11 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:hive/hive.dart';
 import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'task.dart';
 import 'attendee.dart';
 import 'category.dart';
+import '../providers/providers.dart';
 
 part 'task_calendar.freezed.dart';
 part 'task_calendar.g.dart';
@@ -46,9 +48,25 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(23) @Default('[]') String projectCategories, // JSON array of Category objects for project-level categories
     @HiveField(25) String? flowitDomain, // X-FLOWIT-DOMAIN - domain for grouping projects
     @HiveField(26) String? flowitStatus, // X-FLOWIT-STATUS - project status (DRAFT, CANCELED, ONGOING, STOPPED, ARCHIVE, COMPLETED, NEEDACTION, FAILED)
+    @HiveField(27) @Default('[]') String sharedWith, // JSON array of SharedProjectMember objects for project sharing
   }) = _TaskCalendar;
 
   factory TaskCalendar.fromJson(Map<String, dynamic> json) => _$TaskCalendarFromJson(json);
+}
+
+// UID extraction extension
+extension TaskCalendarUID on TaskCalendar {
+  /// Extract project UID from calendar path
+  /// Path format: /user-uuid/project-uuid/ -> returns project-uuid
+  String get uid {
+    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    if (segments.isEmpty) return '';
+    
+    // If last segment is empty (path ends with /), take the one before
+    // Otherwise take the last segment
+    final lastSegment = segments.last;
+    return lastSegment.isEmpty && segments.length > 1 ? segments[segments.length - 2] : lastSegment;
+  }
 }
 
 // Factory methods for creating task calendars
@@ -93,6 +111,7 @@ extension TaskCalendarFactory on TaskCalendar {
     String? flowitTemplate,
     String? flowitStatus,
     String? flowitKanban,
+    String? sharedWith,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -113,6 +132,7 @@ extension TaskCalendarFactory on TaskCalendar {
       flowitTemplate: flowitTemplate,
       flowitStatus: flowitStatus,
       flowitKanban: flowitKanban ?? '[]',
+      sharedWith: sharedWith ?? '[]',
     );
   }
 }
@@ -202,6 +222,104 @@ extension TaskCalendarDomain on TaskCalendar {
   TaskCalendar withoutDomain() {
     return copyWith(
       flowitDomain: null,
+      lastModified: DateTime.now(),
+    );
+  }
+}
+
+// Extension for sharing-related operations  
+extension TaskCalendarSharing on TaskCalendar {
+  /// Parse shared project members from JSON
+  List<Map<String, dynamic>> get sharedWithMembers {
+    try {
+      if (sharedWith.isEmpty || sharedWith == '[]') return [];
+      final decoded = jsonDecode(sharedWith);
+      if (decoded is List) {
+        return decoded.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Check if project is shared with others
+  bool get isSharedWith => sharedWithMembers.isNotEmpty;
+
+  /// Check if project is shared with me and return the source user email
+  /// Returns empty string if not shared, otherwise returns sourceUserEmail
+  Future<String> isSharedWithMeBy(WidgetRef ref) async {
+    try {
+      final userRepository = ref.read(userRepositoryProvider);
+      final preferencesResult = await userRepository.getUserPreferences();
+      
+      return preferencesResult.when(
+        success: (preferences) {
+          final sharedProject = preferences.getSharedProject(uid);
+          return sharedProject?.sourceUserEmail ?? '';
+        },
+        failure: (_) => '',
+      );
+    } catch (e) {
+      // Fallback to empty string if anything goes wrong
+      return '';
+    }
+  }
+
+  /// Check if this project is a new unacknowledged shared project
+  /// Returns true if project is shared with me but not yet acknowledged
+  Future<bool> hasNewSharedProjectNotification(WidgetRef ref) async {
+    try {
+      final userRepository = ref.read(userRepositoryProvider);
+      final preferencesResult = await userRepository.getUserPreferences();
+      
+      return preferencesResult.when(
+        success: (preferences) {
+          final sharedProject = preferences.getSharedProject(uid);
+          return sharedProject != null && !sharedProject.ack;
+        },
+        failure: (_) => false,
+      );
+    } catch (e) {
+      // Fallback to false if anything goes wrong
+      return false;
+    }
+  }
+
+  /// Computed property: Check if this project is shared with others  
+  /// This is a project I own but have shared with other users
+  bool get isSharedWithOthers => sharedWithMembers.isNotEmpty;
+
+  /// Extract username from calendar path or owner field
+  String _extractUserFromPath(String path) {
+    // Handle different CalDAV path formats:
+    // /calendars/username/ or /principals/users/username/ or similar
+    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    final userPath = segments.length >= 2 ? segments.first : '';
+    return userPath;
+  }
+
+  /// Get list of users this project is shared with
+  List<String> get sharedWithEmails {
+    return sharedWithMembers
+        .map((member) => member['targetUserEmail'] as String?)
+        .where((email) => email != null)
+        .cast<String>()
+        .toList();
+  }
+
+  /// Create a copy with updated sharing info
+  TaskCalendar withSharedWith(List<Map<String, dynamic>> members) {
+    return copyWith(
+      sharedWith: jsonEncode(members),
+      lastModified: DateTime.now(),
+    );
+  }
+
+  /// Create a copy with no sharing
+  TaskCalendar withoutSharing() {
+    return copyWith(
+      sharedWith: '[]',
       lastModified: DateTime.now(),
     );
   }

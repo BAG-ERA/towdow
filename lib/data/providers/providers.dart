@@ -15,6 +15,7 @@ import '../repositories/external_account_repository.dart';
 import '../repositories/external_calendar_repository.dart';
 import '../repositories/external_event_repository.dart';
 import '../repositories/category_repository.dart';
+import '../repositories/kanban_repository.dart';
 import '../models/task.dart';
 import '../models/task_calendar.dart';
 import '../models/caldav_account.dart';
@@ -44,8 +45,11 @@ import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/category_viewmodel.dart';
 import '../../presentation/viewmodels/project_kanban_viewmodel.dart';
+import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
 import '../services/kanban_service.dart';
 import '../../app.dart';
+import '../services/share_service.dart';
+import '../models/user_preferences.dart';
 
 // Local storage service provider
 // This must be overridden in main.dart with an initialized instance
@@ -74,6 +78,32 @@ final accountRepositoryProvider = Provider<AccountRepository>((ref) {
 final userRepositoryProvider = Provider<UserRepository>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
   return LocalUserRepository(storageService);
+});
+
+// User sync service provider
+final userSyncServiceProvider = Provider<UserSyncService>((ref) {
+  return UserSyncService(
+    userRepository: ref.watch(userRepositoryProvider),
+    externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
+    externalCalendarRepository: ref.watch(externalCalendarRepositoryProvider),
+    accountRepository: ref.watch(accountRepositoryProvider),
+    calendarRepository: ref.watch(calendarRepositoryProvider),
+  );
+});
+
+// User repository sync setup provider - sets up sync trigger after all providers are created
+final userRepositorySyncSetupProvider = Provider<void>((ref) {
+  final userRepository = ref.watch(userRepositoryProvider);
+  final userSyncService = ref.watch(userSyncServiceProvider);
+  
+  // Set up sync trigger after both providers are available
+  if (userRepository is LocalUserRepository) {
+    userRepository.setSyncTrigger(() async {
+      await userSyncService.uploadUserData();
+    });
+  }
+  
+  return;
 });
 
 // External calendar repository providers
@@ -109,6 +139,12 @@ final kanbanServiceProvider = Provider<KanbanService>((ref) {
   );
 });
 
+// Kanban repository provider
+final kanbanRepositoryProvider = Provider<KanbanRepository>((ref) {
+  final kanbanService = ref.watch(kanbanServiceProvider);
+  return LocalKanbanRepository(kanbanService);
+});
+
 // CalDAV service provider  
 final caldavServiceProvider = Provider.family<CalDAVService, CaldavAccount>((ref, account) {
   return CalDAVService(account: account);
@@ -142,17 +178,6 @@ final connectionMonitorServiceProvider = Provider<ConnectionMonitorService>((ref
   return ConnectionMonitorService();
 });
 
-// User sync service provider
-final userSyncServiceProvider = Provider<UserSyncService>((ref) {
-  return UserSyncService(
-    userRepository: ref.watch(userRepositoryProvider),
-    externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
-    externalCalendarRepository: ref.watch(externalCalendarRepositoryProvider),
-    accountRepository: ref.watch(accountRepositoryProvider),
-    calendarRepository: ref.watch(calendarRepositoryProvider),
-  );
-});
-
 // External calendar sync service provider
 final externalCalendarSyncServiceProvider = Provider<ExternalCalendarSyncService>((ref) {
   final accountRepository = ref.watch(externalAccountRepositoryProvider);
@@ -164,6 +189,11 @@ final externalCalendarSyncServiceProvider = Provider<ExternalCalendarSyncService
     calendarRepository,
     eventRepository,
   );
+});
+
+// Sharing service provider
+final shareServiceProvider = Provider.family<ShareService, CaldavAccount>((ref, account) {
+  return ShareService(account: account);
 });
 
 // Global navigator key for session expiry navigation
@@ -195,7 +225,7 @@ void handleSessionExpired([ProviderRef? ref]) {
   }
 }
 
-// Sync service provider
+// Sync service provider - initializes singleton
 final syncServiceProvider = Provider<SyncService>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
@@ -203,13 +233,21 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   final categoryRepository = ref.watch(categoryRepositoryProvider);
   final localStorage = ref.watch(localStorageServiceProvider);
   
-  return SyncService(
+  // Initialize singleton instance
+  final syncService = SyncService(
     taskRepository: taskRepository,
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
     categoryRepository: categoryRepository,
     localStorage: localStorage,
   );
+  
+  // Inject sync service into repository for sync coordination
+  if (taskRepository is LocalTaskRepository) {
+    taskRepository.setSyncService(syncService);
+  }
+  
+  return syncService;
 });
 
 // CalDAV Monitor provider
@@ -217,6 +255,9 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
   final accountRepository = ref.watch(accountRepositoryProvider);
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final userRepository = ref.watch(userRepositoryProvider);
+  final externalAccountRepository = ref.watch(externalAccountRepositoryProvider);
+  final externalCalendarRepository = ref.watch(externalCalendarRepositoryProvider);
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final syncService = ref.watch(syncServiceProvider);
   
@@ -224,6 +265,9 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
     categoryRepository: categoryRepository,
+    userRepository: userRepository,
+    externalAccountRepository: externalAccountRepository,
+    externalCalendarRepository: externalCalendarRepository,
     connectionMonitorService: connectionMonitorService,
     syncService: syncService,
   );
@@ -242,7 +286,7 @@ final statusServiceProvider = Provider<StatusService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final localStorageService = ref.watch(localStorageServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
-  return StatusService(calendarRepository, localStorageService, accountRepository);
+  return StatusService(calendarRepository, localStorageService);
 });
 
 // Export/Import service provider
@@ -273,6 +317,9 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final userSyncService = ref.watch(userSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
+  
+  // Initialize user repository sync setup
+  ref.watch(userRepositorySyncSetupProvider);
 
   final caldavMonitor = ref.watch(caldavMonitorProvider);
 
@@ -306,8 +353,7 @@ final appLifecycleStateProvider = StreamProvider<FlowItAppState>((ref) {
 final taskViewModelProvider = StateNotifierProvider<TaskViewModel, TaskViewModelState>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  return TaskViewModel(taskRepository, accountRepository, syncService);
+  return TaskViewModel(taskRepository, accountRepository);
 });
 
 final caldavSettingsViewModelProvider = StateNotifierProvider<CaldavSettingsViewModel, CaldavSettingsState>((ref) {
@@ -321,18 +367,16 @@ final caldavSettingsViewModelProvider = StateNotifierProvider<CaldavSettingsView
 final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final taskRepository = ref.watch(taskRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  final domainService = ref.watch(domainServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final userRepository = ref.watch(userRepositoryProvider);
-  return ProjectListViewModel(calendarRepository, taskRepository, syncService, domainService, accountRepository, userRepository);
+  final userSyncService = ref.watch(userSyncServiceProvider);
+  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository, userSyncService);
 });
 
 final validatorViewModelProvider = StateNotifierProvider.family<ValidatorViewModel, ValidatorViewModelState, String>((ref, taskUid) {
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
-  final syncService = ref.watch(syncServiceProvider);
-  return ValidatorViewModel(taskRepository, accountRepository, syncService);
+  return ValidatorViewModel(taskRepository, accountRepository);
 });
 
 // Task file attachment ViewModel provider for managing file attachments per task
@@ -341,13 +385,11 @@ final taskFileAttachmentViewModelProvider = StateNotifierProvider.family<TaskFil
   final accountRepository = ref.watch(accountRepositoryProvider);
   final offlineFileService = ref.watch(offlineFileServiceProvider);
   final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
-  final syncService = ref.watch(syncServiceProvider);
   return TaskFileAttachmentViewModel(
     taskRepository: taskRepository,
     accountRepository: accountRepository,
     offlineFileService: offlineFileService,
     fileUploadQueueService: fileUploadQueueService,
-    syncService: syncService,
   );
 });
 
@@ -357,14 +399,12 @@ final taskMediaAttachmentViewModelProvider = StateNotifierProvider.family<TaskMe
   final accountRepository = ref.watch(accountRepositoryProvider);
   final offlineFileService = ref.watch(offlineFileServiceProvider);
   final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
-  final syncService = ref.watch(syncServiceProvider);
   return TaskMediaAttachmentViewModel(
     taskUid,
     taskRepository,
     accountRepository,
     offlineFileService,
     fileUploadQueueService,
-    syncService,
   );
 });
 
@@ -385,15 +425,22 @@ final projectCategoryViewModelProvider = StateNotifierProvider.family<CategoryVi
 
 // Project Kanban ViewModel provider for specific project
 final projectKanbanViewModelProvider = StateNotifierProvider.family<ProjectKanbanViewModel, ProjectKanbanState, String>((ref, projectPath) {
-  final kanbanService = ref.watch(kanbanServiceProvider);
+  final kanbanRepository = ref.watch(kanbanRepositoryProvider);
   final categoryRepository = ref.watch(categoryRepositoryProvider);
   final viewModel = ProjectKanbanViewModel(
-    kanbanService,
+    kanbanRepository,
     categoryRepository,
   );
   // Initialize with project path
   viewModel.initialize(projectPath);
   return viewModel;
+});
+
+// Project Sharing ViewModel provider
+final projectSharingViewModelProvider = StateNotifierProvider<ProjectSharingViewModel, ProjectSharingState>((ref) {
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  return ProjectSharingViewModel(accountRepository, calendarRepository);
 });
 
 // Account status providers
@@ -736,4 +783,40 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   }).toList();
   
   return filteredTasks;
+});
+
+// Project sharing notification provider - reactive to user preferences changes
+final projectSharedNotificationProvider = Provider.family<AsyncValue<bool>, String>((ref, projectId) {
+  final userPreferencesAsync = ref.watch(userPreferencesProvider);
+  
+  return userPreferencesAsync.when(
+    data: (preferences) {
+      final sharedProject = preferences.getSharedProject(projectId);
+      final hasNotification = sharedProject != null && !sharedProject.ack;
+      return AsyncValue.data(hasNotification);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (error, stackTrace) => AsyncValue.error(error, stackTrace),
+  );
+});
+
+// Shared project source provider - reactive to user preferences changes  
+final projectSharedByProvider = Provider.family<AsyncValue<String>, String>((ref, projectId) {
+  final userPreferencesAsync = ref.watch(userPreferencesProvider);
+  
+  return userPreferencesAsync.when(
+    data: (preferences) {
+      final sharedProject = preferences.getSharedProject(projectId);
+      final sourceEmail = sharedProject?.sourceUserEmail ?? '';
+      return AsyncValue.data(sourceEmail);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (error, stackTrace) => AsyncValue.error(error, stackTrace),
+  );
+});
+
+// User preferences provider - watches user repository for changes
+final userPreferencesProvider = StreamProvider<UserPreferences>((ref) {
+  final userRepository = ref.watch(userRepositoryProvider);
+  return userRepository.watchUserPreferences();
 });

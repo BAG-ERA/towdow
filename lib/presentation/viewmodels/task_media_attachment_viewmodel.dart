@@ -56,7 +56,6 @@ class TaskMediaAttachmentViewModel extends StateNotifier<TaskMediaAttachmentStat
   final String _taskUid;
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
-  final SyncService? _syncService;
   final OfflineFileService _offlineFileService;
   final FileUploadQueueService _fileUploadQueueService;
 
@@ -65,9 +64,8 @@ class TaskMediaAttachmentViewModel extends StateNotifier<TaskMediaAttachmentStat
     this._taskRepository,
     this._accountRepository,
     this._offlineFileService,
-    this._fileUploadQueueService, [
-    this._syncService,
-  ]) : super(const TaskMediaAttachmentState());
+    this._fileUploadQueueService,
+  ) : super(const TaskMediaAttachmentState());
 
   /// Generate a unique encryption key for media files
   String _generateEncryptionKey() {
@@ -173,7 +171,7 @@ class TaskMediaAttachmentViewModel extends StateNotifier<TaskMediaAttachmentStat
           await saveResult.when(
             success: (_) async {
               AppLogger.info('TaskMediaAttachmentViewModel: Task updated successfully');
-              await _queueSyncOperation(updatedTask);
+              // Sync is now handled by repository
             },
             failure: (failure) async {
               throw Exception('Failed to save media info: ${failure.message}');
@@ -344,7 +342,7 @@ class TaskMediaAttachmentViewModel extends StateNotifier<TaskMediaAttachmentStat
       await saveResult.when(
         success: (_) async {
           AppLogger.info('TaskMediaAttachmentViewModel: Media file removed from task');
-          await _queueSyncOperation(updatedTask);
+          // Sync is now handled by repository
         },
         failure: (failure) async {
           throw Exception('Failed to save updated task: ${failure.message}');
@@ -380,30 +378,7 @@ class TaskMediaAttachmentViewModel extends StateNotifier<TaskMediaAttachmentStat
     state = state.clearMessages();
   }
 
-  /// Queue sync operation for task updates
-  Future<void> _queueSyncOperation(dynamic task) async {
-    if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
-      final syncData = <String, dynamic>{
-        'calendarUid': task.projectPath,
-        'taskUid': task.uid,
-      };
-      
-      final syncResult = await _syncService!.queueSyncOperation(
-        SyncOperation.update,
-        task.uid,
-        syncData,
-      );
-      
-      await syncResult.when(
-        success: (_) async {
-          AppLogger.debug('TaskMediaAttachmentViewModel: Queued sync for ${task.uid}');
-        },
-        failure: (failure) async {
-          AppLogger.warning('TaskMediaAttachmentViewModel: Failed to queue sync: ${failure.message}');
-        },
-      );
-    }
-  }
+  // Sync is now handled by repository
 
   /// Parse media attachments JSON array
   List<Map<String, dynamic>> _parseMediaAttachments(String mediaAttachmentsJson) {

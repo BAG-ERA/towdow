@@ -6,17 +6,15 @@ import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
-import '../repositories/account_repository.dart';
 import 'local_storage_service.dart';
-import 'caldav_service.dart';
+import 'sync_service.dart';
 
 /// Service for managing project statuses and status-related operations
 class StatusService {
   final CalendarRepository _calendarRepository;
   final LocalStorageService _localStorageService;
-  final AccountRepository _accountRepository;
 
-  StatusService(this._calendarRepository, this._localStorageService, this._accountRepository);
+  StatusService(this._calendarRepository, this._localStorageService);
 
   /// Create a new status
   Future<Result<void>> createStatus(String status) async {
@@ -172,7 +170,7 @@ class StatusService {
     return await assignStatusToCalendar(calendarUid, 'ONGOING');
   }
 
-  /// Sync status to CalDAV server
+  /// Sync status to CalDAV server using queue for offline resilience
   Future<Result<void>> _syncStatusToServer(TaskCalendar calendar) async {
     try {
       AppLogger.info('StatusService: *** Starting status sync to server ***');
@@ -180,49 +178,36 @@ class StatusService {
       AppLogger.info('StatusService: Calendar path: ${calendar.path}');
       AppLogger.info('StatusService: Status value: ${calendar.flowitStatus ?? "(null)"}');
       
-      // Get active account
-      final accountResult = await _accountRepository.getActiveAccount();
-      return accountResult.when(
-        success: (account) async {
-          if (account == null) {
-            AppLogger.warning('StatusService: No active account found, skipping server sync');
-            return Result.success(null); // Still success since local save worked
-          }
-          
-          AppLogger.info('StatusService: Found active account: ${account.username}@${account.serverUrl}');
-          
-          // Create CalDAV service instance
-          final caldavService = CalDAVService(account: account);
-          AppLogger.info('StatusService: Created CalDAV service, calling updateCalendarProperties...');
-          
-          // Update calendar properties on server
-          final updateResult = await caldavService.updateCalendarProperties(calendar);
-          
-          return updateResult.when(
-            success: (_) {
-              AppLogger.info('StatusService: *** Successfully synced status to server ***');
-              return Result.success(null);
-            },
-            failure: (failure) {
-              AppLogger.error('StatusService: Failed to sync status to server: ${failure.message}');
-              AppLogger.error('StatusService: Failure code: ${failure.code}');
-              // Don't fail the entire operation since local save succeeded
-              // The sync will be retried during next full sync
-              return Result.success(null);
-            },
-          );
-        },
-        failure: (failure) {
-          AppLogger.error('StatusService: Failed to get active account for server sync: ${failure.message}');
-          AppLogger.error('StatusService: Account failure code: ${failure.code}');
-          // Don't fail the entire operation since local save succeeded
-          return Result.success(null);
-        },
-      );
+      // Always use sync queue for offline resilience
+      final syncService = SyncService.instance;
+      if (syncService != null) {
+        AppLogger.debug('StatusService: Queuing calendar update for status sync');
+        final queueResult = await syncService.queueCalendarUpdate(calendar.path);
+        
+        return await queueResult.when(
+          success: (_) async {
+            AppLogger.info('StatusService: *** Successfully queued status sync to server ***');
+            return Result.success(null);
+          },
+          failure: (failure) async {
+            AppLogger.error('StatusService: Failed to queue status sync: ${failure.message}');
+            return Result.failure(failure);
+          },
+        );
+      } else {
+        AppLogger.error('StatusService: SyncService singleton not initialized - cannot queue update');
+        return Result.failure(Failure(
+          message: 'SyncService not initialized',
+          exception: Exception('SyncService singleton not available'),
+        ));
+      }
     } catch (e, stackTrace) {
-      AppLogger.error('StatusService: Exception during server sync', e, stackTrace);
-      // Don't fail the entire operation since local save succeeded
-      return Result.success(null);
+      AppLogger.error('StatusService: Exception during status sync to server', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to sync status to server: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
     }
   }
 

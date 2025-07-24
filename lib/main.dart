@@ -5,24 +5,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
 import 'app.dart';
-import 'core/logger.dart';
+
+// Import all the adapters for Hive
 import 'data/models/task.dart';
-import 'data/models/attendee.dart';
-
-import 'data/models/automated_task.dart';
 import 'data/models/caldav_account.dart';
-import 'data/models/validator.dart';
 import 'data/models/task_calendar.dart';
+import 'data/models/automated_task.dart';
+import 'data/models/attendee.dart';
 import 'data/models/user_preferences.dart';
-
-// External calendar models
+import 'data/models/shared_with_me_project.dart';
 import 'data/models/external_calendar.dart';
 import 'data/models/external_caldav_account.dart';
 import 'data/models/calendar_event.dart';
 import 'data/models/offline_file.dart';
+import 'data/models/validator.dart';
 import 'data/models/category.dart';
+
+// Import services and providers
+import 'core/logger.dart';
 import 'data/services/local_storage_service.dart';
 import 'data/providers/providers.dart';
 
@@ -53,6 +54,9 @@ void main() async {
   // Register User Preferences adapter
   Hive.registerAdapter(UserPreferencesAdapter());
   
+  // Register SharedWithMeProject adapter
+  Hive.registerAdapter(SharedWithMeProjectAdapter());
+  
   // Register External Calendar adapters
   Hive.registerAdapter(ExternalCalendarAdapter());
   Hive.registerAdapter(ExternalCalendarAuthTypeAdapter());
@@ -62,10 +66,11 @@ void main() async {
   // Register Offline File adapters
   Hive.registerAdapter(OfflineFileStatusAdapter());
   Hive.registerAdapter(OfflineFileAdapter());
-  Hive.registerAdapter(FileUploadQueueItemAdapter());
   
   // Register Category adapter
   Hive.registerAdapter(CategoryAdapter());
+  
+  AppLogger.info('Main: Hive adapters registered successfully');
   
   // Initialize local storage service
   final storageService = LocalStorageService();
@@ -74,7 +79,7 @@ void main() async {
   // Ensure storage initialization succeeded before starting the app
   await initResult.when(
     success: (_) async {
-      // AppLogger.info('Main: Local storage initialized successfully');
+      AppLogger.info('Main: Local storage initialized successfully');
       
       runApp(
         ProviderScope(
