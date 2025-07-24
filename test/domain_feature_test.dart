@@ -49,6 +49,10 @@ void main() {
         localStorage: mockLocalStorageService,
       );
       
+      // Add stub for put method
+      when(mockLocalStorageService.put(any, any, any))
+          .thenAnswer((_) async => const Result.success(null));
+
       domainService = DomainService(mockCalendarRepository, mockLocalStorageService, mockAccountRepository);
       
       // Mock getActiveAccount for all tests

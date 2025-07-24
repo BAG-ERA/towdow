@@ -37,6 +37,7 @@ void main() {
     late MockDomainService mockDomainService;
     late MockAccountRepository mockAccountRepository;
     late MockUserRepository mockUserRepository;
+    late MockUserSyncService mockUserSyncService;
 
     late List<TaskCalendar> testCalendars;
     late List<Task> testTasks;
@@ -48,6 +49,7 @@ void main() {
       mockDomainService = MockDomainService();
       mockAccountRepository = MockAccountRepository();
       mockUserRepository = MockUserRepository();
+      mockUserSyncService = MockUserSyncService();
 
       // Create test data first
       testCalendars = [
@@ -95,6 +97,7 @@ void main() {
         mockTaskRepository,
         mockAccountRepository,
         mockUserRepository,
+        mockUserSyncService,
       );
     });
 
@@ -281,7 +284,7 @@ void main() {
         // Assert
         expect(viewModel.state.isRefreshing, false);
         expect(viewModel.state.error, isNotNull);
-        expect(viewModel.state.error!.contains('Failed to refresh: Exception: Refresh error'), true);
+        expect(viewModel.state.error!.contains('Failed to load projects'), true);
       });
     });
   });
