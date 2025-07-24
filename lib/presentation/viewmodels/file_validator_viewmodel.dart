@@ -5,18 +5,14 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/services/s3_storage_service.dart';
 import '../../data/services/validator_service.dart';
-import '../../data/services/sync_service.dart';
 import '../../data/services/offline_file_service.dart';
 import '../../data/services/file_upload_queue_service.dart';
 import '../../data/providers/providers.dart';
-import '../../data/models/offline_file.dart';
 import '../../core/logger.dart';
-import '../../core/result.dart';
 
 /// File Validator ViewModel State
 class FileValidatorState {
@@ -60,7 +56,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
   final String _taskUid;
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
-  final SyncService? _syncService;
+  // SyncService removed - sync now handled by repository
   final OfflineFileService _offlineFileService;
   final FileUploadQueueService _fileUploadQueueService;
 
@@ -69,9 +65,8 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
     this._taskRepository,
     this._accountRepository,
     this._offlineFileService,
-    this._fileUploadQueueService, [
-    this._syncService,
-  ]) : super(const FileValidatorState());
+    this._fileUploadQueueService,
+  ) : super(const FileValidatorState());
 
   /// Get encryption key for a specific validator
   Future<String> _getValidatorEncryptionKey(String validatorId) async {
@@ -495,27 +490,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
 
   /// Queue sync operation for updated task
   Future<void> _queueSyncOperation(task) async {
-    if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
-      final syncData = <String, dynamic>{
-        'calendarUid': task.projectPath,
-        'taskUid': task.uid,
-      };
-      
-      final syncResult = await _syncService!.queueSyncOperation(
-        SyncOperation.update,
-        task.uid,
-        syncData,
-      );
-      
-      await syncResult.when(
-        success: (_) async {
-          AppLogger.debug('FileValidatorViewModel: Queued sync for ${task.uid}');
-        },
-        failure: (failure) async {
-          AppLogger.warning('FileValidatorViewModel: Failed to queue sync: ${failure.message}');
-        },
-      );
-    }
+    // Sync is now handled by repository
   }
 
   /// Sanitize filename to avoid S3 signature issues with special characters
@@ -543,6 +518,5 @@ final fileValidatorViewModelProvider = StateNotifierProvider.family<FileValidato
     ref.watch(accountRepositoryProvider),
     ref.watch(offlineFileServiceProvider),
     ref.watch(fileUploadQueueServiceProvider),
-    ref.watch(syncServiceProvider),
   ),
 ); 

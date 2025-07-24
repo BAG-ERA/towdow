@@ -28,6 +28,8 @@ class CaldavAccount with _$CaldavAccount {
     @HiveField(14) String? email, // user's email address
     @HiveField(15) String? clientId, // user's email address
     @HiveField(16) String? issuerUrl, // user's email address
+    @HiveField(17) String? calendarHome, // calendar home URL for sharing
+    @HiveField(18) String? principal, // principal URL for sharing
   }) = _CaldavAccount;
 
   factory CaldavAccount.fromJson(Map<String, dynamic> json) => _$CaldavAccountFromJson(json);

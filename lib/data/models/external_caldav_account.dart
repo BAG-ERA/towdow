@@ -62,6 +62,9 @@ class ExternalCaldavAccount with _$ExternalCaldavAccount {
     @HiveField(27) @Default(0) int activeCalendars,
     @HiveField(28) @Default(0) int totalEvents,
     @HiveField(29) DateTime? lastEventSync,
+    
+    // S3 sync tracking
+    @HiveField(31) String? etag, // S3 MinIO file etag for sync tracking
   }) = _ExternalCaldavAccount;
 
   factory ExternalCaldavAccount.fromJson(Map<String, dynamic> json) => _$ExternalCaldavAccountFromJson(json);
@@ -276,6 +279,13 @@ extension ExternalCaldavAccountOperations on ExternalCaldavAccount {
     return copyWith(
       isActive: active,
       lastSyncAt: DateTime.now(),
+    );
+  }
+  
+  /// Create a copy with updated etag for sync tracking
+  ExternalCaldavAccount withEtag(String? etag) {
+    return copyWith(
+      etag: etag,
     );
   }
 } 

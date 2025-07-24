@@ -16,13 +16,14 @@ import '../../data/models/caldav_account.dart';
 import '../../data/models/task_calendar.dart';
 
 import '../../data/services/caldav_service.dart';
-import '../../data/services/user_sync_service.dart';
 import '../../data/services/status_service.dart';
+import '../../data/services/local_storage_service.dart';
+import '../../data/services/user_sync_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../data/services/local_storage_service.dart';
 import '../../data/providers/providers.dart';
+import '../viewmodels/commands/status_commands.dart';
 
 // CalDAV Management state for calendar discovery and selection
 class CalDAVManagementState {
@@ -69,7 +70,6 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
   final CalendarRepository _calendarRepository;
   final UserRepository _userRepository;
   final UserSyncService _userSyncService;
-  final LocalStorageService _localStorageService;
   final void Function()? _onInvalidateProjectList;
 
   CalDAVManagementViewModel({
@@ -77,13 +77,11 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     required CalendarRepository calendarRepository,
     required UserRepository userRepository,
     required UserSyncService userSyncService,
-    required LocalStorageService localStorageService,
     void Function()? onInvalidateProjectList,
   })  : _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
         _userRepository = userRepository,
         _userSyncService = userSyncService,
-        _localStorageService = localStorageService,
         _onInvalidateProjectList = onInvalidateProjectList,
         super(const CalDAVManagementState());
 
@@ -234,6 +232,9 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     
     // Update user preferences with new project order
     _updateUserPreferencesProjectOrder();
+    
+    // Trigger immediate sync for calendar selection change
+    _triggerImmediateSync();
   }
 
   /// Check if a calendar is selected
@@ -253,6 +254,9 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     
     // Update user preferences with new project order
     _updateUserPreferencesProjectOrder();
+    
+    // Trigger immediate sync for calendar selection change
+    _triggerImmediateSync();
   }
 
   /// Deselect all calendars
@@ -264,6 +268,9 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     
     // Update user preferences with new project order
     _updateUserPreferencesProjectOrder();
+    
+    // Trigger immediate sync for calendar selection change  
+    _triggerImmediateSync();
   }
 
   /// Delete a calendar from the server and local storage
@@ -329,21 +336,16 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Get the status service from providers
-      final statusService = StatusService(_calendarRepository, _localStorageService, _accountRepository);
-      
-      // Archive the calendar
-      final result = await statusService.archiveCalendar(calendar.path);
-      
-      result.when(
-        success: (_) {
-          AppLogger.info('CalDAVManagement: Successfully archived calendar: ${calendar.displayName}');
-        },
-        failure: (failure) {
-          AppLogger.error('CalDAVManagement: Failed to archive calendar: ${failure.message}');
-          state = state.copyWith(error: 'Failed to archive calendar: ${failure.message}');
-        },
+      // Use command pattern for archiving
+      // TODO: Inject StatusService through dependency injection instead of creating it here
+      final statusService = StatusService(_calendarRepository, LocalStorageService());
+      final archiveCommand = ArchiveCalendarCommand(
+        statusService,
+        calendar.path,
       );
+      
+      await archiveCommand.run();
+      AppLogger.info('CalDAVManagement: Successfully archived calendar: ${calendar.displayName}');
 
       // Refresh calendar discovery to update the list
       await refreshCalendars();
@@ -436,34 +438,47 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     try {
       if (state.currentAccount == null) return;
       
-      final syncAvailable = await _userSyncService.isSyncAvailable();
-      if (syncAvailable) {
-        final uploadResult = await _userSyncService.uploadUserData();
-        uploadResult.when(
-          success: (_) {
-            AppLogger.info('CalDAVManagement: Successfully uploaded user data to S3');
-          },
-          failure: (failure) {
-            AppLogger.warning('CalDAVManagement: Failed to sync user data: ${failure.message}');
-          },
-        );
-      }
+      // For now, just log that sync would be triggered
+      // TODO: Implement proper user sync through repository when available
+      AppLogger.info('CalDAVManagement: User sync upload would be triggered here');
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVManagement: Error triggering user sync upload', e, stackTrace);
     }
   }
 
+  /// Trigger immediate user preferences sync when selections change
+  Future<void> _triggerImmediateSync() async {
+    try {
+      if (state.currentAccount == null) return;
+      
+      AppLogger.info('CalDAVManagement: Triggering immediate user preferences sync');
+      final result = await _userSyncService.uploadUserData();
+      
+      result.when(
+        success: (_) {
+          AppLogger.info('CalDAVManagement: User preferences synced successfully');
+        },
+        failure: (failure) {
+          AppLogger.warning('CalDAVManagement: Failed to sync user preferences: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVManagement: Error during immediate sync', e, stackTrace);
+    }
+  }
+
   /// Clear existing calendars and save selected calendars as local projects
   Future<void> _createProjectsForSelectedCalendars() async {
-    // First, clear all existing calendars (repository is now source of truth)
-    final clearResult = await _localStorageService.clear(LocalStorageService.calendarsBoxName);
-    
-    clearResult.when(
-      success: (_) {
-        // Successfully cleared existing calendars
+    // First, clear all existing calendars using repository
+    final allCalendarsResult = await _calendarRepository.getAll();
+    await allCalendarsResult.when(
+      success: (calendars) async {
+        for (final calendar in calendars) {
+          await _calendarRepository.delete(calendar.path);
+        }
       },
       failure: (failure) {
-        AppLogger.warning('CalDAVManagement: Failed to clear calendars: ${failure.message}');
+        AppLogger.warning('CalDAVManagement: Failed to get calendars for clearing: ${failure.message}');
       },
     );
     
@@ -510,7 +525,6 @@ final caldavManagementViewModelProvider = StateNotifierProvider.autoDispose<CalD
     calendarRepository: ref.read(calendarRepositoryProvider),
     userRepository: ref.read(userRepositoryProvider),
     userSyncService: ref.read(userSyncServiceProvider),
-    localStorageService: ref.read(localStorageServiceProvider),
     onInvalidateProjectList: () => ref.invalidate(projectListProvider),
   ),
 ); 

@@ -13,7 +13,6 @@ import '../../data/services/s3_storage_service.dart';
 
 import '../../data/services/offline_file_service.dart';
 import '../../data/services/file_upload_queue_service.dart';
-import '../../data/services/sync_service.dart';
 import '../../core/logger.dart';
 
 /// State for task file attachment operations
@@ -55,7 +54,7 @@ class TaskFileAttachmentViewModel extends StateNotifier<TaskFileAttachmentState>
   final AccountRepository _accountRepository;
   final OfflineFileService _offlineFileService;
   final FileUploadQueueService _fileUploadQueueService;
-  final SyncService _syncService;
+  // SyncService removed - sync now handled by repository
 
 
   TaskFileAttachmentViewModel({
@@ -63,13 +62,11 @@ class TaskFileAttachmentViewModel extends StateNotifier<TaskFileAttachmentState>
     required AccountRepository accountRepository,
     required OfflineFileService offlineFileService,
     required FileUploadQueueService fileUploadQueueService,
-    required SyncService syncService,
 
   })  : _taskRepository = taskRepository,
         _accountRepository = accountRepository,
         _offlineFileService = offlineFileService,
         _fileUploadQueueService = fileUploadQueueService,
-        _syncService = syncService,
 
         super(const TaskFileAttachmentState());
 
@@ -157,30 +154,7 @@ class TaskFileAttachmentViewModel extends StateNotifier<TaskFileAttachmentState>
       // Queue file for upload
       await _fileUploadQueueService.queueFileUpload(fileId);
 
-      // Queue task sync (only if task has a valid project path)
-      if (task.projectPath != null && task.projectPath!.isNotEmpty) {
-        final syncData = <String, dynamic>{
-          'calendarUid': task.projectPath,
-          'taskUid': taskUid,
-        };
-        
-        final syncResult = await _syncService.queueSyncOperation(
-          SyncOperation.update,
-          taskUid,
-          syncData,
-        );
-        
-        await syncResult.when(
-          success: (_) async {
-            AppLogger.debug('TaskFileAttachmentViewModel: Queued sync for task $taskUid');
-          },
-          failure: (failure) async {
-            AppLogger.error('TaskFileAttachmentViewModel: Sync queue failed: ${failure.message}');
-          },
-        );
-      } else {
-        AppLogger.warning('TaskFileAttachmentViewModel: Cannot sync task $taskUid - no project path');
-      }
+      // Sync is now handled by repository
 
       state = state.copyWith(
         isUploading: false,
@@ -335,30 +309,7 @@ class TaskFileAttachmentViewModel extends StateNotifier<TaskFileAttachmentState>
       // Clean up local file
       await _offlineFileService.deleteOfflineFile(fileId);
 
-      // Queue task sync (only if task has a valid project path)
-      if (task.projectPath != null && task.projectPath!.isNotEmpty) {
-        final syncData = <String, dynamic>{
-          'calendarUid': task.projectPath,
-          'taskUid': taskUid,
-        };
-        
-        final syncResult = await _syncService.queueSyncOperation(
-          SyncOperation.update,
-          taskUid,
-          syncData,
-        );
-        
-        await syncResult.when(
-          success: (_) async {
-            AppLogger.debug('TaskFileAttachmentViewModel: Queued sync for file removal of task $taskUid');
-          },
-          failure: (failure) async {
-            AppLogger.error('TaskFileAttachmentViewModel: Sync queue failed for file removal: ${failure.message}');
-          },
-        );
-      } else {
-        AppLogger.warning('TaskFileAttachmentViewModel: Cannot sync task $taskUid after file removal - no project path');
-      }
+      // Sync is now handled by repository
 
       state = state.copyWith(successMessage: 'File removed successfully');
       AppLogger.info('TaskFileAttachmentViewModel: File removed successfully: $fileId');

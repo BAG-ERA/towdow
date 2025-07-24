@@ -10,6 +10,7 @@ import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
 import '../services/caldav_service.dart';
+import '../services/sync_service.dart';
 
 class KanbanService {
   final CalendarRepository _calendarRepository;
@@ -225,42 +226,24 @@ class KanbanService {
               success: (_) async {
                 AppLogger.info('KanbanService: Saved kanban locally for project $projectPath');
                 
-                // Get active account
-                final accountResult = await _accountRepository.getActiveAccount();
-                await accountResult.when(
-                  success: (account) async {
-                    if (account == null) {
-                      AppLogger.warning('KanbanService: No active account found, skipping server sync');
-                      return;
-                    }
-                    
-                    AppLogger.info('KanbanService: Found active account: ${account.username}@${account.serverUrl}');
-                    
-                    // Create CalDAV service instance
-                    final caldavService = CalDAVService(account: account);
-                    AppLogger.info('KanbanService: Created CalDAV service, calling updateCalendarProperties...');
-                    
-                    // Update calendar properties on server
-                    final updateResult = await caldavService.updateCalendarProperties(updatedCalendar);
-                    
-                    await updateResult.when(
-                      success: (_) {
-                        AppLogger.info('KanbanService: *** Successfully synced kanban to server ***');
-                      },
-                      failure: (failure) {
-                        AppLogger.error('KanbanService: Failed to sync kanban to server: ${failure.message}');
-                        AppLogger.error('KanbanService: Failure code: ${failure.code}');
-                        // Don't fail the entire operation since local save succeeded
-                        // The sync will be retried during next full sync
-                      },
-                    );
-                  },
-                  failure: (failure) {
-                    AppLogger.error('KanbanService: Failed to get active account for server sync: ${failure.message}');
-                    AppLogger.error('KanbanService: Account failure code: ${failure.code}');
-                    // Don't fail the entire operation since local save succeeded
-                  },
-                );
+                // Always use sync queue for offline resilience
+                final syncService = SyncService.instance;
+                if (syncService != null) {
+                  AppLogger.debug('KanbanService: Queuing calendar update for kanban sync');
+                  final queueResult = await syncService.queueCalendarUpdate(updatedCalendar.path);
+                  
+                  await queueResult.when(
+                    success: (_) async {
+                      AppLogger.info('KanbanService: *** Successfully queued kanban sync to server ***');
+                    },
+                    failure: (failure) async {
+                      AppLogger.error('KanbanService: Failed to queue kanban sync: ${failure.message}');
+                      // Note: We don't throw here to avoid breaking the local save operation
+                    },
+                  );
+                } else {
+                  AppLogger.error('KanbanService: SyncService singleton not initialized - kanban sync skipped');
+                }
               },
               failure: (failure) async {
                 AppLogger.error('KanbanService: Failed to save kanban locally: ${failure.message}');

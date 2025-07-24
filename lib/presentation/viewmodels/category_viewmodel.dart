@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../core/logger.dart';
-import '../../core/result.dart';
 import '../../data/models/category.dart';
 import '../../data/repositories/category_repository.dart';
 

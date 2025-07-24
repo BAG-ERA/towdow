@@ -16,6 +16,7 @@ import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
+import 'package:towdow_app/data/services/user_sync_service.dart';
 
 @GenerateNiceMocks([
   MockSpec<LocalStorageService>(),
@@ -25,6 +26,7 @@ import 'package:mockito/annotations.dart';
   MockSpec<UserRepository>(),
   MockSpec<SyncService>(),
   MockSpec<DomainService>(),
+  MockSpec<UserSyncService>(),
 ])
 import 'delete_functionality_test.mocks.dart';
 
@@ -36,6 +38,7 @@ void main() {
     late MockAccountRepository mockAccountRepository;
     late MockUserRepository mockUserRepository;
     late MockDomainService mockDomainService;
+    late MockUserSyncService mockUserSyncService;
 
     setUp(() {
       mockCalendarRepository = MockCalendarRepository();
@@ -44,6 +47,7 @@ void main() {
       mockAccountRepository = MockAccountRepository();
       mockUserRepository = MockUserRepository();
       mockDomainService = MockDomainService();
+      mockUserSyncService = MockUserSyncService();
 
       // Add this stub for user repository
       when(mockUserRepository.removeProjectFromOrder(any)).thenAnswer((_) async => const Result.success(null));
@@ -69,10 +73,9 @@ void main() {
         final viewModel = ProjectListViewModel(
           mockCalendarRepository,
           mockTaskRepository,
-          mockSyncService,
-          mockDomainService,
           mockAccountRepository,
           mockUserRepository,
+          mockUserSyncService,
         );
 
         // Set initial state with the project
@@ -119,10 +122,9 @@ void main() {
         final viewModel = ProjectListViewModel(
           mockCalendarRepository,
           mockTaskRepository,
-          mockSyncService,
-          mockDomainService,
           mockAccountRepository,
           mockUserRepository,
+          mockUserSyncService,
         );
 
         // Set initial state with the project
@@ -155,10 +157,9 @@ void main() {
         final viewModel = ProjectListViewModel(
           mockCalendarRepository,
           mockTaskRepository,
-          mockSyncService,
-          mockDomainService,
           mockAccountRepository,
           mockUserRepository,
+          mockUserSyncService,
         );
 
         // Mock getById to return null (project not found)
@@ -270,7 +271,9 @@ void main() {
         final calendarRepo = LocalCalendarRepository(mockStorage);
         final taskRepo = LocalTaskRepository(mockStorage);
 
-        // Mock successful storage deletion
+        // Mock successful storage operations
+        when(mockStorage.get(LocalStorageService.tasksBoxName, 'task1'))
+            .thenAnswer((_) async => const Result<Task?>.success(null)); // Task not found, which is fine for delete
         when(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1'))
             .thenAnswer((_) async => const Result.success(null));
         when(mockStorage.delete(LocalStorageService.tasksBoxName, 'task1'))

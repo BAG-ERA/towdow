@@ -191,12 +191,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => const ProjectCreationDialog(),
-    ).then((result) {
-      // If project was created successfully and we have a callback, call it
-      if (result != null && result is String && onProjectCreated != null) {
-        onProjectCreated!(result);
-      }
-    });
+    );
   }
 }
 

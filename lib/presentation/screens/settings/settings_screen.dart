@@ -12,8 +12,10 @@ import 'caldav_management_screen.dart';
 import 'connection_info_screen.dart';
 import 'external_calendar_management_screen.dart';
 import 's3_debug_screen.dart';
+import 'shared_projects_test_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
+import '../../../data/services/sync_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -109,6 +111,12 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsSection(
             title: 'Debug',
             children: [
+              _SettingsItem(
+                title: 'Shared Projects Test',
+                subtitle: 'Test shared project API endpoints',
+                icon: Icons.share_rounded,
+                onTap: () => _showSharedProjectsTest(context, ref),
+              ),
               _SettingsItem(
                 title: 'S3 Storage Debug',
                 subtitle: 'Test S3 file storage operations',
@@ -214,7 +222,10 @@ class SettingsScreen extends ConsumerWidget {
       final result = await storageService.clearAllData();
 
       result.when(
-        success: (_) {
+        success: (_) async {
+          // Reset SyncService singleton to clean up timers and streams
+          await SyncService.reset();
+          
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('✅ All data cleared successfully!')),
@@ -299,6 +310,15 @@ class SettingsScreen extends ConsumerWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const ExternalCalendarManagementScreen(),
+      ),
+    );
+  }
+
+  Future<void> _showSharedProjectsTest(BuildContext context, WidgetRef ref) async {
+    // Navigate to shared projects test screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SharedProjectsTestScreen(),
       ),
     );
   }
@@ -444,7 +464,10 @@ class SettingsScreen extends ConsumerWidget {
 
       if (context.mounted) {
         result.when(
-          success: (_) {
+          success: (_) async {
+            // Reset SyncService singleton to clean up timers and streams
+            await SyncService.reset();
+            
             // Invalidate all relevant providers to clear cached data
             ref.invalidate(taskListProvider);
             ref.invalidate(calendarListProvider);
@@ -463,7 +486,8 @@ class SettingsScreen extends ConsumerWidget {
             ref.invalidate(externalAccountRepositoryProvider);
             ref.invalidate(externalCalendarRepositoryProvider);
             ref.invalidate(externalEventRepositoryProvider);
-
+            ref.invalidate(syncServiceProvider);
+            
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('✅ All data cleared successfully!'),

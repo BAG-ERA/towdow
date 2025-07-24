@@ -17,11 +17,13 @@ import 'local_storage_service.dart';
 import 'webdav_client.dart';
 import 'parsers/xml_response_parser.dart';
 import 'parsers/vtodo_parser.dart';
+import 'share_service.dart';
 
 enum SyncOperation {
   create,
   update,
   delete,
+  updateCalendar,
 }
 
 enum SyncStatus {
@@ -79,11 +81,60 @@ class SyncResult {
 }
 
 class SyncService {
+  static SyncService? _instance;
+  
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
   final CategoryRepository _categoryRepository;
   final LocalStorageService _localStorage;
+  final ShareService? _shareService;
+
+  // Private constructor
+  SyncService._({
+    required TaskRepository taskRepository,
+    required AccountRepository accountRepository,
+    required CalendarRepository calendarRepository,
+    required CategoryRepository categoryRepository,
+    required LocalStorageService localStorage,
+    ShareService? shareService,
+  })  : _taskRepository = taskRepository,
+        _accountRepository = accountRepository,
+        _calendarRepository = calendarRepository,
+        _categoryRepository = categoryRepository,
+        _localStorage = localStorage,
+        _shareService = shareService;
+
+  // Factory constructor for creating/getting singleton instance
+  factory SyncService({
+    required TaskRepository taskRepository,
+    required AccountRepository accountRepository,
+    required CalendarRepository calendarRepository,
+    required CategoryRepository categoryRepository,
+    required LocalStorageService localStorage,
+    ShareService? shareService,
+  }) {
+    _instance ??= SyncService._(
+      taskRepository: taskRepository,
+      accountRepository: accountRepository,
+      calendarRepository: calendarRepository,
+      categoryRepository: categoryRepository,
+      localStorage: localStorage,
+      shareService: shareService,
+    );
+    return _instance!;
+  }
+
+  // Static getter for accessing the singleton instance
+  static SyncService? get instance => _instance;
+
+  // Static method to ensure instance is available
+  static SyncService get requireInstance {
+    if (_instance == null) {
+      throw Exception('SyncService instance not initialized. Call SyncService() first.');
+    }
+    return _instance!;
+  }
 
   // Sync state
   SyncStatus _status = SyncStatus.idle;
@@ -96,18 +147,6 @@ class SyncService {
   static const Duration syncInterval = Duration(seconds: 10);
   static const int maxRetryCount = 3;
   static const String syncQueueBoxName = 'sync_queue';
-
-  SyncService({
-    required TaskRepository taskRepository,
-    required AccountRepository accountRepository,
-    required CalendarRepository calendarRepository,
-    required CategoryRepository categoryRepository,
-    required LocalStorageService localStorage,
-  })  : _taskRepository = taskRepository,
-        _accountRepository = accountRepository,
-        _calendarRepository = calendarRepository,
-        _categoryRepository = categoryRepository,
-        _localStorage = localStorage;
 
   // Public streams
   Stream<SyncStatus> get statusStream => _statusController.stream;
@@ -306,13 +345,60 @@ class SyncService {
       success: (serverSyncToken) async {
         final localSyncToken = calendar.syncToken;
         
-        //AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: $localSyncToken, Server: $serverSyncToken');
+        AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: ${localSyncToken ?? "(null)"}, Server: ${serverSyncToken ?? "(null)"}');
         
         if (localSyncToken != serverSyncToken) {
-          //AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing from server');
+          // Case 1: Sync token changed - get actual changes and apply them
+          AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing changes from server');
           await _syncFromServer(caldavService, calendar, serverSyncToken, errors);
           return true;
         }
+        
+        // Case 2: Sync token unchanged - check if ETag needs updating
+        final serverPropertiesResult = await caldavService.getCalendarProperties(calendar);
+        await serverPropertiesResult.when(
+          success: (serverCalendar) async {
+            AppLogger.debug('🔄 SyncService: ETag comparison for ${calendar.path}:');
+            AppLogger.debug('🔄 SyncService:   Local ETag: ${calendar.etag ?? "(null)"}');
+            AppLogger.debug('🔄 SyncService:   Server ETag: ${serverCalendar.etag ?? "(null)"}');
+            AppLogger.debug('🔄 SyncService:   ETags equal? ${calendar.etag == serverCalendar.etag}');
+            
+            if (calendar.etag != serverCalendar.etag) {
+              AppLogger.info('🔄 SyncService: ETag differs - updating calendar properties');
+              final updatedCalendar = calendar.copyWith(
+                etag: serverCalendar.etag,
+                lastSyncAt: DateTime.now(),
+                // Copy server properties to sync changes from server
+                displayName: serverCalendar.displayName,
+                description: serverCalendar.description,
+                color: serverCalendar.color,
+                flowitDomain: serverCalendar.flowitDomain,
+                flowitStatus: serverCalendar.flowitStatus,
+                flowitKanban: serverCalendar.flowitKanban,
+                projectCategories: serverCalendar.projectCategories,
+                sharedWith: serverCalendar.sharedWith,
+                lastModified: serverCalendar.lastModified,
+                // Keep attendees from server if they exist, otherwise keep local ones
+                attendees: serverCalendar.attendees.isNotEmpty ? serverCalendar.attendees : calendar.attendees,
+              );
+              
+              final saveResult = await _calendarRepository.save(updatedCalendar);
+              await saveResult.when(
+                success: (_) async {
+                  AppLogger.info('🔄 SyncService: Calendar ${calendar.path} ETag updated successfully');
+                },
+                failure: (failure) async {
+                  AppLogger.error('🔄 SyncService: Failed to save ETag update: ${failure.message}');
+                },
+              );
+            } else {
+              AppLogger.debug('🔄 SyncService: ETags are equal - no update needed');
+            }
+          },
+          failure: (failure) async {
+            AppLogger.warning('🔄 SyncService: Could not get server properties: ${failure.message}');
+          },
+        );
         
         // TEST 2: queue non vide → pousser modifications vers serveur
         final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
@@ -324,14 +410,50 @@ class SyncService {
           final newServerSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
           await newServerSyncTokenResult.when(
             success: (newServerSyncToken) async {
+              AppLogger.debug('🔄 SyncService: Server sync token after queue processing: ${newServerSyncToken ?? "(null)"}');
               if (newServerSyncToken != serverSyncToken) {
-                //AppLogger.debug('🔄 SyncService: Server sync-token updated after push: $newServerSyncToken');
-                // Mettre à jour le calendrier avec le nouveau token
-                final updatedCalendar = calendar.copyWith(
-                  syncToken: newServerSyncToken,
-                  lastSyncAt: DateTime.now(),
+                AppLogger.debug('🔄 SyncService: Server sync-token updated after push: ${newServerSyncToken ?? "(null)"}');
+                
+                // Get current calendar properties to update ETag as well
+                final serverPropertiesResult = await caldavService.getCalendarProperties(calendar);
+                await serverPropertiesResult.when(
+                  success: (serverCalendar) async {
+                    // Update calendar with new sync token and ETag
+                    final updatedCalendar = calendar.copyWith(
+                      syncToken: newServerSyncToken,
+                      etag: serverCalendar.etag,
+                      lastSyncAt: DateTime.now(),
+                    );
+                    final saveResult = await _calendarRepository.save(updatedCalendar);
+                    await saveResult.when(
+                      success: (_) async {
+                        AppLogger.info('🔄 SyncService: Calendar ${calendar.path} sync token and ETag updated after queue processing');
+                      },
+                      failure: (failure) async {
+                        AppLogger.error('🔄 SyncService: Failed to save calendar ${calendar.path}: ${failure.message}');
+                      },
+                    );
+                  },
+                  failure: (failure) async {
+                    AppLogger.warning('🔄 SyncService: Could not get server properties for ETag update: ${failure.message}');
+                    // Fallback: update only sync token
+                    final updatedCalendar = calendar.copyWith(
+                      syncToken: newServerSyncToken,
+                      lastSyncAt: DateTime.now(),
+                    );
+                    final saveResult = await _calendarRepository.save(updatedCalendar);
+                    await saveResult.when(
+                      success: (_) async {
+                        AppLogger.info('🔄 SyncService: Calendar ${calendar.path} sync token updated after queue processing (ETag update failed)');
+                      },
+                      failure: (failure) async {
+                        AppLogger.error('🔄 SyncService: Failed to save calendar ${calendar.path}: ${failure.message}');
+                      },
+                    );
+                  },
                 );
-                await _calendarRepository.save(updatedCalendar);
+              } else {
+                AppLogger.info('🔄 SyncService: Server sync token unchanged after queue processing');
               }
             },
             failure: (failure) async {
@@ -510,6 +632,73 @@ class SyncService {
           throw Exception('Missing required data for task deletion');
         }
         break;
+
+      case SyncOperation.updateCalendar:
+        // Get the calendar from repository using calendarUid
+        final calendarUid = item.data['calendarUid'] as String?;
+        
+        AppLogger.debug('SyncService: Processing calendar update for: $calendarUid');
+        
+        if (calendarUid == null) {
+          AppLogger.warning('SyncService: Missing calendarUid for calendar update');
+          throw Exception('Missing required data for calendar update');
+        }
+        
+        // Get the complete calendar from repository
+        final calendarResult = await _calendarRepository.getById(calendarUid);
+        await calendarResult.when(
+          success: (calendar) async {
+            if (calendar == null) {
+              AppLogger.warning('SyncService: Calendar not found in repository: $calendarUid');
+              throw Exception('Calendar not found in repository: $calendarUid');
+            }
+            
+            AppLogger.debug('SyncService: Found calendar ${calendar.displayName}, calling CalDAV update');
+            
+            // Update calendar properties on server
+            final result = await caldavService.updateCalendarProperties(calendar);
+            await result.when(
+              success: (_) async {
+                AppLogger.debug('SyncService: Updated calendar properties ${calendar.displayName} on server');
+              },
+              failure: (failure) async {
+                throw Exception('Failed to update calendar properties: ${failure.message}');
+              },
+            );
+          },
+          failure: (failure) async {
+            AppLogger.warning('SyncService: Could not find calendar $calendarUid for update');
+            throw Exception('Calendar not found for update: ${failure.message}');
+          },
+        );
+        break;
+    }
+  }
+
+  /// Queue a calendar update operation for later processing
+  Future<Result<void>> queueCalendarUpdate(String calendarUid) async {
+    try {
+      AppLogger.debug('SyncService: Queuing calendar update for: $calendarUid');
+      
+      final syncData = <String, dynamic>{
+        'calendarUid': calendarUid,
+      };
+
+      final result = await queueSyncOperation(
+        SyncOperation.updateCalendar,
+        calendarUid,
+        syncData,
+      );
+      
+      AppLogger.debug('SyncService: Calendar update queue result: ${result is Success ? "SUCCESS" : "FAILURE"}');
+      return result;
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Failed to queue calendar update', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to queue calendar update: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
     }
   }
 
@@ -674,7 +863,7 @@ class SyncService {
           success: (remoteTasks) async {
             for (final task in remoteTasks) {
               final taskWithCalendar = task.copyWith(projectPath: calendar.path);
-              await _taskRepository.save(taskWithCalendar);
+              await _taskRepository.saveFromSync(taskWithCalendar);
             }
             //AppLogger.debug('🔄 SyncService: Full sync completed - ${remoteTasks.length} tasks from ${calendar.path}');
           },
@@ -705,7 +894,7 @@ class SyncService {
                 final taskData = changeMap['task'] as Map<String, dynamic>;
                 final task = Task.fromJson(taskData);
                 final taskWithCalendar = task.copyWith(projectPath: calendar.path);
-                await _taskRepository.save(taskWithCalendar);
+                await _taskRepository.saveFromSync(taskWithCalendar);
                 //AppLogger.debug('🔄 SyncService: Updated task ${task.uid}');
               }
             }
@@ -716,15 +905,88 @@ class SyncService {
         );
       }
       
-      // Update calendar with new sync token
-      final updatedCalendar = calendar.copyWith(
-        syncToken: newSyncToken,
-        lastSyncAt: DateTime.now(),
+      // Get current calendar properties from server to update ETag
+      final serverPropertiesResult = await caldavService.getCalendarProperties(calendar);
+      await serverPropertiesResult.when(
+        success: (serverCalendar) async {
+          // Update calendar with new sync token and ETag
+          AppLogger.info('🔄 SyncService: Updating calendar ${calendar.path}');
+          
+          final updatedCalendar = calendar.copyWith(
+            syncToken: newSyncToken,
+            etag: serverCalendar.etag,
+            lastSyncAt: DateTime.now(),
+            // Copy server properties to sync changes from server
+            displayName: serverCalendar.displayName,
+            description: serverCalendar.description,
+            color: serverCalendar.color,
+            flowitDomain: serverCalendar.flowitDomain,
+            flowitStatus: serverCalendar.flowitStatus,
+            flowitKanban: serverCalendar.flowitKanban,
+            projectCategories: serverCalendar.projectCategories,
+            sharedWith: serverCalendar.sharedWith,
+            lastModified: serverCalendar.lastModified,
+            attendees: serverCalendar.attendees,
+          );
+          
+
+          
+          final saveResult = await _calendarRepository.save(updatedCalendar);
+          await saveResult.when(
+            success: (_) async {
+              AppLogger.info('🔄 SyncService: Calendar ${calendar.path} sync token and ETag updated successfully');
+              
+
+            },
+            failure: (failure) async {
+              AppLogger.error('🔄 SyncService: Failed to save calendar ${calendar.path}: ${failure.message}');
+            },
+          );
+        },
+        failure: (failure) async {
+          AppLogger.warning('🔄 SyncService: Could not get server properties for ETag update: ${failure.message}');
+          // Fallback: update only sync token
+          final updatedCalendar = calendar.copyWith(
+            syncToken: newSyncToken,
+            lastSyncAt: DateTime.now(),
+          );
+          final saveResult = await _calendarRepository.save(updatedCalendar);
+          await saveResult.when(
+            success: (_) async {
+              AppLogger.info('🔄 SyncService: Calendar ${calendar.path} sync token updated (ETag update failed)');
+            },
+            failure: (failure) async {
+              AppLogger.error('🔄 SyncService: Failed to save calendar ${calendar.path}: ${failure.message}');
+            },
+          );
+        },
       );
-      await _calendarRepository.save(updatedCalendar);
       
       // Load categories from the updated calendar data
-      await _categoryRepository.loadCategoriesFromCalendar(updatedCalendar);
+      await _categoryRepository.loadCategoriesFromCalendar(calendar);
+      
+      // Update sharing information if supported - use the updated calendar with correct ETag/syncToken
+      AppLogger.info('SyncService: About to update sharing information for calendar ${calendar.path}');
+      
+      // Get the freshly updated calendar from repository to ensure we have the latest ETag/syncToken
+      final freshCalendarResult = await _calendarRepository.getByPath(calendar.path);
+      await freshCalendarResult.when(
+        success: (freshCalendar) async {
+          if (freshCalendar != null) {
+            AppLogger.debug('SyncService: Using fresh calendar with ETag: ${freshCalendar.etag} for sharing update');
+            await _updateSharingInformation(caldavService.account, freshCalendar);
+          } else {
+            AppLogger.warning('SyncService: Could not get fresh calendar for sharing update, using original');
+            await _updateSharingInformation(caldavService.account, calendar);
+          }
+        },
+        failure: (failure) async {
+          AppLogger.warning('SyncService: Could not get fresh calendar for sharing update: ${failure.message}, using original');
+          await _updateSharingInformation(caldavService.account, calendar);
+        },
+      );
+      
+      AppLogger.info('SyncService: Finished updating sharing information for calendar ${calendar.path}');
       
     } catch (e, stackTrace) {
       AppLogger.error('SyncService: Failed to sync from server for ${calendar.path}', e, stackTrace);
@@ -783,7 +1045,7 @@ class SyncService {
   /// Get sync changes using REPORT sync-collection (RFC 6578)
   Future<Result<Map<String, dynamic>>> _getSyncChanges(WebDAVClient webdavClient, String calendarPath, String syncToken) async {
     try {
-      //AppLogger.debug('🔄 SyncService: Making sync-collection request for $calendarPath with token: $syncToken');
+      AppLogger.debug('🔄 SyncService: Making sync-collection request for $calendarPath with token: $syncToken');
       
       final reportBody = '''<?xml version="1.0" encoding="utf-8" ?>
 <D:sync-collection xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -800,8 +1062,8 @@ class SyncService {
       final result = await webdavClient.report(calendarPath, reportBody);
       return await result.when(
         success: (response) async {
-          //AppLogger.debug('🔄 SyncService: REPORT sync-collection response: ${response.statusCode}');
-          //AppLogger.debug('🔄 SyncService: Response body: ${response.body}');
+          AppLogger.debug('🔄 SyncService: REPORT sync-collection response status code: ${response.statusCode}');
+          AppLogger.debug('🔄 SyncService: REPORT sync-collection response body: ${response.body}');
           
           if (response.statusCode == 207) {
             final parsedResult = _parseSyncCollectionResponse(response.body);
@@ -989,6 +1251,31 @@ class SyncService {
     }
   }
 
+  /// Reset SyncService instance and clean up resources
+  /// Called when clearing all data to ensure clean state
+  static Future<void> reset() async {
+    AppLogger.info('SyncService: Resetting singleton instance and cleaning up resources');
+    
+    if (_instance != null) {
+      // Cancel any active timers
+      _instance!._periodicSyncTimer?.cancel();
+      _instance!._periodicSyncTimer = null;
+      
+      // Close stream controllers
+      await _instance!._statusController.close();
+      await _instance!._progressController.close();
+      
+      // Reset state
+      _instance!._status = SyncStatus.idle;
+      _instance!._lastSyncTime = null;
+    }
+    
+    // Clear singleton instance
+    _instance = null;
+    
+    AppLogger.info('SyncService: Reset complete');
+  }
+
   /// Helper to convert SyncQueueItem to Map for storage
   Map<String, dynamic> _mapFromSyncQueueItem(SyncQueueItem item) {
     return {
@@ -1037,7 +1324,7 @@ class SyncService {
     }
   }
 
-  /// Delete task by href from local storage
+  /// Delete task by href from local storage TODO: check if this is needed
   Future<void> _deleteTaskByHref(String href, String calendarUid) async {
     try {
       // Extract UID from href (assuming href ends with UID.ics)
@@ -1061,7 +1348,7 @@ class SyncService {
     }
   }
 
-  /// Process sync queue only (for background sync service)
+  /// Process sync queue only (for background sync service) TODO: check if this is needed
   /// This method bypasses the sync status check and only processes queued operations
   Future<Result<SyncResult>> processQueueOnly() async {
     try {
@@ -1094,7 +1381,7 @@ class SyncService {
     }
   }
 
-  /// Perform queue processing only (without sync status check)
+  /// Perform queue processing only (without sync status check) TODO: check if this is needed
   Future<Result<SyncResult>> _performQueueProcessing(CaldavAccount account) async {
     final caldavService = CalDAVService(account: account);
     final errors = <String>[];
@@ -1154,7 +1441,7 @@ class SyncService {
   }
 
   /// Force queue processing (for background sync service)
-  /// This method processes the queue without doing full sync
+  /// This method processes the queue without doing full sync TODO: check if this is needed
   Future<void> forceQueueProcessing() async {
     try {
       AppLogger.debug('SyncService: Force processing queue');
@@ -1210,7 +1497,7 @@ class SyncService {
     }
   }
 
-  /// Check if calendar exists on server using PROPFIND
+  /// Check if calendar exists on server using PROPFIND TODO: check if this is needed
   Future<bool> _checkCalendarExistsOnServer(WebDAVClient webdavClient, String calendarPath) async {
     try {
       final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
@@ -1237,7 +1524,7 @@ class SyncService {
     }
   }
 
-  /// Create a local calendar on the server
+  /// Create a local calendar on the server TODO: check if this is needed
   Future<bool> _createCalendarOnServer(CaldavAccount account, TaskCalendar calendar) async {
     try {
       AppLogger.info('SyncService: Creating calendar on server: ${calendar.displayName}');
@@ -1272,6 +1559,63 @@ class SyncService {
     }
   }
 
+  /// Update sharing information for a calendar TODO: check if this is needed
+  Future<void> _updateSharingInformation(CaldavAccount account, TaskCalendar calendar) async {
+    try {
+      // Only update sharing info for TowDow Cloud and self-hosted accounts
+      final sharingService = ShareService(account: account);
+      if (!sharingService.supportsSharing) {
+        AppLogger.debug('SyncService: Skipping sharing update - account type ${account.providerType} does not support sharing');
+        return;
+      }
+      
+      AppLogger.info('SyncService: Updating sharing information for calendar ${calendar.path}');
+      AppLogger.debug('SyncService: Account: ${account.username}@${account.serverUrl}, Provider: ${account.providerType}');
+      
+      // Extract project path from calendar path (UUID part)
+      final projectPath = calendar.uid;
+      if (projectPath.isEmpty) {
+        AppLogger.warning('SyncService: Could not extract project path from ${calendar.path}');
+        return;
+      }
+      
+      AppLogger.debug('SyncService: Extracted project path: $projectPath');
+      AppLogger.debug('SyncService: Calling ShareService.getProjectMembers...');
+      
+      // Get current sharing members from API
+      final membersResult = await sharingService.getProjectMembers(projectPath);
+      await membersResult.when(
+        success: (members) async {
+          AppLogger.info('SyncService: Successfully fetched ${members.length} shared members from API');
+          for (int i = 0; i < members.length; i++) {
+            final member = members[i];
+            AppLogger.debug('SyncService: Member $i: ${member.targetUserEmail} (${member.projectRight}) from ${member.sourceUserEmail}');
+          }
+          
+          // Convert SharedProjectMember objects to JSON for storage
+          final membersJson = members.map((member) => member.toJson()).toList();
+          AppLogger.debug('SyncService: Converting members to JSON: $membersJson');
+          
+          // Update calendar with sharing information
+          final updatedCalendar = calendar.withSharedWith(membersJson);
+          AppLogger.debug('SyncService: Updated calendar sharedWith field: "${updatedCalendar.sharedWith}"');
+          
+          await _calendarRepository.save(updatedCalendar);
+          AppLogger.info('SyncService: Successfully saved sharing info for ${calendar.path} - ${members.length} members');
+        },
+        failure: (failure) async {
+          // Log the error but don't fail the sync - sharing is optional
+          AppLogger.warning('SyncService: Failed to get sharing info for ${calendar.path}: ${failure.message}');
+          AppLogger.debug('SyncService: Sharing API error code: ${failure.code}');
+          AppLogger.debug('SyncService: Sharing API error details: ${failure.exception}');
+        },
+      );
+    } catch (e, stackTrace) {
+      // Log the error but don't fail the sync - sharing is optional  
+      AppLogger.warning('SyncService: Error updating sharing information for ${calendar.path}', e, stackTrace);
+    }
+  }
+  
   /// Dispose resources
   void dispose() {
     // Note: No periodic sync to stop - CalDAVMonitor handles this

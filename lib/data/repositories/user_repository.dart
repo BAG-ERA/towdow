@@ -5,6 +5,7 @@
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/user_preferences.dart';
+import '../models/shared_with_me_project.dart';
 import '../services/local_storage_service.dart';
 
 // Abstract repository interface
@@ -15,15 +16,52 @@ abstract class UserRepository {
   Future<Result<void>> addProjectToOrder(String projectUid);
   Future<Result<void>> removeProjectFromOrder(String projectUid);
   Future<Result<void>> reorderProject(String projectUid, int newIndex);
+  Future<Result<void>> updateSharedWithMeProjects(List<SharedWithMeProject> projects);
+  Future<Result<void>> acknowledgeSharedProject(String projectId);
   Stream<UserPreferences> watchUserPreferences();
+  
+  // Etag methods for S3 sync tracking
+  Future<Result<String?>> getEtag();
+  Future<Result<void>> setEtag(String? etag);
+  
+  // Set sync trigger callback for UserSyncService
+  void setSyncTrigger(Future<void> Function() triggerSync);
+  
+  // Internal method for sync operations (don't trigger sync)
+  Future<Result<void>> saveUserPreferencesWithoutSync(UserPreferences preferences);
+  
+  // Internal method for sync operations (don't trigger sync)
+  Future<Result<void>> updateSharedWithMeProjectsWithoutSync(List<SharedWithMeProject> projects);
 }
 
 // Local implementation using Hive
 class LocalUserRepository implements UserRepository {
   final LocalStorageService _storageService;
   static const String _userPreferencesKey = 'user_preferences';
+  
+  // Sync trigger callback
+  Future<void> Function()? _triggerSync;
 
   LocalUserRepository(this._storageService);
+  
+  @override
+  void setSyncTrigger(Future<void> Function() triggerSync) {
+    _triggerSync = triggerSync;
+  }
+  
+  // Helper method to trigger sync after user preference changes
+  Future<void> _triggerSyncIfAvailable() async {
+    if (_triggerSync != null) {
+      try {
+        AppLogger.debug('LocalUserRepository: Triggering user data sync to S3');
+        await _triggerSync!();
+      } catch (e) {
+        AppLogger.warning('LocalUserRepository: Failed to trigger sync: $e');
+      }
+    } else {
+      AppLogger.debug('LocalUserRepository: No sync trigger available - changes saved locally only');
+    }
+  }
 
   @override
   Future<Result<UserPreferences>> getUserPreferences() async {
@@ -39,7 +77,7 @@ class LocalUserRepository implements UserRepository {
           AppLogger.info('LocalUserRepository: No user preferences found, returning defaults');
           return Result.success(UserPreferences.defaultPreferences());
         }
-        AppLogger.info('LocalUserRepository: Loaded user preferences with ${preferences.projectOrder.length} project orders');
+        AppLogger.info('LocalUserRepository: Loaded user preferences with ${preferences.projectOrder.length} project orders and ${preferences.sharedWithMeProjects.length} shared projects');
         return Result.success(preferences);
       },
       failure: (failure) {
@@ -52,12 +90,24 @@ class LocalUserRepository implements UserRepository {
 
   @override
   Future<Result<void>> saveUserPreferences(UserPreferences preferences) async {
-    AppLogger.info('LocalUserRepository: Saving user preferences with ${preferences.projectOrder.length} project orders');
-    return await _storageService.put(
+    AppLogger.info('LocalUserRepository: Saving user preferences with ${preferences.projectOrder.length} project orders and ${preferences.sharedWithMeProjects.length} shared projects');
+    final result = await _storageService.put(
       LocalStorageService.userPreferencesBoxName,
       _userPreferencesKey,
       preferences,
     );
+    
+    // Trigger sync after successful save
+    await result.when(
+      success: (_) async {
+        await _triggerSyncIfAvailable();
+      },
+      failure: (_) async {
+        // Don't trigger sync if save failed
+      },
+    );
+    
+    return result;
   }
 
   @override
@@ -113,6 +163,63 @@ class LocalUserRepository implements UserRepository {
   }
 
   @override
+  Future<Result<void>> updateSharedWithMeProjects(List<SharedWithMeProject> projects) async {
+    final preferencesResult = await getUserPreferences();
+    return await preferencesResult.when(
+      success: (preferences) async {
+        final updatedPreferences = preferences.withSharedWithMeProjects(projects);
+        AppLogger.info('LocalUserRepository: Updating shared with me projects: ${projects.length} projects');
+        return await saveUserPreferences(updatedPreferences);
+      },
+      failure: (failure) async => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<void>> acknowledgeSharedProject(String projectId) async {
+    final currentPrefs = await getUserPreferences();
+    return currentPrefs.when(
+      success: (prefs) async {
+        final updatedProjects = prefs.sharedWithMeProjects
+            .map((project) => project.projectId == projectId 
+                ? project.copyWith(ack: true) 
+                : project)
+            .toList();
+        
+        final updatedPrefs = prefs.copyWith(sharedWithMeProjects: updatedProjects);
+        final saveResult = await saveUserPreferences(updatedPrefs);
+        
+        // Trigger sync after updating acknowledgment
+        await _triggerSyncIfAvailable();
+        
+        return saveResult;
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<String?>> getEtag() async {
+    final preferencesResult = await getUserPreferences();
+    return preferencesResult.when(
+      success: (prefs) => Result.success(prefs.etag),
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
+  Future<Result<void>> setEtag(String? etag) async {
+    final currentPrefs = await getUserPreferences();
+    return currentPrefs.when(
+      success: (prefs) async {
+        final updatedPrefs = prefs.copyWith(etag: etag);
+        return await saveUserPreferencesWithoutSync(updatedPrefs);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  @override
   Stream<UserPreferences> watchUserPreferences() async* {
     // Emit initial value
     final result = await getUserPreferences();
@@ -130,5 +237,28 @@ class LocalUserRepository implements UserRepository {
             failure: (_) => UserPreferences.defaultPreferences(),
           );
         });
+  }
+
+  @override
+  Future<Result<void>> saveUserPreferencesWithoutSync(UserPreferences preferences) async {
+    AppLogger.info('LocalUserRepository: Saving user preferences without triggering sync: ${preferences.projectOrder.length} project orders and ${preferences.sharedWithMeProjects.length} shared projects');
+    final result = await _storageService.put(
+      LocalStorageService.userPreferencesBoxName,
+      _userPreferencesKey,
+      preferences,
+    );
+    return result;
+  }
+
+  @override
+  Future<Result<void>> updateSharedWithMeProjectsWithoutSync(List<SharedWithMeProject> projects) async {
+    final currentPrefs = await getUserPreferences();
+    return currentPrefs.when(
+      success: (prefs) async {
+        final updatedPrefs = prefs.copyWith(sharedWithMeProjects: projects);
+        return await saveUserPreferencesWithoutSync(updatedPrefs);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
   }
 } 
