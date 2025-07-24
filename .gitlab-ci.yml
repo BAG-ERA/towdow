@@ -224,6 +224,7 @@ deploy_web:
     - apt-get update && apt-get install -y openssh-client
     # Save and decode the base64 key into a file
     - echo "${SSH_PRIVATE_KEY}" | base64 -d > /tmp/ssh_key
+    - cat /tmp/ssh_key
     - chmod 600 /tmp/ssh_key
     # Start ssh-agent and add the key
     - eval "$(ssh-agent -s)"
