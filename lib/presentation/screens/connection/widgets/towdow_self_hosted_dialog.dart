@@ -5,16 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../viewmodels/login_viewmodel.dart';
-import 'base_auth_dialog.dart';
+import 'cloud_auth_dialog.dart';
 
-class TowdowSelfHostedDialog extends BaseAuthDialog {
+class TowdowSelfHostedDialog extends BaseCloudAuthDialog {
   const TowdowSelfHostedDialog({super.key}) : super(type: AuthDialogType.selfHosted);
 
   @override
   ConsumerState<TowdowSelfHostedDialog> createState() => _TowdowSelfHostedDialogState();
 }
 
-class _TowdowSelfHostedDialogState extends BaseAuthDialogState<TowdowSelfHostedDialog> {
+class _TowdowSelfHostedDialogState extends BaseCloudAuthDialogState<TowdowSelfHostedDialog> {
   @override
   String getDialogTitle() => 'TowDow Self-Hosted (Keycloak)';
 

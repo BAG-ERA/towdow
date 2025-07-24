@@ -1,4 +1,4 @@
-﻿// Settings screen for app configuration
+// Settings screen for app configuration
 // CalDAV connections, theme, and app preferences
 
 import 'package:flutter/material.dart';
@@ -15,6 +15,7 @@ import 's3_debug_screen.dart';
 import 'shared_projects_test_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
+import '../../../data/services/web_storage.dart';
 import '../../../data/services/sync_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -390,15 +391,10 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _clearLocalStorageUsingJsInterop() async {
     if (kIsWeb) {
       try {
-        // For security reasons, we can't directly access localStorage in a standard Dart function
-        // In a real implementation, you would use dart:js to clear localStorage:
-        // js.context.callMethod('eval', ['localStorage.clear();']);
-
-        // Since we can't import dart:js safely (causes errors on non-web platforms),
-        // we'll use conditional imports in a real implementation
-        AppLogger.info('Web platform: localStorage would be cleared here');
-      } catch (e) {
-        AppLogger.error('Failed to clear localStorage', e);
+        await clearLocalStorage();
+        AppLogger.info('localStorage cleared successfully via JS interop');
+      } catch (e, stacktrace) {
+        AppLogger.error('Failed to clear localStorage', e, stacktrace);
       }
     }
   }
