@@ -16,6 +16,7 @@ import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
 import 'package:towdow_app/data/services/domain_service.dart';
 import 'package:towdow_app/data/services/sync_service.dart';
+import 'package:towdow_app/data/services/user_sync_service.dart';
 import 'package:towdow_app/presentation/viewmodels/project_list_viewmodel.dart';
 
 import 'project_list_viewmodel_test.mocks.dart';
@@ -28,6 +29,10 @@ import 'project_list_viewmodel_test.mocks.dart';
   AccountRepository,
   UserRepository,
 ])
+
+// Manually create UserSyncService mock class since the generated one isn't available yet
+class MockUserSyncService extends Mock implements UserSyncService {}
+
 void main() {
   group('ProjectListViewModel Tests', () {
     late ProjectListViewModel viewModel;
