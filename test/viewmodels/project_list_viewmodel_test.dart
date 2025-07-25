@@ -27,9 +27,6 @@ import 'project_list_viewmodel_test.mocks.dart';
   UserRepository,
 ])
 
-// Manually create UserSyncService mock class since the generated one isn't available yet
-class MockUserSyncService extends Mock implements UserSyncService {}
-
 void main() {
   group('ProjectListViewModel Tests', () {
     late ProjectListViewModel viewModel;
