@@ -403,13 +403,6 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       
       result.when(
         success: (_) async {
-          // Trigger user sync upload after toggling (only for cloud/self-hosted users)
-          final userSyncService = ref.read(userSyncServiceProvider);
-          final uploadResult = await userSyncService.uploadUserData();
-          uploadResult.when(
-            success: (_) => AppLogger.info('ExternalCalendarManagement: User data synced to cloud after toggling external calendar'),
-            failure: (failure) => AppLogger.warning('ExternalCalendarManagement: Failed to sync user data: ${failure.message}'),
-          );
           
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -539,13 +532,8 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
         failure: (failure) => throw Exception('Failed to delete account: ${failure.message}'),
       );
       
-      // Trigger user sync upload after deletion (only for cloud/self-hosted users)
-      final userSyncService = ref.read(userSyncServiceProvider);
-      final uploadResult = await userSyncService.uploadUserData();
-      uploadResult.when(
-        success: (_) => AppLogger.info('ExternalCalendarManagement: User data synced to cloud after deleting external calendar'),
-        failure: (failure) => AppLogger.warning('ExternalCalendarManagement: Failed to sync user data: ${failure.message}'),
-      );
+      // Note: User data upload is handled by queue system during background sync
+      // No need to upload here as it will be handled automatically
       
       // Success
       if (mounted) {

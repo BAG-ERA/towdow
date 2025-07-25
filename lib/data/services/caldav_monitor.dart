@@ -8,6 +8,7 @@ import '../../core/logger.dart';
 import '../models/caldav_account.dart';
 import '../models/task_calendar.dart';
 import '../models/shared_with_me_project.dart';
+import '../models/user_preferences.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/category_repository.dart';
@@ -19,6 +20,7 @@ import 'sync_service.dart';
 import 'caldav_service.dart';
 import 's3_storage_service.dart';
 import 'user_sync_service.dart';
+import 'user_preferences_queue_service.dart';
 import 'share_service.dart';
 
 class CalDAVMonitor {
@@ -30,6 +32,8 @@ class CalDAVMonitor {
   final ExternalCalendarRepository _externalCalendarRepository;
   final ConnectionMonitorService _connectionMonitorService;
   final SyncService _syncService;
+  final UserSyncService _userSyncService;
+  final UserPreferencesQueueService _userPreferencesQueueService;
 
   // Dynamic interval configuration
   static const Duration _minInterval = Duration(seconds: 2);
@@ -52,13 +56,17 @@ class CalDAVMonitor {
     required ExternalCalendarRepository externalCalendarRepository,
     required ConnectionMonitorService connectionMonitorService,
     required SyncService syncService,
+    required UserSyncService userSyncService,
+    required UserPreferencesQueueService userPreferencesQueueService,
   })  : _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
         _userRepository = userRepository,
         _externalAccountRepository = externalAccountRepository,
         _externalCalendarRepository = externalCalendarRepository,
         _connectionMonitorService = connectionMonitorService,
-        _syncService = syncService;
+        _syncService = syncService,
+        _userSyncService = userSyncService,
+        _userPreferencesQueueService = userPreferencesQueueService;
 
   /// Start monitoring with dynamic interval
   Future<Result<void>> start() async {
@@ -132,41 +140,29 @@ class CalDAVMonitor {
             success: (calendars) async {
               bool changesDetected = false;
               
-              // Process queued operations first
+              // Process queued operations
               final queueChanges = await _processQueuedOperations();
-              if (queueChanges) {
-                changesDetected = true;
-                AppLogger.debug('CalDAVMonitor: Queued operations processed');
-              }
-
-              // Check each calendar for changes
-              for (final calendar in calendars) {
-                final calendarChanges = await _checkCalendarChanges(account, calendar);
-                if (calendarChanges) {
-                  changesDetected = true;
-                  AppLogger.debug('CalDAVMonitor: Changes detected for calendar ${calendar.displayName}');
-                }
-              }
-
-              // Check user preferences for changes
+              
+              // Process user preferences queue
+              final userPreferencesQueueChanges = await _processUserPreferencesQueue();
+              
+              // Check for changes in user preferences
               final userPrefsChanges = await _checkUserPreferencesChanges(account);
-              if (userPrefsChanges) {
-                changesDetected = true;
-                AppLogger.debug('CalDAVMonitor: Changes detected for user preferences');
-              }
-
-              // Check external accounts for changes
+              
+              // Check for changes in external accounts
               final externalAccountChanges = await _checkExternalAccountChanges(account);
-              if (externalAccountChanges) {
-                changesDetected = true;
-                AppLogger.debug('CalDAVMonitor: Changes detected for external accounts');
-              }
-
+              
+              // Check for changes in shared projects
+              await _checkAndUpdateSharedProjects(account);
+              
+              // Determine if any changes were detected
+              final anyChanges = queueChanges || userPrefsChanges || externalAccountChanges || userPreferencesQueueChanges;
+              
               // Update interval based on changes detected
-              _updateInterval(changesDetected);
+              _updateInterval(anyChanges);
               
               
-              if (changesDetected) {
+              if (anyChanges) {
                 AppLogger.debug('CalDAVMonitor: Changes detected, interval adjusted to ${_currentInterval.inSeconds}s');
               } else {
                 AppLogger.debug('CalDAVMonitor: No changes detected, interval adjusted to ${_currentInterval.inSeconds}s');
@@ -202,6 +198,20 @@ class CalDAVMonitor {
       );
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVMonitor: Queue processing failed', e, stackTrace);
+      return false;
+    }
+  }
+
+  /// Process user preferences queue
+  Future<bool> _processUserPreferencesQueue() async {
+    try {
+      final result = await _userPreferencesQueueService.processQueue();
+      return result.when(
+        success: (_) => true,
+        failure: (_) => false,
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVMonitor: User preferences queue processing failed', e, stackTrace);
       return false;
     }
   }
@@ -328,6 +338,8 @@ class CalDAVMonitor {
         failure: (_) => null,
       );
 
+      AppLogger.debug('CalDAVMonitor: Retrieved local ETag: $localEtag');
+
       // Create S3 service and get remote etag
       final s3Service = S3StorageService(account: account);
       final userPrefix = s3Service.getUserPrefix();
@@ -349,16 +361,8 @@ class CalDAVMonitor {
               success: (fileInfo) async {
                 AppLogger.debug('CalDAVMonitor: Remote file last modified: ${fileInfo.lastModified}');
                 
-                // Create UserSyncService and trigger download
-                final userSyncService = UserSyncService(
-                  userRepository: _userRepository,
-                  externalAccountRepository: _externalAccountRepository,
-                  externalCalendarRepository: _externalCalendarRepository,
-                  accountRepository: _accountRepository,
-                  calendarRepository: _calendarRepository,
-                );
-                
-                final downloadResult = await userSyncService.downloadUserData();
+                // Use injected UserSyncService instead of creating a new instance
+                final downloadResult = await _userSyncService.downloadUserData();
                 await downloadResult.when(
                   success: (hasData) async {
                     if (hasData) {
@@ -429,16 +433,8 @@ class CalDAVMonitor {
               success: (fileInfo) async {
                 AppLogger.debug('CalDAVMonitor: Remote credentials file last modified: ${fileInfo.lastModified}');
                 
-                // Create UserSyncService and trigger download
-                final userSyncService = UserSyncService(
-                  userRepository: _userRepository,
-                  externalAccountRepository: _externalAccountRepository,
-                  externalCalendarRepository: _externalCalendarRepository,
-                  accountRepository: _accountRepository,
-                  calendarRepository: _calendarRepository,
-                );
-                
-                final downloadResult = await userSyncService.downloadUserData();
+                // Use injected UserSyncService instead of creating a new instance
+                final downloadResult = await _userSyncService.downloadUserData();
                 await downloadResult.when(
                   success: (hasData) async {
                     if (hasData) {
@@ -498,7 +494,19 @@ class CalDAVMonitor {
       final serverSharedResult = await shareService.getProjectsSharedWithMe();
       await serverSharedResult.when(
         success: (serverMembers) async {
-          // Convert server members to SharedWithMeProject, preserving acknowledgments
+          AppLogger.info('CalDAVMonitor: Server returned ${serverMembers.length} shared projects:');
+          for (final member in serverMembers) {
+            AppLogger.info('CalDAVMonitor:   - ${member.projectPath} (from ${member.sourceUserEmail})');
+          }
+          
+          AppLogger.info('CalDAVMonitor: Current preferences has ${currentSharedProjects.length} shared projects:');
+          for (final project in currentSharedProjects) {
+            AppLogger.info('CalDAVMonitor:   - ${project.projectId} (ack: ${project.ack}, from ${project.sourceUserEmail})');
+          }
+          
+          // Convert server members to SharedWithMeProject
+          // NEW SHARED PROJECTS: Set ack: false regardless of user preferences
+          // EXISTING SHARED PROJECTS: Preserve current acknowledgment status
           final currentAcknowledgments = <String, bool>{};
           for (final currentProject in currentSharedProjects) {
             currentAcknowledgments[currentProject.projectId] = currentProject.ack;
@@ -510,9 +518,16 @@ class CalDAVMonitor {
               allTasks: member.allTasks,
               projectRight: member.projectRight,
               sourceUserEmail: member.sourceUserEmail,
+              // NEW PROJECTS: Always set ack: false
+              // EXISTING PROJECTS: Preserve current ack status
               ack: currentAcknowledgments[member.projectPath] ?? false,
             )
           ).toList();
+          
+          AppLogger.info('CalDAVMonitor: After merging, new shared projects list:');
+          for (final project in newSharedProjects) {
+            AppLogger.info('CalDAVMonitor:   - ${project.projectId} (ack: ${project.ack}, from ${project.sourceUserEmail})');
+          }
 
           // Compare and detect changes
           final currentProjectPaths = currentSharedProjects.map((p) => p.projectId).toSet();
@@ -531,9 +546,66 @@ class CalDAVMonitor {
             final prefsResult = await _userRepository.getUserPreferences();
             await prefsResult.when(
               success: (prefs) async {
-                final updatedPrefs = prefs.copyWith(sharedWithMeProjects: newSharedProjects);
+                // Add ALL non-acknowledged shared projects to active synced list
+                final updatedProjectOrder = [...prefs.projectOrder];
+                final updatedSyncedProjects = [...prefs.syncedProjects];
+                
+                // Get all non-acknowledged shared projects
+                final nonAckedSharedProjects = newSharedProjects
+                    .where((project) => !project.ack)
+                    .map((project) => project.projectId)
+                    .toSet();
+                
+                AppLogger.info('CalDAVMonitor: Found ${nonAckedSharedProjects.length} non-acknowledged shared projects:');
+                for (final projectId in nonAckedSharedProjects) {
+                  AppLogger.info('CalDAVMonitor:   - $projectId');
+                }
+                
+                AppLogger.info('CalDAVMonitor: Current project order: ${prefs.projectOrder}');
+                AppLogger.info('CalDAVMonitor: Current synced projects: ${prefs.syncedProjects}');
+                
+                // Add all non-acknowledged shared projects to active synced list
+                for (final projectId in nonAckedSharedProjects) {
+                  // Add to project order if not already there
+                  if (!updatedProjectOrder.contains(projectId)) {
+                    updatedProjectOrder.add(projectId);
+                    AppLogger.info('CalDAVMonitor: Added non-acknowledged shared project $projectId to active synced list');
+                  } else {
+                    AppLogger.info('CalDAVMonitor: Non-acknowledged shared project $projectId already in active synced list');
+                  }
+                  
+                  // Add to synced projects if not already there
+                  if (!updatedSyncedProjects.contains(projectId)) {
+                    updatedSyncedProjects.add(projectId);
+                    AppLogger.info('CalDAVMonitor: Added non-acknowledged shared project $projectId to synced projects list');
+                  } else {
+                    AppLogger.info('CalDAVMonitor: Non-acknowledged shared project $projectId already in synced projects list');
+                  }
+                }
+                
+                AppLogger.info('CalDAVMonitor: Final project order: $updatedProjectOrder');
+                AppLogger.info('CalDAVMonitor: Final synced projects: $updatedSyncedProjects');
+                
+                // Remove disappeared shared projects from active lists
+                for (final removedProject in removedProjects) {
+                  updatedProjectOrder.remove(removedProject);
+                  updatedSyncedProjects.remove(removedProject);
+                  AppLogger.info('CalDAVMonitor: Removed shared project $removedProject from active synced list');
+                }
+                
+                final updatedPrefs = prefs.copyWith(
+                  sharedWithMeProjects: newSharedProjects,
+                  projectOrder: updatedProjectOrder,
+                  syncedProjects: updatedSyncedProjects,
+                );
+                
                 await _userRepository.saveUserPreferences(updatedPrefs);
-                AppLogger.info('CalDAVMonitor: Updated user preferences with ${newSharedProjects.length} shared projects');
+                AppLogger.info('CalDAVMonitor: Updated user preferences with ${newSharedProjects.length} shared projects and updated active lists');
+                
+                // Activate calendars for the updated project order to update UI
+                AppLogger.info('CalDAVMonitor: Starting calendar activation for updated project order');
+                await _activateCalendarsFromProjectOrder(updatedPrefs);
+                AppLogger.info('CalDAVMonitor: Calendar activation completed');
               },
               failure: (failure) async {
                 AppLogger.error('CalDAVMonitor: Failed to update user preferences with shared projects: ${failure.message}');
@@ -583,7 +655,7 @@ class CalDAVMonitor {
                   // Find and add calendars for new shared projects
                   for (final addedProjectPath in addedProjects) {
                     final matchingCalendar = availableCalendars
-                        .where((cal) => cal.uid == addedProjectPath)
+                        .where((cal) => cal.path == addedProjectPath)
                         .firstOrNull;
                     
                     if (matchingCalendar != null) {
@@ -613,6 +685,99 @@ class CalDAVMonitor {
       }
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVMonitor: Failed to update calendar list for shared projects', e, stackTrace);
+    }
+  }
+
+  /// Activate calendars for the given project order
+  Future<void> _activateCalendarsFromProjectOrder(UserPreferences prefs) async {
+    try {
+      AppLogger.info('CalDAVMonitor: Activating calendars for project order: ${prefs.projectOrder}');
+      
+      final accountResult = await _accountRepository.getActiveAccount();
+      await accountResult.when(
+        success: (account) async {
+          if (account == null) {
+            AppLogger.warning('CalDAVMonitor: No active account to activate calendars');
+            return;
+          }
+
+          AppLogger.info('CalDAVMonitor: Got active account, discovering capabilities');
+          final caldavService = CalDAVService(account: account);
+          final capabilitiesResult = await caldavService.discoverCapabilities();
+
+          await capabilitiesResult.when(
+            success: (capabilities) async {
+              final availableCalendars = capabilities.taskCalendars;
+              AppLogger.info('CalDAVMonitor: Discovered ${availableCalendars.length} available calendars');
+              
+              // Log all available calendars for debugging
+              for (final calendar in availableCalendars) {
+                AppLogger.debug('CalDAVMonitor: Available calendar: ${calendar.path} (${calendar.displayName})');
+              }
+              
+              final projectOrder = prefs.projectOrder;
+              AppLogger.info('CalDAVMonitor: Processing ${projectOrder.length} projects in project order');
+
+              for (final projectId in projectOrder) {
+                AppLogger.info('CalDAVMonitor: Looking for calendar for project: $projectId');
+                
+                // Try to find calendar by exact path match first
+                var matchingCalendar = availableCalendars
+                    .where((cal) => cal.path == projectId)
+                    .firstOrNull;
+                
+                // If not found, try to find by UID (for shared projects)
+                if (matchingCalendar == null) {
+                  AppLogger.debug('CalDAVMonitor: No exact path match, trying UID match for: $projectId');
+                  matchingCalendar = availableCalendars
+                      .where((cal) => cal.uid == projectId)
+                      .firstOrNull;
+                }
+                
+                // If still not found, try to construct path from UID
+                if (matchingCalendar == null) {
+                  AppLogger.debug('CalDAVMonitor: No UID match, trying path construction for: $projectId');
+                  final calendarHome = capabilities.calendarHome;
+                  final constructedPath = '$calendarHome$projectId/';
+                  AppLogger.debug('CalDAVMonitor: Constructed path: $constructedPath');
+                  
+                  matchingCalendar = availableCalendars
+                      .where((cal) => cal.path == constructedPath)
+                      .firstOrNull;
+                }
+                
+                // If still not found, try to find by path containing the project ID
+                if (matchingCalendar == null) {
+                  AppLogger.debug('CalDAVMonitor: No constructed path match, trying path contains for: $projectId');
+                  matchingCalendar = availableCalendars
+                      .where((cal) => cal.path.contains(projectId))
+                      .firstOrNull;
+                }
+                
+                if (matchingCalendar != null) {
+                  AppLogger.info('CalDAVMonitor: Found matching calendar for $projectId: ${matchingCalendar.displayName} (${matchingCalendar.path})');
+                  final saveResult = await _calendarRepository.save(matchingCalendar);
+                  saveResult.when(
+                    success: (_) => AppLogger.info('CalDAVMonitor: Successfully activated calendar $projectId'),
+                    failure: (failure) => AppLogger.warning('CalDAVMonitor: Failed to activate calendar $projectId: ${failure.message}'),
+                  );
+                } else {
+                  AppLogger.warning('CalDAVMonitor: Could not find calendar to activate: $projectId');
+                  AppLogger.debug('CalDAVMonitor: Available calendars: ${availableCalendars.map((c) => '${c.path} (${c.uid})').join(', ')}');
+                }
+              }
+            },
+            failure: (failure) async {
+              AppLogger.error('CalDAVMonitor: Failed to discover capabilities for calendar activation: ${failure.message}');
+            },
+          );
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVMonitor: Failed to get active account for calendar activation: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVMonitor: Failed to activate calendars from project order', e, stackTrace);
     }
   }
 

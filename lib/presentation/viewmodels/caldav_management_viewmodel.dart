@@ -451,17 +451,7 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     try {
       if (state.currentAccount == null) return;
       
-      AppLogger.info('CalDAVManagement: Triggering immediate user preferences sync');
-      final result = await _userSyncService.uploadUserData();
-      
-      result.when(
-        success: (_) {
-          AppLogger.info('CalDAVManagement: User preferences synced successfully');
-        },
-        failure: (failure) {
-          AppLogger.warning('CalDAVManagement: Failed to sync user preferences: ${failure.message}');
-        },
-      );
+      AppLogger.info('CalDAVManagement: User preferences changes will be synced via queue system');
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVManagement: Error during immediate sync', e, stackTrace);
     }

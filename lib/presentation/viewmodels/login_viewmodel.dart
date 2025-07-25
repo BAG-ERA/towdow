@@ -174,19 +174,6 @@ class LoginViewModel extends StateNotifier<LoginState> {
       // Save account temporarily for user sync check
       await _accountRepository.save(account);
 
-      // Check for existing user data
-      final syncDownloadResult = await _userSyncService.downloadUserData();
-      final hasExistingData = syncDownloadResult.when(
-        success: (hasData) => hasData,
-        failure: (failure) {
-          AppLogger.warning(
-            'Login: Failed to check for existing user data: ${failure.message}',
-          );
-          return false;
-        },
-      );
-
-      if (hasExistingData) {
         // Trigger external calendar sync
         try {
           final syncResult = await _externalSyncService.syncAllAccounts();
@@ -212,10 +199,6 @@ class LoginViewModel extends StateNotifier<LoginState> {
           isLoading: false,
         );
         return;
-      }
-
-      // No existing data, test connection for capability discovery
-      await _testConnectionAndDiscoverCapabilities(account);
     } catch (e, stackTrace) {
       AppLogger.error('Login: Authentication failed', e, stackTrace);
       state = state.copyWith(

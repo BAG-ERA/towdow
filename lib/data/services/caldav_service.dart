@@ -64,13 +64,10 @@ class CalDAVService {
   }
 
   /// Create a task (VTODO) on the server - RFC 4791 Section 5.3.2
-  Future<Result<String>> createTask(Task task, {String? calendarPath}) async {
+  Future<Result<String>> createTask(Task task, String calendarPath) async {
     try {
       // AppLogger.debug('CalDAVService: Creating task ${task.summary}');
-      
-      // Use default calendar path if none specified
-      calendarPath ??= '/calendars/${account.username}/tasks/';
-      
+         
       // Generate iCalendar VTODO content
       final vtodoContent = VTODOParser.serializeTask(task);
       

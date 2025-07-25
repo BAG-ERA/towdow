@@ -32,6 +32,9 @@ class UserSyncService {
   Timer? _periodicWatcher;
   DateTime? _lastSyncTime;
   
+  // Callback to notify when preferences are updated from server
+  void Function()? _onPreferencesUpdated;
+  
   UserSyncService({
     required UserRepository userRepository,
     required ExternalAccountRepository externalAccountRepository,
@@ -122,6 +125,12 @@ class UserSyncService {
           return await updateResult.when(
             success: (_) async {
               AppLogger.info('UserSyncService: Successfully updated ${sharedProjects.length} shared projects');
+              
+              // If this is during download, also add new shared projects to active synced list
+              if (duringDownload) {
+                await _addSharedProjectsToActiveList(sharedProjects);
+              }
+              
               return Result.success(null);
             },
             failure: (failure) async {
@@ -445,9 +454,33 @@ class UserSyncService {
               failure: (_) => null,
             );
             
+            AppLogger.debug('UserSyncService: Downloaded preferences with ETag: $currentEtag');
+            
             // Save preferences with the current etag to avoid sync loops
             final preferencesWithEtag = preferences.copyWith(etag: currentEtag);
-            await _userRepository.saveUserPreferencesWithoutSync(preferencesWithEtag);
+            final saveResult = await _userRepository.saveUserPreferencesWithoutSync(preferencesWithEtag);
+            
+            AppLogger.debug('UserSyncService: Save result: ${saveResult.when(success: (_) => 'success', failure: (f) => 'failure: ${f.message}')}');
+            
+            // Verify the ETag was saved correctly
+            final verifyEtagResult = await _userRepository.getEtag();
+            final savedEtag = verifyEtagResult.when(
+              success: (etag) => etag,
+              failure: (_) => null,
+            );
+            AppLogger.debug('UserSyncService: Verified saved ETag: $savedEtag');
+            
+            // Activate calendars for the downloaded project order to update UI
+            await _activateCalendarsFromProjectOrder(preferencesWithEtag);
+            
+            // Notify that preferences have been updated
+            if (_onPreferencesUpdated != null) {
+              AppLogger.debug('UserSyncService: Notifying preferences update - callback available');
+              _onPreferencesUpdated!();
+              AppLogger.debug('UserSyncService: Preferences update notification sent');
+            } else {
+              AppLogger.warning('UserSyncService: Preferences updated but no callback set');
+            }
             
             // Note: Calendar activation is not done during download to keep downloads read-only
             // Calendar activation should happen through user actions or separate sync operations
@@ -663,6 +696,51 @@ class UserSyncService {
         .toList();
         
     return (accounts, calendars);
+  }
+
+  /// Add new shared projects to the active synced list
+  Future<void> _addSharedProjectsToActiveList(List<SharedWithMeProject> newSharedProjects) async {
+    final currentPreferencesResult = await _userRepository.getUserPreferences();
+    final currentPreferences = currentPreferencesResult.when(
+      success: (prefs) => prefs,
+      failure: (_) => UserPreferences.defaultPreferences(),
+    );
+
+    // Add new shared projects to active synced list (project order and synced projects)
+    final updatedProjectOrder = [...currentPreferences.projectOrder];
+    final updatedSyncedProjects = [...currentPreferences.syncedProjects];
+    
+    for (final newProject in newSharedProjects) {
+      // Add to project order if not already there
+      if (!updatedProjectOrder.contains(newProject.projectId)) {
+        updatedProjectOrder.add(newProject.projectId);
+        AppLogger.info('UserSyncService: Added shared project ${newProject.projectId} to active synced list');
+      }
+      
+      // Add to synced projects if not already there
+      if (!updatedSyncedProjects.contains(newProject.projectId)) {
+        updatedSyncedProjects.add(newProject.projectId);
+        AppLogger.info('UserSyncService: Added shared project ${newProject.projectId} to synced projects list');
+      }
+    }
+    
+    final updatedPreferences = currentPreferences.copyWith(
+      projectOrder: updatedProjectOrder,
+      syncedProjects: updatedSyncedProjects,
+    );
+    
+    await _userRepository.saveUserPreferencesWithoutSync(updatedPreferences);
+    AppLogger.info('UserSyncService: Added ${newSharedProjects.length} new shared projects to active synced list');
+    
+    // Activate calendars for the updated project order to update UI
+    await _activateCalendarsFromProjectOrder(updatedPreferences);
+  }
+
+  /// Set callback to be called when preferences are updated from server
+  void setPreferencesUpdateCallback(void Function() callback) {
+    AppLogger.debug('UserSyncService: Setting preferences update callback');
+    _onPreferencesUpdated = callback;
+    AppLogger.debug('UserSyncService: Preferences update callback set successfully');
   }
 
   /// Get last sync time
