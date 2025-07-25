@@ -86,7 +86,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          flowitValidator: 'default',
+          flowitValidator: '{"type":"default"}',
         ),
         Task(
           uid: 'task-2',
@@ -97,7 +97,7 @@ void main() {
           created: DateTime.now(),
           dtstamp: DateTime.now(),
           due: DateTime.now().add(const Duration(days: 1)),
-          flowitValidator: 'default',
+          flowitValidator: '{"type":"default"}',
         ),
       ];
     });
