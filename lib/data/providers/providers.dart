@@ -289,6 +289,20 @@ final statusServiceProvider = Provider<StatusService>((ref) {
   return StatusService(calendarRepository, localStorageService);
 });
 
+// Available domains provider - watches calendar changes to update domain list
+final availableDomainsProvider = FutureProvider<List<String>>((ref) async {
+  final domainService = ref.watch(domainServiceProvider);
+  
+  // Watch calendar list to refresh domains when calendars change
+  ref.watch(calendarListProvider);
+  
+  final result = await domainService.getAvailableDomains();
+  return result.when(
+    success: (domains) => domains,
+    failure: (failure) => <String>[],
+  );
+});
+
 // Export/Import service provider
 final exportImportServiceProvider = Provider<ExportImportService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);

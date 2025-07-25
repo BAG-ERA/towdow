@@ -49,17 +49,12 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
     // Only show selected state on desktop, not on mobile
     final isSelected = widget.isDesktop && GoRouterState.of(context).uri.path == '/project/${Uri.encodeComponent(widget.project.path)}';
     
-    // Calculate percentage completed for this project
-    final taskListAsync = ref.watch(taskListProvider);
-    final completionData = taskListAsync.when(
+    // Calculate percentage completed for this project using project-specific provider
+    final projectTasksAsync = ref.watch(projectTasksProvider(widget.project.path));
+    final completionData = projectTasksAsync.when(
       data: (tasks) {
-        // Encode project path to match task storage format
-        final encodedProjectPath = widget.project.path.replaceAll('@', '%40');
-        final projectTasks = tasks.where((task) {
-          return task.projectPath == encodedProjectPath;
-        });
-        final totalTasks = projectTasks.length;
-        final completedTasks = projectTasks.where((task) => task.status == 'COMPLETED').length;
+        final totalTasks = tasks.length;
+        final completedTasks = tasks.where((task) => task.status == 'COMPLETED').length;
         final percentage = totalTasks > 0 ? (completedTasks / totalTasks * 100).round() : 0;
         return {'total': totalTasks, 'percentage': percentage};
       },

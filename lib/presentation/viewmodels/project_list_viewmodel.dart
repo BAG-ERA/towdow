@@ -5,13 +5,11 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/logger.dart';
 import '../../data/models/task_calendar.dart';
-import '../../data/models/task.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/user_repository.dart';
 import '../../data/services/user_sync_service.dart';
-import '../../data/providers/providers.dart';
 
 // Project with associated statistics
 class ProjectWithStats {
@@ -292,6 +290,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   
   // Stream subscription for repository changes
   StreamSubscription? _calendarSubscription;
+  Timer? _debounceTimer;
 
   ProjectListViewModel(
     this._calendarRepository,
@@ -310,7 +309,13 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     _calendarSubscription = _calendarRepository.watchCalendars().listen((calendars) {
       // Only reload if the ViewModel is still mounted
       if (mounted) {
-        loadProjects();
+        // Debounce rapid changes to prevent excessive reloads during sync
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            loadProjects();
+          }
+        });
       }
     });
   }
@@ -319,6 +324,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   void dispose() {
     // Cancel the stream subscription to prevent memory leaks
     _calendarSubscription?.cancel();
+    // Cancel the debounce timer to prevent memory leaks
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -329,7 +336,12 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     // Check if still mounted before updating state
     if (!mounted) return;
     
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(
+      isLoading: true, 
+      error: null,
+      // Preserve domain expanded state to prevent UI reset
+      domainExpandedState: state.domainExpandedState,
+    );
     
     try {
       await loadProjects();
@@ -340,7 +352,10 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
       if (mounted) {
         state = state.copyWith(
           isLoading: false,
+          isRefreshing: false,
           error: 'Failed to initialize: $e',
+          // Preserve domain expanded state to prevent UI reset
+          domainExpandedState: state.domainExpandedState,
         );
       }
     }
@@ -428,6 +443,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
             activeProjects: activeProjects,
             isLoading: false,
             isRefreshing: false,
+            // Preserve domain expanded state to prevent UI reset
+            domainExpandedState: state.domainExpandedState,
           );
           
           // AppLogger.info('ProjectListViewModel: Loaded $totalProjects projects ($completedProjects completed, $activeProjects active)');
@@ -440,6 +457,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
               isLoading: false,
               isRefreshing: false,
               error: 'Failed to load projects: ${failure.message}',
+              // Preserve domain expanded state to prevent UI reset
+              domainExpandedState: state.domainExpandedState,
             );
           }
         },
@@ -452,6 +471,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           isLoading: false,
           isRefreshing: false,
           error: 'Failed to load projects: $e',
+          // Preserve domain expanded state to prevent UI reset
+          domainExpandedState: state.domainExpandedState,
         );
       }
     }
@@ -464,7 +485,12 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     // Check if still mounted before updating state
     if (!mounted) return;
     
-    state = state.copyWith(isRefreshing: true, error: null);
+    state = state.copyWith(
+      isRefreshing: true, 
+      error: null,
+      // Preserve domain expanded state to prevent UI reset
+      domainExpandedState: state.domainExpandedState,
+    );
     
     try {
       // Reload projects - sync is handled by repositories
@@ -476,6 +502,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         state = state.copyWith(
           isRefreshing: false,
           error: 'Failed to refresh: $e',
+          // Preserve domain expanded state to prevent UI reset
+          domainExpandedState: state.domainExpandedState,
         );
       }
     }
@@ -516,6 +544,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
       state = state.copyWith(
         searchQuery: '',
         filter: ProjectFilter.all,
+        // Preserve domain expanded state to prevent UI reset
+        domainExpandedState: state.domainExpandedState,
       );
     }
   }
@@ -597,7 +627,11 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
               await _removeProjectFromUserOrder(projectPath);
               // Remove from local state
               final updatedProjects = state.projects.where((p) => p.project.path != projectPath).toList();
-              state = state.copyWith(projects: updatedProjects);
+              state = state.copyWith(
+                projects: updatedProjects,
+                // Preserve domain expanded state to prevent UI reset
+                domainExpandedState: state.domainExpandedState,
+              );
             },
             failure: (failure) async {
               AppLogger.error('ProjectListViewModel: Failed to delete project locally', failure.exception, failure.stackTrace);

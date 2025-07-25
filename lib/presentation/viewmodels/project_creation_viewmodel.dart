@@ -112,10 +112,6 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
         );
       }
       
-      // Invalidate providers so UI refreshes
-      _ref.invalidate(projectListProvider);
-      _ref.invalidate(calendarListProvider);
-      _ref.invalidate(activeCalendarListProvider);
       
       // Also refresh the project list view model to ensure it picks up the new project
       final projectListViewModel = _ref.read(projectListViewModelProvider.notifier);

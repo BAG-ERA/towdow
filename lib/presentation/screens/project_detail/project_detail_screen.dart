@@ -22,28 +22,34 @@ import '../../widgets/project_detail/project_kanban_view.dart';
 import '../../widgets/utils/editable_title.dart';
 import '../../../data/services/webdav_client.dart';
 
-// Provider for a specific project/calendar that automatically refreshes when repository data changes
-final projectProvider = FutureProvider.family<TaskCalendar?, String>((ref, projectPath) async {
+// Provider for a specific project/calendar that watches only this specific calendar
+final projectProvider = StreamProvider.family<TaskCalendar?, String>((ref, projectPath) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
-  
-  // Also watch the calendar list stream to trigger refresh when any calendar changes
-  ref.watch(calendarListProvider);
   
   // Encode special characters in the project path to match storage format
   final encodedProjectPath = projectPath.replaceAll('@', '%40');
   
-  // Try to get by path since projectPath is the actual path, not ID
-  final result = await calendarRepository.getByPath(encodedProjectPath);
-  return result.when(
-    success: (calendar) {
-      AppLogger.debug('ProjectDetailScreen: Loaded project for path $projectPath (encoded: $encodedProjectPath): ${calendar?.displayName}');
+  // Watch all calendars and filter for just this one
+  return calendarRepository.watchCalendars().asyncMap((calendars) async {
+    // Find the specific calendar by path
+    try {
+      final calendar = calendars.cast<TaskCalendar?>().firstWhere(
+        (cal) => cal?.path == encodedProjectPath,
+        orElse: () => null,
+      );
+      
+      if (calendar != null) {
+        AppLogger.debug('ProjectDetailScreen: Found project for path $projectPath: ${calendar.displayName}');
+      } else {
+        AppLogger.debug('ProjectDetailScreen: Project not found for path $projectPath (encoded: $encodedProjectPath)');
+      }
+      
       return calendar;
-    },
-    failure: (failure) {
-      AppLogger.error('ProjectDetailScreen: Failed to load project $projectPath (encoded: $encodedProjectPath): ${failure.message}');
+    } catch (e) {
+      AppLogger.error('ProjectDetailScreen: Error finding project $projectPath: $e');
       return null;
-    },
-  );
+    }
+  });
 });
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
