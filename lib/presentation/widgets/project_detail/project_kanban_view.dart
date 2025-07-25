@@ -9,6 +9,7 @@ import '../../../data/models/category.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../widgets/kanban_board.dart';
+import '../utils/popup/task_creation_dialog.dart';
 
 class ProjectKanbanView extends ConsumerWidget {
   final String projectPath;
@@ -246,44 +247,15 @@ class ProjectKanbanView extends ConsumerWidget {
   }
 
   Future<void> _addTaskToCategory(BuildContext context, WidgetRef ref, String? category) async {
-    final textController = TextEditingController();
-    
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(category != null 
-            ? 'Add Task to "$category"' 
-            : 'Add Uncategorized Task'),
-        content: TextField(
-          controller: textController,
-          decoration: const InputDecoration(
-            hintText: 'Enter task summary',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(textController.text.trim()),
-            child: const Text('Add'),
-          ),
-        ],
+      builder: (context) => TaskCreationDialog(
+        projectPath: projectPath,
+        initialCategories: category != null ? [category] : null,
       ),
     );
     
     if (result != null && result.isNotEmpty) {
-      final taskViewModel = ref.read(taskViewModelProvider.notifier);
-      await taskViewModel.createTask(
-        summary: result,
-        projectPath: projectPath,
-      );
-      
-      // TODO: After creation, we would need to update the task with the category
-      // This would require additional API to update task categories
-      
       onTasksRefresh?.call();
       
       if (context.mounted) {

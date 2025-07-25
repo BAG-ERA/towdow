@@ -101,6 +101,9 @@ void main() {
         displayName: 'Test Project',
         description: 'Test Description',
         uid: anyNamed('uid'),
+        domain: anyNamed('domain'),
+        kanban: anyNamed('kanban'),
+        categ: anyNamed('categ'),
       )).thenAnswer((_) async => Result.success(testCalendar));
 
       when(mockCalendarRepository.save(testCalendar))
@@ -127,6 +130,9 @@ void main() {
         displayName: 'Test Project',
         description: 'Test Description',
         uid: anyNamed('uid'),
+        domain: anyNamed('domain'),
+        kanban: anyNamed('kanban'),
+        categ: anyNamed('categ'),
       )).thenAnswer((_) async => Result.failure(const Failure(message: 'Calendar creation failed')));
 
       // Add stub for generateCalendarPath which is called when server creation fails
@@ -155,6 +161,9 @@ void main() {
         displayName: 'Test Project',
         description: 'Test Description',
         uid: anyNamed('uid'),
+        domain: anyNamed('domain'),
+        kanban: anyNamed('kanban'),
+        categ: anyNamed('categ'),
       )).thenAnswer((_) async => Result.success(testCalendar));
 
       when(mockCalendarRepository.save(testCalendar))
@@ -176,6 +185,9 @@ void main() {
         displayName: 'Test Project',
         description: 'Test Description',
         uid: anyNamed('uid'),
+        domain: anyNamed('domain'),
+        kanban: anyNamed('kanban'),
+        categ: anyNamed('categ'),
       )).called(1);
     });
 
@@ -184,6 +196,9 @@ void main() {
         displayName: 'Test Project',
         description: 'Test Description',
         uid: anyNamed('uid'),
+        domain: anyNamed('domain'),
+        kanban: anyNamed('kanban'),
+        categ: anyNamed('categ'),
       )).thenAnswer((_) async => Result.success(testCalendar));
 
       when(mockCalendarRepository.save(testCalendar))
@@ -211,6 +226,9 @@ void main() {
         displayName: 'Test Project',
         description: 'Test Description',
         uid: anyNamed('uid'),
+        domain: anyNamed('domain'),
+        kanban: anyNamed('kanban'),
+        categ: anyNamed('categ'),
       )).thenAnswer((_) async => Result.success(testCalendar));
 
       when(mockCalendarRepository.save(testCalendar))
