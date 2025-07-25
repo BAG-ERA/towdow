@@ -190,7 +190,7 @@ class VTODOParser {
           organizer: organizer,
           attendees: attendees,
           percentComplete: percentComplete,
-          flowitValidator: flowitValidator ?? 'default',
+          flowitValidator: flowitValidator ?? '{"type":"default"}',
           attachments: _serializeAttachments(attachments),
           mediaAttachments: _serializeAttachments(mediaAttachments),
         );
