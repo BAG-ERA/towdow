@@ -63,6 +63,7 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
       final createResult = await caldavService.createCalendar(
         displayName: name,
         description: description,
+        domain: domain,
       );
       
       TaskCalendar? createdCalendar;
