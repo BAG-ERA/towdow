@@ -36,6 +36,9 @@ abstract class CalendarRepository {
   
   // Sync-related methods
   Future<Result<void>> updateCalendarProperties(TaskCalendar calendar);
+  
+  // Domain-related methods with sync
+  Future<Result<void>> assignDomainToCalendar(String calendarUid, String? domain);
 }
 
 // Local implementation using Hive
@@ -400,6 +403,70 @@ class LocalCalendarRepository implements CalendarRepository {
       AppLogger.error('LocalCalendarRepository: Exception updating calendar properties', e, stackTrace);
       return Result.failure(Failure(
         message: 'Failed to update calendar properties: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  @override
+  Future<Result<void>> assignDomainToCalendar(String calendarUid, String? domain) async {
+    // Get the calendar and update its domain
+    final calendarResult = await getById(calendarUid);
+    return calendarResult.when(
+      success: (calendar) async {
+        if (calendar == null) {
+          return Result.failure(const Failure(
+            message: 'Calendar not found',
+            code: 'CALENDAR_NOT_FOUND',
+          ));
+        }
+        
+        final updatedCalendar = calendar.copyWith(flowitDomain: domain);
+        
+        // Save locally first
+        final saveResult = await save(updatedCalendar);
+        if (saveResult is Error<void>) {
+          return saveResult;
+        }
+        
+        // Then queue sync to server
+        return await _queueCalendarSync(updatedCalendar);
+      },
+      failure: (failure) => Result.failure(failure),
+    );
+  }
+
+  /// Queue calendar update for server sync
+  Future<Result<void>> _queueCalendarSync(TaskCalendar calendar) async {
+    try {
+      // Use SyncService singleton to queue the calendar update
+      final syncService = SyncService.instance;
+      if (syncService != null) {
+        AppLogger.debug('CalendarRepository: Queuing calendar update for domain sync');
+        final queueResult = await syncService.queueCalendarUpdate(calendar.path);
+        
+        return await queueResult.when(
+          success: (_) async {
+            AppLogger.info('CalendarRepository: Successfully queued calendar sync to server');
+            return Result.success(null);
+          },
+          failure: (failure) async {
+            AppLogger.error('CalendarRepository: Failed to queue calendar sync: ${failure.message}');
+            return Result.failure(failure);
+          },
+        );
+      } else {
+        AppLogger.error('CalendarRepository: SyncService singleton not initialized - cannot queue update');
+        return Result.failure(Failure(
+          message: 'SyncService not initialized',
+          exception: Exception('SyncService singleton not available'),
+        ));
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('CalendarRepository: Exception during calendar sync to server', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to sync calendar to server: $e',
         exception: e is Exception ? e : Exception(e.toString()),
         stackTrace: stackTrace,
       ));

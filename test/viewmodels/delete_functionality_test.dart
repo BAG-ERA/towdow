@@ -9,14 +9,12 @@ import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
 import 'package:towdow_app/data/services/sync_service.dart';
-import 'package:towdow_app/data/services/domain_service.dart';
 import 'package:towdow_app/data/services/local_storage_service.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import 'package:towdow_app/data/services/user_sync_service.dart';
 
 @GenerateNiceMocks([
   MockSpec<LocalStorageService>(),
@@ -25,8 +23,6 @@ import 'package:towdow_app/data/services/user_sync_service.dart';
   MockSpec<AccountRepository>(),
   MockSpec<UserRepository>(),
   MockSpec<SyncService>(),
-  MockSpec<DomainService>(),
-  MockSpec<UserSyncService>(),
 ])
 import 'delete_functionality_test.mocks.dart';
 
@@ -37,8 +33,6 @@ void main() {
     late MockSyncService mockSyncService;
     late MockAccountRepository mockAccountRepository;
     late MockUserRepository mockUserRepository;
-    late MockDomainService mockDomainService;
-    late MockUserSyncService mockUserSyncService;
 
     setUp(() {
       mockCalendarRepository = MockCalendarRepository();
@@ -46,8 +40,6 @@ void main() {
       mockSyncService = MockSyncService();
       mockAccountRepository = MockAccountRepository();
       mockUserRepository = MockUserRepository();
-      mockDomainService = MockDomainService();
-      mockUserSyncService = MockUserSyncService();
 
       // Add this stub for user repository
       when(mockUserRepository.removeProjectFromOrder(any)).thenAnswer((_) async => const Result.success(null));
@@ -75,7 +67,6 @@ void main() {
           mockTaskRepository,
           mockAccountRepository,
           mockUserRepository,
-          mockUserSyncService,
         );
 
         // Set initial state with the project
@@ -124,7 +115,6 @@ void main() {
           mockTaskRepository,
           mockAccountRepository,
           mockUserRepository,
-          mockUserSyncService,
         );
 
         // Set initial state with the project
@@ -159,7 +149,6 @@ void main() {
           mockTaskRepository,
           mockAccountRepository,
           mockUserRepository,
-          mockUserSyncService,
         );
 
         // Mock getById to return null (project not found)

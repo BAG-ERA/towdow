@@ -9,7 +9,6 @@ import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../data/services/user_sync_service.dart';
 
 // Project with associated statistics
 class ProjectWithStats {
@@ -283,10 +282,8 @@ enum ProjectSort {
 class ProjectListViewModel extends StateNotifier<ProjectListState> {
   final CalendarRepository _calendarRepository;
   final TaskRepository _taskRepository;
-  // DomainService removed - domain operations now handled by repository
   final AccountRepository _accountRepository;
   final UserRepository _userRepository;
-  final UserSyncService _userSyncService;
   
   // Stream subscription for repository changes
   StreamSubscription? _calendarSubscription;
@@ -297,7 +294,6 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     this._taskRepository,
     this._accountRepository,
     this._userRepository,
-    this._userSyncService,
   ) : super(const ProjectListState()) {
     // Listen to calendar repository changes and update state automatically
     _startListeningToRepositoryChanges();
@@ -749,59 +745,17 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
 
   /// Assign domain to project
   Future<void> assignDomainToProject(String projectPath, String? domain) async {
-    // AppLogger.info('ProjectListViewModel: Assigning domain "$domain" to project $projectPath');
-    
-    // Check if still mounted before proceeding
-    if (!mounted) return;
-    
-    try {
-      state = state.copyWith(error: null);
-      
-      // Domain assignment is handled by repository updates
-      final calendarResult = await _calendarRepository.getById(projectPath);
-      await calendarResult.when(
-        success: (calendar) async {
-          if (calendar != null) {
-            final updatedCalendar = calendar.copyWith(flowitDomain: domain);
-            final result = await _calendarRepository.save(updatedCalendar);
-            await result.when(
-              success: (_) async {
-                // Reload projects to reflect the change
-                await loadProjects();
-                // Trigger immediate sync after domain assignment
-                await _triggerImmediateSync();
-              },
-              failure: (failure) async {
-                AppLogger.error('ProjectListViewModel: Failed to assign domain', failure.exception, failure.stackTrace);
-                // Check if still mounted before updating state
-                if (mounted) {
-                  state = state.copyWith(error: 'Failed to assign domain: ${failure.message}');
-                }
-              },
-            );
-          } else {
-            AppLogger.error('ProjectListViewModel: Project not found for domain assignment');
-            // Check if still mounted before updating state
-            if (mounted) {
-              state = state.copyWith(error: 'Project not found');
-            }
-          }
-        },
-        failure: (failure) async {
-          AppLogger.error('ProjectListViewModel: Failed to get project for domain assignment', failure.exception, failure.stackTrace);
-          // Check if still mounted before updating state
-          if (mounted) {
-            state = state.copyWith(error: 'Failed to get project: ${failure.message}');
-          }
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('ProjectListViewModel: Exception assigning domain', e, stackTrace);
-      // Check if still mounted before updating state
-      if (mounted) {
-        state = state.copyWith(error: 'Failed to assign domain: $e');
-      }
-    }
+    // Use repository method that handles both local save and server sync
+    final result = await _calendarRepository.assignDomainToCalendar(projectPath, domain);
+    await result.when(
+      success: (_) async {
+        AppLogger.info('ProjectListViewModel: Domain assigned successfully');
+      },
+      failure: (failure) async {
+        AppLogger.error('ProjectListViewModel: Failed to assign domain', failure.exception, failure.stackTrace);
+        throw Exception(failure.message);
+      },
+    );
   }
 
   /// Reorder project to a new position in the user's custom ordering
@@ -822,8 +776,6 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           if (state.sortBy == ProjectSort.custom) {
             await loadProjects();
           }
-          // Trigger immediate sync after reordering
-          await _triggerImmediateSync();
         },
         failure: (failure) async {
           AppLogger.error('ProjectListViewModel: Failed to reorder project', failure.exception, failure.stackTrace);
@@ -986,10 +938,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     }
   }
 
-  /// Trigger immediate sync after reordering
-  Future<void> _triggerImmediateSync() async {
-    await _userSyncService.uploadUserData();
-  }
+
 
   /// Build domain groups from projects
   List<DomainGroup> _buildDomainGroups(List<ProjectWithStats> projects) {

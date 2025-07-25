@@ -14,9 +14,7 @@ import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
-import 'package:towdow_app/data/services/domain_service.dart';
 import 'package:towdow_app/data/services/sync_service.dart';
-import 'package:towdow_app/data/services/user_sync_service.dart';
 import 'package:towdow_app/presentation/viewmodels/project_list_viewmodel.dart';
 
 import 'project_list_viewmodel_test.mocks.dart';
@@ -25,7 +23,6 @@ import 'project_list_viewmodel_test.mocks.dart';
   CalendarRepository,
   TaskRepository,
   SyncService,
-  DomainService,
   AccountRepository,
   UserRepository,
 ])
@@ -39,10 +36,8 @@ void main() {
     late MockCalendarRepository mockCalendarRepository;
     late MockTaskRepository mockTaskRepository;
     late MockSyncService mockSyncService;
-    late MockDomainService mockDomainService;
     late MockAccountRepository mockAccountRepository;
     late MockUserRepository mockUserRepository;
-    late MockUserSyncService mockUserSyncService;
 
     late List<TaskCalendar> testCalendars;
     late List<Task> testTasks;
@@ -51,10 +46,8 @@ void main() {
       mockCalendarRepository = MockCalendarRepository();
       mockTaskRepository = MockTaskRepository();
       mockSyncService = MockSyncService();
-      mockDomainService = MockDomainService();
       mockAccountRepository = MockAccountRepository();
       mockUserRepository = MockUserRepository();
-      mockUserSyncService = MockUserSyncService();
 
       // Create test data first
       testCalendars = [
@@ -102,7 +95,6 @@ void main() {
         mockTaskRepository,
         mockAccountRepository,
         mockUserRepository,
-        mockUserSyncService,
       );
     });
 
