@@ -430,22 +430,11 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
     final value = validator['value'] as String? ?? '';
     final validatorId = validator['id'] as String;
     
-    return TextField(
-      controller: TextEditingController(text: value),
-      onChanged: validatorState.canInteract 
-          ? (newValue) => _updateFreeField(validatorId, newValue)
-          : null,
+    return _FreeFieldValidatorWidget(
+      initialValue: value,
+      validatorId: validatorId,
       enabled: validatorState.canInteract,
-      decoration: InputDecoration(
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-        ),
-        hintText: 'Enter text...',
-      ),
-      style: const TextStyle(fontSize: 13),
-      maxLines: null,
+      onValueChanged: _updateFreeField,
     );
   }
 
@@ -604,6 +593,70 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
         ref.read(validatorViewModelProvider(widget.task.uid).notifier)
             .updateValidatorState(validatorId, updateData);
       },
+    );
+  }
+}
+
+/// Stateful widget for free field validators to properly manage TextEditingController
+class _FreeFieldValidatorWidget extends StatefulWidget {
+  final String initialValue;
+  final String validatorId;
+  final bool enabled;
+  final Function(String validatorId, String newValue) onValueChanged;
+
+  const _FreeFieldValidatorWidget({
+    required this.initialValue,
+    required this.validatorId,
+    required this.enabled,
+    required this.onValueChanged,
+  });
+
+  @override
+  State<_FreeFieldValidatorWidget> createState() => _FreeFieldValidatorWidgetState();
+}
+
+class _FreeFieldValidatorWidgetState extends State<_FreeFieldValidatorWidget> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void didUpdateWidget(_FreeFieldValidatorWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update controller text when initial value changes (e.g., when widget is reused for different validator)
+    if (oldWidget.initialValue != widget.initialValue) {
+      _controller.text = widget.initialValue;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      onChanged: widget.enabled 
+          ? (newValue) => widget.onValueChanged(widget.validatorId, newValue)
+          : null,
+      enabled: widget.enabled,
+      decoration: InputDecoration(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+        ),
+        hintText: 'Enter text...',
+      ),
+      style: const TextStyle(fontSize: 13),
+      maxLines: null,
     );
   }
 } 
