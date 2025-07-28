@@ -94,16 +94,19 @@ class UserSyncService {
           // Get current user preferences to preserve existing acknowledgments
           final currentPreferencesResult = await _userRepository.getUserPreferences();
           final currentAcknowledgments = <String, bool>{};
+          UserPreferences? currentPreferences;
           
           await currentPreferencesResult.when(
-            success: (currentPreferences) async {
+            success: (prefs) async {
+              currentPreferences = prefs;
               // Build map of existing acknowledgments
-              for (final existingProject in currentPreferences.sharedWithMeProjects) {
+              for (final existingProject in prefs.sharedWithMeProjects) {
                 currentAcknowledgments[existingProject.projectId] = existingProject.ack;
               }
             },
             failure: (_) async {
               // If we can't get current preferences, continue with defaults
+              currentPreferences = null;
             },
           );
 
@@ -118,10 +121,40 @@ class UserSyncService {
             )
           ).toList();
 
-          // Update user repository with shared projects
+          // Update user repository with shared projects and user principal
           final updateResult = duringDownload 
               ? await _userRepository.updateSharedWithMeProjectsWithoutSync(sharedProjects)
               : await _userRepository.updateSharedWithMeProjects(sharedProjects);
+          
+          // Also update the user principal in preferences
+          await updateResult.when(
+            success: (_) async {
+              // Get current preferences to update user principal
+              final currentPrefsResult = await _userRepository.getUserPreferences();
+              await currentPrefsResult.when(
+                success: (currentPrefs) async {
+                  final updatedPrefs = currentPrefs.copyWith(userPrincipal: account.username);
+                  if (duringDownload) {
+                    await _userRepository.saveUserPreferencesWithoutSync(updatedPrefs);
+                  } else {
+                    await _userRepository.saveUserPreferences(updatedPrefs);
+                  }
+                },
+                failure: (_) async {
+                  // If we can't get current preferences, create new ones with user principal
+                  final newPrefs = UserPreferences.defaultPreferences().copyWith(userPrincipal: account.username);
+                  if (duringDownload) {
+                    await _userRepository.saveUserPreferencesWithoutSync(newPrefs);
+                  } else {
+                    await _userRepository.saveUserPreferences(newPrefs);
+                  }
+                },
+              );
+            },
+            failure: (_) async {
+              // Don't update user principal if shared projects update failed
+            },
+          );
           return await updateResult.when(
             success: (_) async {
               AppLogger.info('UserSyncService: Successfully updated ${sharedProjects.length} shared projects');
@@ -633,6 +666,7 @@ class UserSyncService {
       'defaultProjectView': preferences.defaultProjectView,
       'customSettings': preferences.customSettings,
       'syncedProjects': preferences.syncedProjects,
+      'userPrincipal': preferences.userPrincipal,
       'sharedWithMeProjects': preferences.sharedWithMeProjects.map((project) => {
         'projectId': project.projectId,
         'allTasks': project.allTasks,
@@ -668,6 +702,7 @@ class UserSyncService {
       defaultProjectView: json['defaultProjectView'] as String?,
       customSettings: json['customSettings'] as Map<String, dynamic>?,
       syncedProjects: (json['syncedProjects'] as List<dynamic>?)?.cast<String>() ?? [],
+      userPrincipal: json['userPrincipal'] as String?,
       sharedWithMeProjects: sharedProjects,
     );
   }
