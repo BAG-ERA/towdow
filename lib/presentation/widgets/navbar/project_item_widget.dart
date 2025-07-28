@@ -12,6 +12,7 @@ import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../utils/popup/move_to_domain_dialog.dart';
 import '../utils/popup/project_sharing_dialog.dart';
+import '../utils/mobile_delayed_draggable_project.dart';
 import 'drag_state_provider.dart';
 import 'project_popup_menu.dart';
 
@@ -220,11 +221,8 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
                 ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
                 : Colors.transparent,
           ),
-          child: Draggable<ProjectDragData>(
-            data: ProjectDragData(
-              project: widget.project,
-              currentDomain: widget.project.flowitDomain,
-            ),
+          child: MobileDelayedDraggableProject(
+            project: widget.project,
             feedback: _buildDragFeedback(context),
             childWhenDragging: Opacity(
               opacity: 0.5,

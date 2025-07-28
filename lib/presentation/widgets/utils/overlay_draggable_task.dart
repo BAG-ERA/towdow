@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../data/models/task.dart';
 import '../task_item/task_item.dart';
+import 'mobile_delayed_draggable.dart';
 
 class OverlayDraggableTask extends StatefulWidget {
   final Task task;
@@ -30,8 +31,8 @@ class _OverlayDraggableTaskState extends State<OverlayDraggableTask> {
 
   @override
   Widget build(BuildContext context) {
-    return Draggable<Task>(
-      data: widget.task,
+    return MobileDelayedDraggableTask(
+      task: widget.task,
       feedback: const SizedBox.shrink(), // KEY: Empty feedback to prevent double rendering
       onDragStarted: _onDragStarted,
       onDragUpdate: _onDragUpdate,

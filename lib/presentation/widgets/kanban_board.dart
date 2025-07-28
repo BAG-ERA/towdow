@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task.dart';
 import 'task_item/task_item.dart';
+import 'utils/mobile_delayed_draggable.dart';
 
 class KanbanColumn {
   final String id;
@@ -256,8 +257,8 @@ class KanbanColumnWidget extends ConsumerWidget {
                                   final task = column.tasks[index];
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 8),
-                                    child: Draggable<Task>(
-                                      data: task,
+                                    child: MobileDelayedDraggableTask(
+                                      task: task,
                                       feedback: Material(
                                         elevation: 4,
                                         borderRadius: BorderRadius.circular(8),
