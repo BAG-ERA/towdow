@@ -6,8 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'navbar/app_sidebar.dart';
+import 'navbar/project_popup_menu.dart';
 import '../../data/models/task_calendar.dart';
+import '../../data/providers/providers.dart';
 import 'utils/editable_title.dart';
+import 'utils/popup/move_to_domain_dialog.dart';
+import 'utils/popup/project_sharing_dialog.dart';
 
 // Provider for dynamic mobile title (used by detail screens)
 final mobileTitleProvider = StateProvider<String?>((ref) => null);
@@ -225,7 +229,10 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
             onPressed: () => Scaffold.of(context).openDrawer(),
             tooltip: 'Back to navigation',
           ),
-                  ),
+        ),
+        actions: location.startsWith('/project/') 
+            ? [_buildMobileProjectMenu(context, ref)]
+            : null,
       ) : null,
       drawer: _buildMobileDrawer(context),
       body: SafeArea(
@@ -270,5 +277,184 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     // Fallback to regular title
     final title = ref.watch(mobileTitleProvider) ?? 'Project Details';
     return Text(title);
+  }
+
+  Widget _buildMobileProjectMenu(BuildContext context, WidgetRef ref) {
+    final project = ref.watch(mobileProjectProvider);
+    
+    if (project == null) {
+      return const SizedBox.shrink();
+    }
+    
+    return ProjectPopupMenu(
+      onMenuAction: (action) => _handleMobileProjectMenuAction(context, ref, action),
+    );
+  }
+
+  void _handleMobileProjectMenuAction(BuildContext context, WidgetRef ref, String action) {
+    final project = ref.read(mobileProjectProvider);
+    if (project == null) return;
+
+    switch (action) {
+      case 'move_to_domain':
+        _showMoveToDomainDialog(context, project);
+        break;
+      case 'share_project':
+        _showProjectSharingDialog(context, project);
+        break;
+      case 'archive_project':
+        _handleArchiveProject(context, ref, project);
+        break;
+      case 'delete_project':
+        _showDeleteConfirmation(context, ref, project);
+        break;
+    }
+  }
+
+  void _showMoveToDomainDialog(BuildContext context, TaskCalendar project) {
+    // Import and use the existing dialog
+    showDialog(
+      context: context,
+      builder: (context) => MoveToDomainDialog(project: project),
+    );
+  }
+
+  void _showProjectSharingDialog(BuildContext context, TaskCalendar project) {
+    // Import and use the existing dialog
+    showDialog(
+      context: context,
+      builder: (context) => ProjectSharingDialog(project: project),
+    );
+  }
+
+  void _handleArchiveProject(BuildContext context, WidgetRef ref, TaskCalendar project) async {
+    try {
+      final statusService = ref.read(statusServiceProvider);
+      final result = await statusService.archiveCalendar(project.path);
+      
+      result.when(
+        success: (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Project "${project.displayName}" archived successfully'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () => _handleUnarchiveProject(context, ref, project),
+              ),
+            ),
+          );
+        },
+        failure: (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to archive project: ${failure.message}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to archive project: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  void _handleUnarchiveProject(BuildContext context, WidgetRef ref, TaskCalendar project) async {
+    try {
+      final statusService = ref.read(statusServiceProvider);
+      final result = await statusService.unarchiveCalendar(project.path);
+      
+      result.when(
+        success: (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Project "${project.displayName}" unarchived successfully'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        },
+        failure: (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to unarchive project: ${failure.message}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to unarchive project: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  void _showDeleteConfirmation(BuildContext context, WidgetRef ref, TaskCalendar project) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Delete Project'),
+        content: Text(
+          'Are you sure you want to delete "${project.displayName}"? This action cannot be undone and will remove all associated tasks.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _deleteProject(context, ref, project);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteProject(BuildContext context, WidgetRef ref, TaskCalendar project) async {
+    try {
+      final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+      await projectListViewModel.deleteProject(project.path);
+      
+      // Navigate away from project if currently viewing it
+      final currentRoute = GoRouterState.of(context).uri.path;
+      if (currentRoute == '/project/${Uri.encodeComponent(project.path)}') {
+        context.go('/');
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Project "${project.displayName}" deleted successfully'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete project: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            onPressed: () {},
+          ),
+        ),
+      );
+    }
   }
 } 
