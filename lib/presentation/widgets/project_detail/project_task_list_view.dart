@@ -10,7 +10,6 @@ import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../../core/theme/chart_theme.dart';
-import '../../viewmodels/task_viewmodel.dart';
 
 class ProjectTaskListView extends ConsumerStatefulWidget {
   final String projectPath;
@@ -30,7 +29,6 @@ class ProjectTaskListView extends ConsumerStatefulWidget {
 
 class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
   final Map<String, Map<String, TaskItemController>> _sectionControllers = {};
-  final Map<String, bool> _sectionExpandedStates = {};
 
   @override
   Widget build(BuildContext context) {
@@ -184,24 +182,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
     );
   }
 
-  void _initializeControllers(String sectionKey, List<Task> tasks) {
-    if (!_sectionControllers.containsKey(sectionKey)) {
-      _sectionControllers[sectionKey] = {};
-    }
-    
-    final currentControllers = _sectionControllers[sectionKey]!;
-    final newControllers = <String, TaskItemController>{};
-    
-    for (final task in tasks) {
-      newControllers[task.uid] = currentControllers[task.uid] ?? TaskItemController();
-    }
-    
-    _sectionControllers[sectionKey] = newControllers;
-  }
-
   Widget _buildSectionHeader(BuildContext context, String title, String sectionKey, int count, Color color) {
-    final isExpanded = _sectionExpandedStates[sectionKey] ?? false;
-    
     return Row(
       children: [
         Container(
@@ -222,7 +203,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
         ),
         const SizedBox(width: 16),
         TextButton(
-          onPressed: () => _expandAllInSection(sectionKey),
+          onPressed: () => _expandAllTasks(),
           style: TextButton.styleFrom(
             foregroundColor: Colors.grey.shade600,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -233,7 +214,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
         ),
         const SizedBox(width: 8),
         TextButton(
-          onPressed: () => _collapseAllInSection(sectionKey),
+          onPressed: () => _collapseAllTasks(),
           style: TextButton.styleFrom(
             foregroundColor: Colors.grey.shade600,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -242,33 +223,65 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
           ),
           child: const Text('Collapse All', style: TextStyle(fontSize: 12)),
         ),
-      ],
-    );
+              ],
+      );
+    }
+
+    void _initializeControllers(String sectionKey, List<Task> tasks) {
+      if (!_sectionControllers.containsKey(sectionKey)) {
+        _sectionControllers[sectionKey] = {};
+      }
+      
+      final currentControllers = _sectionControllers[sectionKey]!;
+      
+      // Preserve existing controllers and add new ones for new tasks
+      for (final task in tasks) {
+        if (!currentControllers.containsKey(task.uid)) {
+          currentControllers[task.uid] = TaskItemController();
+          AppLogger.debug('ProjectTaskListView: Created new controller for task ${task.summary} in section $sectionKey');
+        }
+      }
+      
+      // Remove controllers for tasks that no longer exist in this section
+      final taskUids = tasks.map((task) => task.uid).toSet();
+      currentControllers.removeWhere((uid, controller) {
+        if (!taskUids.contains(uid)) {
+          AppLogger.debug('ProjectTaskListView: Removed controller for task $uid in section $sectionKey');
+          return true;
+        }
+        return false;
+      });
+      
+      AppLogger.debug('ProjectTaskListView: Section $sectionKey now has ${currentControllers.length} controllers');
+    }
+
+    void _expandAllTasks() {
+    // Force expand all tasks in all sections
+    for (final sectionKey in ['overdue', 'pending', 'completed']) {
+      final controllers = _sectionControllers[sectionKey];
+      if (controllers != null) {
+        for (final controller in controllers.values) {
+          controller.expand();
+        }
+      }
+    }
+    AppLogger.info('ProjectTaskListView: Expanded all tasks');
   }
 
-  void _expandAllInSection(String sectionKey) {
-    final controllers = _sectionControllers[sectionKey];
-    if (controllers != null) {
-      for (final controller in controllers.values) {
-        controller.expand();
+  void _collapseAllTasks() {
+    // Force collapse all tasks in all sections
+    for (final sectionKey in ['overdue', 'pending', 'completed']) {
+      final controllers = _sectionControllers[sectionKey];
+      if (controllers != null) {
+        for (final controller in controllers.values) {
+          controller.collapse();
+        }
       }
-      setState(() {
-        _sectionExpandedStates[sectionKey] = true;
-      });
     }
+    AppLogger.info('ProjectTaskListView: Collapsed all tasks');
   }
 
-  void _collapseAllInSection(String sectionKey) {
-    final controllers = _sectionControllers[sectionKey];
-    if (controllers != null) {
-      for (final controller in controllers.values) {
-        controller.collapse();
-      }
-      setState(() {
-        _sectionExpandedStates[sectionKey] = false;
-      });
-    }
-  }
+
 
   /// Builds a responsive grid layout for tasks that wraps to new rows when needed
   Widget _buildResponsiveTaskGrid(BuildContext context, String sectionKey, List<Task> tasks) {
@@ -278,8 +291,6 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
       alignment: WrapAlignment.center,
       runAlignment: WrapAlignment.center,
       children: tasks.map((task) {
-        final controller = _sectionControllers[sectionKey]?[task.uid];
-        
         return ConstrainedBox(
           constraints: const BoxConstraints(
             maxWidth: 420,
@@ -295,7 +306,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
             },
             child: TaskItem(
               task: task,
-              controller: controller,
+              controller: _sectionControllers[sectionKey]?[task.uid],
               onTap: () => _viewTask(context, task),
               onToggleComplete: () => _toggleTaskComplete(context, ref, task),
               onTaskUpdated: (updatedTask) async {
