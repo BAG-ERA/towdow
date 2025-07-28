@@ -217,7 +217,6 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _animation;
-  bool _isExpanded = false; // Domains start collapsed by default
 
   @override
   void initState() {
@@ -231,10 +230,22 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
       curve: Curves.easeInOut,
     );
     
-    if (_isExpanded) {
-      _animationController.value = 1.0;
-    } else {
-      _animationController.value = 0.0;
+    // Initialize animation based on ViewModel state
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateAnimationState();
+    });
+  }
+
+  void _updateAnimationState() {
+    final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+    final isExpanded = projectListViewModel.isDomainExpanded(widget.domain);
+    
+    // Only animate if the current state doesn't match the desired state
+    final isCurrentlyExpanded = _animationController.value == 1.0;
+    if (isExpanded && !isCurrentlyExpanded) {
+      _animationController.forward();
+    } else if (!isExpanded && isCurrentlyExpanded) {
+      _animationController.reverse();
     }
   }
 
@@ -245,14 +256,11 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
   }
 
   void _toggleExpanded() {
-    setState(() {
-      _isExpanded = !_isExpanded;
-      if (_isExpanded) {
-        _animationController.forward();
-      } else {
-        _animationController.reverse();
-      }
-    });
+    final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+    projectListViewModel.toggleDomainExpansion(widget.domain);
+    
+    // The build method will be called again due to the state change,
+    // so we don't need to manually update the animation here
   }
 
   void _deleteDomain() async {
@@ -542,6 +550,16 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
 
   @override
   Widget build(BuildContext context) {
+    // Watch the ViewModel state to trigger rebuilds when domain expansion changes
+    final projectListState = ref.watch(projectListViewModelProvider);
+    final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+    final isExpanded = projectListViewModel.isDomainExpanded(widget.domain);
+    
+    // Update animation state when expansion state changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateAnimationState();
+    });
+    
     return DragTarget<ProjectDragData>(
       onWillAcceptWithDetails: (details) {
         // Only accept projects from different domains (for domain change, not reordering)
@@ -583,7 +601,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                       child: Row(
                         children: [
                           AnimatedRotation(
-                            turns: _isExpanded ? 0.25 : 0,
+                            turns: isExpanded ? 0.25 : 0,
                             duration: const Duration(milliseconds: 200),
                             child: Icon(
                               Icons.arrow_right,
