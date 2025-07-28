@@ -17,6 +17,8 @@ import 'package:towdow_app/data/repositories/external_calendar_repository.dart';
 import 'package:towdow_app/data/services/caldav_monitor.dart';
 import 'package:towdow_app/data/services/connection_monitor_service.dart';
 import 'package:towdow_app/data/services/sync_service.dart';
+import 'package:towdow_app/data/services/user_sync_service.dart';
+import 'package:towdow_app/data/services/user_preferences_queue_service.dart';
 import 'package:towdow_app/data/services/webdav_client.dart';
 import 'package:towdow_app/core/logger.dart';
 
@@ -31,6 +33,8 @@ import 'caldav_monitor_test.mocks.dart';
   ExternalCalendarRepository,
   ConnectionMonitorService,
   SyncService,
+  UserSyncService,
+  UserPreferencesQueueService,
   WebDAVClient,
 ])
 void main() {
@@ -44,6 +48,8 @@ void main() {
     late MockExternalCalendarRepository mockExternalCalendarRepository;
     late MockConnectionMonitorService mockConnectionMonitorService;
     late MockSyncService mockSyncService;
+    late MockUserSyncService mockUserSyncService;
+    late MockUserPreferencesQueueService mockUserPreferencesQueueService;
 
     setUp(() {
       mockAccountRepository = MockAccountRepository();
@@ -54,6 +60,8 @@ void main() {
       mockExternalCalendarRepository = MockExternalCalendarRepository();
       mockConnectionMonitorService = MockConnectionMonitorService();
       mockSyncService = MockSyncService();
+      mockUserSyncService = MockUserSyncService();
+      mockUserPreferencesQueueService = MockUserPreferencesQueueService();
 
       monitor = CalDAVMonitor(
         accountRepository: mockAccountRepository,
@@ -64,6 +72,8 @@ void main() {
         externalCalendarRepository: mockExternalCalendarRepository,
         connectionMonitorService: mockConnectionMonitorService,
         syncService: mockSyncService,
+        userSyncService: mockUserSyncService,
+        userPreferencesQueueService: mockUserPreferencesQueueService,
       );
     });
 
@@ -293,6 +303,8 @@ void main() {
           externalCalendarRepository: mockExternalCalendarRepository,
           connectionMonitorService: mockConnectionMonitorService,
           syncService: mockSyncService,
+          userSyncService: mockUserSyncService,
+          userPreferencesQueueService: mockUserPreferencesQueueService,
         );
 
         when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);
