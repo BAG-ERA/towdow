@@ -357,9 +357,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       columns: columns,
       onTaskTap: (task) {
         // Navigate to task detail
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('👁️ View task: ${task.summary}')),
-        );
       },
       onTaskToggle: (task) async {
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
@@ -367,18 +364,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         
         // Refresh the tasks list
         _refreshProjectTasks(ref);
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                task.status == 'COMPLETED' 
-                    ? '✅ Task marked as incomplete' 
-                    : '✅ Task completed!',
-              ),
-            ),
-          );
-        }
       },
       onTaskUpdated: (task) async {
         await ref.read(taskViewModelProvider.notifier).updateTask(task);
@@ -391,21 +376,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         
         // Refresh the tasks list
         _refreshProjectTasks(ref);
-        
-        // Show confirmation
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Task "${task.summary}" deleted'),
-              action: SnackBarAction(
-                label: 'Undo',
-                onPressed: () {
-                  // TODO: Implement undo functionality
-                },
-              ),
-            ),
-          );
-        }
       },
     );
   }
@@ -459,12 +429,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       );
       
       ref.invalidate(projectTasksProvider(widget.projectPath));
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Task "$result" added for ${_formatAttendeeEmail(attendee)}')),
-        );
-      }
     }
   }
 
@@ -556,9 +520,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       columns: columns,
       onTaskTap: (task) {
         // Navigate to task detail
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('👁️ View task: ${task.summary}')),
-        );
       },
       onTaskToggle: (task) async {
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
@@ -566,18 +527,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         
         // Refresh the tasks list
         _refreshProjectTasks(ref);
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                task.status == 'COMPLETED' 
-                    ? '✅ Task marked as incomplete' 
-                    : '✅ Task completed!',
-              ),
-            ),
-          );
-        }
       },
       onTaskUpdated: (task) async {
         await ref.read(taskViewModelProvider.notifier).updateTask(task);
@@ -645,12 +594,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       );
       
       ref.invalidate(projectTasksProvider(widget.projectPath));
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Unassigned task "$result" added')),
-        );
-      }
     }
   }
 
@@ -667,15 +610,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         
         // Refresh the UI
         ref.invalidate(projectTasksProvider(widget.projectPath));
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Removed all attendees from "${task.summary}"'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
       } else {
         // Assign attendee to task
         final command = AssignAttendeeToTaskCommand(
@@ -687,16 +621,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         
         // Refresh the UI
         ref.invalidate(projectTasksProvider(widget.projectPath));
-        
-        final attendeeName = _formatAttendeeEmail(columnId);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Assigned "$attendeeName" to "${task.summary}"'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
       }
     } catch (error) {
       if (context.mounted) {
@@ -756,9 +680,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         tasks: tasks,
         onTaskTap: (task) {
           // Navigate to task detail
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('👁️ View task: ${task.summary}')),
-          );
         },
         onTaskToggle: (task) async {
           final taskViewModel = ref.read(taskViewModelProvider.notifier);
@@ -766,18 +687,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           
           // Refresh the tasks list
           _refreshProjectTasks(ref);
-          
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  task.status == 'COMPLETED' 
-                      ? '✅ Task marked as incomplete' 
-                      : '✅ Task completed!',
-                ),
-              ),
-            );
-          }
         },
         onTaskUpdated: (task) async {
           await ref.read(taskViewModelProvider.notifier).updateTask(task);
@@ -790,21 +699,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           
           // Refresh the tasks list
           _refreshProjectTasks(ref);
-          
-          // Show confirmation
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Task "${task.summary}" deleted'),
-                action: SnackBarAction(
-                  label: 'Undo',
-                  onPressed: () {
-                    // TODO: Implement undo functionality
-                  },
-                ),
-              ),
-            );
-          }
         },
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -840,13 +734,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           
           // Also invalidate the project list provider so navbar updates
           ref.invalidate(projectListProvider);
-          
-          // Show success message
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('✅ Project updated successfully')),
-            );
-          }
           
           // Sync changes to CalDAV server (don't wait for this)
           AppLogger.info('ProjectDetail: About to call _syncProjectToServer...');
@@ -885,15 +772,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       await syncResult.when(
         success: (_) {
           AppLogger.info('ProjectDetail: Successfully synced project metadata to server');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('☁️ Project synced to server'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
         },
         failure: (failure) {
           AppLogger.error('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');

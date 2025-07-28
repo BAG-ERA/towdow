@@ -227,11 +227,7 @@ class SettingsScreen extends ConsumerWidget {
           // Reset SyncService singleton to clean up timers and streams
           await SyncService.reset();
           
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('✅ All data cleared successfully!')),
-            );
-          }
+
 
           // Invalidate all relevant providers to clear cached data
           ref.invalidate(taskListProvider);
@@ -280,13 +276,7 @@ class SettingsScreen extends ConsumerWidget {
       final storageService = ref.read(localStorageServiceProvider);
       await storageService.debugAllBoxes();
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Storage debug info logged to console!'),
-          ),
-        );
-      }
+
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(

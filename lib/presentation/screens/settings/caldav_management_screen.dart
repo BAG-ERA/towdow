@@ -133,14 +133,6 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                       ElevatedButton.icon(
                         onPressed: () async {
                           await viewModel.saveChanges();
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('✅ Saved ${state.selectedCalendars.length} calendar selections and created projects'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          }
                         },
                         icon: const Icon(Icons.save_rounded),
                         label: Text('Save ${state.selectedCalendars.length} selections'),
@@ -539,15 +531,6 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
 
     if (confirmed && mounted) {
       await viewModel.archiveCalendar(calendar);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Archived calendar "${calendar.displayName}"'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
     }
   }
 
@@ -580,15 +563,6 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
 
     if (confirmed && mounted) {
       await viewModel.deleteCalendar(calendar);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Deleted calendar "${calendar.displayName}"'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
     }
   }
 }

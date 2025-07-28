@@ -312,9 +312,6 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
 
   void _viewTask(BuildContext context, Task task) {
     // Navigate to task detail
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('👁️ View task: ${task.summary}')),
-    );
   }
 
   Future<void> _toggleTaskComplete(BuildContext context, WidgetRef ref, Task task) async {
@@ -323,18 +320,6 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
     
     // Refresh the tasks list
     widget.onTasksRefresh?.call();
-    
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            task.status == 'COMPLETED' 
-                ? '✅ Task marked as incomplete' 
-                : '✅ Task completed!',
-          ),
-        ),
-      );
-    }
   }
 
   Future<void> _deleteTask(BuildContext context, WidgetRef ref, Task task) async {
@@ -344,20 +329,5 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
     
     // Refresh the tasks list
     widget.onTasksRefresh?.call();
-    
-    // Show confirmation
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Task "${task.summary}" deleted'),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () {
-              // TODO: Implement undo functionality
-            },
-          ),
-        ),
-      );
-    }
   }
 } 

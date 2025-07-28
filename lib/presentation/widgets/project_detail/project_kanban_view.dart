@@ -163,9 +163,6 @@ class ProjectKanbanView extends ConsumerWidget {
           : null,
       onTaskTap: (task) {
         // Navigate to task detail
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('👁️ View task: ${task.summary}')),
-        );
       },
       onTaskToggle: (task) async {
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
@@ -173,18 +170,6 @@ class ProjectKanbanView extends ConsumerWidget {
         
         // Refresh the tasks list
         onTasksRefresh?.call();
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                task.status == 'COMPLETED' 
-                    ? '✅ Task marked as incomplete' 
-                    : '✅ Task completed!',
-              ),
-            ),
-          );
-        }
       },
       onTaskUpdated: (task) async {
         await ref.read(taskViewModelProvider.notifier).updateTask(task);
@@ -196,20 +181,6 @@ class ProjectKanbanView extends ConsumerWidget {
         
         // Refresh the tasks list
         onTasksRefresh?.call();
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Task "${task.summary}" deleted'),
-              action: SnackBarAction(
-                label: 'Undo',
-                onPressed: () {
-                  // TODO: Implement undo functionality
-                },
-              ),
-            ),
-          );
-        }
       },
       onTaskMoved: (task, columnId) => _handleTaskMove(context, ref, task, columnId),
       onColumnHide: (columnId) => _handleColumnHide(context, ref, columnId),
@@ -257,13 +228,6 @@ class ProjectKanbanView extends ConsumerWidget {
     
     if (result != null && result.isNotEmpty) {
       onTasksRefresh?.call();
-      
-      if (context.mounted) {
-        final categoryText = category != null ? ' in "$category"' : ' (uncategorized)';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Task "$result" added$categoryText')),
-        );
-      }
     }
   }
 
@@ -290,16 +254,6 @@ class ProjectKanbanView extends ConsumerWidget {
       
       // Refresh the UI
       onTasksRefresh?.call();
-      
-      if (context.mounted) {
-        final columnName = columnId == 'uncategorized' ? 'Uncategorized' : columnId;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Moved "${task.summary}" to "$columnName"'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
     } catch (error) {
       AppLogger.error('ProjectKanbanView: Error moving task', error);
       if (context.mounted) {
@@ -326,19 +280,6 @@ class ProjectKanbanView extends ConsumerWidget {
       
       // Refresh the UI
       onTasksRefresh?.call();
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Hidden column "$columnId"'),
-            backgroundColor: Colors.orange,
-            action: SnackBarAction(
-              label: 'Undo',
-              onPressed: () => _handleColumnShow(context, ref, columnId),
-            ),
-          ),
-        );
-      }
     } catch (error) {
       AppLogger.error('ProjectKanbanView: Error hiding column', error);
       if (context.mounted) {
@@ -389,15 +330,6 @@ class ProjectKanbanView extends ConsumerWidget {
       
       // Refresh the UI
       onTasksRefresh?.call();
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Shown column "$columnId"'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
     } catch (error) {
       AppLogger.error('ProjectKanbanView: Error showing column', error);
       if (context.mounted) {
