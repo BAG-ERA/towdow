@@ -203,6 +203,10 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     } else if (location.startsWith('/project/')) {
       title = ref.watch(mobileTitleProvider) ?? 'Project Details';
       isDetailScreen = true;
+    } else if (location == '/' || location.startsWith('/today') || location.startsWith('/soon') || 
+               location.startsWith('/next-week') || location.startsWith('/later') || location.startsWith('/anytime')) {
+      title = 'My Tasks';
+      isDetailScreen = true;
     }    
     return Scaffold(
       key: _scaffoldKey,
