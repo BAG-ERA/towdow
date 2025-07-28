@@ -416,6 +416,7 @@ class UserSyncService {
             isPrivate: true, // User preferences are always private
             symmetricKey: 'dummy-key', // TODO: Use proper encryption key when encryption is implemented
             contentType: 'application/json',
+            skipEncryption: true, // Skip encryption for user preferences
           );
         },
         failure: (failure) async => Result.failure(failure),
@@ -437,6 +438,7 @@ class UserSyncService {
         key: _getUserPreferencesPath(s3Service),
         isPrivate: true,
         symmetricKey: 'dummy-key', // TODO: Use proper encryption key when encryption is implemented
+        skipDecryption: true, // Skip decryption for user preferences
       );
       return await downloadResult.when(
         success: (data) async {
