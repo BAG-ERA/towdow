@@ -60,78 +60,60 @@ class ProjectsSection extends ConsumerWidget {
     }
     
     // Get all available domains (including empty ones) and sort them
-    // Use projectListState as key to rebuild when state changes
+    // Watch project list state but don't use it as key to prevent widget recreation
     final projectListState = ref.watch(projectListViewModelProvider);
-    return FutureBuilder<List<String>>(
-      key: ValueKey(projectListState.hashCode),
-      future: _getAllAvailableDomains(ref),
-      builder: (context, domainsSnapshot) {
-        List<String> allDomains = [];
-        
-        if (domainsSnapshot.hasData) {
-          allDomains = domainsSnapshot.data!;
-          // Add empty domains to domainGroups
-          for (final domain in allDomains) {
-            domainGroups.putIfAbsent(domain, () => []);
-          }
-        } else {
-          // Fallback to domains that have projects
-          allDomains = domainGroups.keys.toList();
+    final availableDomainsAsync = ref.watch(availableDomainsProvider);
+    
+    final allDomains = availableDomainsAsync.when(
+      data: (domains) {
+        // Add empty domains to domainGroups
+        for (final domain in domains) {
+          domainGroups.putIfAbsent(domain, () => []);
         }
-        
-        final sortedDomains = allDomains..sort();
-        
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            
-            // Projects list
-            Expanded(
-              child: projects.isEmpty && sortedDomains.isEmpty
-                  ? _buildEmptyProjectsState(context)
-                  : ListView(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      children: [
-                        // Projects without domain (with drop target)
-                        // Always show this section to provide a drop target for removing projects from domains
-                        _NoDomainSection(
-                          projects: projectsWithoutDomain,
-                          ref: ref,
-                          showSeparator: sortedDomains.isNotEmpty,
-                          isDesktop: isDesktop,
-                        ),
-                        
-                        // Domain sections (including empty ones)
-                        ...sortedDomains.map((domain) => 
-                          _DomainSection(
-                            domain: domain,
-                            projects: domainGroups[domain]!,
-                            ref: ref,
-                            isDesktop: isDesktop,
-                          )
-                        ),
-                      ],
-                    ),
-            ),
-          ],
-        );
+        return domains;
       },
+      loading: () => domainGroups.keys.toList(), // Fallback to domains that have projects
+      error: (error, stackTrace) => domainGroups.keys.toList(), // Fallback to domains that have projects
+    );
+    
+    final sortedDomains = allDomains..sort();
+        
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        
+        // Projects list
+        Expanded(
+          child: projects.isEmpty && sortedDomains.isEmpty
+              ? _buildEmptyProjectsState(context)
+              : ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  children: [
+                    // Projects without domain (with drop target)
+                    // Always show this section to provide a drop target for removing projects from domains
+                    _NoDomainSection(
+                      projects: projectsWithoutDomain,
+                      ref: ref,
+                      showSeparator: sortedDomains.isNotEmpty,
+                      isDesktop: isDesktop,
+                    ),
+                    
+                    // Domain sections (including empty ones)
+                    ...sortedDomains.map((domain) => 
+                      _DomainSection(
+                        domain: domain,
+                        projects: domainGroups[domain]!,
+                        ref: ref,
+                        isDesktop: isDesktop,
+                      )
+                    ),
+                  ],
+                ),
+        ),
+      ],
     );
   }
   
-  Future<List<String>> _getAllAvailableDomains(WidgetRef ref) async {
-    try {
-      final domainService = ref.read(domainServiceProvider);
-      final result = await domainService.getAvailableDomains();
-      return result.when(
-        success: (domains) => domains,
-        failure: (failure) => <String>[],
-      );
-    } catch (e) {
-      return <String>[];
-    }
-  }
-
   Widget _buildEmptyProjectsState(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16),

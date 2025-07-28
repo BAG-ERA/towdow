@@ -171,7 +171,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          flowitValidator: 'default',
+          flowitValidator: '{"type":"default"}',
         );
 
         // Act
@@ -342,7 +342,7 @@ void main() {
           created: DateTime.now(),
           dtstamp: DateTime.now(),
           due: today,
-          flowitValidator: 'default',
+          flowitValidator: '{"type":"default"}',
         );
         
         final tomorrowTask = Task(
@@ -354,7 +354,7 @@ void main() {
           created: DateTime.now(),
           dtstamp: DateTime.now(),
           due: tomorrow,
-          flowitValidator: 'default',
+          flowitValidator: '{"type":"default"}',
         );
 
         // Act
@@ -383,7 +383,7 @@ void main() {
           created: DateTime.now(),
           dtstamp: DateTime.now(),
           due: DateTime.now().add(const Duration(days: 1)),
-          flowitValidator: 'default',
+          flowitValidator: '{"type":"default"}',
         );
         
         final unregisteredTask = Task(
@@ -395,7 +395,7 @@ void main() {
           created: DateTime.now(),
           dtstamp: DateTime.now(),
           // No due date
-          flowitValidator: 'default',
+          flowitValidator: '{"type":"default"}',
         );
 
         // Act
@@ -426,7 +426,7 @@ void main() {
           lastModified: DateTime.now(),
           created: DateTime.now(),
           dtstamp: DateTime.now(),
-          flowitValidator: 'default',
+          flowitValidator: '{"type":"default"}',
         ));
 
         // Act

@@ -207,8 +207,6 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
         success: (_) async {
           await _saveCalendarsAsProjects();
           
-          // Trigger user sync upload for cloud/self-hosted users
-          await _triggerUserSyncUpload();
         },
         failure: (f) async {
           state = state.copyWith(error: 'Failed to save setup: ${f.message}');
@@ -240,26 +238,6 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
 
     if (onInvalidateProjectList != null) {
       onInvalidateProjectList!();
-    }
-  }
-
-  /// Trigger user sync upload for cloud/self-hosted users
-  Future<void> _triggerUserSyncUpload() async {
-    try {
-      final syncAvailable = await _userSyncService.isSyncAvailable();
-      if (syncAvailable) {
-        final uploadResult = await _userSyncService.uploadUserData();
-        uploadResult.when(
-          success: (_) {
-            AppLogger.info('CalendarSelection: Successfully uploaded user data to S3');
-          },
-          failure: (failure) {
-            AppLogger.warning('CalendarSelection: Failed to sync user data: ${failure.message}');
-          },
-        );
-      }
-    } catch (e, stackTrace) {
-      AppLogger.error('CalendarSelection: Error triggering user sync upload', e, stackTrace);
     }
   }
 }

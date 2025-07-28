@@ -31,6 +31,7 @@ import '../services/offline_file_service.dart';
 import '../services/file_upload_queue_service.dart';
 import '../services/connection_monitor_service.dart';
 import '../services/user_sync_service.dart';
+import '../services/user_preferences_queue_service.dart';
 import '../services/caldav_monitor.dart';
 import '../../core/app_lifecycle_manager.dart';
 import 'package:flutter/material.dart';
@@ -75,6 +76,7 @@ final accountRepositoryProvider = Provider<AccountRepository>((ref) {
   return LocalAccountRepository(storageService);
 });
 
+// User repository provider
 final userRepositoryProvider = Provider<UserRepository>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
   return LocalUserRepository(storageService);
@@ -82,24 +84,55 @@ final userRepositoryProvider = Provider<UserRepository>((ref) {
 
 // User sync service provider
 final userSyncServiceProvider = Provider<UserSyncService>((ref) {
-  return UserSyncService(
+  final userSyncService = UserSyncService(
     userRepository: ref.watch(userRepositoryProvider),
     externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
     externalCalendarRepository: ref.watch(externalCalendarRepositoryProvider),
     accountRepository: ref.watch(accountRepositoryProvider),
     calendarRepository: ref.watch(calendarRepositoryProvider),
   );
+
+  // Set up callback to invalidate user preferences provider when preferences are updated
+  userSyncService.setPreferencesUpdateCallback(() {
+    AppLogger.debug('Providers: Invalidating user preferences and project list providers');
+    AppLogger.debug('Providers: Invalidating userPreferencesProvider');
+    ref.invalidate(userPreferencesProvider);
+    AppLogger.debug('Providers: Invalidating projectListProvider');
+    ref.invalidate(projectListProvider);
+    AppLogger.debug('Providers: Invalidating activeCalendarListProvider');
+    ref.invalidate(activeCalendarListProvider);
+    AppLogger.debug('Providers: Invalidating calendarListProvider');
+    ref.invalidate(calendarListProvider);
+    // Also invalidate providers that depend on user preferences
+    AppLogger.debug('Providers: Invalidating projectSharedNotificationProvider');
+    ref.invalidate(projectSharedNotificationProvider);
+    AppLogger.debug('Providers: Invalidating projectSharedByProvider');
+    ref.invalidate(projectSharedByProvider);
+    AppLogger.debug('Providers: All provider invalidations completed');
+  });
+  
+  AppLogger.debug('Providers: UserSyncService provider created with callback set');
+  return userSyncService;
 });
 
-// User repository sync setup provider - sets up sync trigger after all providers are created
-final userRepositorySyncSetupProvider = Provider<void>((ref) {
+// User preferences queue service provider
+final userPreferencesQueueServiceProvider = Provider<UserPreferencesQueueService>((ref) {
+  return UserPreferencesQueueService(
+    userRepository: ref.watch(userRepositoryProvider),
+    userSyncService: ref.watch(userSyncServiceProvider),
+    localStorage: ref.watch(localStorageServiceProvider),
+  );
+});
+
+// User preferences queue setup provider - sets up queue callback after both providers are created
+final userPreferencesQueueSetupProvider = Provider<void>((ref) {
   final userRepository = ref.watch(userRepositoryProvider);
-  final userSyncService = ref.watch(userSyncServiceProvider);
+  final userPreferencesQueueService = ref.watch(userPreferencesQueueServiceProvider);
   
-  // Set up sync trigger after both providers are available
+  // Set up queue callback after both providers are available
   if (userRepository is LocalUserRepository) {
-    userRepository.setSyncTrigger(() async {
-      await userSyncService.uploadUserData();
+    userRepository.setQueueCallback((preferences) async {
+      await userPreferencesQueueService.queueUserPreferencesUpdate(preferences);
     });
   }
   
@@ -260,6 +293,10 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
   final externalCalendarRepository = ref.watch(externalCalendarRepositoryProvider);
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final syncService = ref.watch(syncServiceProvider);
+  final userSyncService = ref.watch(userSyncServiceProvider);
+  final userPreferencesQueueService = ref.watch(userPreferencesQueueServiceProvider);
+  
+  AppLogger.debug('Providers: Creating CalDAVMonitor with injected UserSyncService');
   
   return CalDAVMonitor(
     accountRepository: accountRepository,
@@ -270,6 +307,8 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
     externalCalendarRepository: externalCalendarRepository,
     connectionMonitorService: connectionMonitorService,
     syncService: syncService,
+    userSyncService: userSyncService,
+    userPreferencesQueueService: userPreferencesQueueService,
   );
 });
 
@@ -287,6 +326,20 @@ final statusServiceProvider = Provider<StatusService>((ref) {
   final localStorageService = ref.watch(localStorageServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   return StatusService(calendarRepository, localStorageService);
+});
+
+// Available domains provider - watches calendar changes to update domain list
+final availableDomainsProvider = FutureProvider<List<String>>((ref) async {
+  final domainService = ref.watch(domainServiceProvider);
+  
+  // Watch calendar list to refresh domains when calendars change
+  ref.watch(calendarListProvider);
+  
+  final result = await domainService.getAvailableDomains();
+  return result.when(
+    success: (domains) => domains,
+    failure: (failure) => <String>[],
+  );
 });
 
 // Export/Import service provider
@@ -318,8 +371,8 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final userSyncService = ref.watch(userSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   
-  // Initialize user repository sync setup
-  ref.watch(userRepositorySyncSetupProvider);
+  // Initialize user preferences queue setup
+  ref.watch(userPreferencesQueueSetupProvider);
 
   final caldavMonitor = ref.watch(caldavMonitorProvider);
 
@@ -369,8 +422,7 @@ final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel,
   final taskRepository = ref.watch(taskRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final userRepository = ref.watch(userRepositoryProvider);
-  final userSyncService = ref.watch(userSyncServiceProvider);
-  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository, userSyncService);
+  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository);
 });
 
 final validatorViewModelProvider = StateNotifierProvider.family<ValidatorViewModel, ValidatorViewModelState, String>((ref, taskUid) {

@@ -28,6 +28,9 @@ class LocalStorageService {
   // Offline file storage boxes
   static const String offlineFilesBoxName = 'offline_files'; // For storing offline file metadata
   static const String fileUploadQueueBoxName = 'file_upload_queue'; // For storing file upload queue items
+  
+  // User preferences queue box
+  static const String userPreferencesQueueBoxName = 'user_preferences_queue'; // For storing user preferences queue items
 
   // Box references
   late Box _tasksBox;
@@ -48,6 +51,9 @@ class LocalStorageService {
   // Offline file storage box references
   late Box _offlineFilesBox;
   late Box _fileUploadQueueBox;
+  
+  // User preferences queue box reference
+  late Box _userPreferencesQueueBox;
 
   // Initialize all Hive boxes
   Future<Result<void>> initialize() async {
@@ -77,6 +83,7 @@ class LocalStorageService {
       await _initializeBoxSafely(domainsBoxName, 'domains');
       await _initializeBoxSafely(statusesBoxName, 'statuses');
       await _initializeBoxSafely(userPreferencesBoxName, 'user_preferences');
+      await _initializeBoxSafely(userPreferencesQueueBoxName, 'user_preferences_queue');
       
       // Initialize external calendar boxes
       await _initializeBoxSafely(externalAccountsBoxName, 'external_accounts');
@@ -97,6 +104,7 @@ class LocalStorageService {
       _domainsBox = Hive.box(domainsBoxName);
       _statusesBox = Hive.box(statusesBoxName);
       _userPreferencesBox = Hive.box(userPreferencesBoxName);
+      _userPreferencesQueueBox = Hive.box(userPreferencesQueueBoxName);
       
       // Assign external calendar boxes
       _externalAccountsBox = Hive.box(externalAccountsBoxName);
@@ -328,6 +336,7 @@ class LocalStorageService {
       await clear(domainsBoxName);
       await clear(statusesBoxName);
       await clear(userPreferencesBoxName);
+      await clear(userPreferencesQueueBoxName);
       
       // Clear external calendar data
       await clear(externalAccountsBoxName);
@@ -365,6 +374,7 @@ class LocalStorageService {
         domainsBoxName,
         statusesBoxName,
         userPreferencesBoxName,
+        userPreferencesQueueBoxName,
         externalAccountsBoxName,
         externalCalendarsBoxName,
         externalEventsBoxName,
@@ -430,6 +440,8 @@ class LocalStorageService {
         return _statusesBox;
       case userPreferencesBoxName:
         return _userPreferencesBox;
+      case userPreferencesQueueBoxName:
+        return _userPreferencesQueueBox;
       case externalAccountsBoxName:
         return _externalAccountsBox;
       case externalCalendarsBoxName:
@@ -458,6 +470,7 @@ class LocalStorageService {
       _domainsBox.close(),
       _statusesBox.close(),
       _userPreferencesBox.close(),
+      _userPreferencesQueueBox.close(),
       _externalAccountsBox.close(),
       _externalCalendarsBox.close(),
       _externalEventsBox.close(),

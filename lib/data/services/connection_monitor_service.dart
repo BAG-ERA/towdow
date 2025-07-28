@@ -28,7 +28,7 @@ class ConnectionMonitorService {
   
   // Configuration
   static const Duration _checkInterval = Duration(seconds: 10);
-  static const String _testHost = 'google.com';
+  static const String _testHost = 'api.towdow.app';
   static const int _testPort = 80;
   static const Duration _testTimeout = Duration(seconds: 5);
   

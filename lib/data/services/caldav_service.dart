@@ -64,13 +64,10 @@ class CalDAVService {
   }
 
   /// Create a task (VTODO) on the server - RFC 4791 Section 5.3.2
-  Future<Result<String>> createTask(Task task, {String? calendarPath}) async {
+  Future<Result<String>> createTask(Task task, String calendarPath) async {
     try {
       // AppLogger.debug('CalDAVService: Creating task ${task.summary}');
-      
-      // Use default calendar path if none specified
-      calendarPath ??= '/calendars/${account.username}/tasks/';
-      
+         
       // Generate iCalendar VTODO content
       final vtodoContent = VTODOParser.serializeTask(task);
       
@@ -583,6 +580,9 @@ class CalDAVService {
     required String displayName,
     String? description,
     String? uid,
+    String? domain,
+    String? kanban,
+    String? categ,
   }) async {
     try {
       // First discover the proper calendar home for this account
@@ -596,7 +596,14 @@ class CalDAVService {
           final normalizedPath = calendarPath.endsWith('/') ? calendarPath : '$calendarPath/';
           AppLogger.info('CalDAVService: Creating calendar $displayName at $normalizedPath using calendar home: $calendarHome');
           
-          return await _performCalendarCreation(normalizedPath, displayName, description);
+          return await _performCalendarCreation(
+            normalizedPath, 
+            displayName, 
+            description,
+            domain: domain,
+            kanban: kanban,
+            categ: categ,
+          );
         },
         failure: (failure) async {
           AppLogger.error('CalDAVService: Failed to discover capabilities for calendar creation', failure.exception, failure.stackTrace);
@@ -618,12 +625,13 @@ class CalDAVService {
     String normalizedPath,
     String displayName,
     String? description,
+    {String? domain, String? kanban, String? categ}
   ) async {
     try {
       
       // Build MKCALENDAR request body (RFC 4791 Section 5.3.1)
       final mkCalendarBody = '''<?xml version="1.0" encoding="utf-8"?>
-<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:FLOWIT="https://flowit.app/ns/">
   <D:set>
     <D:prop>
       <D:displayname><![CDATA[$displayName]]></D:displayname>
@@ -636,6 +644,9 @@ class CalDAVService {
         <C:comp name="VEVENT"/>
       </C:supported-calendar-component-set>
       <C:calendar-description><![CDATA[${description ?? 'Created by FlowIt'}]]></C:calendar-description>
+      ${domain != null && domain.isNotEmpty ? '<FLOWIT:domain>$domain</FLOWIT:domain>' : ''}
+      ${kanban != null && kanban.isNotEmpty ? '<FLOWIT:kanban>$kanban</FLOWIT:kanban>' : ''}
+      ${categ != null && categ.isNotEmpty ? '<FLOWIT:categories>$categ</FLOWIT:categories>' : ''}
     </D:prop>
   </D:set>
 </C:mkcalendar>''';

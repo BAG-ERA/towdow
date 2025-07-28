@@ -12,10 +12,12 @@ import '../enhanced_text_field.dart';
 
 class TaskCreationDialog extends ConsumerStatefulWidget {
   final String? projectPath; // Optional project to assign the task to
+  final List<String>? initialCategories; // Optional initial categories to assign
 
   const TaskCreationDialog({
     super.key,
     this.projectPath,
+    this.initialCategories,
   });
 
   @override
@@ -204,7 +206,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         summary: taskSummary,
         description: taskDescription.isEmpty ? '' : taskDescription,
         due: selectedDue,
-        categories: const [],
+        categories: widget.initialCategories ?? const [],
         projectPath: widget.projectPath,
       );
 
@@ -234,17 +236,6 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
           ),
         );
         
-        // Refresh task providers to show the new task
-        ref.invalidate(taskListProvider);
-        ref.invalidate(todayTasksProvider);
-        ref.invalidate(soonTasksProvider);
-        ref.invalidate(laterTasksProvider);
-        ref.invalidate(anytimeTasksProvider);
-        
-        // Refresh project tasks provider if task was created in a project
-        if (widget.projectPath != null) {
-          ref.invalidate(projectTasksProvider(widget.projectPath!));
-        }
         
         // Handle dialog behavior based on checkbox
         if (keepDialogOpen) {

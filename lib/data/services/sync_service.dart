@@ -516,7 +516,7 @@ class SyncService {
             await calendarResult.when(
               success: (calendar) async {
                 if (calendar != null) {
-                  final result = await caldavService.createTask(task, calendarPath: calendar.path);
+                  final result = await caldavService.createTask(task, calendar.path);
                   await result.when(
                     success: (_) async {
                       //AppLogger.debug('SyncService: Created task ${task.uid} on server in calendar ${calendar.path}');

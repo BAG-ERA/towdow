@@ -346,9 +346,9 @@ class _TaskListTab extends ConsumerWidget {
 
         return RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(taskListProvider);
-            // External events now automatically refresh via streams
-            // Manual invalidation removed as it should be handled reactively
+            // Trigger sync instead of manual invalidation since streams auto-update
+            final syncService = ref.read(syncServiceProvider);
+            await syncService.syncAllActiveCaldav();
           },
           child: Column(
             children: [
@@ -470,26 +470,13 @@ class _TaskListTab extends ConsumerWidget {
                                     // Handle task updates - save to repository and sync
                                     await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
                                     
-                                    // Refresh the task lists
-                                    ref.invalidate(taskListProvider);
-                                    ref.invalidate(todayTasksProvider);
-                                    ref.invalidate(soonTasksProvider);
-                                    ref.invalidate(nextWeekTasksProvider);
-                                    ref.invalidate(laterTasksProvider);
-                                    ref.invalidate(anytimeTasksProvider);
+                                    // Note: Task lists will auto-update via repository streams
                                   },
                                   onTaskDeleted: () async {
                                     // Handle task deletion
                                     await ref.read(taskViewModelProvider.notifier).deleteTask(task.uid);
                                     
-                                    // Refresh the task lists
-                                    ref.invalidate(taskListProvider);
-                                    ref.invalidate(todayTasksProvider);
-                                    ref.invalidate(soonTasksProvider);
-                                    ref.invalidate(nextWeekTasksProvider);
-                                    ref.invalidate(laterTasksProvider);
-                                    ref.invalidate(anytimeTasksProvider);
-                                    
+                                    // Note: Task lists will auto-update via repository streams
                                   },
                                 ),
                               );

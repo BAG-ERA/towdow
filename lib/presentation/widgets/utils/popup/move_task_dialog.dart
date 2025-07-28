@@ -213,10 +213,6 @@ class MoveTaskDialog extends ConsumerWidget {
         );
       }
       
-             // Invalidate providers to refresh task lists
-       ref.invalidate(taskListProvider);
-       // Note: projectTasksProvider is defined locally in ProjectDetailScreen
-       // Task lists will be refreshed when navigating to project screens
       
     } catch (e, stackTrace) {
       AppLogger.error('MoveTaskDialog: Failed to move task', e, stackTrace);

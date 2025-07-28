@@ -48,6 +48,21 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
   }
 
   @override
+  void didUpdateWidget(TaskItemDescription oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update controller text when task changes (e.g., when widget is reused for different task)
+    if (oldWidget.task.uid != widget.task.uid) {
+      _controller.text = widget.task.description;
+      // Reset editing state when task changes
+      if (_isEditing) {
+        setState(() {
+          _isEditing = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

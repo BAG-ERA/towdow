@@ -544,7 +544,7 @@ class ExportImportService {
       final caldavService = CalDAVService(account: account);
       
       // Create the task using CalDAV PUT method
-      final result = await caldavService.createTask(task, calendarPath: calendarPath);
+      final result = await caldavService.createTask(task, calendarPath);
       
       return result.when(
         success: (_) {

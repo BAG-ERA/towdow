@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../../../data/models/caldav_account.dart';
@@ -549,21 +550,33 @@ class _ProjectSharingStatus extends ConsumerWidget {
       if (accountResult is Success<CaldavAccount?> && accountResult.data != null) {
         final account = accountResult.data!;
         final shareService = ref.read(shareServiceProvider(account));
-        await shareService.exitShare(project.uid);
-        AppLogger.info('ProjectInfoCard: Exit share completed on server');
+        final exitResult = await shareService.exitShare(project.uid);
+        exitResult.when(
+          success: (_) => AppLogger.info('ProjectInfoCard: Exit share completed on server'),
+          failure: (failure) => AppLogger.warning('ProjectInfoCard: Exit share failed on server: ${failure.message}'),
+        );
       }
       
       // Always clean up local data
       AppLogger.info('ProjectInfoCard: Cleaning up local data for project: ${project.path}');
       
+      bool cleanupSuccessful = true;
+      
       try {
         // Remove project from calendar repository
         AppLogger.info('ProjectInfoCard: Step 1 - Deleting from calendar repository');
         final calendarRepository = ref.read(calendarRepositoryProvider);
-        await calendarRepository.delete(project.path);
-        AppLogger.info('ProjectInfoCard: Step 1 completed - Deleted project from calendar repository');
+        final deleteResult = await calendarRepository.delete(project.path);
+        deleteResult.when(
+          success: (_) => AppLogger.info('ProjectInfoCard: Step 1 completed - Deleted project from calendar repository'),
+          failure: (failure) {
+            AppLogger.error('ProjectInfoCard: Step 1 failed - Calendar deletion error: ${failure.message}');
+            cleanupSuccessful = false;
+          },
+        );
       } catch (e) {
-        AppLogger.error('ProjectInfoCard: Step 1 failed - Calendar deletion error: $e');
+        AppLogger.error('ProjectInfoCard: Step 1 failed - Calendar deletion exception: $e');
+        cleanupSuccessful = false;
       }
       
       try {
@@ -571,18 +584,26 @@ class _ProjectSharingStatus extends ConsumerWidget {
         AppLogger.info('ProjectInfoCard: Step 2 - Getting and deleting tasks');
         final taskRepository = ref.read(taskRepositoryProvider);
         final projectTasksResult = await taskRepository.getByProject(project.path);
-        if (projectTasksResult is Success<List<Task>>) {
-          final tasks = projectTasksResult.data;
-          AppLogger.info('ProjectInfoCard: Step 2 - Found ${tasks.length} tasks to delete');
-          for (final task in tasks) {
-            await taskRepository.delete(task.uid);
-          }
-          AppLogger.info('ProjectInfoCard: Step 2 completed - Deleted ${tasks.length} tasks');
-        } else {
-          AppLogger.info('ProjectInfoCard: Step 2 - No tasks found or failed to get tasks');
-        }
+        projectTasksResult.when(
+          success: (tasks) async {
+            AppLogger.info('ProjectInfoCard: Step 2 - Found ${tasks.length} tasks to delete');
+            for (final task in tasks) {
+              final deleteResult = await taskRepository.delete(task.uid);
+              deleteResult.when(
+                success: (_) => AppLogger.debug('ProjectInfoCard: Deleted task ${task.uid}'),
+                failure: (failure) => AppLogger.warning('ProjectInfoCard: Failed to delete task ${task.uid}: ${failure.message}'),
+              );
+            }
+            AppLogger.info('ProjectInfoCard: Step 2 completed - Deleted ${tasks.length} tasks');
+          },
+          failure: (failure) {
+            AppLogger.info('ProjectInfoCard: Step 2 - Failed to get tasks: ${failure.message}');
+            cleanupSuccessful = false;
+          },
+        );
       } catch (e) {
-        AppLogger.error('ProjectInfoCard: Step 2 failed - Task deletion error: $e');
+        AppLogger.error('ProjectInfoCard: Step 2 failed - Task deletion exception: $e');
+        cleanupSuccessful = false;
       }
       
       try {
@@ -590,37 +611,64 @@ class _ProjectSharingStatus extends ConsumerWidget {
         AppLogger.info('ProjectInfoCard: Step 3 - Updating user preferences');
         final userRepository = ref.read(userRepositoryProvider);
         final preferencesResult = await userRepository.getUserPreferences();
-        if (preferencesResult is Success<UserPreferences>) {
-          final preferences = preferencesResult.data;
-          final updatedSharedProjects = preferences.sharedWithMeProjects
-              .where((sharedProject) => sharedProject.projectId != project.path)
-              .toList();
-          await userRepository.updateSharedWithMeProjects(updatedSharedProjects);
-          AppLogger.info('ProjectInfoCard: Step 3 completed - Updated user preferences');
-        } else {
-          AppLogger.info('ProjectInfoCard: Step 3 - Failed to get user preferences');
-        }
+        preferencesResult.when(
+          success: (preferences) async {
+            final updatedSharedProjects = preferences.sharedWithMeProjects
+                .where((sharedProject) => sharedProject.projectId != project.path)
+                .toList();
+            final updateResult = await userRepository.updateSharedWithMeProjects(updatedSharedProjects);
+            updateResult.when(
+              success: (_) => AppLogger.info('ProjectInfoCard: Step 3 completed - Updated user preferences'),
+              failure: (failure) {
+                AppLogger.error('ProjectInfoCard: Step 3 failed - User preferences error: ${failure.message}');
+                cleanupSuccessful = false;
+              },
+            );
+          },
+          failure: (failure) {
+            AppLogger.info('ProjectInfoCard: Step 3 - Failed to get user preferences: ${failure.message}');
+            cleanupSuccessful = false;
+          },
+        );
       } catch (e) {
-        AppLogger.error('ProjectInfoCard: Step 3 failed - User preferences error: $e');
+        AppLogger.error('ProjectInfoCard: Step 3 failed - User preferences exception: $e');
+        cleanupSuccessful = false;
       }
       
-      // Refresh UI
-      ref.invalidate(calendarListProvider);
-      ref.invalidate(projectListProvider);
-      ref.invalidate(userPreferencesProvider);
+      // Refresh UI only if cleanup was successful
+      if (cleanupSuccessful) {
+        AppLogger.info('ProjectInfoCard: Refreshing UI providers');
+        // Use a small delay to ensure all operations complete
+        await Future.delayed(const Duration(milliseconds: 100));
+        ref.invalidate(calendarListProvider);
+        ref.invalidate(projectListProvider);
+        ref.invalidate(userPreferencesProvider);
+      }
       
       AppLogger.info('ProjectInfoCard: Exit share cleanup completed successfully');
       
       // Close dialog and navigate to home
       if (context.mounted) {
         Navigator.of(context).pop(); // Close dialog
-        // Navigate to home page - remove all routes and go to root
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        
+        // Use proper navigation to home screen with GoRouter
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) {
+            // Use GoRouter to navigate to today view
+            GoRouter.of(context).go('/today');
+          }
+        });
       }
     } catch (e, stackTrace) {
       AppLogger.error('ProjectInfoCard: Error during exit share', e, stackTrace);
       if (context.mounted) {
         Navigator.of(context).pop(); // Close dialog on error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error leaving shared project: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
       }
     }
   }

@@ -5,13 +5,10 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/logger.dart';
 import '../../data/models/task_calendar.dart';
-import '../../data/models/task.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../data/services/user_sync_service.dart';
-import '../../data/providers/providers.dart';
 
 // Project with associated statistics
 class ProjectWithStats {
@@ -285,20 +282,18 @@ enum ProjectSort {
 class ProjectListViewModel extends StateNotifier<ProjectListState> {
   final CalendarRepository _calendarRepository;
   final TaskRepository _taskRepository;
-  // DomainService removed - domain operations now handled by repository
   final AccountRepository _accountRepository;
   final UserRepository _userRepository;
-  final UserSyncService _userSyncService;
   
   // Stream subscription for repository changes
   StreamSubscription? _calendarSubscription;
+  Timer? _debounceTimer;
 
   ProjectListViewModel(
     this._calendarRepository,
     this._taskRepository,
     this._accountRepository,
     this._userRepository,
-    this._userSyncService,
   ) : super(const ProjectListState()) {
     // Listen to calendar repository changes and update state automatically
     _startListeningToRepositoryChanges();
@@ -310,7 +305,13 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     _calendarSubscription = _calendarRepository.watchCalendars().listen((calendars) {
       // Only reload if the ViewModel is still mounted
       if (mounted) {
-        loadProjects();
+        // Debounce rapid changes to prevent excessive reloads during sync
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            loadProjects();
+          }
+        });
       }
     });
   }
@@ -319,6 +320,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   void dispose() {
     // Cancel the stream subscription to prevent memory leaks
     _calendarSubscription?.cancel();
+    // Cancel the debounce timer to prevent memory leaks
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -329,7 +332,12 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     // Check if still mounted before updating state
     if (!mounted) return;
     
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(
+      isLoading: true, 
+      error: null,
+      // Preserve domain expanded state to prevent UI reset
+      domainExpandedState: state.domainExpandedState,
+    );
     
     try {
       await loadProjects();
@@ -340,7 +348,10 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
       if (mounted) {
         state = state.copyWith(
           isLoading: false,
+          isRefreshing: false,
           error: 'Failed to initialize: $e',
+          // Preserve domain expanded state to prevent UI reset
+          domainExpandedState: state.domainExpandedState,
         );
       }
     }
@@ -428,6 +439,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
             activeProjects: activeProjects,
             isLoading: false,
             isRefreshing: false,
+            // Preserve domain expanded state to prevent UI reset
+            domainExpandedState: state.domainExpandedState,
           );
           
           // AppLogger.info('ProjectListViewModel: Loaded $totalProjects projects ($completedProjects completed, $activeProjects active)');
@@ -440,6 +453,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
               isLoading: false,
               isRefreshing: false,
               error: 'Failed to load projects: ${failure.message}',
+              // Preserve domain expanded state to prevent UI reset
+              domainExpandedState: state.domainExpandedState,
             );
           }
         },
@@ -452,6 +467,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           isLoading: false,
           isRefreshing: false,
           error: 'Failed to load projects: $e',
+          // Preserve domain expanded state to prevent UI reset
+          domainExpandedState: state.domainExpandedState,
         );
       }
     }
@@ -464,7 +481,12 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     // Check if still mounted before updating state
     if (!mounted) return;
     
-    state = state.copyWith(isRefreshing: true, error: null);
+    state = state.copyWith(
+      isRefreshing: true, 
+      error: null,
+      // Preserve domain expanded state to prevent UI reset
+      domainExpandedState: state.domainExpandedState,
+    );
     
     try {
       // Reload projects - sync is handled by repositories
@@ -476,6 +498,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         state = state.copyWith(
           isRefreshing: false,
           error: 'Failed to refresh: $e',
+          // Preserve domain expanded state to prevent UI reset
+          domainExpandedState: state.domainExpandedState,
         );
       }
     }
@@ -516,6 +540,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
       state = state.copyWith(
         searchQuery: '',
         filter: ProjectFilter.all,
+        // Preserve domain expanded state to prevent UI reset
+        domainExpandedState: state.domainExpandedState,
       );
     }
   }
@@ -597,7 +623,11 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
               await _removeProjectFromUserOrder(projectPath);
               // Remove from local state
               final updatedProjects = state.projects.where((p) => p.project.path != projectPath).toList();
-              state = state.copyWith(projects: updatedProjects);
+              state = state.copyWith(
+                projects: updatedProjects,
+                // Preserve domain expanded state to prevent UI reset
+                domainExpandedState: state.domainExpandedState,
+              );
             },
             failure: (failure) async {
               AppLogger.error('ProjectListViewModel: Failed to delete project locally', failure.exception, failure.stackTrace);
@@ -715,59 +745,17 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
 
   /// Assign domain to project
   Future<void> assignDomainToProject(String projectPath, String? domain) async {
-    // AppLogger.info('ProjectListViewModel: Assigning domain "$domain" to project $projectPath');
-    
-    // Check if still mounted before proceeding
-    if (!mounted) return;
-    
-    try {
-      state = state.copyWith(error: null);
-      
-      // Domain assignment is handled by repository updates
-      final calendarResult = await _calendarRepository.getById(projectPath);
-      await calendarResult.when(
-        success: (calendar) async {
-          if (calendar != null) {
-            final updatedCalendar = calendar.copyWith(flowitDomain: domain);
-            final result = await _calendarRepository.save(updatedCalendar);
-            await result.when(
-              success: (_) async {
-                // Reload projects to reflect the change
-                await loadProjects();
-                // Trigger immediate sync after domain assignment
-                await _triggerImmediateSync();
-              },
-              failure: (failure) async {
-                AppLogger.error('ProjectListViewModel: Failed to assign domain', failure.exception, failure.stackTrace);
-                // Check if still mounted before updating state
-                if (mounted) {
-                  state = state.copyWith(error: 'Failed to assign domain: ${failure.message}');
-                }
-              },
-            );
-          } else {
-            AppLogger.error('ProjectListViewModel: Project not found for domain assignment');
-            // Check if still mounted before updating state
-            if (mounted) {
-              state = state.copyWith(error: 'Project not found');
-            }
-          }
-        },
-        failure: (failure) async {
-          AppLogger.error('ProjectListViewModel: Failed to get project for domain assignment', failure.exception, failure.stackTrace);
-          // Check if still mounted before updating state
-          if (mounted) {
-            state = state.copyWith(error: 'Failed to get project: ${failure.message}');
-          }
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('ProjectListViewModel: Exception assigning domain', e, stackTrace);
-      // Check if still mounted before updating state
-      if (mounted) {
-        state = state.copyWith(error: 'Failed to assign domain: $e');
-      }
-    }
+    // Use repository method that handles both local save and server sync
+    final result = await _calendarRepository.assignDomainToCalendar(projectPath, domain);
+    await result.when(
+      success: (_) async {
+        AppLogger.info('ProjectListViewModel: Domain assigned successfully');
+      },
+      failure: (failure) async {
+        AppLogger.error('ProjectListViewModel: Failed to assign domain', failure.exception, failure.stackTrace);
+        throw Exception(failure.message);
+      },
+    );
   }
 
   /// Reorder project to a new position in the user's custom ordering
@@ -788,8 +776,6 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           if (state.sortBy == ProjectSort.custom) {
             await loadProjects();
           }
-          // Trigger immediate sync after reordering
-          await _triggerImmediateSync();
         },
         failure: (failure) async {
           AppLogger.error('ProjectListViewModel: Failed to reorder project', failure.exception, failure.stackTrace);
@@ -952,10 +938,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     }
   }
 
-  /// Trigger immediate sync after reordering
-  Future<void> _triggerImmediateSync() async {
-    await _userSyncService.uploadUserData();
-  }
+
 
   /// Build domain groups from projects
   List<DomainGroup> _buildDomainGroups(List<ProjectWithStats> projects) {
