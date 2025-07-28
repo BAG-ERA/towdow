@@ -61,8 +61,8 @@ dependencies:
   logger: ^2.4.0
   
   # Editor & Animation
-  appflowy_editor: ^5.1.0
-  rive: ^0.13.12
+  # appflowy_editor: ^5.1.0
+  # rive: ^0.13.12
   
   # Notifications
   flutter_local_notifications: ^19.2.1
