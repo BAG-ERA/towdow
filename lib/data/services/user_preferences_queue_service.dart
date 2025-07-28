@@ -104,7 +104,9 @@ class UserPreferencesQueueService {
       final queue = await _getQueue();
       if (queue.isEmpty) {
         AppLogger.debug('UserPreferencesQueueService: Queue is empty, nothing to process');
-        return const Result.success(null);
+        return const Result.failure(Failure(
+          message: 'Queue is empty, nothing to process'
+        ));
       }
 
       final processedItems = <UserPreferencesQueueItem>[];

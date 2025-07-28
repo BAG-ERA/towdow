@@ -45,6 +45,7 @@ class CalDAVMonitor {
   // State management
   Timer? _monitorTimer;
   bool _isMonitoring = false;
+  bool _isPerformingMonitoring = false; // Guard against concurrent executions
   Duration _currentInterval = _initialInterval;
 
   CalDAVMonitor({
@@ -116,6 +117,13 @@ class CalDAVMonitor {
       return;
     }
 
+    // Prevent concurrent executions
+    if (_isPerformingMonitoring) {
+      AppLogger.debug('CalDAVMonitor: Monitoring already in progress, skipping concurrent execution');
+      return;
+    }
+
+    _isPerformingMonitoring = true;
     try {
       // Check connection status first
       final connectionStatus = _connectionMonitorService.currentStatus;
@@ -141,28 +149,25 @@ class CalDAVMonitor {
               bool changesDetected = false;
               
               // Process queued operations
-              final queueChanges = await _processQueuedOperations();
+              changesDetected |= await _processQueuedOperations();
               
               // Process user preferences queue
-              final userPreferencesQueueChanges = await _processUserPreferencesQueue();
+              changesDetected |= await _processUserPreferencesQueue();
               
               // Check for changes in user preferences
-              final userPrefsChanges = await _checkUserPreferencesChanges(account);
+              changesDetected |= await _checkUserPreferencesChanges(account);
               
               // Check for changes in external accounts
-              final externalAccountChanges = await _checkExternalAccountChanges(account);
+              changesDetected |= await _checkExternalAccountChanges(account);
               
               // Check for changes in shared projects
-              await _checkAndUpdateSharedProjects(account);
-              
-              // Determine if any changes were detected
-              final anyChanges = queueChanges || userPrefsChanges || externalAccountChanges || userPreferencesQueueChanges;
-              
+              changesDetected |= await _checkAndUpdateSharedProjects(account);
+                        
               // Update interval based on changes detected
-              _updateInterval(anyChanges);
+              _updateInterval(changesDetected);
               
               
-              if (anyChanges) {
+              if (changesDetected) {
                 AppLogger.debug('CalDAVMonitor: Changes detected, interval adjusted to ${_currentInterval.inSeconds}s');
               } else {
                 AppLogger.debug('CalDAVMonitor: No changes detected, interval adjusted to ${_currentInterval.inSeconds}s');
@@ -179,6 +184,8 @@ class CalDAVMonitor {
       );
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVMonitor: Change monitoring failed', e, stackTrace);
+    } finally {
+      _isPerformingMonitoring = false;
     }
   }
 
@@ -472,13 +479,13 @@ class CalDAVMonitor {
   }
 
   /// Check and update shared projects from server
-  Future<void> _checkAndUpdateSharedProjects(CaldavAccount account) async {
+  Future<bool> _checkAndUpdateSharedProjects(CaldavAccount account) async {
     try {
       // Check if account supports sharing
       final shareService = ShareService(account: account);
       if (!shareService.supportsSharing) {
         AppLogger.debug('CalDAVMonitor: Account does not support sharing, skipping shared project check');
-        return;
+        return false;
       }
 
       AppLogger.debug('CalDAVMonitor: Checking shared projects from server');
@@ -611,6 +618,7 @@ class CalDAVMonitor {
                 AppLogger.error('CalDAVMonitor: Failed to update user preferences with shared projects: ${failure.message}');
               },
             );
+            return true;
           } else {
             AppLogger.debug('CalDAVMonitor: No changes in shared projects');
           }
@@ -622,6 +630,7 @@ class CalDAVMonitor {
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVMonitor: Failed to check and update shared projects', e, stackTrace);
     }
+    return false;
   }
 
   /// Update calendar list for shared project changes
