@@ -408,7 +408,7 @@ class UserSyncService {
     }
   }
 
-  /// Start periodic watcher for file updates
+  /// Start periodic watcher for file updates TODO: remove it
   void startPeriodicSync({Duration interval = const Duration(hours: 1)}) {
     _periodicWatcher?.cancel();
     _periodicWatcher = Timer.periodic(interval, (_) async {
