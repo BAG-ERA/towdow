@@ -217,7 +217,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _animation;
-  bool _isExpanded = true; // Domains start expanded by default
+  bool _isExpanded = false; // Domains start collapsed by default
 
   @override
   void initState() {
@@ -233,6 +233,8 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     
     if (_isExpanded) {
       _animationController.value = 1.0;
+    } else {
+      _animationController.value = 0.0;
     }
   }
 
