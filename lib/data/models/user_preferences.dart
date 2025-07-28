@@ -33,6 +33,9 @@ class UserPreferences extends HiveObject {
   @HiveField(7)
   final String? etag; // S3 MinIO file etag for sync tracking
 
+  @HiveField(8)
+  final String? userPrincipal; // User principal for constructing project paths
+
   UserPreferences({
     this.projectOrder = const [],
     this.preferredTheme,
@@ -42,6 +45,7 @@ class UserPreferences extends HiveObject {
     this.syncedProjects = const [],
     this.sharedWithMeProjects = const [],
     this.etag,
+    this.userPrincipal,
   });
 
   /// Create a copy with updated values
@@ -54,6 +58,7 @@ class UserPreferences extends HiveObject {
     List<String>? syncedProjects,
     List<SharedWithMeProject>? sharedWithMeProjects,
     String? etag,
+    String? userPrincipal,
   }) {
     return UserPreferences(
       projectOrder: projectOrder ?? this.projectOrder,
@@ -64,6 +69,7 @@ class UserPreferences extends HiveObject {
       syncedProjects: syncedProjects ?? this.syncedProjects,
       sharedWithMeProjects: sharedWithMeProjects ?? this.sharedWithMeProjects,
       etag: etag ?? this.etag,
+      userPrincipal: userPrincipal ?? this.userPrincipal,
     );
   }
 
