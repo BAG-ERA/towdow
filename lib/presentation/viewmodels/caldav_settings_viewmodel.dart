@@ -323,4 +323,7 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
 
   /// Get the number of selected calendars
   int get selectedCalendarCount => state.selectedCalendars.length;
+
+  /// Get the number of calendars that support tasks
+  int get taskSupportedCalendarCount => state.availableCalendars.where((calendar) => calendar.supportsTodos).length;
 } 
