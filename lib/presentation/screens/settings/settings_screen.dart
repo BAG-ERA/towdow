@@ -108,25 +108,6 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           _SettingsSection(
-            title: 'Debug',
-            children: [
-              _SettingsItem(
-                title: 'Clear All Data',
-                subtitle: 'Delete all local data without disconnecting',
-                icon: Icons.delete_forever_rounded,
-                isDestructive: true,
-                onTap: () => _clearAllData(context, ref),
-              ),
-              _SettingsItem(
-                title: 'Inspect Storage',
-                subtitle: 'Debug local storage contents',
-                icon: Icons.bug_report_rounded,
-                onTap: () => _debugStorage(context, ref),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _SettingsSection(
             title: 'Danger Zone',
             children: [
               _SettingsItem(
@@ -257,21 +238,6 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _debugStorage(BuildContext context, WidgetRef ref) async {
-    try {
-      final storageService = ref.read(localStorageServiceProvider);
-      await storageService.debugAllBoxes();
-
-
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('❌ Debug error: $e')));
-      }
-    }
-  }
-
   Future<void> _showSyncSettings(BuildContext context, WidgetRef ref) async {
     // Navigate to sync/CalDAV management screen
     Navigator.of(context).push(
@@ -368,107 +334,6 @@ class SettingsScreen extends ConsumerWidget {
         AppLogger.info('Web platform: page would be reloaded here');
       } catch (e) {
         AppLogger.error('Failed to reload page', e);
-      }
-    }
-  }
-
-  Future<void> _clearAllData(BuildContext context, WidgetRef ref) async {
-    // Show confirmation dialog
-    final confirmed =
-        await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('⚠️ Clear ALL Data'),
-            content: const Text(
-              'This will permanently delete:\n'
-              '• All tasks\n'
-              '• All projects\n'
-              '• All accounts\n'
-              '• All sync data\n\n'
-              'This action cannot be undone!',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                  foregroundColor: Theme.of(context).colorScheme.onError,
-                ),
-                child: const Text('DELETE ALL'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (!confirmed) return;
-
-    try {
-      final storageService = ref.read(localStorageServiceProvider);
-
-      // Special handling for web platform
-      if (kIsWeb) {
-        // For web browsers, we need to clear the browser's localStorage as well
-        await _clearWebStorageAndCache();
-      }
-
-      final result = await storageService.clearAllData();
-
-      if (context.mounted) {
-        result.when(
-          success: (_) async {
-            // Reset SyncService singleton to clean up timers and streams
-            await SyncService.reset();
-            
-            // Invalidate all relevant providers to clear cached data
-            ref.invalidate(taskListProvider);
-            ref.invalidate(calendarListProvider);
-            ref.invalidate(externalCalendarListProvider);
-            ref.invalidate(externalEventListProvider);
-            ref.invalidate(enabledExternalCalendarListProvider);
-            ref.invalidate(enabledExternalEventListProvider);
-            ref.invalidate(hasActiveAccountProvider);
-            ref.invalidate(activeAccountProvider);
-            ref.invalidate(syncStatusStreamProvider);
-            ref.invalidate(currentSyncStatusProvider);
-            ref.invalidate(userRepositoryProvider);
-            ref.invalidate(accountRepositoryProvider);
-            ref.invalidate(calendarRepositoryProvider);
-            ref.invalidate(taskRepositoryProvider);
-            ref.invalidate(externalAccountRepositoryProvider);
-            ref.invalidate(externalCalendarRepositoryProvider);
-            ref.invalidate(externalEventRepositoryProvider);
-            ref.invalidate(syncServiceProvider);
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✅ All data cleared successfully!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          },
-          failure: (failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('❌ Failed to clear data: ${failure.message}'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          },
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error clearing data: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }
