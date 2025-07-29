@@ -6,8 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
 import '../../../../data/models/task.dart';
+import '../../../../data/models/attendee.dart';
 import '../../../../data/providers/providers.dart';
 import 'due_date_dialog.dart';
+import 'category_dialog.dart';
+import 'attendee_dialog.dart';
 import '../enhanced_text_field.dart';
 
 class TaskCreationDialog extends ConsumerStatefulWidget {
@@ -30,6 +33,17 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
   DateTime? selectedDue;
   bool isLoading = false;
   bool keepDialogOpen = false; // New checkbox state
+  bool showAdvancedFields = false; // Toggle for showing additional fields
+  
+  // Advanced fields
+  List<String> selectedCategories = [];
+  List<Attendee> selectedAttendees = [];
+
+  @override
+  void initState() {
+    super.initState();
+    selectedCategories = widget.initialCategories ?? [];
+  }
 
   @override
   void dispose() {
@@ -65,55 +79,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Create a new task to track work and progress.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              EnhancedTextField(
-                controller: summaryController,
-                decoration: const InputDecoration(
-                  labelText: 'Task summary *',
-                  hintText: 'e.g., Review client proposal, Write documentation',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-                onChanged: (_) => setState(() {}),
-                onSubmitted: (_) => _canCreate() ? _createTask() : null,
-              ),
-              
-              const SizedBox(height: 16),
-              
-              EnhancedTextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description (optional)',
-                  hintText: 'Add details about what needs to be done',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-                onChanged: (_) => setState(() {}),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.calendar_today_rounded),
-                title: Text(selectedDue == null 
-                  ? 'No due date' 
-                  : 'Due: ${selectedDue!.day}/${selectedDue!.month}/${selectedDue!.year}'
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded),
-                onTap: () => _showDueDateDialog(),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Keep dialog open checkbox
+              // Keep dialog open checkbox at the top
               Row(
                 children: [
                   Checkbox(
@@ -133,6 +99,102 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                   ),
                 ],
               ),
+              
+              const SizedBox(height: 16),
+              
+              EnhancedTextField(
+                controller: summaryController,
+                decoration: const InputDecoration(
+                  labelText: 'Task summary *',
+                  hintText: 'e.g., Review client proposal, Write documentation',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _canCreate() ? _createTask() : null,
+              ),
+              
+              // Toggle button for advanced fields
+              if (!showAdvancedFields) ...[
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      showAdvancedFields = true;
+                    });
+                  },
+                  icon: const Icon(Icons.expand_more),
+                  label: const Text('Show more options'),
+                ),
+              ],
+              
+              // Advanced fields (initially hidden)
+              if (showAdvancedFields) ...[
+                const SizedBox(height: 16),
+                
+                EnhancedTextField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (optional)',
+                    hintText: 'Add details about what needs to be done',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                  onChanged: (_) => setState(() {}),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_today_rounded),
+                  title: Text(selectedDue == null 
+                    ? 'No due date' 
+                    : 'Due: ${selectedDue!.day}/${selectedDue!.month}/${selectedDue!.year}'
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded),
+                  onTap: () => _showDueDateDialog(),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Categories field
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.label_rounded),
+                  title: Text(selectedCategories.isEmpty 
+                    ? 'No categories' 
+                    : '${selectedCategories.length} categor${selectedCategories.length == 1 ? 'y' : 'ies'} selected'
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded),
+                  onTap: () => _showCategoryDialog(),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Attendees field
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.person_add_rounded),
+                  title: Text(selectedAttendees.isEmpty 
+                    ? 'No attendees' 
+                    : '${selectedAttendees.length} attendee${selectedAttendees.length == 1 ? '' : 's'} selected'
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded),
+                  onTap: () => _showAttendeeDialog(),
+                ),
+                
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      showAdvancedFields = false;
+                    });
+                  },
+                  icon: const Icon(Icons.expand_less),
+                  label: const Text('Show fewer options'),
+                ),
+              ],
             ],
           ),
         ),
@@ -164,6 +226,8 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
     summaryController.clear();
     descriptionController.clear();
     selectedDue = null;
+    selectedCategories.clear();
+    selectedAttendees.clear();
   }
 
   void _showDueDateDialog() {
@@ -187,6 +251,66 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
     );
   }
 
+  void _showCategoryDialog() async {
+    // Create a temporary task with current selections
+    final tempTask = TaskFactory.createNew(
+      summary: summaryController.text.trim(),
+      description: descriptionController.text.trim(),
+      due: selectedDue,
+      categoryIds: selectedCategories,
+      projectPath: widget.projectPath,
+    );
+
+    final result = await showDialog<Task>(
+      context: context,
+      builder: (context) => CategoryDialog(
+        task: tempTask,
+        onTaskUpdated: (updatedTask) {
+          setState(() {
+            selectedCategories = updatedTask.categoryIds;
+          });
+        },
+        projectPath: widget.projectPath,
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        selectedCategories = result.categoryIds;
+      });
+    }
+  }
+
+  void _showAttendeeDialog() async {
+    // Create a temporary task with current selections including attendees
+    final tempTask = TaskFactory.createNew(
+      summary: summaryController.text.trim(),
+      description: descriptionController.text.trim(),
+      due: selectedDue,
+      categoryIds: selectedCategories,
+      attendees: selectedAttendees,
+      projectPath: widget.projectPath,
+    );
+
+    final result = await showDialog<Task>(
+      context: context,
+      builder: (context) => AttendeeDialog(
+        task: tempTask,
+        onTaskUpdated: (updatedTask) {
+          setState(() {
+            selectedAttendees = updatedTask.attendees;
+          });
+        },
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        selectedAttendees = result.attendees;
+      });
+    }
+  }
+
   void _createTask() async {
     final taskSummary = summaryController.text.trim();
     final taskDescription = descriptionController.text.trim();
@@ -206,7 +330,8 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         summary: taskSummary,
         description: taskDescription.isEmpty ? '' : taskDescription,
         due: selectedDue,
-        categories: widget.initialCategories ?? const [],
+        categories: selectedCategories,
+        attendees: selectedAttendees,
         projectPath: widget.projectPath,
       );
 
