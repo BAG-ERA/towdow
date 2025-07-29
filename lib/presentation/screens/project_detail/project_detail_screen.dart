@@ -80,7 +80,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final projectAsync = ref.watch(projectProvider(widget.projectPath));
     final tasksAsync = ref.watch(projectTasksProvider(widget.projectPath));
 
-    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
+    // Check if we're on desktop (same breakpoint as AdaptiveAppLayout)
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
     // Update mobile providers when project data is available
@@ -100,8 +100,149 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       }
     });
 
+    if (isDesktop) {
+      // Desktop 3-column layout: Nav bar | Title/Header | View content
+      return _buildDesktopLayout(context, projectAsync, tasksAsync);
+    } else {
+      // Mobile single-column layout (existing)
+      return _buildMobileLayout(context, projectAsync, tasksAsync);
+    }
+  }
+
+  Widget _buildDesktopLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
     return Scaffold(
-      appBar: isDesktop ? AppBar(
+      body: Row(
+        children: [
+          // Column 1: Title/Header area (fixed width) with full project info
+          Container(
+            width: 320,
+            decoration: BoxDecoration(
+              border: Border(
+                right: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Project title and full project info
+                _buildDesktopHeader(context, projectAsync, tasksAsync),
+              ],
+            ),
+          ),
+          
+          // Column 2: View content (expanded) with tabs and content
+          Expanded(
+            child: Column(
+              children: [
+                // View tabs moved to right column
+                _buildViewTabs(context),
+                
+                // Content based on selected tab
+                Expanded(
+                  child: _buildTabContent(context, ref, tasksAsync),
+                ),
+                
+                // Bottom toolbar with search and create task button
+                TaskListToolbar(
+                  projectPath: widget.projectPath,
+                  projectName: projectAsync.asData?.value?.displayName,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopHeader(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Project title (editable)
+          projectAsync.when(
+            data: (project) => project != null 
+                ? EditableTitle(
+                    title: project.displayName,
+                    onTitleUpdated: (newTitle) {
+                      final updatedProject = project.copyWith(
+                        displayName: newTitle,
+                        lastModified: DateTime.now(),
+                      );
+                      _updateProject(updatedProject);
+                    },
+                    isInAppBar: false,
+                  )
+                : const Text('Unknown Project', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            loading: () => const Text('Loading...', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            error: (_, _) => const Text('Error', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Full project info card (with description, stats, and share)
+          projectAsync.when(
+            data: (project) => project != null 
+                ? ProjectInfoCard(
+                    project: project,
+                    tasksAsync: tasksAsync,
+                    projectPath: widget.projectPath,
+                    onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                  )
+                : const SizedBox.shrink(),
+            loading: () => Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Loading project...'),
+                ],
+              ),
+            ),
+            error: (error, _) => Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.error_rounded,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Failed to load project: $error',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+  Widget _buildMobileLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
+    return Scaffold(
+      appBar: AppBar(
         title: projectAsync.when(
           data: (project) => project != null 
               ? EditableTitle(
@@ -123,7 +264,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Colors.transparent,
-      ) : null,
+      ),
       body: Column(
         children: [
           // Project Info Card
