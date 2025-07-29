@@ -2,6 +2,8 @@
 // Provides menu items for moving to domain, sharing, archiving, and deleting projects
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
 
@@ -116,6 +118,29 @@ class ProjectPopupMenu extends ConsumerWidget {
           ],
         ),
       ),
+      // Debug option - only in debug mode
+      if (kDebugMode) ...[
+        const PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'copy_path',
+          child: Row(
+            children: [
+              Icon(
+                Icons.copy,
+                size: 16,
+                color: Colors.orange,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Copy project path',
+                style: TextStyle(
+                  color: Colors.orange,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     ];
   }
 

@@ -278,6 +278,9 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       case 'delete_project':
         _showDeleteConfirmation(context);
         break;
+      case 'copy_path':
+        _copyProjectPath(context);
+        break;
     }
   }
 
@@ -498,6 +501,17 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
         ),
       );
     }
+  }
+
+  void _copyProjectPath(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: widget.project.path));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Project path copied: ${widget.project.path}'),
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Widget _buildDragFeedback(BuildContext context) {
