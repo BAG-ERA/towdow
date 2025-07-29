@@ -338,52 +338,6 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (calendar.description.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(calendar.description),
-                      ],
-                      // Domain and State information
-                      if (calendar.flowitDomain != null || calendar.flowitStatus != null) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            if (calendar.flowitDomain != null) ...[
-                              Icon(Icons.domain_rounded, size: 14, color: Colors.blue[600]),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Domain: ${calendar.flowitDomain}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.blue[600],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              if (calendar.flowitStatus != null) const SizedBox(width: 12),
-                            ],
-                            if (calendar.flowitStatus != null) ...[
-                              Icon(Icons.flag_rounded, size: 14, color: Colors.purple[600]),
-                              const SizedBox(width: 4),
-                              Text(
-                                'State: ${calendar.flowitStatus}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.purple[600],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                      const SizedBox(height: 4),
-                      Text(
-                        calendar.path,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                          fontFamily: 'monospace',
-                        ),
-                      ),
                       if (calendar.etag != null) ...[
                         const SizedBox(height: 2),
                         Text(
