@@ -218,13 +218,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   Widget _buildMobileLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(''), // Empty title
-        scrolledUnderElevation: 0,
-        elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        surfaceTintColor: Colors.transparent,
-      ),
       body: Column(
         children: [
           // Scrollable content area
