@@ -19,7 +19,6 @@ import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/project_detail/project_kanban_view.dart';
 import '../../widgets/project_detail/project_details_widget.dart';
-import '../../widgets/utils/editable_title.dart';
 import '../../../data/services/webdav_client.dart';
 
 // Provider for a specific project/calendar that watches only this specific calendar
@@ -116,14 +115,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           // Column 1: Title/Header area (fixed width) with full project info
           Container(
             width: 320,
-            decoration: BoxDecoration(
-              border: Border(
-                right: BorderSide(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                  width: 1,
-                ),
-              ),
-            ),
             child: Column(
               children: [
                 // Project title and full project info

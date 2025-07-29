@@ -32,10 +32,6 @@ class ProjectDetailsWidget extends ConsumerWidget {
     
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -207,15 +203,7 @@ class ProjectDetailsWidget extends ConsumerWidget {
             ],
           ),
           
-          const SizedBox(height: 20),
-          
-          // Separator
-          Divider(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-            height: 1,
-          ),
-          
-          const SizedBox(height: 20),
+          const SizedBox(height: 32),
           
           // Second block: Details section
           Text(
@@ -225,6 +213,13 @@ class ProjectDetailsWidget extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
+          
+          // Separator right below section title
+          Divider(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            height: 1,
+          ),
+          
           const SizedBox(height: 12),
           
           // Project Manager
@@ -356,15 +351,7 @@ class ProjectDetailsWidget extends ConsumerWidget {
             },
           ),
           
-          const SizedBox(height: 20),
-          
-          // Separator
-          Divider(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-            height: 1,
-          ),
-          
-          const SizedBox(height: 20),
+          const SizedBox(height: 32),
           
           // Third block: Description section
           Text(
@@ -374,38 +361,36 @@ class ProjectDetailsWidget extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
+          
+          // Separator right below section title
+          Divider(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            height: 1,
+          ),
+          
           const SizedBox(height: 8),
           
           // Description content in enhanced text field
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                width: 1,
-              ),
-              borderRadius: BorderRadius.circular(8),
+          EnhancedTextField(
+            controller: TextEditingController(text: project.description),
+            maxLines: null,
+            decoration: const InputDecoration(
+              hintText: 'No description provided',
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.fromLTRB(0, 12, 12, 12),
+              isDense: true,
             ),
-            child: EnhancedTextField(
-              controller: TextEditingController(text: project.description),
-              maxLines: null,
-              decoration: const InputDecoration(
-                hintText: 'No description provided',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.all(12),
-                isDense: true,
-              ),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              onChanged: (value) {
-                // Update description as user types
-                final updatedProject = project.copyWith(
-                  description: value,
-                  lastModified: DateTime.now(),
-                );
-                onProjectUpdated(updatedProject);
-              },
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
             ),
+            onChanged: (value) {
+              // Update description as user types
+              final updatedProject = project.copyWith(
+                description: value,
+                lastModified: DateTime.now(),
+              );
+              onProjectUpdated(updatedProject);
+            },
           ),
         ],
       ),
