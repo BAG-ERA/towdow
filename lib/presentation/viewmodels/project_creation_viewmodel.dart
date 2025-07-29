@@ -64,6 +64,8 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
         displayName: name,
         description: description,
         domain: domain,
+        author: account!.email,
+        manager: account!.email,
       );
       
       TaskCalendar? createdCalendar;

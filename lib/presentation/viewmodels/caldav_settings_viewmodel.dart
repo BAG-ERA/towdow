@@ -227,6 +227,9 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
         path: '/calendars/${account.username}/${name.toLowerCase().replaceAll(' ', '_')}/',
         displayName: name,
         description: description,
+        organizer: account.email,
+        author: account.email,
+        manager: account.email,
       );
 
       // TODO: Implement calendar creation in CalDAVService
