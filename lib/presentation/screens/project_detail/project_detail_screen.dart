@@ -16,9 +16,9 @@ import '../../viewmodels/commands/attendee_commands.dart';
 
 import '../../../core/theme/chart_theme.dart';
 import '../../widgets/adaptive_app_layout.dart';
-import '../../widgets/project_detail/project_info_card.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/project_detail/project_kanban_view.dart';
+import '../../widgets/project_detail/project_details_widget.dart';
 import '../../widgets/utils/editable_title.dart';
 import '../../../data/services/webdav_client.dart';
 
@@ -163,35 +163,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Project title (editable)
+          // Project details layout
           projectAsync.when(
             data: (project) => project != null 
-                ? EditableTitle(
-                    title: project.displayName,
-                    onTitleUpdated: (newTitle) {
-                      final updatedProject = project.copyWith(
-                        displayName: newTitle,
-                        lastModified: DateTime.now(),
-                      );
-                      _updateProject(updatedProject);
-                    },
-                    isInAppBar: false,
-                  )
-                : const Text('Unknown Project', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            loading: () => const Text('Loading...', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            error: (_, _) => const Text('Error', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Full project info card (with description, stats, and share)
-          projectAsync.when(
-            data: (project) => project != null 
-                ? ProjectInfoCard(
+                ? ProjectDetailsWidget(
                     project: project,
                     tasksAsync: tasksAsync,
-                    projectPath: widget.projectPath,
-                    onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                    onProjectUpdated: _updateProject,
                   )
                 : const SizedBox.shrink(),
             loading: () => Container(
@@ -238,28 +216,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
   }
 
-
-
   Widget _buildMobileLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
     return Scaffold(
       appBar: AppBar(
-        title: projectAsync.when(
-          data: (project) => project != null 
-              ? EditableTitle(
-                  title: project.displayName,
-                  onTitleUpdated: (newTitle) {
-                    final updatedProject = project.copyWith(
-                      displayName: newTitle,
-                      lastModified: DateTime.now(),
-                    );
-                    _updateProject(updatedProject);
-                  },
-                  isInAppBar: true,
-                )
-              : const Text('Unknown Project'),
-          loading: () => const Text('Loading...'),
-          error: (_, _) => const Text('Error'),
-        ),
+        title: const Text(''), // Empty title
         scrolledUnderElevation: 0,
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -267,65 +227,100 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       ),
       body: Column(
         children: [
-          // Project Info Card
-          projectAsync.when(
-            data: (project) => ProjectInfoCard(
-              project: project,
-              tasksAsync: tasksAsync,
-              projectPath: widget.projectPath,
-              onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
-            ),
-            loading: () => Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
+          // Scrollable content area
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Loading project...'),
-                ],
-              ),
-            ),
-            error: (error, _) => Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.error_rounded,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Failed to load project: $error',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onErrorContainer,
+                  // Project Details Widget (replacing ProjectInfoCard)
+                  projectAsync.when(
+                    data: (project) => project != null 
+                        ? ProjectDetailsWidget(
+                            project: project,
+                            tasksAsync: tasksAsync,
+                            onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                          )
+                        : Container(
+                            margin: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.errorContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.error_rounded,
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Project not found: ${widget.projectPath}',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Theme.of(context).colorScheme.onErrorContainer,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                    loading: () => Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(width: 16),
+                          Text('Loading project...'),
+                        ],
+                      ),
+                    ),
+                    error: (error, _) => Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_rounded,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Failed to load project: $error',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onErrorContainer,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                  
+                  // View Tabs - Updated labels for new views
+                  _buildViewTabs(context),
+                  
+                  // Content based on selected tab
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.7, // Give content a reasonable height
+                    child: _buildTabContent(context, ref, tasksAsync),
+                  ),
                 ],
               ),
             ),
           ),
           
-          // View Tabs - Updated labels for new views
-          _buildViewTabs(context),
-          
-          // Content based on selected tab
-          Expanded(
-            child: _buildTabContent(context, ref, tasksAsync),
-          ),
-          
-          // Bottom toolbar with search and create task button
+          // Bottom toolbar with search and create task button (fixed at bottom)
           TaskListToolbar(
             projectPath: widget.projectPath,
             projectName: projectAsync.asData?.value?.displayName,
