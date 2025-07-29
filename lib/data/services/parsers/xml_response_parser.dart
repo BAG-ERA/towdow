@@ -385,6 +385,10 @@ class XMLResponseParser {
         responseData['flowit-owner'] = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
         responseData['flowit-template'] = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
         responseData['flowit-sharedWith'] = _extractFlowItPropertyWithPrefixes(responseContent, 'sharedWith', globalFlowItPrefixes);
+        responseData['flowit-author'] = _extractFlowItPropertyWithPrefixes(responseContent, 'author', globalFlowItPrefixes);
+        responseData['flowit-manager'] = _extractFlowItPropertyWithPrefixes(responseContent, 'manager', globalFlowItPrefixes);
+        responseData['flowit-created-at'] = _extractFlowItPropertyWithPrefixes(responseContent, 'created-at', globalFlowItPrefixes);
+        responseData['flowit-ended-at'] = _extractFlowItPropertyWithPrefixes(responseContent, 'ended-at', globalFlowItPrefixes);
         
         responses.add(responseData);
       }

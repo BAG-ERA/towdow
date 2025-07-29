@@ -12,7 +12,9 @@ import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../utils/popup/move_to_domain_dialog.dart';
 import '../utils/popup/project_sharing_dialog.dart';
+import '../utils/mobile_delayed_draggable_project.dart';
 import 'drag_state_provider.dart';
+import 'project_popup_menu.dart';
 
 /// Data class for drag and drop operations
 class ProjectDragData {
@@ -180,18 +182,8 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
                       child: SizedBox(
                         width: 24,
                         height: 24,
-                        child: PopupMenuButton<String>(
-                          padding: EdgeInsets.zero,
-                          icon: Icon(
-                            Icons.more_vert,
-                            size: 16,
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.7)
-                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                          ),
-                          tooltip: 'Project options',
-                          onSelected: (value) => _handleMenuAction(context, value),
-                          itemBuilder: (BuildContext context) => _buildMenuItems(context),
+                        child: ProjectPopupMenu(
+                          onMenuAction: (value) => _handleMenuAction(context, value),
                         ),
                       ),
                     ),
@@ -229,11 +221,8 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
                 ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
                 : Colors.transparent,
           ),
-          child: Draggable<ProjectDragData>(
-            data: ProjectDragData(
-              project: widget.project,
-              currentDomain: widget.project.flowitDomain,
-            ),
+          child: MobileDelayedDraggableProject(
+            project: widget.project,
             feedback: _buildDragFeedback(context),
             childWhenDragging: Opacity(
               opacity: 0.5,
@@ -267,95 +256,12 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
         Rect.fromLTWH(details.globalPosition.dx, details.globalPosition.dy, 0, 0),
         Rect.fromLTWH(0, 0, overlay.size.width, overlay.size.height),
       ),
-      items: _buildMenuItems(context),
+      items: ProjectPopupMenu.getMenuItems(context, ref),
     );
     
     if (result != null) {
       _handleMenuAction(context, result);
     }
-  }
-
-  List<PopupMenuEntry<String>> _buildMenuItems(BuildContext context) {
-    // Check if current account supports sharing
-    final accountAsync = ref.watch(activeAccountProvider);
-    final supportsSharing = accountAsync.when(
-      data: (account) => account?.providerType == 'towdow_cloud' || account?.providerType == 'towdow_selfhosted',
-      loading: () => false,
-      error: (_, __) => false,
-    );
-
-    return [
-      PopupMenuItem<String>(
-        value: 'move_to_domain',
-        child: Row(
-          children: [
-            Icon(
-              Icons.folder_open,
-              size: 16,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-            const SizedBox(width: 8),
-            const Text('Move to domain'),
-          ],
-        ),
-      ),
-      // Share option - only for TowDow accounts
-      if (supportsSharing) ...[
-        PopupMenuItem<String>(
-          value: 'share_project',
-          child: Row(
-            children: [
-              Icon(
-                Icons.share,
-                size: 16,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Share project',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-      ],
-      PopupMenuItem<String>(
-        value: 'archive_project',
-        child: Row(
-          children: [
-            Icon(
-              Icons.archive,
-              size: 16,
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-            const SizedBox(width: 8),
-            const Text('Archive project'),
-          ],
-        ),
-      ),
-      PopupMenuItem<String>(
-        value: 'delete_project',
-        child: Row(
-          children: [
-            Icon(
-              Icons.delete,
-              size: 16,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Delete project',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ];
   }
 
   void _handleMenuAction(BuildContext context, String action) {
@@ -371,6 +277,9 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
         break;
       case 'delete_project':
         _showDeleteConfirmation(context);
+        break;
+      case 'copy_path':
+        _copyProjectPath(context);
         break;
     }
   }
@@ -399,41 +308,13 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       
       result.when(
         success: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Project "${widget.project.displayName}" archived successfully'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              action: SnackBarAction(
-                label: 'Undo',
-                onPressed: () => _handleUnarchiveProject(context),
-              ),
-            ),
-          );
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to archive project: ${failure.message}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-              action: SnackBarAction(
-                label: 'Dismiss',
-                onPressed: () {},
-              ),
-            ),
-          );
+          AppLogger.error('Failed to archive project: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to archive project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          action: SnackBarAction(
-            label: 'Dismiss',
-            onPressed: () {},
-          ),
-        ),
-      );
+      AppLogger.error('Failed to archive project: $e');
     }
   }
 
@@ -447,29 +328,14 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       
       result.when(
         success: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Project "${widget.project.displayName}" unarchived successfully'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-          );
+          // Project unarchived successfully - no notification needed
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to unarchive project: ${failure.message}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+          AppLogger.error('Failed to unarchive project: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to unarchive project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      AppLogger.error('Failed to unarchive project: $e');
     }
   }
 
@@ -515,29 +381,11 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
         context.go('/');
       }
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Project "${widget.project.displayName}" deleted successfully'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      // Project deleted successfully - no notification needed
       
       AppLogger.info('ProjectItem: Successfully deleted project ${widget.project.path}');
     } catch (e) {
       AppLogger.error('ProjectItem: Failed to delete project ${widget.project.path}: $e');
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 5),
-          action: SnackBarAction(
-            label: 'Dismiss',
-            onPressed: () {},
-          ),
-        ),
-      );
     }
   }
 
@@ -560,38 +408,23 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       final taskViewModel = ref.read(taskViewModelProvider.notifier);
       await taskViewModel.moveTask(task, widget.project.path);
       
-      // Show success feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Moved "${task.summary}" to "${widget.project.displayName}"'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          duration: const Duration(seconds: 2),
-          action: SnackBarAction(
-            label: 'View Project',
-            onPressed: () {
-                              context.go('/project/${Uri.encodeComponent(widget.project.path)}');
-            },
-          ),
-        ),
-      );
+      // Task moved successfully - no notification needed
       
       AppLogger.info('ProjectItem: Successfully moved task ${task.summary} to project ${widget.project.displayName}');
     } catch (e) {
       AppLogger.error('ProjectItem: Failed to move task ${task.summary} to project ${widget.project.displayName}: $e');
-      
-      // Show error feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to move task: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-          action: SnackBarAction(
-            label: 'Dismiss',
-            onPressed: () {},
-          ),
-        ),
-      );
     }
+  }
+
+  void _copyProjectPath(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: widget.project.path));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Project path copied: ${widget.project.path}'),
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Widget _buildDragFeedback(BuildContext context) {

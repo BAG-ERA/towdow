@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../../core/logger.dart';
 import '../../../data/models/task.dart';
 import 'chips/attendee_chip.dart';
 import 'chips/category_chip.dart';
@@ -239,9 +240,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
           fileBytes = await fileObj.readAsBytes();
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Could not read media file: $e')),
-            );
+            AppLogger.error('Could not read media file: $e');
           }
           return;
         }
@@ -249,9 +248,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
 
       if (fileBytes == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not read media file data')),
-          );
+          AppLogger.error('Could not read media file data');
         }
         return;
       }
@@ -282,16 +279,11 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
         );
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Media file "$fileName" uploaded successfully')),
-          );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading media file: $e')),
-        );
+        AppLogger.error('Error uploading media file: $e');
       }
     }
   }
@@ -319,9 +311,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
           fileBytes = await fileObj.readAsBytes();
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Could not read file: $e')),
-            );
+            AppLogger.error('Could not read file: $e');
           }
           return;
         }
@@ -329,9 +319,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
 
       if (fileBytes == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not read file data')),
-          );
+          AppLogger.error('Could not read file data');
         }
         return;
       }
@@ -362,16 +350,11 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
         );
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('File "$fileName" uploaded successfully')),
-          );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading file: $e')),
-        );
+        AppLogger.error('Error uploading file: $e');
       }
     }
   }

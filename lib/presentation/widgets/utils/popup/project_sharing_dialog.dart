@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/logger.dart';
 import '../../../../data/models/task_calendar.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../viewmodels/project_sharing_viewmodel.dart';
@@ -123,14 +124,10 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                       result.when(
                         success: (account) {
                           final providerType = account?.providerType ?? 'Unknown';
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Account Provider Type: $providerType')),
-                          );
+                          // Account provider type retrieved - no notification needed
                         },
                         failure: (failure) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: ${failure.message}')),
-                          );
+                          AppLogger.error('Failed to get account info: ${failure.message}');
                         },
                       );
                     },
@@ -316,12 +313,6 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
   void _saveChanges(ProjectSharingViewModel notifier) async {
     await notifier.saveChanges();
     
-    // Show success message if no error
-    final state = ref.read(projectSharingViewModelProvider);
-    if (state.error == null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Project sharing updated successfully')),
-      );
-    }
+    // Project sharing updated successfully - no notification needed
   }
 } 

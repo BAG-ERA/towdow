@@ -367,12 +367,6 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
     );
 
     if (result != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('External calendar "${result.displayName}" added successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
       
       // Refresh the data
       setState(() {});
@@ -403,33 +397,13 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       
       result.when(
         success: (_) async {
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                account.isActive 
-                    ? 'Calendar disabled' 
-                    : 'Calendar enabled',
-              ),
-            ),
-          );
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${failure.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppLogger.error('Failed to toggle account: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppLogger.error('Failed to toggle account: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -445,29 +419,14 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       
       result.when(
         success: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Sync completed successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          // Sync completed successfully - no notification needed
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Sync failed: ${failure.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppLogger.error('Sync failed: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sync error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppLogger.error('Sync error: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -537,23 +496,12 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       
       // Success
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('External calendar deleted successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
       }
       
     } catch (e) {
       AppLogger.error('ExternalCalendarManagement: Failed to delete account ${account.id}', e, StackTrace.current);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting calendar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppLogger.error('Error deleting calendar: $e');
       }
     } finally {
       if (mounted) {
@@ -569,32 +517,13 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       
       result.when(
         success: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                enabled 
-                    ? 'Calendar "${calendar.displayName}" enabled' 
-                    : 'Calendar "${calendar.displayName}" disabled',
-              ),
-            ),
-          );
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${failure.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppLogger.error('Failed to toggle calendar: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppLogger.error('Failed to toggle calendar: $e');
     }
   }
 
@@ -711,35 +640,16 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       
       result.when(
         success: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                color != null 
-                    ? 'Color updated for "${calendar.displayName}"'
-                    : 'Color removed from "${calendar.displayName}"',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
+          // Color updated successfully - no notification needed
           // Refresh the UI
           setState(() {});
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error updating color: ${failure.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppLogger.error('Failed to update color: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error updating color: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppLogger.error('Failed to update color: $e');
     }
   }
 

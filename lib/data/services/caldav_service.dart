@@ -518,6 +518,10 @@ class CalDAVService {
     <FLOWIT:kanban />
     <FLOWIT:categories />
     <FLOWIT:sharedWith />
+    <FLOWIT:author />
+    <FLOWIT:manager />
+    <FLOWIT:created-at />
+    <FLOWIT:ended-at />
   </D:prop>
 </D:propfind>''';
 
@@ -537,11 +541,20 @@ class CalDAVService {
                 syncToken: responseData['sync-token'],
                 displayName: responseData['displayname'] ?? calendar.displayName,
                 description: responseData['calendar-description'] ?? calendar.description,
-                flowitDomain: responseData['flowit-domain'],
+
+                flowitDomain: responseData['flowit-domain'] ?? calendar.flowitDomain,
                 flowitStatus: responseData['flowit-status'],
                 flowitKanban: responseData['flowit-kanban'] ?? calendar.flowitKanban,
                 projectCategories: responseData['flowit-categories'] ?? calendar.projectCategories,
                 sharedWith: responseData['flowit-sharedWith'] ?? calendar.sharedWith,
+                flowitAuthor: responseData['flowit-author'] ?? calendar.flowitAuthor,
+                flowitManager: responseData['flowit-manager'] ?? calendar.flowitManager,
+                flowitCreatedAt: responseData['flowit-created-at'] != null 
+                    ? DateTime.tryParse(responseData['flowit-created-at']) ?? calendar.flowitCreatedAt
+                    : calendar.flowitCreatedAt,
+                flowitEndedAt: responseData['flowit-ended-at'] != null 
+                    ? DateTime.tryParse(responseData['flowit-ended-at']) ?? calendar.flowitEndedAt
+                    : calendar.flowitEndedAt,
                 lastSyncAt: DateTime.now(),
               );
               
@@ -583,6 +596,8 @@ class CalDAVService {
     String? domain,
     String? kanban,
     String? categ,
+    String? author,
+    String? manager,
   }) async {
     try {
       // First discover the proper calendar home for this account
@@ -603,6 +618,8 @@ class CalDAVService {
             domain: domain,
             kanban: kanban,
             categ: categ,
+            author: author,
+            manager: manager,
           );
         },
         failure: (failure) async {
@@ -625,7 +642,7 @@ class CalDAVService {
     String normalizedPath,
     String displayName,
     String? description,
-    {String? domain, String? kanban, String? categ}
+    {String? domain, String? kanban, String? categ, String? author, String? manager}
   ) async {
     try {
       
@@ -644,9 +661,13 @@ class CalDAVService {
         <C:comp name="VEVENT"/>
       </C:supported-calendar-component-set>
       <C:calendar-description><![CDATA[${description ?? 'Created by FlowIt'}]]></C:calendar-description>
+      <FLOWIT:type>PROJECT</FLOWIT:type>
+      <FLOWIT:status>ONGOING</FLOWIT:status>
       ${domain != null && domain.isNotEmpty ? '<FLOWIT:domain>$domain</FLOWIT:domain>' : ''}
       ${kanban != null && kanban.isNotEmpty ? '<FLOWIT:kanban>$kanban</FLOWIT:kanban>' : ''}
       ${categ != null && categ.isNotEmpty ? '<FLOWIT:categories>$categ</FLOWIT:categories>' : ''}
+      ${author != null && author.isNotEmpty ? '<FLOWIT:author>$author</FLOWIT:author>' : ''}
+      ${manager != null && manager.isNotEmpty ? '<FLOWIT:manager>$manager</FLOWIT:manager>' : ''}
     </D:prop>
   </D:set>
 </C:mkcalendar>''';
@@ -671,6 +692,9 @@ class CalDAVService {
                path: normalizedPath,
                displayName: displayName,
                description: description ?? 'Created by FlowIt',
+               flowitAuthor: author,
+               flowitManager: manager,
+               flowitCreatedAt: DateTime.now(),
              ));
                      } else if (webDavResponse.statusCode == 409) {
              // 409 Conflict - calendar already exists
@@ -974,6 +998,22 @@ class CalDAVService {
       vcalendar.writeln('X-FLOWIT-TEMPLATE:${calendar.flowitTemplate}');
     }
     
+    if (calendar.flowitAuthor != null && calendar.flowitAuthor!.isNotEmpty) {
+      vcalendar.writeln('X-FLOWIT-AUTHOR:${_escapeCalendarText(calendar.flowitAuthor!)}');
+    }
+    
+    if (calendar.flowitManager != null && calendar.flowitManager!.isNotEmpty) {
+      vcalendar.writeln('X-FLOWIT-MANAGER:${_escapeCalendarText(calendar.flowitManager!)}');
+    }
+    
+    if (calendar.flowitCreatedAt != null) {
+      vcalendar.writeln('X-FLOWIT-CREATED-AT:${calendar.flowitCreatedAt!.toIso8601String()}');
+    }
+    
+    if (calendar.flowitEndedAt != null) {
+      vcalendar.writeln('X-FLOWIT-ENDED-AT:${calendar.flowitEndedAt!.toIso8601String()}');
+    }
+    
     vcalendar.writeln('CALENDAR-ORDER:${calendar.calendarOrder}');
     
     // Categories
@@ -1021,6 +1061,10 @@ class CalDAVService {
       final flowitKanban = properties['X-FLOWIT-KANBAN'] ?? '[]';
       final flowitOwner = properties['X-FLOWIT-OWNER'];
       final flowitTemplate = properties['X-FLOWIT-TEMPLATE'];
+      final flowitAuthor = properties['X-FLOWIT-AUTHOR'];
+      final flowitManager = properties['X-FLOWIT-MANAGER'];
+      final flowitCreatedAt = _parseDateTime(properties['X-FLOWIT-CREATED-AT']);
+      final flowitEndedAt = _parseDateTime(properties['X-FLOWIT-ENDED-AT']);
       final calendarOrder = int.tryParse(properties['CALENDAR-ORDER'] ?? '1') ?? 1;
       
       // Project categories are handled via X-FLOWIT-CATEGORIES field, not CATEGORIES
@@ -1043,6 +1087,10 @@ class CalDAVService {
         flowitKanban: flowitKanban,
         flowitOwner: flowitOwner,
         flowitTemplate: flowitTemplate,
+        flowitAuthor: flowitAuthor,
+        flowitManager: flowitManager,
+        flowitCreatedAt: flowitCreatedAt,
+        flowitEndedAt: flowitEndedAt,
         calendarOrder: calendarOrder,
         // projectCategories will be set by the caller via X-FLOWIT-CATEGORIES
       );

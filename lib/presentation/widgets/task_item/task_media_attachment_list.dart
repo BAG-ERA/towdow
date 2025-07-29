@@ -456,25 +456,15 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
 
   void _showSuccessSnackbar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      // Success message - no notification needed
+      AppLogger.info('TaskMediaAttachmentList: $message');
     }
   }
 
   void _showErrorSnackbar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+      // Error message - no notification needed
+      AppLogger.error('TaskMediaAttachmentList: $message');
     }
   }
 

@@ -5,9 +5,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/logger.dart';
 import 'navbar/app_sidebar.dart';
+import 'navbar/project_popup_menu.dart';
 import '../../data/models/task_calendar.dart';
+import '../../data/providers/providers.dart';
 import 'utils/editable_title.dart';
+import 'utils/popup/move_to_domain_dialog.dart';
+import 'utils/popup/project_sharing_dialog.dart';
 
 // Provider for dynamic mobile title (used by detail screens)
 final mobileTitleProvider = StateProvider<String?>((ref) => null);
@@ -203,6 +208,10 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     } else if (location.startsWith('/project/')) {
       title = ref.watch(mobileTitleProvider) ?? 'Project Details';
       isDetailScreen = true;
+    } else if (location == '/' || location.startsWith('/today') || location.startsWith('/soon') || 
+               location.startsWith('/next-week') || location.startsWith('/later') || location.startsWith('/anytime')) {
+      title = 'My Tasks';
+      isDetailScreen = true;
     }    
     return Scaffold(
       key: _scaffoldKey,
@@ -221,7 +230,10 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
             onPressed: () => Scaffold.of(context).openDrawer(),
             tooltip: 'Back to navigation',
           ),
-                  ),
+        ),
+        actions: location.startsWith('/project/') 
+            ? [_buildMobileProjectMenu(context, ref)]
+            : null,
       ) : null,
       drawer: _buildMobileDrawer(context),
       body: SafeArea(
@@ -266,5 +278,131 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     // Fallback to regular title
     final title = ref.watch(mobileTitleProvider) ?? 'Project Details';
     return Text(title);
+  }
+
+  Widget _buildMobileProjectMenu(BuildContext context, WidgetRef ref) {
+    final project = ref.watch(mobileProjectProvider);
+    
+    if (project == null) {
+      return const SizedBox.shrink();
+    }
+    
+    return ProjectPopupMenu(
+      onMenuAction: (action) => _handleMobileProjectMenuAction(context, ref, action),
+    );
+  }
+
+  void _handleMobileProjectMenuAction(BuildContext context, WidgetRef ref, String action) {
+    final project = ref.read(mobileProjectProvider);
+    if (project == null) return;
+
+    switch (action) {
+      case 'move_to_domain':
+        _showMoveToDomainDialog(context, project);
+        break;
+      case 'share_project':
+        _showProjectSharingDialog(context, project);
+        break;
+      case 'archive_project':
+        _handleArchiveProject(context, ref, project);
+        break;
+      case 'delete_project':
+        _showDeleteConfirmation(context, ref, project);
+        break;
+    }
+  }
+
+  void _showMoveToDomainDialog(BuildContext context, TaskCalendar project) {
+    // Import and use the existing dialog
+    showDialog(
+      context: context,
+      builder: (context) => MoveToDomainDialog(project: project),
+    );
+  }
+
+  void _showProjectSharingDialog(BuildContext context, TaskCalendar project) {
+    // Import and use the existing dialog
+    showDialog(
+      context: context,
+      builder: (context) => ProjectSharingDialog(project: project),
+    );
+  }
+
+  void _handleArchiveProject(BuildContext context, WidgetRef ref, TaskCalendar project) async {
+    try {
+      final statusService = ref.read(statusServiceProvider);
+      final result = await statusService.archiveCalendar(project.path);
+      
+      result.when(
+        success: (_) {
+        },
+        failure: (failure) {
+          AppLogger.error('Failed to archive project: ${failure.message}');
+        },
+      );
+    } catch (e) {
+      AppLogger.error('Failed to archive project: $e');
+    }
+  }
+
+  void _handleUnarchiveProject(BuildContext context, WidgetRef ref, TaskCalendar project) async {
+    try {
+      final statusService = ref.read(statusServiceProvider);
+      final result = await statusService.unarchiveCalendar(project.path);
+      
+      result.when(
+        success: (_) {
+        },
+        failure: (failure) {
+          AppLogger.error('Failed to unarchive project: ${failure.message}');
+        },
+      );
+    } catch (e) {
+      AppLogger.error('Failed to unarchive project: $e');
+    }
+  }
+
+  void _showDeleteConfirmation(BuildContext context, WidgetRef ref, TaskCalendar project) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Delete Project'),
+        content: Text(
+          'Are you sure you want to delete "${project.displayName}"? This action cannot be undone and will remove all associated tasks.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _deleteProject(context, ref, project);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteProject(BuildContext context, WidgetRef ref, TaskCalendar project) async {
+    try {
+      final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+      await projectListViewModel.deleteProject(project.path);
+      
+      // Navigate away from project if currently viewing it
+      final currentRoute = GoRouterState.of(context).uri.path;
+      if (currentRoute == '/project/${Uri.encodeComponent(project.path)}') {
+        context.go('/');
+      }
+      
+    } catch (e) {
+      AppLogger.error('Failed to delete project: $e');
+    }
   }
 } 

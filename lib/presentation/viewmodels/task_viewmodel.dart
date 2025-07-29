@@ -3,6 +3,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task.dart';
+import '../../data/models/attendee.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../core/logger.dart';
@@ -46,6 +47,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
     String description = '',
     DateTime? due,
     List<String> categories = const [],
+    List<Attendee> attendees = const [],
     String? projectPath,
   }) async {
     AppLogger.debug('🔄 TaskViewModel: Creating task with summary: $summary');
@@ -78,6 +80,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
         description: description,
         due: due,
         categoryIds: categories,
+        attendees: attendees,
         projectPath: encodedProjectPath,
         organizer: organizer,
       );

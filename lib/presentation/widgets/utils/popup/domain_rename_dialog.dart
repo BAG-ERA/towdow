@@ -175,33 +175,13 @@ class _DomainRenameDialogState extends ConsumerState<DomainRenameDialog> {
           
           Navigator.of(context).pop(newDomainName);
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Domain renamed to "$newDomainName" successfully'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-          );
         },
         failure: (failure) {
           AppLogger.error('DomainRename: Failed to rename domain: ${failure.message}');
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to rename domain: ${failure.message}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
         },
       );
     } catch (e) {
       AppLogger.error('DomainRename: Exception renaming domain: $e');
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to rename domain: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
     } finally {
       if (mounted) {
         setState(() => isLoading = false);

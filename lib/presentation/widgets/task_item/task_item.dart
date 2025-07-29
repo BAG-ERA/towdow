@@ -77,20 +77,17 @@ class _TaskItemState extends State<TaskItem> {
     final isCompleted = widget.task.status == 'COMPLETED';
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        border: _isExpanded ? Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          width: 1,
+        ) : null,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(8.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -110,7 +107,7 @@ class _TaskItemState extends State<TaskItem> {
             
             // Extended state content
             if (_isExpanded) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
               
               // Description, attendees, and categories
               TaskItemDescription(
@@ -119,14 +116,14 @@ class _TaskItemState extends State<TaskItem> {
               ),
               
               // Validators
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               TaskItemValidatorList(
                 task: widget.task,
                 onTaskUpdated: widget.onTaskUpdated,
               ),
               
               // Action buttons toolbar
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               TaskItemToolbar(
                 task: widget.task,
                 onTaskUpdated: widget.onTaskUpdated,
