@@ -133,22 +133,14 @@ class TaskItemToolbar extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
           ),
         ),
-        const PopupMenuItem(
-          value: 'archive',
-          child: ListTile(
-            leading: Icon(Icons.archive),
-            title: Text('Archive Task'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'gps',
-          child: ListTile(
-            leading: Icon(Icons.pin_drop),
-            title: Text('Add GPS Location'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
+//        const PopupMenuItem(
+//          value: 'gps',
+//          child: ListTile(
+//            leading: Icon(Icons.pin_drop),
+//            title: Text('Add GPS Location'),
+//            contentPadding: EdgeInsets.zero,
+//          ),
+//        ),
         const PopupMenuItem(
           value: 'delete',
           child: ListTile(
@@ -249,9 +241,6 @@ class TaskItemToolbar extends ConsumerWidget {
       case 'move':
         _showMoveDialog(context);
         break;
-      case 'archive':
-        _showArchiveDialog(context);
-        break;
       case 'gps':
         _showGpsDialog(context);
         break;
@@ -346,15 +335,6 @@ class TaskItemToolbar extends ConsumerWidget {
 
   void _showMoveDialog(BuildContext context) {
     showMoveTaskDialog(context, task);
-  }
-
-  void _showArchiveDialog(BuildContext context) {
-    // TODO: Implement archive dialog
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Archive dialog not implemented yet')),
-      );
-    }
   }
 
   void _showGpsDialog(BuildContext context) {

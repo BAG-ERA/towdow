@@ -318,30 +318,13 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
           success: (_) {
             // Refresh the project list
             projectListViewModel.refresh();
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Domain "${widget.domain}" deleted successfully'),
-                backgroundColor: Theme.of(context).colorScheme.primary,
-              ),
-            );
           },
           failure: (failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to delete domain: ${failure.message}'),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-            );
+            AppLogger.error('Failed to delete domain: ${failure.message}');
           },
         );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete domain: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        AppLogger.error('Failed to delete domain: $e');
       }
     }
   }
@@ -445,14 +428,6 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     } catch (e) {
       AppLogger.error('DomainSection: Failed to reorder project ${dragData.project.displayName}: $e');
       
-      // Show error feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to reorder project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     }
   }
 
@@ -524,27 +499,11 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.assignDomainToProject(dragData.project.path, widget.domain);
       
-      // Show success feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Moved "${dragData.project.displayName}" to "${widget.domain}" domain'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          duration: const Duration(seconds: 2),
-        ),
-      );
       
               AppLogger.info('DomainSection: Successfully moved project ${dragData.project.displayName} to domain ${widget.domain}');
     } catch (e) {
               AppLogger.error('DomainSection: Failed to move project ${dragData.project.displayName} to domain ${widget.domain}: $e');
       
-      // Show error feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to move project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     }
   }
 
@@ -833,14 +792,6 @@ class _NoDomainSection extends ConsumerWidget {
     } catch (e) {
       AppLogger.error('NoDomainSection: Failed to reorder project ${dragData.project.displayName}: $e');
       
-      // Show error feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to reorder project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     }
   }
 
@@ -977,27 +928,11 @@ class _NoDomainSection extends ConsumerWidget {
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.assignDomainToProject(dragData.project.path, null);
       
-      // Show success feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Removed "${dragData.project.displayName}" from "${dragData.currentDomain}" domain'),
-          backgroundColor: Theme.of(context).colorScheme.secondary,
-          duration: const Duration(seconds: 2),
-        ),
-      );
       
       AppLogger.info('NoDomainSection: Successfully removed project ${dragData.project.displayName} from domain');
     } catch (e) {
       AppLogger.error('NoDomainSection: Failed to remove project ${dragData.project.displayName} from domain: $e');
       
-      // Show error feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to remove project from domain: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     }
   }
 }

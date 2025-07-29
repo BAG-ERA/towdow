@@ -8,6 +8,7 @@ import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/kanban_board.dart';
 import '../../widgets/agenda_calendar.dart';
 import '../../widgets/utils/tasklist_toolbar.dart';
+import '../../widgets/utils/buttons/archive_project_button.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
@@ -127,6 +128,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           Expanded(
             child: Column(
               children: [
+                // Archive button row at the top
+                _buildArchiveButtonRow(context, projectAsync),
+                
                 // View tabs moved to right column
                 _buildViewTabs(context),
                 
@@ -315,6 +319,31 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
 
+
+  Widget _buildArchiveButtonRow(BuildContext context, AsyncValue<TaskCalendar?> projectAsync) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          projectAsync.when(
+            data: (project) => project != null
+                ? ArchiveProjectButton.compact(
+                    projectPath: project.path,
+                    projectDisplayName: project.displayName,
+                    onProjectArchived: () {
+                      // Navigate back to home after archiving
+                      Navigator.of(context).pop();
+                    },
+                  )
+                : const SizedBox.shrink(),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildViewTabs(BuildContext context) {
     return Container(
@@ -744,12 +773,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error moving task: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppLogger.error('Error moving task: $error');
       }
     }
   }
@@ -862,17 +886,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         },
         failure: (failure) async {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('❌ Failed to update project: ${failure.message}')),
-            );
+            AppLogger.error('Failed to update project: ${failure.message}');
           }
         },
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Error updating project: $e')),
-        );
+        AppLogger.error('Error updating project: $e');
       }
     }
   }
@@ -896,31 +916,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         failure: (failure) {
           AppLogger.error('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('❌ Server sync failed: ${failure.message}'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 5),
-                action: SnackBarAction(
-                  label: 'Retry',
-                  textColor: Colors.white,
-                  onPressed: () => _syncProjectToServer(project),
-                ),
-              ),
-            );
           }
         },
       );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectDetail: Exception during server sync', e, stackTrace);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Sync error: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        // Sync error - no user notification needed
       }
     }
   }

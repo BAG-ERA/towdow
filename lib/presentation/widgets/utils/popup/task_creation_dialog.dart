@@ -335,52 +335,31 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         projectPath: widget.projectPath,
       );
 
-      // Check if there was an error during creation
-      final currentState = ref.read(taskViewModelProvider);
-      if (currentState.error != null) {
-        // Task creation failed
-        AppLogger.error('TaskCreation: Failed to create task: ${currentState.error}');
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create task: ${currentState.error}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-        
-        // Even on error, respect the keepDialogOpen setting
-        if (!keepDialogOpen) {
-          Navigator.of(context).pop();
-        }
-      } else {
-        // Task creation succeeded
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Task "$taskSummary" created successfully'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-          ),
-        );
-        
-        
-        // Handle dialog behavior based on checkbox
-        if (keepDialogOpen) {
-          // Clear form for next task but keep dialog open
-          _clearForm();
-          setState(() {}); // Refresh UI to show cleared form
+              // Check if there was an error during creation
+        final currentState = ref.read(taskViewModelProvider);
+        if (currentState.error != null) {
+          // Task creation failed
+          AppLogger.error('TaskCreation: Failed to create task: ${currentState.error}');
+          
+          // Even on error, respect the keepDialogOpen setting
+          if (!keepDialogOpen) {
+            Navigator.of(context).pop();
+          }
         } else {
-          // Close dialog as before
-          Navigator.of(context).pop(taskSummary);
+          // Task creation succeeded
+          
+          // Handle dialog behavior based on checkbox
+          if (keepDialogOpen) {
+            // Clear form for next task but keep dialog open
+            _clearForm();
+            setState(() {}); // Refresh UI to show cleared form
+          } else {
+            // Close dialog as before
+            Navigator.of(context).pop(taskSummary);
+          }
         }
-      }
     } catch (e) {
       AppLogger.error('TaskCreation: Exception creating task: $e');
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to create task: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
       
       // Even on exception, respect the keepDialogOpen setting
       if (!keepDialogOpen) {

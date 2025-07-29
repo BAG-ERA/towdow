@@ -236,17 +236,11 @@ BuildContext? get globalContext => globalNavigatorKey.currentContext;
 // Session epoch provider to force GoRouter refresh on session expiry
 final sessionEpochProvider = StateProvider<int>((ref) => 0);
 
-/// Global session expiry handler: navigates to /connect, shows a SnackBar, and invalidates account providers.
+/// Global session expiry handler: navigates to /connect and invalidates account providers.
 void handleSessionExpired([ProviderRef? ref]) {
   final context = globalContext;
   if (context != null && context.mounted) {
     GoRouter.of(context).go('/connect');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Your session has expired. Please log in again.'),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
   // Invalidate main account providers so UI updates
   if (ref != null) {

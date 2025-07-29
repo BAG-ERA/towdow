@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/logger.dart';
 import 'navbar/app_sidebar.dart';
 import 'navbar/project_popup_menu.dart';
 import '../../data/models/task_calendar.dart';
@@ -334,33 +335,13 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
       
       result.when(
         success: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Project "${project.displayName}" archived successfully'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              action: SnackBarAction(
-                label: 'Undo',
-                onPressed: () => _handleUnarchiveProject(context, ref, project),
-              ),
-            ),
-          );
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to archive project: ${failure.message}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+          AppLogger.error('Failed to archive project: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to archive project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      AppLogger.error('Failed to archive project: $e');
     }
   }
 
@@ -371,29 +352,13 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
       
       result.when(
         success: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Project "${project.displayName}" unarchived successfully'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-          );
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to unarchive project: ${failure.message}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+          AppLogger.error('Failed to unarchive project: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to unarchive project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      AppLogger.error('Failed to unarchive project: $e');
     }
   }
 
@@ -436,25 +401,8 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
         context.go('/');
       }
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Project "${project.displayName}" deleted successfully'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 5),
-          action: SnackBarAction(
-            label: 'Dismiss',
-            onPressed: () {},
-          ),
-        ),
-      );
+      AppLogger.error('Failed to delete project: $e');
     }
   }
 } 

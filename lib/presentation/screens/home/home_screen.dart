@@ -73,27 +73,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   return IconButton(
                     icon: const Icon(Icons.sync_problem_rounded, color: Colors.red),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Sync error occurred')),
-                      );
+                      // Sync error - no action needed
                     },
                   );
                 case SyncStatus.offline:
                   return IconButton(
                     icon: const Icon(Icons.cloud_off_rounded, color: Colors.orange),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Offline - no account configured')),
-                      );
+                      // Offline - no action needed
                     },
                   );
                 case SyncStatus.idle:
                   return IconButton(
                     icon: const Icon(Icons.sync_rounded),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Go to Settings > Debug > Sync Now')),
-                      );
+                      // Idle - no action needed
                     },
                   );
               }

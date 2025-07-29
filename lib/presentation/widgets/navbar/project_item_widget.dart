@@ -308,41 +308,13 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       
       result.when(
         success: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Project "${widget.project.displayName}" archived successfully'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              action: SnackBarAction(
-                label: 'Undo',
-                onPressed: () => _handleUnarchiveProject(context),
-              ),
-            ),
-          );
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to archive project: ${failure.message}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-              action: SnackBarAction(
-                label: 'Dismiss',
-                onPressed: () {},
-              ),
-            ),
-          );
+          AppLogger.error('Failed to archive project: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to archive project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          action: SnackBarAction(
-            label: 'Dismiss',
-            onPressed: () {},
-          ),
-        ),
-      );
+      AppLogger.error('Failed to archive project: $e');
     }
   }
 
@@ -356,29 +328,14 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       
       result.when(
         success: (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Project "${widget.project.displayName}" unarchived successfully'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-          );
+          // Project unarchived successfully - no notification needed
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to unarchive project: ${failure.message}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+          AppLogger.error('Failed to unarchive project: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to unarchive project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      AppLogger.error('Failed to unarchive project: $e');
     }
   }
 
@@ -424,29 +381,11 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
         context.go('/');
       }
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Project "${widget.project.displayName}" deleted successfully'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      // Project deleted successfully - no notification needed
       
       AppLogger.info('ProjectItem: Successfully deleted project ${widget.project.path}');
     } catch (e) {
       AppLogger.error('ProjectItem: Failed to delete project ${widget.project.path}: $e');
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to delete project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 5),
-          action: SnackBarAction(
-            label: 'Dismiss',
-            onPressed: () {},
-          ),
-        ),
-      );
     }
   }
 
@@ -469,37 +408,11 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       final taskViewModel = ref.read(taskViewModelProvider.notifier);
       await taskViewModel.moveTask(task, widget.project.path);
       
-      // Show success feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Moved "${task.summary}" to "${widget.project.displayName}"'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          duration: const Duration(seconds: 2),
-          action: SnackBarAction(
-            label: 'View Project',
-            onPressed: () {
-                              context.go('/project/${Uri.encodeComponent(widget.project.path)}');
-            },
-          ),
-        ),
-      );
+      // Task moved successfully - no notification needed
       
       AppLogger.info('ProjectItem: Successfully moved task ${task.summary} to project ${widget.project.displayName}');
     } catch (e) {
       AppLogger.error('ProjectItem: Failed to move task ${task.summary} to project ${widget.project.displayName}: $e');
-      
-      // Show error feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to move task: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-          action: SnackBarAction(
-            label: 'Dismiss',
-            onPressed: () {},
-          ),
-        ),
-      );
     }
   }
 

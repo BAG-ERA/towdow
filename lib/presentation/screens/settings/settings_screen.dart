@@ -224,17 +224,11 @@ class SettingsScreen extends ConsumerWidget {
           });
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ Failed to clear data: ${failure.message}'),
-            ),
-          );
+          AppLogger.error('Failed to clear data: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ Error clearing data: $e')));
+      AppLogger.error('Error clearing data: $e');
     }
   }
 
@@ -397,9 +391,7 @@ class _SettingsItem extends StatelessWidget {
       onTap:
           onTap ??
           () {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('$title coming soon!')));
+            // Feature coming soon - no action needed
           },
     );
   }
