@@ -68,7 +68,8 @@ final taskRepositoryProvider = Provider<TaskRepository>((ref) {
 
 final calendarRepositoryProvider = Provider<CalendarRepository>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
-  return LocalCalendarRepository(storageService);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return LocalCalendarRepository(storageService, accountRepository);
 });
 
 final accountRepositoryProvider = Provider<AccountRepository>((ref) {
