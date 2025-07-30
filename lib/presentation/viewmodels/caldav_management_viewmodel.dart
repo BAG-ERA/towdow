@@ -275,33 +275,17 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
 
   /// Delete a calendar from the server and local storage
   Future<void> deleteCalendar(TaskCalendar calendar) async {
-    if (state.currentAccount == null) return;
-
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // First, try to delete from server
-      final caldavService = CalDAVService(account: state.currentAccount!);
-      final serverDeleteResult = await caldavService.deleteCalendar(calendar.path);
-      
-      serverDeleteResult.when(
+      // Delete through repository (handles both server and local deletion)
+      final deleteResult = await _calendarRepository.delete(calendar.path);
+      deleteResult.when(
         success: (_) {
-          AppLogger.info('CalDAVManagement: Successfully deleted calendar from server: ${calendar.displayName}');
+          AppLogger.info('CalDAVManagement: Successfully deleted calendar: ${calendar.displayName}');
         },
         failure: (failure) {
-          AppLogger.warning('CalDAVManagement: Failed to delete calendar from server: ${failure.message}');
-          // Continue with local deletion even if server deletion fails
-        },
-      );
-
-      // Remove from local storage
-      final localDeleteResult = await _calendarRepository.delete(calendar.path);
-      localDeleteResult.when(
-        success: (_) {
-          AppLogger.info('CalDAVManagement: Successfully deleted calendar from local storage: ${calendar.displayName}');
-        },
-        failure: (failure) {
-          AppLogger.error('CalDAVManagement: Failed to delete calendar from local storage: ${failure.message}');
+          AppLogger.error('CalDAVManagement: Failed to delete calendar: ${failure.message}');
           state = state.copyWith(error: 'Failed to delete calendar: ${failure.message}');
         },
       );

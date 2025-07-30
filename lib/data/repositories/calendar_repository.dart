@@ -7,6 +7,8 @@ import '../../core/logger.dart';
 import '../models/task_calendar.dart';
 import '../services/local_storage_service.dart';
 import '../services/sync_service.dart';
+import '../services/caldav_service.dart';
+import 'account_repository.dart';
 
 // Abstract repository interface
 abstract class CalendarRepository {
@@ -44,8 +46,9 @@ abstract class CalendarRepository {
 // Local implementation using Hive
 class LocalCalendarRepository implements CalendarRepository {
   final LocalStorageService _storageService;
+  final AccountRepository _accountRepository;
 
-  LocalCalendarRepository(this._storageService);
+  LocalCalendarRepository(this._storageService, this._accountRepository);
 
   @override
   Future<Result<List<TaskCalendar>>> getAll() async {
@@ -96,7 +99,76 @@ class LocalCalendarRepository implements CalendarRepository {
 
   @override
   Future<Result<void>> delete(String uid) async {
-    return await _storageService.delete(LocalStorageService.calendarsBoxName, uid);
+    AppLogger.info('LocalCalendarRepository: Deleting calendar: $uid');
+    
+    try {
+      // First, get the calendar to obtain its path for server deletion
+      final calendarResult = await getById(uid);
+      await calendarResult.when(
+        success: (calendar) async {
+          if (calendar == null) {
+            AppLogger.warning('LocalCalendarRepository: Calendar $uid not found for deletion');
+            return; // Already deleted
+          }
+
+          // Try to delete from server first
+          final accountResult = await _accountRepository.getActiveAccount();
+          await accountResult.when(
+            success: (account) async {
+              if (account != null) {
+                try {
+                  final caldavService = CalDAVService(account: account);
+                  final serverDeleteResult = await caldavService.deleteCalendar(calendar.path);
+                  
+                  serverDeleteResult.when(
+                    success: (_) {
+                      AppLogger.info('LocalCalendarRepository: Successfully deleted calendar from server: ${calendar.displayName}');
+                    },
+                    failure: (failure) {
+                      AppLogger.warning('LocalCalendarRepository: Failed to delete calendar from server: ${failure.message}');
+                      // Continue with local deletion even if server deletion fails
+                    },
+                  );
+                } catch (e) {
+                  AppLogger.warning('LocalCalendarRepository: Exception during server deletion: $e');
+                  // Continue with local deletion even if server deletion fails
+                }
+              } else {
+                AppLogger.info('LocalCalendarRepository: No active account - skipping server deletion');
+              }
+            },
+            failure: (failure) {
+              AppLogger.warning('LocalCalendarRepository: Failed to get account for server deletion: ${failure.message}');
+              // Continue with local deletion even if we can't get account
+            },
+          );
+        },
+        failure: (failure) {
+          AppLogger.warning('LocalCalendarRepository: Failed to get calendar for deletion: ${failure.message}');
+          // Continue with local deletion attempt
+        },
+      );
+
+      // Always attempt local deletion regardless of server deletion result
+      final localDeleteResult = await _storageService.delete(LocalStorageService.calendarsBoxName, uid);
+      localDeleteResult.when(
+        success: (_) {
+          AppLogger.info('LocalCalendarRepository: Successfully deleted calendar from local storage: $uid');
+        },
+        failure: (failure) {
+          AppLogger.error('LocalCalendarRepository: Failed to delete calendar from local storage: ${failure.message}');
+        },
+      );
+      
+      return localDeleteResult;
+    } catch (e, stackTrace) {
+      AppLogger.error('LocalCalendarRepository: Exception during calendar deletion', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to delete calendar: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
   }
 
   @override
@@ -124,9 +196,9 @@ class LocalCalendarRepository implements CalendarRepository {
     final result = await getAll();
     return result.when(
       success: (calendars) {
-        // All calendars that support VTODO and are not archived are projects
-        final projects = calendars.where((c) => c.supportsTodos && !c.isArchived).toList();
-        // AppLogger.info('LocalCalendarRepository: Found  [32m${projects.length} [0m active project calendars (all synchronized VTODO calendars)');
+        // All calendars that support VTODO are projects (including archived ones)
+        final projects = calendars.where((c) => c.supportsTodos).toList();
+        // AppLogger.info('LocalCalendarRepository: Found  [32m${projects.length} [0m project calendars (all VTODO calendars including archived)');
         return Result.success(projects);
       },
       failure: (failure) => Result.failure(failure),

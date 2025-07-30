@@ -397,6 +397,36 @@ class CalDAVMonitor {
         },
         failure: (failure) async {
           AppLogger.warning('CalDAVMonitor: Could not get remote etag for user preferences: ${failure.message}');
+          
+          // Check if this is a 404 (file not found) and we have local preferences
+          if (failure.message.contains('404') || failure.message.contains('not found')) {
+            AppLogger.info('CalDAVMonitor: No remote user preferences file found, checking for local preferences to upload');
+            
+            // Check if we have local preferences that should be uploaded
+            final localPrefsResult = await _userRepository.getUserPreferences();
+            final hasLocalPrefs = localPrefsResult.when(
+              success: (prefs) => prefs.projectOrder.isNotEmpty || prefs.syncedProjects.isNotEmpty,
+              failure: (_) => false,
+            );
+            
+            if (hasLocalPrefs) {
+              AppLogger.info('CalDAVMonitor: Found local preferences, triggering upload to server');
+              
+              // Trigger upload of local preferences
+              final uploadResult = await _userSyncService.uploadUserData();
+              await uploadResult.when(
+                success: (_) async {
+                  AppLogger.info('CalDAVMonitor: Successfully uploaded local user preferences to server');
+                },
+                failure: (uploadFailure) async {
+                  AppLogger.error('CalDAVMonitor: Failed to upload local user preferences: ${uploadFailure.message}');
+                },
+              );
+              
+              return true; // Return true to indicate changes were processed
+            }
+          }
+          
           return false;
         },
       );

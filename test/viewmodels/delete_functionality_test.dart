@@ -257,16 +257,21 @@ void main() {
 
         // Arrange
         final mockStorage = MockLocalStorageService();
-        final calendarRepo = LocalCalendarRepository(mockStorage);
+        final mockAccountRepository = MockAccountRepository();
+        final calendarRepo = LocalCalendarRepository(mockStorage, mockAccountRepository);
         final taskRepo = LocalTaskRepository(mockStorage);
 
         // Mock successful storage operations
         when(mockStorage.get(LocalStorageService.tasksBoxName, 'task1'))
             .thenAnswer((_) async => const Result<Task?>.success(null)); // Task not found, which is fine for delete
+        when(mockStorage.get(LocalStorageService.calendarsBoxName, 'calendar1'))
+            .thenAnswer((_) async => const Result<TaskCalendar?>.success(null)); // Calendar not found, which is fine for delete
         when(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1'))
             .thenAnswer((_) async => const Result.success(null));
         when(mockStorage.delete(LocalStorageService.tasksBoxName, 'task1'))
             .thenAnswer((_) async => const Result.success(null));
+        when(mockAccountRepository.getActiveAccount())
+            .thenAnswer((_) async => Result.failure(Failure(exception: Exception('No account'), message: 'No active account')));
 
         // Act - Test calendar deletion
         final calendarResult = await calendarRepo.delete('calendar1');
@@ -282,12 +287,17 @@ void main() {
       test('should handle storage deletion failure', () async {
         // Arrange
         final mockStorage = MockLocalStorageService();
-        final calendarRepo = LocalCalendarRepository(mockStorage);
+        final mockAccountRepository = MockAccountRepository();
+        final calendarRepo = LocalCalendarRepository(mockStorage, mockAccountRepository);
 
         // Mock storage failure
+        when(mockStorage.get(LocalStorageService.calendarsBoxName, 'calendar1'))
+            .thenAnswer((_) async => const Result<TaskCalendar?>.success(null)); // Calendar not found, which is fine for delete
         when(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1'))
             .thenAnswer((_) async => Result.failure(
                 Failure(exception: Exception('Storage locked'), message: 'Storage is locked by another process')));
+        when(mockAccountRepository.getActiveAccount())
+            .thenAnswer((_) async => Result.failure(Failure(exception: Exception('No account'), message: 'No active account')));
 
         // Act
         final result = await calendarRepo.delete('calendar1');
