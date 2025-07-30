@@ -238,7 +238,7 @@ class ProjectInfosWidget extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           
-          // Members
+          // Members - Always displayed
           sharedByAsync.when(
             data: (sharedBy) {
               final membersList = <String>[];
@@ -262,92 +262,89 @@ class ProjectInfosWidget extends ConsumerWidget {
                 }
               }
               
-              if (membersList.isNotEmpty) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDetailRow(context, 'Members', membersList.join(', ')),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => ProjectSharingDialog(project: project),
-                        );
-                      },
-                      child: Text(
-                        'Manage sharing',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          decoration: TextDecoration.underline,
-                          fontWeight: FontWeight.w500,
-                        ),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDetailRow(context, 'Members', 
+                    membersList.isNotEmpty ? membersList.join(', ') : 'No members'
+                  ),
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => ProjectSharingDialog(project: project),
+                      );
+                    },
+                    child: Text(
+                      'Manage sharing',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        decoration: TextDecoration.underline,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ],
-                );
-              }
-              return const SizedBox.shrink();
+                  ),
+                ],
+              );
             },
             loading: () {
-              // While loading, show owner/author as fallback
+              // While loading, show owner/author as fallback or "No members"
               final currentUser = project.flowitOwner ?? project.flowitAuthor ?? '';
-              if (currentUser.isNotEmpty) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDetailRow(context, 'Members', currentUser),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => ProjectSharingDialog(project: project),
-                        );
-                      },
-                      child: Text(
-                        'Manage sharing',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          decoration: TextDecoration.underline,
-                          fontWeight: FontWeight.w500,
-                        ),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDetailRow(context, 'Members', 
+                    currentUser.isNotEmpty ? currentUser : 'No members'
+                  ),
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => ProjectSharingDialog(project: project),
+                      );
+                    },
+                    child: Text(
+                      'Manage sharing',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        decoration: TextDecoration.underline,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ],
-                );
-              }
-              return const SizedBox.shrink();
+                  ),
+                ],
+              );
             },
             error: (_, __) {
-              // On error, show owner/author as fallback
+              // On error, show owner/author as fallback or "No members"
               final currentUser = project.flowitOwner ?? project.flowitAuthor ?? '';
-              if (currentUser.isNotEmpty) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDetailRow(context, 'Members', currentUser),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => ProjectSharingDialog(project: project),
-                        );
-                      },
-                      child: Text(
-                        'Manage sharing',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          decoration: TextDecoration.underline,
-                          fontWeight: FontWeight.w500,
-                        ),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDetailRow(context, 'Members', 
+                    currentUser.isNotEmpty ? currentUser : 'No members'
+                  ),
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => ProjectSharingDialog(project: project),
+                      );
+                    },
+                    child: Text(
+                      'Manage sharing',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        decoration: TextDecoration.underline,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ],
-                );
-              }
-              return const SizedBox.shrink();
+                  ),
+                ],
+              );
             },
           ),
           
