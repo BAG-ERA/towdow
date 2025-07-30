@@ -231,11 +231,11 @@ class ShareService {
   }
 
   /// Exit share from project (POST /exitShare/{project_path})
-  Future<Result<void>> exitShare(String projectPath) async {
+  Future<Result<void>> exitShare(String projectUid) async {
     try {
-      AppLogger.info('ShareService: Exiting share for project $projectPath');
+      AppLogger.info('ShareService: Exiting share for project $projectUid');
       
-      final url = Uri.parse('$_baseUrl/exitShare/$projectPath');
+      final url = Uri.parse('$_baseUrl/exitShare/$projectUid');
       final headers = await _client.getAuthHeaders();
       
       final response = await http.post(url, headers: headers);

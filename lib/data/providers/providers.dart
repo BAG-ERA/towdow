@@ -69,7 +69,8 @@ final taskRepositoryProvider = Provider<TaskRepository>((ref) {
 final calendarRepositoryProvider = Provider<CalendarRepository>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
-  return LocalCalendarRepository(storageService, accountRepository);
+  final userRepository = ref.watch(userRepositoryProvider);
+  return LocalCalendarRepository(storageService, accountRepository, userRepository);
 });
 
 final accountRepositoryProvider = Provider<AccountRepository>((ref) {
@@ -529,10 +530,36 @@ final calendarListProvider = StreamProvider<List<TaskCalendar>>((ref) {
 // Active calendars provider (excludes archived calendars)
 final activeCalendarListProvider = StreamProvider<List<TaskCalendar>>((ref) {
   final repository = ref.watch(calendarRepositoryProvider);
-  return repository.watchCalendars().asyncMap((_) async {
+  return repository.watchCalendars().asyncMap((watchedCalendars) async {
+    AppLogger.info('ActiveCalendarListProvider: DEBUG - Received ${watchedCalendars.length} calendars from watchCalendars');
     final result = await repository.getProjectCalendars();
     return result.when(
-      success: (calendars) => calendars.where((calendar) => !calendar.isArchived).toList(),
+      success: (calendars) {
+        AppLogger.info('ActiveCalendarListProvider: DEBUG - getProjectCalendars returned ${calendars.length} calendars');
+        // Filter out archived calendars
+        final activeCalendars = calendars.where((calendar) => !calendar.isArchived).toList();
+        AppLogger.info('ActiveCalendarListProvider: DEBUG - After filtering archived: ${activeCalendars.length} calendars');
+        
+        // Deduplicate calendars by UID to prevent shared projects from appearing twice
+        final seen = <String>{};
+        final deduplicatedCalendars = <TaskCalendar>[];
+        
+        for (final calendar in activeCalendars) {
+          final uid = calendar.uid;
+          if (!seen.contains(uid)) {
+            seen.add(uid);
+            deduplicatedCalendars.add(calendar);
+          } else {
+            AppLogger.debug('CalendarListProvider: Filtered duplicate calendar with UID: $uid (path: ${calendar.path})');
+          }
+        }
+        
+        AppLogger.info('ActiveCalendarListProvider: DEBUG - Final deduped list: ${deduplicatedCalendars.length} calendars');
+        for (final cal in deduplicatedCalendars) {
+          AppLogger.info('  - ${cal.displayName} | Path: ${cal.path} | UID: ${cal.uid}');
+        }
+        return deduplicatedCalendars;
+      },
       failure: (failure) => throw Exception(failure.message),
     );
   });

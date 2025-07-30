@@ -5,10 +5,15 @@
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/task_calendar.dart';
+import '../models/shared_with_me_project.dart';
 import '../services/local_storage_service.dart';
 import '../services/sync_service.dart';
 import '../services/caldav_service.dart';
+import '../services/share_service.dart';
+import '../services/share_service.dart';
 import 'account_repository.dart';
+import 'user_repository.dart';
+import 'user_repository.dart';
 
 // Abstract repository interface
 abstract class CalendarRepository {
@@ -17,6 +22,7 @@ abstract class CalendarRepository {
   Future<Result<TaskCalendar?>> getByPath(String path);
   Future<Result<void>> save(TaskCalendar calendar);
   Future<Result<void>> delete(String uid);
+  Future<Result<void>> deleteSharedProject(String uid, String fullPath);
   Stream<List<TaskCalendar>> watchCalendars();
   Future<Result<List<TaskCalendar>>> getProjectCalendars();
   
@@ -47,8 +53,60 @@ abstract class CalendarRepository {
 class LocalCalendarRepository implements CalendarRepository {
   final LocalStorageService _storageService;
   final AccountRepository _accountRepository;
+  final UserRepository _userRepository;
 
-  LocalCalendarRepository(this._storageService, this._accountRepository);
+  LocalCalendarRepository(this._storageService, this._accountRepository, this._userRepository);
+
+  /// Check if a project is shared with me by looking up in user preferences
+  Future<bool> _isSharedWithMe(String uid) async {
+    final userPreferencesResult = await _userRepository.getUserPreferences();
+    return userPreferencesResult.when(
+      success: (preferences) {
+        // Find shared project by extracting UID from project paths
+        for (final shared in preferences.sharedWithMeProjects) {
+          final segments = shared.projectId.split('/').where((s) => s.isNotEmpty).toList();
+          final sharedProjectUid = segments.isNotEmpty ? segments.last : shared.projectId;
+          if (sharedProjectUid == uid) {
+            return true;
+          }
+        }
+        return false;
+      },
+      failure: (_) => false,
+    );
+  }
+
+  /// Remove a project from the shared with me projects list
+  Future<void> _removeFromSharedProjects(String uid) async {
+    final userPreferencesResult = await _userRepository.getUserPreferences();
+    await userPreferencesResult.when(
+      success: (preferences) async {
+        final updatedPreferences = preferences.copyWith(
+          sharedWithMeProjects: preferences.sharedWithMeProjects
+              .where((project) {
+                // Compare UIDs extracted from paths
+                final segments = project.projectId.split('/').where((s) => s.isNotEmpty).toList();
+                final projectUid = segments.isNotEmpty ? segments.last : project.projectId;
+                return projectUid != uid;
+              })
+              .toList(),
+        );
+        
+        final saveResult = await _userRepository.saveUserPreferences(updatedPreferences);
+        saveResult.when(
+          success: (_) {
+            AppLogger.info('LocalCalendarRepository: Successfully removed shared project from preferences: $uid');
+          },
+          failure: (failure) {
+            AppLogger.warning('LocalCalendarRepository: Failed to update user preferences after exit share: ${failure.message}');
+          },
+        );
+      },
+      failure: (failure) async {
+        AppLogger.warning('LocalCalendarRepository: Failed to get user preferences for shared project removal: ${failure.message}');
+      },
+    );
+  }
 
   @override
   Future<Result<List<TaskCalendar>>> getAll() async {
@@ -102,7 +160,147 @@ class LocalCalendarRepository implements CalendarRepository {
     AppLogger.info('LocalCalendarRepository: Deleting calendar: $uid');
     
     try {
-      // First, get the calendar to obtain its path for server deletion
+      // Check if this is a shared project first (before looking for local calendar)
+      AppLogger.info('LocalCalendarRepository: Checking if project $uid is shared with me');
+      final userPreferencesResult = await _userRepository.getUserPreferences();
+      SharedWithMeProject? sharedProject;
+      await userPreferencesResult.when(
+        success: (preferences) async {
+          AppLogger.info('LocalCalendarRepository: Found ${preferences.sharedWithMeProjects.length} shared projects');
+          // Find shared project by extracting UID from project paths
+          // SharedWithMeProject.projectId contains full path like /user-uuid/project-uuid/
+          // We need to compare extracted UIDs
+          for (final shared in preferences.sharedWithMeProjects) {
+            final segments = shared.projectId.split('/').where((s) => s.isNotEmpty).toList();
+            final sharedProjectUid = segments.isNotEmpty ? segments.last : shared.projectId;
+            AppLogger.info('LocalCalendarRepository: Comparing UID "$uid" with shared project UID "$sharedProjectUid" (path: ${shared.projectId})');
+            if (sharedProjectUid == uid) {
+              sharedProject = shared;
+              AppLogger.info('LocalCalendarRepository: MATCH FOUND! Project $uid is shared with me');
+              break;
+            }
+          }
+          if (sharedProject == null) {
+            AppLogger.info('LocalCalendarRepository: No match found, project $uid is not shared with me');
+          }
+        },
+        failure: (failure) async {
+          AppLogger.warning('LocalCalendarRepository: Failed to get user preferences: ${failure.message}');
+          // Continue with local calendar lookup if we can't get preferences
+        },
+      );
+
+      if (sharedProject != null) {
+        // Handle shared project deletion using exitShare API
+        AppLogger.info('LocalCalendarRepository: Project $uid is shared, using exitShare API');
+        
+        final accountResult = await _accountRepository.getActiveAccount();
+        await accountResult.when(
+          success: (account) async {
+            if (account != null) {
+              try {
+                // For exitShare API, we need to pass the project UID, not the full path
+                AppLogger.info('LocalCalendarRepository: Using project UID for exitShare: $uid');
+                
+                final shareService = ShareService(account: account);
+                final exitShareResult = await shareService.exitShare(uid);
+                
+                exitShareResult.when(
+                  success: (_) {
+                    AppLogger.info('LocalCalendarRepository: Successfully exited share for project: $uid');
+                  },
+                  failure: (failure) {
+                    AppLogger.warning('LocalCalendarRepository: Failed to exit share on server: ${failure.message}');
+                    // Continue with local removal even if server exit fails
+                  },
+                );
+              } catch (e) {
+                AppLogger.warning('LocalCalendarRepository: Exception during exitShare: $e');
+              }
+            } else {
+              AppLogger.warning('LocalCalendarRepository: No active account for exitShare');
+            }
+          },
+          failure: (failure) {
+            AppLogger.warning('LocalCalendarRepository: Failed to get account for exitShare: ${failure.message}');
+          },
+        );
+
+        // Remove from local shared projects list
+        await userPreferencesResult.when(
+          success: (preferences) async {
+            final updatedPreferences = preferences.copyWith(
+              sharedWithMeProjects: preferences.sharedWithMeProjects
+                  .where((project) {
+                    // Compare UIDs extracted from paths
+                    final segments = project.projectId.split('/').where((s) => s.isNotEmpty).toList();
+                    final projectUid = segments.isNotEmpty ? segments.last : project.projectId;
+                    return projectUid != uid;
+                  })
+                  .toList(),
+            );
+            final saveResult = await _userRepository.saveUserPreferences(updatedPreferences);
+            saveResult.when(
+              success: (_) {
+                AppLogger.info('LocalCalendarRepository: Successfully removed shared project from preferences');
+              },
+              failure: (failure) {
+                AppLogger.warning('LocalCalendarRepository: Failed to update user preferences after exit share: ${failure.message}');
+              },
+            );
+          },
+          failure: (_) async {
+            AppLogger.warning('LocalCalendarRepository: Failed to update user preferences after exit share');
+          },
+        );
+
+        // Also attempt to remove local calendar cache for shared project
+        // Use the project path from SharedWithMeProject for deletion
+        final projectPath = sharedProject!.projectId; // This contains the full path
+        
+        // DEBUG: Log all calendars in storage before deletion
+        final allCalendarsBeforeResult = await getAll();
+        await allCalendarsBeforeResult.when(
+          success: (calendars) async {
+            AppLogger.info('LocalCalendarRepository: DEBUG - Before deletion, found ${calendars.length} calendars in storage:');
+            for (final cal in calendars) {
+              AppLogger.info('  - Calendar: ${cal.displayName} | Path: ${cal.path} | UID: ${cal.uid}');
+            }
+            AppLogger.info('LocalCalendarRepository: DEBUG - Attempting to delete calendar with path: $projectPath');
+          },
+          failure: (failure) async {
+            AppLogger.warning('LocalCalendarRepository: DEBUG - Failed to get calendars before deletion: ${failure.message}');
+          },
+        );
+        
+        final localDeleteResult = await _storageService.delete(LocalStorageService.calendarsBoxName, projectPath);
+        localDeleteResult.when(
+          success: (_) {
+            AppLogger.info('LocalCalendarRepository: Successfully deleted shared project calendar from local storage: $projectPath');
+          },
+          failure: (failure) {
+            AppLogger.info('LocalCalendarRepository: Shared project calendar not found in local storage (expected): $projectPath');
+          },
+        );
+        
+        // DEBUG: Log all calendars in storage after deletion
+        final allCalendarsAfterResult = await getAll();
+        await allCalendarsAfterResult.when(
+          success: (calendars) async {
+            AppLogger.info('LocalCalendarRepository: DEBUG - After deletion, found ${calendars.length} calendars in storage:');
+            for (final cal in calendars) {
+              AppLogger.info('  - Calendar: ${cal.displayName} | Path: ${cal.path} | UID: ${cal.uid}');
+            }
+          },
+          failure: (failure) async {
+            AppLogger.warning('LocalCalendarRepository: DEBUG - Failed to get calendars after deletion: ${failure.message}');
+          },
+        );
+
+        return const Result.success(null);
+      }
+
+      // Handle owned project deletion (traditional flow)
       final calendarResult = await getById(uid);
       await calendarResult.when(
         success: (calendar) async {
@@ -111,34 +309,55 @@ class LocalCalendarRepository implements CalendarRepository {
             return; // Already deleted
           }
 
-          // Try to delete from server first
+          // Check if this is a shared project and use appropriate API
+          final isShared = await _isSharedWithMe(uid);
+          
           final accountResult = await _accountRepository.getActiveAccount();
           await accountResult.when(
             success: (account) async {
               if (account != null) {
                 try {
-                  final caldavService = CalDAVService(account: account);
-                  final serverDeleteResult = await caldavService.deleteCalendar(calendar.path);
-                  
-                  serverDeleteResult.when(
-                    success: (_) {
-                      AppLogger.info('LocalCalendarRepository: Successfully deleted calendar from server: ${calendar.displayName}');
-                    },
-                    failure: (failure) {
-                      AppLogger.warning('LocalCalendarRepository: Failed to delete calendar from server: ${failure.message}');
-                      // Continue with local deletion even if server deletion fails
-                    },
-                  );
+                  if (isShared) {
+                    // Use exit share API for shared projects
+                    AppLogger.info('LocalCalendarRepository: Project is shared with me, using exit share: ${calendar.displayName}');
+                    final shareService = ShareService(account: account);
+                    final exitShareResult = await shareService.exitShare(uid);
+                    
+                    exitShareResult.when(
+                      success: (_) {
+                        AppLogger.info('LocalCalendarRepository: Successfully exited share: ${calendar.displayName}');
+                      },
+                      failure: (failure) {
+                        AppLogger.warning('LocalCalendarRepository: Failed to exit share: ${failure.message}');
+                        // Continue with local deletion even if server exit fails
+                      },
+                    );
+                  } else {
+                    // Use traditional delete for owned projects
+                    AppLogger.info('LocalCalendarRepository: Project is owned by me, using delete: ${calendar.displayName}');
+                    final caldavService = CalDAVService(account: account);
+                    final serverDeleteResult = await caldavService.deleteCalendar(calendar.path);
+                    
+                    serverDeleteResult.when(
+                      success: (_) {
+                        AppLogger.info('LocalCalendarRepository: Successfully deleted calendar from server: ${calendar.displayName}');
+                      },
+                      failure: (failure) {
+                        AppLogger.warning('LocalCalendarRepository: Failed to delete calendar from server: ${failure.message}');
+                        // Continue with local deletion even if server deletion fails
+                      },
+                    );
+                  }
                 } catch (e) {
-                  AppLogger.warning('LocalCalendarRepository: Exception during server deletion: $e');
-                  // Continue with local deletion even if server deletion fails
+                  AppLogger.warning('LocalCalendarRepository: Exception during server operation: $e');
+                  // Continue with local deletion even if server operation fails
                 }
               } else {
-                AppLogger.info('LocalCalendarRepository: No active account - skipping server deletion');
+                AppLogger.info('LocalCalendarRepository: No active account - skipping server operation');
               }
             },
             failure: (failure) {
-              AppLogger.warning('LocalCalendarRepository: Failed to get account for server deletion: ${failure.message}');
+              AppLogger.warning('LocalCalendarRepository: Failed to get account for server operation: ${failure.message}');
               // Continue with local deletion even if we can't get account
             },
           );
@@ -148,6 +367,12 @@ class LocalCalendarRepository implements CalendarRepository {
           // Continue with local deletion attempt
         },
       );
+
+      // If this was a shared project, also remove it from user preferences
+      final isShared = await _isSharedWithMe(uid);
+      if (isShared) {
+        await _removeFromSharedProjects(uid);
+      }
 
       // Always attempt local deletion regardless of server deletion result
       final localDeleteResult = await _storageService.delete(LocalStorageService.calendarsBoxName, uid);
@@ -172,22 +397,162 @@ class LocalCalendarRepository implements CalendarRepository {
   }
 
   @override
+  Future<Result<void>> deleteSharedProject(String uid, String fullPath) async {
+    AppLogger.info('LocalCalendarRepository: Deleting shared project - UID: $uid, Path: $fullPath');
+    
+    try {
+      // Check if this is a shared project using UserPreferences
+      final userPreferencesResult = await _userRepository.getUserPreferences();
+      SharedWithMeProject? sharedProject;
+      await userPreferencesResult.when(
+        success: (preferences) async {
+          // Find shared project by extracting UID from project paths
+          // SharedWithMeProject.projectId contains full path like /user-uuid/project-uuid/
+          // We need to compare extracted UIDs
+          for (final shared in preferences.sharedWithMeProjects) {
+            final segments = shared.projectId.split('/').where((s) => s.isNotEmpty).toList();
+            final sharedProjectUid = segments.isNotEmpty ? segments.last : shared.projectId;
+            if (sharedProjectUid == uid) {
+              sharedProject = shared;
+              break;
+            }
+          }
+        },
+        failure: (_) async {
+          // Continue if we can't get preferences
+        },
+      );
+
+      if (sharedProject != null) {
+        // Handle shared project deletion using exitShare API
+        AppLogger.info('LocalCalendarRepository: Project $uid is shared, using exitShare API');
+        
+        final accountResult = await _accountRepository.getActiveAccount();
+        await accountResult.when(
+          success: (account) async {
+            if (account != null) {
+              try {
+                // Use the project UID for exitShare API
+                AppLogger.info('LocalCalendarRepository: Using project UID for exitShare: $uid');
+                
+                final shareService = ShareService(account: account);
+                final exitShareResult = await shareService.exitShare(uid);
+                
+                exitShareResult.when(
+                  success: (_) {
+                    AppLogger.info('LocalCalendarRepository: Successfully exited share for project: $uid');
+                  },
+                  failure: (failure) {
+                    AppLogger.warning('LocalCalendarRepository: Failed to exit share on server: ${failure.message}');
+                    // Continue with local removal even if server exit fails
+                  },
+                );
+              } catch (e) {
+                AppLogger.warning('LocalCalendarRepository: Exception during exitShare: $e');
+              }
+            } else {
+              AppLogger.warning('LocalCalendarRepository: No active account for exitShare');
+            }
+          },
+          failure: (failure) {
+            AppLogger.warning('LocalCalendarRepository: Failed to get account for exitShare: ${failure.message}');
+          },
+        );
+
+        // Remove from local shared projects list
+        await userPreferencesResult.when(
+          success: (preferences) async {
+            final updatedPreferences = preferences.copyWith(
+              sharedWithMeProjects: preferences.sharedWithMeProjects
+                  .where((project) {
+                    // Compare UIDs extracted from paths
+                    final segments = project.projectId.split('/').where((s) => s.isNotEmpty).toList();
+                    final projectUid = segments.isNotEmpty ? segments.last : project.projectId;
+                    return projectUid != uid;
+                  })
+                  .toList(),
+            );
+            final saveResult = await _userRepository.saveUserPreferences(updatedPreferences);
+            saveResult.when(
+              success: (_) {
+                AppLogger.info('LocalCalendarRepository: Successfully removed shared project from preferences');
+              },
+              failure: (failure) {
+                AppLogger.warning('LocalCalendarRepository: Failed to update user preferences after exit share: ${failure.message}');
+              },
+            );
+          },
+          failure: (_) async {
+            AppLogger.warning('LocalCalendarRepository: Failed to update user preferences after exit share');
+          },
+        );
+
+        // Remove local calendar cache for shared project using the full path
+        AppLogger.info('LocalCalendarRepository: DEBUG - Attempting to delete calendar with full path: $fullPath');
+        final localDeleteResult = await _storageService.delete(LocalStorageService.calendarsBoxName, fullPath);
+        localDeleteResult.when(
+          success: (_) {
+            AppLogger.info('LocalCalendarRepository: Successfully deleted shared project calendar from local storage: $fullPath');
+          },
+          failure: (failure) {
+            AppLogger.warning('LocalCalendarRepository: Failed to delete shared project calendar from local storage: ${failure.message}');
+          },
+        );
+
+        // DEBUG: Log all calendars in storage after deletion
+        final allCalendarsAfterResult = await getAll();
+        await allCalendarsAfterResult.when(
+          success: (calendars) async {
+            AppLogger.info('LocalCalendarRepository: DEBUG - After shared project deletion, found ${calendars.length} calendars in storage:');
+            for (final cal in calendars) {
+              AppLogger.info('  - Calendar: ${cal.displayName} | Path: ${cal.path} | UID: ${cal.uid}');
+            }
+          },
+          failure: (failure) async {
+            AppLogger.warning('LocalCalendarRepository: DEBUG - Failed to get calendars after deletion: ${failure.message}');
+          },
+        );
+
+        return const Result.success(null);
+      } else {
+        AppLogger.warning('LocalCalendarRepository: Project $uid not found in shared projects list');
+        return Result.failure(Failure(
+          message: 'Project not found in shared projects',
+          exception: Exception('Not a shared project'),
+        ));
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('LocalCalendarRepository: Exception during shared project deletion', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to delete shared project: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  @override
   Stream<List<TaskCalendar>> watchCalendars() async* {
     // Emit initial value
     final result = await getAll();
-    yield result.when(
+    final initialCalendars = result.when(
       success: (calendars) => calendars,
       failure: (_) => <TaskCalendar>[],
     );
+    AppLogger.info('LocalCalendarRepository: DEBUG - watchCalendars initial emit: ${initialCalendars.length} calendars');
+    yield initialCalendars;
     
     // Then listen to changes
     yield* _storageService.getStream(LocalStorageService.calendarsBoxName)
-        .asyncMap((_) async {
+        .asyncMap((boxEvent) async {
+          AppLogger.info('LocalCalendarRepository: DEBUG - watchCalendars received box event: ${boxEvent.key} ${boxEvent.deleted ? "DELETED" : "UPDATED"}');
           final result = await getAll();
-          return result.when(
+          final calendars = result.when(
             success: (calendars) => calendars,
             failure: (_) => <TaskCalendar>[],
           );
+          AppLogger.info('LocalCalendarRepository: DEBUG - watchCalendars emitting: ${calendars.length} calendars');
+          return calendars;
         });
   }
 

@@ -123,8 +123,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                       final result = await accountRepo.getActiveAccount();
                       result.when(
                         success: (account) {
-                          final providerType = account?.providerType ?? 'Unknown';
-                          // Account provider type retrieved - no notification needed
+                          AppLogger.debug('Account provider type: ${account?.providerType ?? 'Unknown'}');
                         },
                         failure: (failure) {
                           AppLogger.error('Failed to get account info: ${failure.message}');
@@ -316,6 +315,12 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
     // Check if save was successful and close dialog
     final state = ref.read(projectSharingViewModelProvider);
     if (state.error == null && mounted) {
+      // Wait a brief moment for any background operations to complete
+      await Future.delayed(const Duration(milliseconds: 200));
+      
+      // Invalidate related providers to ensure UI refresh
+      // Note: These providers will be refreshed automatically by the repository updates
+      
       Navigator.of(context).pop();
     }
   }

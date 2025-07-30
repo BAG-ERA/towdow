@@ -100,7 +100,6 @@ class ExitShareButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final chartTheme = context.chartTheme;
     final effectiveBackgroundColor = backgroundColor ?? chartTheme.colors.primary;
-    final effectiveTextColor = textColor ?? chartTheme.typography.primaryButton.color;
     
     final buttonPadding = _getPadding(chartTheme);
     final fontSize = _getFontSize();
@@ -175,56 +174,38 @@ class ExitShareButton extends ConsumerWidget {
     try {
       AppLogger.info('ExitShareButton: Exiting share for project $projectPath');
       
-      // Get the user repository to remove the shared project
-      final userRepository = ref.read(userRepositoryProvider);
+      // Extract project UID from path like /user-uuid/project-uuid/ -> project-uuid
+      final segments = projectPath.split('/').where((s) => s.isNotEmpty).toList();
+      final projectUid = segments.isNotEmpty ? segments.last : projectPath;
       
-      // Remove the shared project from user preferences
-      final preferencesResult = await userRepository.getUserPreferences();
+      AppLogger.info('ExitShareButton: Extracted project UID: $projectUid from path: $projectPath');
       
-      await preferencesResult.when(
-        success: (preferences) async {
-          // Remove the project from shared projects list using project UID
-          // Extract UID from path like /user-uuid/project-uuid/ -> project-uuid
-          final segments = projectPath.split('/').where((s) => s.isNotEmpty).toList();
-          final projectUid = segments.isNotEmpty ? segments.last : projectPath;
+      // Use calendar repository delete - pass both UID and full path for shared project handling
+      final calendarRepository = ref.read(calendarRepositoryProvider);
+      final deleteResult = await calendarRepository.deleteSharedProject(projectUid, projectPath);
+      
+      await deleteResult.when(
+        success: (_) async {
+          AppLogger.info('ExitShareButton: Successfully exited share for project $projectPath');
           
-          AppLogger.info('ExitShareButton: Extracted project UID: $projectUid from path: $projectPath');
-          AppLogger.info('ExitShareButton: Current shared projects: ${preferences.sharedWithMeProjects.map((p) => p.projectId).toList()}');
+          // Invalidate providers to refresh UI
+          ref.invalidate(projectListProvider);
+          ref.invalidate(activeCalendarListProvider);
           
-          final updatedPreferences = preferences.copyWith(
-            sharedWithMeProjects: preferences.sharedWithMeProjects
-                .where((project) => project.projectId != projectUid)
-                .toList(),
-          );
+          // Navigate away from project if currently viewing it
+          if (context.mounted) {
+            final currentRoute = GoRouterState.of(context).uri.path;
+            if (currentRoute == '/project/${Uri.encodeComponent(projectPath)}') {
+              AppLogger.info('ExitShareButton: Navigating away from exited shared project');
+              context.go('/today');
+            }
+          }
           
-          AppLogger.info('ExitShareButton: After removal, shared projects: ${updatedPreferences.sharedWithMeProjects.map((p) => p.projectId).toList()}');
-          
-          // Save updated preferences
-          final saveResult = await userRepository.saveUserPreferences(updatedPreferences);
-          
-          saveResult.when(
-            success: (_) {
-              AppLogger.info('ExitShareButton: Successfully exited share for project $projectPath');
-              
-              // Navigate away from project if currently viewing it
-              if (context.mounted) {
-                final currentRoute = GoRouterState.of(context).uri.path;
-                if (currentRoute == '/project/${Uri.encodeComponent(projectPath)}') {
-                  AppLogger.info('ExitShareButton: Navigating away from exited shared project');
-                  context.go('/');
-                }
-              }
-              
-              // Call optional callback
-              onShareExited?.call();
-            },
-            failure: (failure) {
-              AppLogger.error('ExitShareButton: Failed to save preferences after exiting share: ${failure.message}');
-            },
-          );
+          // Call optional callback
+          onShareExited?.call();
         },
-        failure: (failure) {
-          AppLogger.error('ExitShareButton: Failed to get user preferences: ${failure.message}');
+        failure: (failure) async {
+          AppLogger.error('ExitShareButton: Failed to exit share: ${failure.message}');
         },
       );
     } catch (e) {

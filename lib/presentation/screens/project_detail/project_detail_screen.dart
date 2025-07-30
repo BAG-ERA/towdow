@@ -357,10 +357,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           return ExitShareButton.compact(
             projectPath: project.path,
             projectDisplayName: project.displayName,
-            onShareExited: () {
-              // Navigate back to home after exiting share
-              Navigator.of(context).pop();
-            },
+            // Navigation is handled internally by ExitShareButton
           );
         } else {
           // Show archive button for owned projects
