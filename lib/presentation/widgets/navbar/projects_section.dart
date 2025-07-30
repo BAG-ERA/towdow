@@ -217,7 +217,6 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _animation;
-  bool _isExpanded = true; // Domains start expanded by default
 
   @override
   void initState() {
@@ -231,8 +230,22 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
       curve: Curves.easeInOut,
     );
     
-    if (_isExpanded) {
-      _animationController.value = 1.0;
+    // Initialize animation based on ViewModel state
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateAnimationState();
+    });
+  }
+
+  void _updateAnimationState() {
+    final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+    final isExpanded = projectListViewModel.isDomainExpanded(widget.domain);
+    
+    // Only animate if the current state doesn't match the desired state
+    final isCurrentlyExpanded = _animationController.value == 1.0;
+    if (isExpanded && !isCurrentlyExpanded) {
+      _animationController.forward();
+    } else if (!isExpanded && isCurrentlyExpanded) {
+      _animationController.reverse();
     }
   }
 
@@ -243,14 +256,11 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
   }
 
   void _toggleExpanded() {
-    setState(() {
-      _isExpanded = !_isExpanded;
-      if (_isExpanded) {
-        _animationController.forward();
-      } else {
-        _animationController.reverse();
-      }
-    });
+    final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+    projectListViewModel.toggleDomainExpansion(widget.domain);
+    
+    // The build method will be called again due to the state change,
+    // so we don't need to manually update the animation here
   }
 
   void _deleteDomain() async {
@@ -308,30 +318,13 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
           success: (_) {
             // Refresh the project list
             projectListViewModel.refresh();
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Domain "${widget.domain}" deleted successfully'),
-                backgroundColor: Theme.of(context).colorScheme.primary,
-              ),
-            );
           },
           failure: (failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to delete domain: ${failure.message}'),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-            );
+            AppLogger.error('Failed to delete domain: ${failure.message}');
           },
         );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete domain: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        AppLogger.error('Failed to delete domain: $e');
       }
     }
   }
@@ -435,14 +428,6 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     } catch (e) {
       AppLogger.error('DomainSection: Failed to reorder project ${dragData.project.displayName}: $e');
       
-      // Show error feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to reorder project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     }
   }
 
@@ -514,32 +499,26 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.assignDomainToProject(dragData.project.path, widget.domain);
       
-      // Show success feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Moved "${dragData.project.displayName}" to "${widget.domain}" domain'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          duration: const Duration(seconds: 2),
-        ),
-      );
       
               AppLogger.info('DomainSection: Successfully moved project ${dragData.project.displayName} to domain ${widget.domain}');
     } catch (e) {
               AppLogger.error('DomainSection: Failed to move project ${dragData.project.displayName} to domain ${widget.domain}: $e');
       
-      // Show error feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to move project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Watch the ViewModel state to trigger rebuilds when domain expansion changes
+    final projectListState = ref.watch(projectListViewModelProvider);
+    final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+    final isExpanded = projectListViewModel.isDomainExpanded(widget.domain);
+    
+    // Update animation state when expansion state changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateAnimationState();
+    });
+    
     return DragTarget<ProjectDragData>(
       onWillAcceptWithDetails: (details) {
         // Only accept projects from different domains (for domain change, not reordering)
@@ -581,7 +560,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                       child: Row(
                         children: [
                           AnimatedRotation(
-                            turns: _isExpanded ? 0.25 : 0,
+                            turns: isExpanded ? 0.25 : 0,
                             duration: const Duration(milliseconds: 200),
                             child: Icon(
                               Icons.arrow_right,
@@ -813,14 +792,6 @@ class _NoDomainSection extends ConsumerWidget {
     } catch (e) {
       AppLogger.error('NoDomainSection: Failed to reorder project ${dragData.project.displayName}: $e');
       
-      // Show error feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to reorder project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     }
   }
 
@@ -957,27 +928,11 @@ class _NoDomainSection extends ConsumerWidget {
       final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
       await projectListViewModel.assignDomainToProject(dragData.project.path, null);
       
-      // Show success feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Removed "${dragData.project.displayName}" from "${dragData.currentDomain}" domain'),
-          backgroundColor: Theme.of(context).colorScheme.secondary,
-          duration: const Duration(seconds: 2),
-        ),
-      );
       
       AppLogger.info('NoDomainSection: Successfully removed project ${dragData.project.displayName} from domain');
     } catch (e) {
       AppLogger.error('NoDomainSection: Failed to remove project ${dragData.project.displayName} from domain: $e');
       
-      // Show error feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to remove project from domain: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     }
   }
 }

@@ -8,6 +8,7 @@ import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/kanban_board.dart';
 import '../../widgets/agenda_calendar.dart';
 import '../../widgets/utils/tasklist_toolbar.dart';
+import '../../widgets/utils/buttons/archive_project_button.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
@@ -16,10 +17,9 @@ import '../../viewmodels/commands/attendee_commands.dart';
 
 import '../../../core/theme/chart_theme.dart';
 import '../../widgets/adaptive_app_layout.dart';
-import '../../widgets/project_detail/project_info_card.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/project_detail/project_kanban_view.dart';
-import '../../widgets/utils/editable_title.dart';
+import '../../widgets/project_detail/project_details_widget.dart';
 import '../../../data/services/webdav_client.dart';
 
 // Provider for a specific project/calendar that watches only this specific calendar
@@ -80,7 +80,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final projectAsync = ref.watch(projectProvider(widget.projectPath));
     final tasksAsync = ref.watch(projectTasksProvider(widget.projectPath));
 
-    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
+    // Check if we're on desktop (same breakpoint as AdaptiveAppLayout)
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
     // Update mobile providers when project data is available
@@ -100,42 +100,74 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       }
     });
 
+    if (isDesktop) {
+      // Desktop 3-column layout: Nav bar | Title/Header | View content
+      return _buildDesktopLayout(context, projectAsync, tasksAsync);
+    } else {
+      // Mobile single-column layout (existing)
+      return _buildMobileLayout(context, projectAsync, tasksAsync);
+    }
+  }
+
+  Widget _buildDesktopLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
     return Scaffold(
-      appBar: isDesktop ? AppBar(
-        title: projectAsync.when(
-          data: (project) => project != null 
-              ? EditableTitle(
-                  title: project.displayName,
-                  onTitleUpdated: (newTitle) {
-                    final updatedProject = project.copyWith(
-                      displayName: newTitle,
-                      lastModified: DateTime.now(),
-                    );
-                    _updateProject(updatedProject);
-                  },
-                  isInAppBar: true,
-                )
-              : const Text('Unknown Project'),
-          loading: () => const Text('Loading...'),
-          error: (_, _) => const Text('Error'),
-        ),
-        scrolledUnderElevation: 0,
-        elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        surfaceTintColor: Colors.transparent,
-      ) : null,
-      body: Column(
+      body: Row(
         children: [
-          // Project Info Card
-          projectAsync.when(
-            data: (project) => ProjectInfoCard(
-              project: project,
-              tasksAsync: tasksAsync,
-              projectPath: widget.projectPath,
-              onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+          // Column 1: Title/Header area (fixed width) with full project info
+          Container(
+            width: 320,
+            child: Column(
+              children: [
+                // Project title and full project info
+                _buildDesktopHeader(context, projectAsync, tasksAsync),
+              ],
             ),
+          ),
+          
+          // Column 2: View content (expanded) with tabs and content
+          Expanded(
+            child: Column(
+              children: [
+                // Archive button row at the top
+                _buildArchiveButtonRow(context, projectAsync),
+                
+                // View tabs moved to right column
+                _buildViewTabs(context),
+                
+                // Content based on selected tab
+                Expanded(
+                  child: _buildTabContent(context, ref, tasksAsync),
+                ),
+                
+                // Bottom toolbar with search and create task button
+                TaskListToolbar(
+                  projectPath: widget.projectPath,
+                  projectName: projectAsync.asData?.value?.displayName,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopHeader(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Project details layout
+          projectAsync.when(
+            data: (project) => project != null 
+                ? ProjectDetailsWidget(
+                    project: project,
+                    tasksAsync: tasksAsync,
+                    onProjectUpdated: _updateProject,
+                  )
+                : const SizedBox.shrink(),
             loading: () => Container(
-              margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -150,7 +182,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               ),
             ),
             error: (error, _) => Container(
-              margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.errorContainer,
@@ -175,16 +206,109 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               ),
             ),
           ),
-          
-          // View Tabs - Updated labels for new views
-          _buildViewTabs(context),
-          
-          // Content based on selected tab
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
+    return Scaffold(
+      body: Column(
+        children: [
+          // Scrollable content area
           Expanded(
-            child: _buildTabContent(context, ref, tasksAsync),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Project Details Widget (replacing ProjectInfoCard)
+                  projectAsync.when(
+                    data: (project) => project != null 
+                        ? ProjectDetailsWidget(
+                            project: project,
+                            tasksAsync: tasksAsync,
+                            onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                          )
+                        : Container(
+                            margin: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.errorContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.error_rounded,
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Project not found: ${widget.projectPath}',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Theme.of(context).colorScheme.onErrorContainer,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                    loading: () => Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(width: 16),
+                          Text('Loading project...'),
+                        ],
+                      ),
+                    ),
+                    error: (error, _) => Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_rounded,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Failed to load project: $error',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onErrorContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // View Tabs - Updated labels for new views
+                  _buildViewTabs(context),
+                  
+                  // Content based on selected tab
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.7, // Give content a reasonable height
+                    child: _buildTabContent(context, ref, tasksAsync),
+                  ),
+                ],
+              ),
+            ),
           ),
           
-          // Bottom toolbar with search and create task button
+          // Bottom toolbar with search and create task button (fixed at bottom)
           TaskListToolbar(
             projectPath: widget.projectPath,
             projectName: projectAsync.asData?.value?.displayName,
@@ -195,6 +319,31 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
 
+
+  Widget _buildArchiveButtonRow(BuildContext context, AsyncValue<TaskCalendar?> projectAsync) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          projectAsync.when(
+            data: (project) => project != null
+                ? ArchiveProjectButton.compact(
+                    projectPath: project.path,
+                    projectDisplayName: project.displayName,
+                    onProjectArchived: () {
+                      // Navigate back to home after archiving
+                      Navigator.of(context).pop();
+                    },
+                  )
+                : const SizedBox.shrink(),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildViewTabs(BuildContext context) {
     return Container(
@@ -357,9 +506,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       columns: columns,
       onTaskTap: (task) {
         // Navigate to task detail
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('👁️ View task: ${task.summary}')),
-        );
       },
       onTaskToggle: (task) async {
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
@@ -367,18 +513,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         
         // Refresh the tasks list
         _refreshProjectTasks(ref);
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                task.status == 'COMPLETED' 
-                    ? '✅ Task marked as incomplete' 
-                    : '✅ Task completed!',
-              ),
-            ),
-          );
-        }
       },
       onTaskUpdated: (task) async {
         await ref.read(taskViewModelProvider.notifier).updateTask(task);
@@ -391,21 +525,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         
         // Refresh the tasks list
         _refreshProjectTasks(ref);
-        
-        // Show confirmation
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Task "${task.summary}" deleted'),
-              action: SnackBarAction(
-                label: 'Undo',
-                onPressed: () {
-                  // TODO: Implement undo functionality
-                },
-              ),
-            ),
-          );
-        }
       },
     );
   }
@@ -459,12 +578,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       );
       
       ref.invalidate(projectTasksProvider(widget.projectPath));
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Task "$result" added for ${_formatAttendeeEmail(attendee)}')),
-        );
-      }
     }
   }
 
@@ -556,9 +669,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       columns: columns,
       onTaskTap: (task) {
         // Navigate to task detail
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('👁️ View task: ${task.summary}')),
-        );
       },
       onTaskToggle: (task) async {
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
@@ -566,18 +676,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         
         // Refresh the tasks list
         _refreshProjectTasks(ref);
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                task.status == 'COMPLETED' 
-                    ? '✅ Task marked as incomplete' 
-                    : '✅ Task completed!',
-              ),
-            ),
-          );
-        }
       },
       onTaskUpdated: (task) async {
         await ref.read(taskViewModelProvider.notifier).updateTask(task);
@@ -645,12 +743,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       );
       
       ref.invalidate(projectTasksProvider(widget.projectPath));
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Unassigned task "$result" added')),
-        );
-      }
     }
   }
 
@@ -667,15 +759,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         
         // Refresh the UI
         ref.invalidate(projectTasksProvider(widget.projectPath));
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Removed all attendees from "${task.summary}"'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
       } else {
         // Assign attendee to task
         final command = AssignAttendeeToTaskCommand(
@@ -687,25 +770,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         
         // Refresh the UI
         ref.invalidate(projectTasksProvider(widget.projectPath));
-        
-        final attendeeName = _formatAttendeeEmail(columnId);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Assigned "$attendeeName" to "${task.summary}"'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
       }
     } catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error moving task: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppLogger.error('Error moving task: $error');
       }
     }
   }
@@ -756,9 +824,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         tasks: tasks,
         onTaskTap: (task) {
           // Navigate to task detail
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('👁️ View task: ${task.summary}')),
-          );
         },
         onTaskToggle: (task) async {
           final taskViewModel = ref.read(taskViewModelProvider.notifier);
@@ -766,18 +831,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           
           // Refresh the tasks list
           _refreshProjectTasks(ref);
-          
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  task.status == 'COMPLETED' 
-                      ? '✅ Task marked as incomplete' 
-                      : '✅ Task completed!',
-                ),
-              ),
-            );
-          }
         },
         onTaskUpdated: (task) async {
           await ref.read(taskViewModelProvider.notifier).updateTask(task);
@@ -790,21 +843,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           
           // Refresh the tasks list
           _refreshProjectTasks(ref);
-          
-          // Show confirmation
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Task "${task.summary}" deleted'),
-                action: SnackBarAction(
-                  label: 'Undo',
-                  onPressed: () {
-                    // TODO: Implement undo functionality
-                  },
-                ),
-              ),
-            );
-          }
         },
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -841,13 +879,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           // Also invalidate the project list provider so navbar updates
           ref.invalidate(projectListProvider);
           
-          // Show success message
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('✅ Project updated successfully')),
-            );
-          }
-          
           // Sync changes to CalDAV server (don't wait for this)
           AppLogger.info('ProjectDetail: About to call _syncProjectToServer...');
           _syncProjectToServer(updatedProject);
@@ -855,17 +886,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         },
         failure: (failure) async {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('❌ Failed to update project: ${failure.message}')),
-            );
+            AppLogger.error('Failed to update project: ${failure.message}');
           }
         },
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Error updating project: $e')),
-        );
+        AppLogger.error('Error updating project: $e');
       }
     }
   }
@@ -885,44 +912,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       await syncResult.when(
         success: (_) {
           AppLogger.info('ProjectDetail: Successfully synced project metadata to server');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('☁️ Project synced to server'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
         },
         failure: (failure) {
           AppLogger.error('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('❌ Server sync failed: ${failure.message}'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 5),
-                action: SnackBarAction(
-                  label: 'Retry',
-                  textColor: Colors.white,
-                  onPressed: () => _syncProjectToServer(project),
-                ),
-              ),
-            );
           }
         },
       );
     } catch (e, stackTrace) {
       AppLogger.error('ProjectDetail: Exception during server sync', e, stackTrace);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Sync error: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        // Sync error - no user notification needed
       }
     }
   }

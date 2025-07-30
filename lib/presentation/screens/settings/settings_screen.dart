@@ -11,8 +11,6 @@ import '../../../data/providers/providers.dart';
 import 'caldav_management_screen.dart';
 import 'connection_info_screen.dart';
 import 'external_calendar_management_screen.dart';
-import 's3_debug_screen.dart';
-import 'shared_projects_test_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
 import '../../../data/services/web_storage.dart';
@@ -110,37 +108,6 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           _SettingsSection(
-            title: 'Debug',
-            children: [
-              _SettingsItem(
-                title: 'Shared Projects Test',
-                subtitle: 'Test shared project API endpoints',
-                icon: Icons.share_rounded,
-                onTap: () => _showSharedProjectsTest(context, ref),
-              ),
-              _SettingsItem(
-                title: 'S3 Storage Debug',
-                subtitle: 'Test S3 file storage operations',
-                icon: Icons.cloud_queue_rounded,
-                onTap: () => _showS3Debug(context, ref),
-              ),
-              _SettingsItem(
-                title: 'Clear All Data',
-                subtitle: 'Delete all local data without disconnecting',
-                icon: Icons.delete_forever_rounded,
-                isDestructive: true,
-                onTap: () => _clearAllData(context, ref),
-              ),
-              _SettingsItem(
-                title: 'Inspect Storage',
-                subtitle: 'Debug local storage contents',
-                icon: Icons.bug_report_rounded,
-                onTap: () => _debugStorage(context, ref),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _SettingsSection(
             title: 'Danger Zone',
             children: [
               _SettingsItem(
@@ -227,11 +194,7 @@ class SettingsScreen extends ConsumerWidget {
           // Reset SyncService singleton to clean up timers and streams
           await SyncService.reset();
           
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('✅ All data cleared successfully!')),
-            );
-          }
+
 
           // Invalidate all relevant providers to clear cached data
           ref.invalidate(taskListProvider);
@@ -261,38 +224,11 @@ class SettingsScreen extends ConsumerWidget {
           });
         },
         failure: (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ Failed to clear data: ${failure.message}'),
-            ),
-          );
+          AppLogger.error('Failed to clear data: ${failure.message}');
         },
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ Error clearing data: $e')));
-    }
-  }
-
-  Future<void> _debugStorage(BuildContext context, WidgetRef ref) async {
-    try {
-      final storageService = ref.read(localStorageServiceProvider);
-      await storageService.debugAllBoxes();
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Storage debug info logged to console!'),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('❌ Debug error: $e')));
-      }
+      AppLogger.error('Error clearing data: $e');
     }
   }
 
@@ -313,22 +249,6 @@ class SettingsScreen extends ConsumerWidget {
         builder: (context) => const ExternalCalendarManagementScreen(),
       ),
     );
-  }
-
-  Future<void> _showSharedProjectsTest(BuildContext context, WidgetRef ref) async {
-    // Navigate to shared projects test screen
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const SharedProjectsTestScreen(),
-      ),
-    );
-  }
-
-  Future<void> _showS3Debug(BuildContext context, WidgetRef ref) async {
-    // Navigate to S3 debug screen
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const S3DebugScreen()));
   }
 
   Future<void> _showExportData(BuildContext context, WidgetRef ref) async {
@@ -411,107 +331,6 @@ class SettingsScreen extends ConsumerWidget {
       }
     }
   }
-
-  Future<void> _clearAllData(BuildContext context, WidgetRef ref) async {
-    // Show confirmation dialog
-    final confirmed =
-        await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('⚠️ Clear ALL Data'),
-            content: const Text(
-              'This will permanently delete:\n'
-              '• All tasks\n'
-              '• All projects\n'
-              '• All accounts\n'
-              '• All sync data\n\n'
-              'This action cannot be undone!',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                  foregroundColor: Theme.of(context).colorScheme.onError,
-                ),
-                child: const Text('DELETE ALL'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (!confirmed) return;
-
-    try {
-      final storageService = ref.read(localStorageServiceProvider);
-
-      // Special handling for web platform
-      if (kIsWeb) {
-        // For web browsers, we need to clear the browser's localStorage as well
-        await _clearWebStorageAndCache();
-      }
-
-      final result = await storageService.clearAllData();
-
-      if (context.mounted) {
-        result.when(
-          success: (_) async {
-            // Reset SyncService singleton to clean up timers and streams
-            await SyncService.reset();
-            
-            // Invalidate all relevant providers to clear cached data
-            ref.invalidate(taskListProvider);
-            ref.invalidate(calendarListProvider);
-            ref.invalidate(externalCalendarListProvider);
-            ref.invalidate(externalEventListProvider);
-            ref.invalidate(enabledExternalCalendarListProvider);
-            ref.invalidate(enabledExternalEventListProvider);
-            ref.invalidate(hasActiveAccountProvider);
-            ref.invalidate(activeAccountProvider);
-            ref.invalidate(syncStatusStreamProvider);
-            ref.invalidate(currentSyncStatusProvider);
-            ref.invalidate(userRepositoryProvider);
-            ref.invalidate(accountRepositoryProvider);
-            ref.invalidate(calendarRepositoryProvider);
-            ref.invalidate(taskRepositoryProvider);
-            ref.invalidate(externalAccountRepositoryProvider);
-            ref.invalidate(externalCalendarRepositoryProvider);
-            ref.invalidate(externalEventRepositoryProvider);
-            ref.invalidate(syncServiceProvider);
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✅ All data cleared successfully!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          },
-          failure: (failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('❌ Failed to clear data: ${failure.message}'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          },
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error clearing data: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 }
 
 class _SettingsSection extends StatelessWidget {
@@ -572,9 +391,7 @@ class _SettingsItem extends StatelessWidget {
       onTap:
           onTap ??
           () {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('$title coming soon!')));
+            // Feature coming soon - no action needed
           },
     );
   }

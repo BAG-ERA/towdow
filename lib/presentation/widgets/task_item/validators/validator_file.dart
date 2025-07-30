@@ -650,25 +650,13 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
 
   void _showSuccessSnackbar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      AppLogger.info('ValidatorFile: $message');
     }
   }
 
   void _showErrorSnackbar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+      AppLogger.error('ValidatorFile: $message');
     }
   }
 } 

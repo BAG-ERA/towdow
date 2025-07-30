@@ -511,6 +511,8 @@ class ExportImportService {
         displayName: calendar.displayName,
         description: calendar.description,
         uid: calendar.path,
+        author: account.email,
+        manager: account.email,
       );
 
       // Simply propagate the Result coming from caldavService so that

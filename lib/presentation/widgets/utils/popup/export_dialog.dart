@@ -194,12 +194,7 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
 
   void _showSuccessMessage() {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ Export completed successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      // Export completed successfully - no notification needed
     }
   }
 } 

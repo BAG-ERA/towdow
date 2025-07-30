@@ -1534,6 +1534,8 @@ class SyncService {
       final createResult = await caldavService.createCalendar(
         displayName: calendar.displayName,
         description: calendar.description,
+        author: account.email,
+        manager: account.email,
       );
 
       return await createResult.when(

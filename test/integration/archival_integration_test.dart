@@ -122,7 +122,7 @@ void main() {
       
       final calendar = calendars.first;
       expect(calendar.displayName, equals('Regular Project'));
-      expect(calendar.flowitStatus, isNull);
+      expect(calendar.flowitStatus, equals('ONGOING')); // Default status when not provided in XML
       expect(calendar.statusDisplayName, equals('ONGOING')); // Default status
       expect(calendar.isArchived, isFalse);
       expect(calendar.isActive, isTrue);

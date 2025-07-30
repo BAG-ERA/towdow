@@ -49,6 +49,12 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(25) String? flowitDomain, // X-FLOWIT-DOMAIN - domain for grouping projects
     @HiveField(26) String? flowitStatus, // X-FLOWIT-STATUS - project status (DRAFT, CANCELED, ONGOING, STOPPED, ARCHIVE, COMPLETED, NEEDACTION, FAILED)
     @HiveField(27) @Default('[]') String sharedWith, // JSON array of SharedProjectMember objects for project sharing
+    
+    // Project management fields
+    @HiveField(28) String? flowitAuthor, // X-FLOWIT-AUTHOR - project author (user who created it)
+    @HiveField(29) String? flowitManager, // X-FLOWIT-MANAGER - project manager (responsible person)
+    @HiveField(30) DateTime? flowitCreatedAt, // X-FLOWIT-CREATED-AT - when project was created
+    @HiveField(31) DateTime? flowitEndedAt, // X-FLOWIT-ENDED-AT - when project was completed/ended
   }) = _TaskCalendar;
 
   factory TaskCalendar.fromJson(Map<String, dynamic> json) => _$TaskCalendarFromJson(json);
@@ -79,6 +85,8 @@ extension TaskCalendarFactory on TaskCalendar {
     List<String> categories = const [],
     List<Attendee> attendees = const [],
     String? domain,
+    String? author,
+    String? manager,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -94,6 +102,10 @@ extension TaskCalendarFactory on TaskCalendar {
       // categories field removed - project categories now stored in projectCategories JSON
       flowitOwner: organizer,
       flowitDomain: domain,
+      flowitStatus: 'ONGOING', // Default status as ONGOING
+      flowitAuthor: author ?? organizer, // Set author, fallback to organizer
+      flowitManager: manager ?? organizer, // Set manager, fallback to organizer  
+      flowitCreatedAt: now, // Set creation time
     );
   }
   
@@ -112,6 +124,10 @@ extension TaskCalendarFactory on TaskCalendar {
     String? flowitStatus,
     String? flowitKanban,
     String? sharedWith,
+    String? flowitAuthor,
+    String? flowitManager,
+    DateTime? flowitCreatedAt,
+    DateTime? flowitEndedAt,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -130,9 +146,13 @@ extension TaskCalendarFactory on TaskCalendar {
       flowitAsFlow: flowitAsFlow ?? false,
       flowitOwner: flowitOwner,
       flowitTemplate: flowitTemplate,
-      flowitStatus: flowitStatus,
+      flowitStatus: flowitStatus ?? 'ONGOING', // Default status as ONGOING
       flowitKanban: flowitKanban ?? '[]',
       sharedWith: sharedWith ?? '[]',
+      flowitAuthor: flowitAuthor,
+      flowitManager: flowitManager,
+      flowitCreatedAt: flowitCreatedAt,
+      flowitEndedAt: flowitEndedAt,
     );
   }
 }
@@ -457,5 +477,61 @@ extension TaskCalendarStatus on TaskCalendar {
     } catch (e) {
       return null;
     }
+  }
+} 
+
+// Extension for project management operations
+extension TaskCalendarProjectManagement on TaskCalendar {
+  /// Check if this calendar has an author assigned
+  bool get hasAuthor => flowitAuthor != null && flowitAuthor!.isNotEmpty;
+  
+  /// Check if this calendar has a manager assigned  
+  bool get hasManager => flowitManager != null && flowitManager!.isNotEmpty;
+  
+  /// Check if this calendar has a creation date
+  bool get hasCreationDate => flowitCreatedAt != null;
+  
+  /// Check if this calendar has an end date
+  bool get hasEndDate => flowitEndedAt != null;
+  
+  /// Check if this calendar is completed (has end date)
+  bool get isEnded => flowitEndedAt != null;
+  
+  /// Get the author name, or "Unknown" if none assigned
+  String get authorDisplayName => flowitAuthor?.isNotEmpty == true ? flowitAuthor! : 'Unknown';
+  
+  /// Get the manager name, or "Unknown" if none assigned  
+  String get managerDisplayName => flowitManager?.isNotEmpty == true ? flowitManager! : 'Unknown';
+  
+  /// Create a copy with a new author
+  TaskCalendar withAuthor(String? newAuthor) {
+    return copyWith(
+      flowitAuthor: newAuthor?.isEmpty == true ? null : newAuthor,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Create a copy with a new manager
+  TaskCalendar withManager(String? newManager) {
+    return copyWith(
+      flowitManager: newManager?.isEmpty == true ? null : newManager,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Create a copy with project ended at current time
+  TaskCalendar markAsEnded() {
+    return copyWith(
+      flowitEndedAt: DateTime.now(),
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Create a copy removing the end date (mark as ongoing)
+  TaskCalendar markAsOngoing() {
+    return copyWith(
+      flowitEndedAt: null,
+      lastModified: DateTime.now(),
+    );
   }
 } 

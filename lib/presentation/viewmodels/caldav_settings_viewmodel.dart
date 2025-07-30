@@ -138,7 +138,6 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
             availableCalendars: discovery.availableCalendars,
             serverCapabilities: {
               'CalDAV Support': discovery.capabilities.supportsCalDAV ? 'Yes' : 'No',
-              'Task Support': discovery.availableCalendars.any((cal) => cal.supportsTodos) ? 'Yes' : 'No',
               'Principal': discovery.capabilities.principal ?? 'Unknown',
               'Calendar Home': discovery.capabilities.calendarHome ?? 'Unknown',
               'Server': discovery.capabilities.serverInfo,
@@ -227,6 +226,9 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
         path: '/calendars/${account.username}/${name.toLowerCase().replaceAll(' ', '_')}/',
         displayName: name,
         description: description,
+        organizer: account.email,
+        author: account.email,
+        manager: account.email,
       );
 
       // TODO: Implement calendar creation in CalDAVService
@@ -285,7 +287,6 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
             serverCapabilities: {
               'Connection': 'Success',
               'CalDAV Support': capabilities.supportsCalDAV ? 'Yes' : 'No',
-              'Task Support': capabilities.supportsTasks ? 'Yes' : 'No',
               'Principal': capabilities.principal,
               'Calendar Home': capabilities.calendarHome,
               'Server': capabilities.serverInfo,
@@ -323,7 +324,6 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
   /// Get the number of selected calendars
   int get selectedCalendarCount => state.selectedCalendars.length;
 
-  /// Get the number of available calendars that support tasks
-  int get taskSupportedCalendarCount => 
-      state.availableCalendars.where((cal) => cal.supportsTodos).length;
+  /// Get the number of calendars that support tasks
+  int get taskSupportedCalendarCount => state.availableCalendars.where((calendar) => calendar.supportsTodos).length;
 } 

@@ -336,8 +336,6 @@ class ArchivedProjectsScreen extends ConsumerWidget {
     
     try {
       final statusService = ref.read(statusServiceProvider);
-      final messenger = ScaffoldMessenger.of(context);
-      final theme = Theme.of(context);
       
       final result = await statusService.unarchiveCalendar(project.path);
       
@@ -345,34 +343,19 @@ class ArchivedProjectsScreen extends ConsumerWidget {
       
       result.when(
         success: (_) {
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text('Project "${project.displayName}" unarchived successfully'),
-              backgroundColor: theme.colorScheme.primary,
-            ),
-          );
-          
           // Refresh the screen
           (context as Element).markNeedsBuild();
         },
         failure: (failure) {
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text('Failed to unarchive project: ${failure.message}'),
-              backgroundColor: theme.colorScheme.error,
-            ),
-          );
+          // Handle failure silently or log it
+          AppLogger.error('Failed to unarchive project: ${failure.message}');
         },
       );
     } catch (e) {
       if (!context.mounted) return;
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to unarchive project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      // Handle exception silently or log it
+      AppLogger.error('Failed to unarchive project: $e');
     }
   }
   

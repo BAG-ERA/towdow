@@ -400,16 +400,10 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         _selectedCategoryIds.remove(category.id);
       });
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Removed "${category.name}" from project')),
-        );
-      }
+      // Category removed from project - no notification needed
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to remove category: $e')),
-        );
+        AppLogger.error('Failed to remove category: $e');
       }
     }
   }
@@ -474,16 +468,9 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
       final updatedCategory = category.copyWith(name: newName);
       await categoryViewModel.updateCategory(updatedCategory);
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Updated category name to "$newName"')),
-        );
-      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update category: $e')),
-        );
+        AppLogger.error('Failed to update category: $e');
       }
     }
   }
@@ -670,9 +657,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                   Navigator.of(context).pop();
                   onColorSelected(color);
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invalid hex color format')),
-                  );
+                  AppLogger.error('Invalid hex color format: $e');
                 }
               }
             },
@@ -691,16 +676,9 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
       final updatedCategory = category.copyWith(color: newColor.value);
       await categoryViewModel.updateCategory(updatedCategory);
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Updated category color')),
-        );
-      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update category: $e')),
-        );
+        AppLogger.error('Failed to update category: $e');
       }
     }
   }
@@ -791,17 +769,10 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         _isLoading = false;
       });
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Created category "$name"')),
-        );
-      }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create category: $e')),
-        );
+        AppLogger.error('Failed to create category: $e');
       }
     }
   }
@@ -823,9 +794,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save categories: $e')),
-        );
+        AppLogger.error('Failed to save categories: $e');
       }
     }
   }

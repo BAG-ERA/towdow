@@ -610,25 +610,13 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
 
   void _showSuccessSnackbar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      AppLogger.info('ValidatorMedia: $message');
     }
   }
 
   void _showErrorSnackbar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+      AppLogger.error('ValidatorMedia: $message');
     }
   }
 
@@ -830,12 +818,6 @@ class _CameraScreenState extends State<_CameraScreen> {
     } catch (e) {
       AppLogger.error('CameraScreen: Failed to take picture', e);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to take picture: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }

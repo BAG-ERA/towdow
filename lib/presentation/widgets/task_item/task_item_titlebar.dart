@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 import '../../../data/models/task.dart';
-import '../../../data/services/validator_service.dart';
 import 'task_item_date_badge.dart';
 import '../utils/editable_title.dart';
 
@@ -158,35 +157,13 @@ class _TaskItemTitlebarState extends State<TaskItemTitlebar> {
   Widget _buildCompactIndicators(BuildContext context) {
     final indicators = <Widget>[];
     
-    // Validator indicator (if not default)
-    if (_hasNonDefaultValidator()) {
-      indicators.add(
-        Icon(
-          Icons.fact_check,
-          size: 16,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-      );
-    }
-    
-    // Attendees indicator
+    // Attendees indicator only
     if (widget.task.attendees.isNotEmpty) {
       indicators.add(
         Icon(
           widget.task.attendees.length == 1 ? Icons.person : Icons.group,
           size: 16,
           color: Theme.of(context).colorScheme.secondary,
-        ),
-      );
-    }
-    
-    // Categories indicator
-    if (widget.task.categoryIds.isNotEmpty) {
-      indicators.add(
-        Icon(
-          Icons.label_rounded,
-          size: 16,
-          color: Theme.of(context).colorScheme.tertiary,
         ),
       );
     }
@@ -202,8 +179,5 @@ class _TaskItemTitlebarState extends State<TaskItemTitlebar> {
     );
   }
 
-  bool _hasNonDefaultValidator() {
-    final validators = ValidatorService.parseValidators(widget.task.flowitValidator);
-    return validators.isNotEmpty && validators.any((list) => list.isNotEmpty);
-  }
+
 } 

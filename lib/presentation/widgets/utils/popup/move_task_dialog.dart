@@ -165,81 +165,14 @@ class MoveTaskDialog extends ConsumerWidget {
       // Close the dialog first
       Navigator.of(context).pop();
       
-      // Show a loading snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text('Moving "${task.summary}" to ${targetCalendar.displayName}...'),
-              ),
-            ],
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-      
       // Execute the move operation via TaskViewModel
       final taskViewModel = ref.read(taskViewModelProvider.notifier);
       await taskViewModel.moveTask(task, targetCalendar.path);
       
-      // Show success message
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  Icons.check_circle_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('✅ Moved "${task.summary}" to ${targetCalendar.displayName}'),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-      
+      // Task moved successfully - no notification needed
       
     } catch (e, stackTrace) {
       AppLogger.error('MoveTaskDialog: Failed to move task', e, stackTrace);
-      
-      // Show error message
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  Icons.error_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('❌ Failed to move task: $e'),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
     }
   }
 }

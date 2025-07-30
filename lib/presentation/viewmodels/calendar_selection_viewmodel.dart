@@ -178,9 +178,15 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
   Future<void> createCalendar({required String name, String? description}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
+      // Get current user information
+      final account = _caldavService.account;
+      final currentUser = account.email ?? account.username;
+      
       final result = await _caldavService.createCalendar(
         displayName: name,
         description: description ?? 'Project portfolio created by FlowIt',
+        author: currentUser,
+        manager: currentUser,
       );
       await result.when(
         success: (calendar) async {

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/task_item/task_item.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/external_calendar/external_events_list.dart';
+import '../../widgets/adaptive_app_layout.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
 import '../../../data/models/calendar_event.dart';
@@ -72,27 +73,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   return IconButton(
                     icon: const Icon(Icons.sync_problem_rounded, color: Colors.red),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Sync error occurred')),
-                      );
+                      // Sync error - no action needed
                     },
                   );
                 case SyncStatus.offline:
                   return IconButton(
                     icon: const Icon(Icons.cloud_off_rounded, color: Colors.orange),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Offline - no account configured')),
-                      );
+                      // Offline - no action needed
                     },
                   );
                 case SyncStatus.idle:
                   return IconButton(
                     icon: const Icon(Icons.sync_rounded),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Go to Settings > Debug > Sync Now')),
-                      );
+                      // Idle - no action needed
                     },
                   );
               }
@@ -133,74 +128,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ) : null,
       body: Column(
         children: [
-          // Mobile header with hamburger menu
-          if (!isDesktop)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Builder(
-                    builder: (context) => IconButton(
-                      icon: const Icon(Icons.menu_rounded),
-                      onPressed: () {
-                        Scaffold.of(context).openDrawer();
-                      },
-                      tooltip: 'Open navigation',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'My Tasks',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  // Mobile sync status
-                  Consumer(
-                    builder: (context, ref, child) {
-                      final syncStatus = ref.watch(currentSyncStatusProvider);
-                      switch (syncStatus) {
-                        case SyncStatus.syncing:
-                          return const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          );
-                        case SyncStatus.error:
-                          return IconButton(
-                            icon: const Icon(Icons.sync_problem_rounded, color: Colors.red),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Sync error occurred')),
-                              );
-                            },
-                          );
-                        case SyncStatus.offline:
-                          return IconButton(
-                            icon: const Icon(Icons.cloud_off_rounded, color: Colors.orange),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Offline - no account configured')),
-                              );
-                            },
-                          );
-                        case SyncStatus.idle:
-                          return IconButton(
-                            icon: const Icon(Icons.sync_rounded),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Go to Settings > Debug > Sync Now')),
-                              );
-                            },
-                          );
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          
           // Mobile tabs - only show when no AppBar (mobile mode)
           if (!isDesktop)
             StyledTabBar(
@@ -448,12 +375,6 @@ class _TaskListTab extends ConsumerWidget {
                                 ),
                                 child: TaskItem(
                                   task: task,
-                                  onTap: () {
-                                    // Navigate to task detail
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Navigate to task ${task.uid}')),
-                                    );
-                                  },
                                   onToggleComplete: () async {
                                     // Toggle task completion
                                     await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);

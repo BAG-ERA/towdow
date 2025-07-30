@@ -2,6 +2,7 @@
 // Provides quick and custom date selection options for tasks
 
 import 'package:flutter/material.dart';
+import '../../../../core/logger.dart';
 import '../../../../data/models/task.dart';
 
 class DueDateDialog extends StatelessWidget {
@@ -125,29 +126,15 @@ class DueDateDialog extends StatelessWidget {
         onTaskUpdated!(updatedTask);
       }
 
-      // Show feedback
       if (context.mounted) {
         final message = newDue == null 
             ? 'Due date removed' 
             : 'Due date set to ${newDue.day}/${newDue.month}/${newDue.year}';
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppLogger.info('DueDateDialog: $message');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating due date: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        AppLogger.error('Error updating due date: $e');
       }
     }
   }

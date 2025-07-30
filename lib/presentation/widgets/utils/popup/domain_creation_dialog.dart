@@ -120,33 +120,13 @@ class _DomainCreationDialogState extends ConsumerState<DomainCreationDialog> {
           
           Navigator.of(context).pop(domainName);
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Domain "$domainName" created successfully'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-          );
         },
         failure: (failure) {
           AppLogger.error('DomainCreation: Failed to create domain: ${failure.message}');
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to create domain: ${failure.message}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
         },
       );
     } catch (e) {
       AppLogger.error('DomainCreation: Exception creating domain: $e');
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to create domain: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
