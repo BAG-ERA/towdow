@@ -398,10 +398,14 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
           // Create project order from selected calendars (using calendar path as project UID)
           final projectOrder = state.selectedCalendars.map((c) => c.path).toList();
           
-          // Update preferences with new project order
+          // Update preferences with new project order and excluded projects
+          // In new architecture: sync all available projects except excluded ones
+          final availableCalendarPaths = state.capabilities?.taskCalendars.map((c) => c.path).toSet() ?? <String>{};
+          final excludedProjects = availableCalendarPaths.where((path) => !projectOrder.contains(path)).toList();
+          
           final updatedPreferences = preferences.copyWith(
             projectOrder: projectOrder,
-            syncedProjects: projectOrder, // Also update synced projects list
+            excludedProjects: excludedProjects, // Exclude unselected calendars from sync
           );
           
           // Save updated preferences

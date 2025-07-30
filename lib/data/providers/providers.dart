@@ -258,6 +258,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   final accountRepository = ref.watch(accountRepositoryProvider);
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final userRepository = ref.watch(userRepositoryProvider);
   final localStorage = ref.watch(localStorageServiceProvider);
   
   // Initialize singleton instance
@@ -266,6 +267,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     accountRepository: accountRepository,
     calendarRepository: calendarRepository,
     categoryRepository: categoryRepository,
+    userRepository: userRepository,
     localStorage: localStorage,
   );
   

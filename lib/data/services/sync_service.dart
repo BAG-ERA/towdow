@@ -12,10 +12,10 @@ import '../repositories/task_repository.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/category_repository.dart';
+import '../repositories/user_repository.dart';
 import 'caldav_service.dart';
 import 'local_storage_service.dart';
 import 'webdav_client.dart';
-import 'parsers/xml_response_parser.dart';
 import 'parsers/vtodo_parser.dart';
 import 'share_service.dart';
 
@@ -87,6 +87,7 @@ class SyncService {
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
   final CategoryRepository _categoryRepository;
+  final UserRepository _userRepository;
   final LocalStorageService _localStorage;
   final ShareService? _shareService;
 
@@ -96,12 +97,14 @@ class SyncService {
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
     required CategoryRepository categoryRepository,
+    required UserRepository userRepository,
     required LocalStorageService localStorage,
     ShareService? shareService,
   })  : _taskRepository = taskRepository,
         _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
         _categoryRepository = categoryRepository,
+        _userRepository = userRepository,
         _localStorage = localStorage,
         _shareService = shareService;
 
@@ -111,6 +114,7 @@ class SyncService {
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
     required CategoryRepository categoryRepository,
+    required UserRepository userRepository,
     required LocalStorageService localStorage,
     ShareService? shareService,
   }) {
@@ -119,6 +123,7 @@ class SyncService {
       accountRepository: accountRepository,
       calendarRepository: calendarRepository,
       categoryRepository: categoryRepository,
+      userRepository: userRepository,
       localStorage: localStorage,
       shareService: shareService,
     );
@@ -253,19 +258,33 @@ class SyncService {
       // AppLogger.info('SyncService: DEBUG - Inspecting storage before sync');
       await _localStorage.debugAllBoxes();
       
-      // Get selected calendars from repository (source of truth)
-      final selectedCalendarsResult = await _calendarRepository.getProjectCalendars();
-      final selectedCalendars = selectedCalendarsResult.when(
+      // Get ALL available calendars from repository (discovery ensures all are available)
+      final allCalendarsResult = await _calendarRepository.getProjectCalendars();
+      final allCalendars = allCalendarsResult.when(
         success: (calendars) => calendars,
         failure: (failure) {
-          AppLogger.error('SyncService: Failed to get selected calendars: ${failure.message}');
+          AppLogger.error('SyncService: Failed to get calendars: ${failure.message}');
           return <TaskCalendar>[];
         },
       );
       
-      if (selectedCalendars.isEmpty) {
-        AppLogger.warning('SyncService: No calendars selected for sync. Please configure calendar selection.');
-        errors.add('No calendars selected for synchronization. Please go to Settings > CalDAV Connection to select calendars.');
+      // Filter out excluded calendars based on user preferences
+      final userPrefsResult = await _userRepository.getUserPreferences();
+      final calendarsToSync = await userPrefsResult.when(
+        success: (prefs) async {
+          final filtered = allCalendars.where((calendar) => prefs.shouldSyncProject(calendar.path)).toList();
+          AppLogger.info('SyncService: Syncing ${filtered.length} of ${allCalendars.length} available calendars (${prefs.excludedProjects.length} excluded)');
+          return filtered;
+        },
+        failure: (failure) async {
+          AppLogger.warning('SyncService: Failed to get user preferences, syncing all calendars: ${failure.message}');
+          return allCalendars; // Fallback: sync all if can't get preferences
+        },
+      );
+      
+      if (calendarsToSync.isEmpty) {
+        AppLogger.warning('SyncService: No calendars available for sync.');
+        errors.add('No calendars available for synchronization. Check your CalDAV connection and shared projects.');
         failedItems++;
 
         // Attempt to load the sync queue and handle errors
@@ -292,9 +311,9 @@ class SyncService {
         _updateStatus(errors.isEmpty ? SyncStatus.idle : SyncStatus.error);
         return Result.success(result);
       } else {
-        //AppLogger.debug('🔄 SyncService: Starting sync for ${selectedCalendars.length} calendars');
+        //AppLogger.debug('🔄 SyncService: Starting sync for ${calendarsToSync.length} calendars');
         
-        for (final calendar in selectedCalendars) {
+        for (final calendar in calendarsToSync) {
           //AppLogger.debug('🔄 SyncService: Processing calendar ${calendar.path}');
           
           final calendarResult = await _syncCalendar(caldavService, calendar, errors);
@@ -304,7 +323,7 @@ class SyncService {
             failedItems++;
           }
           
-          _progressController.add(0.2 + (0.6 * (selectedCalendars.indexOf(calendar) + 1) / selectedCalendars.length));
+          _progressController.add(0.2 + (0.6 * (calendarsToSync.indexOf(calendar) + 1) / calendarsToSync.length));
         }
       }
 

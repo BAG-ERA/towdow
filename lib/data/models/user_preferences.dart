@@ -2,7 +2,6 @@
 // Includes project ordering and future user preference options
 
 import 'package:hive/hive.dart';
-import 'package:logger/web.dart';
 import 'shared_with_me_project.dart';
 
 part 'user_preferences.g.dart';
@@ -24,9 +23,6 @@ class UserPreferences extends HiveObject {
   @HiveField(4)
   final Map<String, dynamic>? customSettings; // Future: extensible settings
 
-  @HiveField(5)
-  final List<String> syncedProjects; // Projects marked for S3 sync
-
   @HiveField(6)
   final List<SharedWithMeProject> sharedWithMeProjects; // Projects shared with me
 
@@ -36,16 +32,19 @@ class UserPreferences extends HiveObject {
   @HiveField(8)
   final String? userPrincipal; // User principal for constructing project paths
 
+  @HiveField(9)
+  final List<String> excludedProjects; // Projects explicitly excluded from sync (NEW approach)
+
   UserPreferences({
     this.projectOrder = const [],
     this.preferredTheme,
     this.enableNotifications,
     this.defaultProjectView,
     this.customSettings,
-    this.syncedProjects = const [],
     this.sharedWithMeProjects = const [],
     this.etag,
     this.userPrincipal,
+    this.excludedProjects = const [], // Default: no projects excluded (sync all)
   });
 
   /// Create a copy with updated values
@@ -55,10 +54,10 @@ class UserPreferences extends HiveObject {
     bool? enableNotifications,
     String? defaultProjectView,
     Map<String, dynamic>? customSettings,
-    List<String>? syncedProjects,
     List<SharedWithMeProject>? sharedWithMeProjects,
     String? etag,
     String? userPrincipal,
+    List<String>? excludedProjects,
   }) {
     return UserPreferences(
       projectOrder: projectOrder ?? this.projectOrder,
@@ -66,10 +65,10 @@ class UserPreferences extends HiveObject {
       enableNotifications: enableNotifications ?? this.enableNotifications,
       defaultProjectView: defaultProjectView ?? this.defaultProjectView,
       customSettings: customSettings ?? this.customSettings,
-      syncedProjects: syncedProjects ?? this.syncedProjects,
       sharedWithMeProjects: sharedWithMeProjects ?? this.sharedWithMeProjects,
       etag: etag ?? this.etag,
       userPrincipal: userPrincipal ?? this.userPrincipal,
+      excludedProjects: excludedProjects ?? this.excludedProjects,
     );
   }
 
@@ -81,8 +80,8 @@ class UserPreferences extends HiveObject {
       enableNotifications: true,
       defaultProjectView: 'list',
       customSettings: const {},
-      syncedProjects: const [],
       sharedWithMeProjects: const [],
+      excludedProjects: const [], // New users: sync all projects by default
     );
   }
 
@@ -119,28 +118,32 @@ class UserPreferences extends HiveObject {
     return copyWith(projectOrder: currentOrder);
   }
 
-  /// Add a project to the synced projects list
-  UserPreferences addSyncedProject(String projectUid) {
-    if (syncedProjects.contains(projectUid)) {
-      return this; // Already synced
+
+
+
+  
+  /// Check if a project should be synced (not excluded)
+  bool shouldSyncProject(String projectPath) {
+    return !excludedProjects.contains(projectPath);
+  }
+  
+  /// Exclude a project from sync
+  UserPreferences excludeProject(String projectPath) {
+    if (excludedProjects.contains(projectPath)) {
+      return this; // Already excluded
     }
-    return copyWith(syncedProjects: [...syncedProjects, projectUid]);
+    return copyWith(excludedProjects: [...excludedProjects, projectPath]);
   }
-
-  /// Remove a project from the synced projects list
-  UserPreferences removeSyncedProject(String projectUid) {
-    final newSyncedProjects = syncedProjects.where((uid) => uid != projectUid).toList();
-    return copyWith(syncedProjects: newSyncedProjects);
+  
+  /// Include a project in sync (remove from excluded list)
+  UserPreferences includeProject(String projectPath) {
+    final updatedExcluded = excludedProjects.where((path) => path != projectPath).toList();
+    return copyWith(excludedProjects: updatedExcluded);
   }
-
-  /// Check if a project is marked for sync
-  bool isProjectSynced(String projectUid) {
-    return syncedProjects.contains(projectUid);
-  }
-
-  /// Set the entire synced projects list
-  UserPreferences withSyncedProjects(List<String> projects) {
-    return copyWith(syncedProjects: projects);
+  
+  /// Set the entire excluded projects list
+  UserPreferences withExcludedProjects(List<String> projects) {
+    return copyWith(excludedProjects: projects);
   }
 
   /// Update shared with me projects list
@@ -175,6 +178,6 @@ class UserPreferences extends HiveObject {
 
   @override
   String toString() {
-    return 'UserPreferences(projectOrder: $projectOrder, theme: $preferredTheme, notifications: $enableNotifications, syncedProjects: ${syncedProjects.length}, sharedWithMe: ${sharedWithMeProjects.length})';
+    return 'UserPreferences(projectOrder: $projectOrder, theme: $preferredTheme, notifications: $enableNotifications, excludedProjects: ${excludedProjects.length}, sharedWithMe: ${sharedWithMeProjects.length})';
   }
 } 

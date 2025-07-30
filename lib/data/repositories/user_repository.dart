@@ -20,10 +20,9 @@ abstract class UserRepository {
   Future<Result<void>> removeProjectFromOrder(String projectUid);
   Future<Result<void>> reorderProject(String projectUid, int newIndex);
   
-  // Synced projects management
-  Future<Result<void>> addSyncedProject(String projectUid);
-  Future<Result<void>> removeSyncedProject(String projectUid);
-  Future<Result<void>> setSyncedProjects(List<String> projectUids);
+  // Project sync management (exclude/include approach)
+  Future<Result<void>> excludeProject(String projectPath);
+  Future<Result<void>> includeProject(String projectPath);
   
   // Shared projects management
   Future<Result<void>> acknowledgeSharedProject(String projectId);
@@ -198,13 +197,15 @@ class LocalUserRepository implements UserRepository {
     );
   }
 
+  // Legacy syncedProjects methods removed - use excludedProjects instead
+  // All projects sync by default now, use excludeProject/includeProject instead
+  
   @override
-  Future<Result<void>> addSyncedProject(String projectUid) async {
+  Future<Result<void>> excludeProject(String projectPath) async {
     final prefsResult = await getUserPreferences();
     return await prefsResult.when(
       success: (prefs) async {
-        final updatedSyncedProjects = [...prefs.syncedProjects, projectUid];
-        final updatedPrefs = prefs.copyWith(syncedProjects: updatedSyncedProjects);
+        final updatedPrefs = prefs.excludeProject(projectPath);
         return await saveUserPreferences(updatedPrefs);
       },
       failure: (failure) async => Result.failure(failure),
@@ -212,24 +213,11 @@ class LocalUserRepository implements UserRepository {
   }
 
   @override
-  Future<Result<void>> removeSyncedProject(String projectUid) async {
+  Future<Result<void>> includeProject(String projectPath) async {
     final prefsResult = await getUserPreferences();
     return await prefsResult.when(
       success: (prefs) async {
-        final updatedSyncedProjects = prefs.syncedProjects.where((uid) => uid != projectUid).toList();
-        final updatedPrefs = prefs.copyWith(syncedProjects: updatedSyncedProjects);
-        return await saveUserPreferences(updatedPrefs);
-      },
-      failure: (failure) async => Result.failure(failure),
-    );
-  }
-
-  @override
-  Future<Result<void>> setSyncedProjects(List<String> projectUids) async {
-    final prefsResult = await getUserPreferences();
-    return await prefsResult.when(
-      success: (prefs) async {
-        final updatedPrefs = prefs.copyWith(syncedProjects: projectUids);
+        final updatedPrefs = prefs.includeProject(projectPath);
         return await saveUserPreferences(updatedPrefs);
       },
       failure: (failure) async => Result.failure(failure),

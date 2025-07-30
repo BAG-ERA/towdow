@@ -576,7 +576,7 @@ class UserSyncService {
       'enableNotifications': preferences.enableNotifications,
       'defaultProjectView': preferences.defaultProjectView,
       'customSettings': preferences.customSettings,
-      'syncedProjects': preferences.syncedProjects,
+      'excludedProjects': preferences.excludedProjects,
       'userPrincipal': preferences.userPrincipal,
       'sharedWithMeProjects': preferences.sharedWithMeProjects.map((project) => {
         'projectId': project.projectId,
@@ -612,7 +612,7 @@ class UserSyncService {
       enableNotifications: json['enableNotifications'] as bool?,
       defaultProjectView: json['defaultProjectView'] as String?,
       customSettings: json['customSettings'] as Map<String, dynamic>?,
-      syncedProjects: (json['syncedProjects'] as List<dynamic>?)?.cast<String>() ?? [],
+      excludedProjects: (json['excludedProjects'] as List<dynamic>?)?.cast<String>() ?? [],
       userPrincipal: json['userPrincipal'] as String?,
       sharedWithMeProjects: sharedProjects,
     );
@@ -654,27 +654,19 @@ class UserSyncService {
       failure: (_) => UserPreferences.defaultPreferences(),
     );
 
-    // Add new shared projects to active synced list (project order and synced projects)
+    // Add new shared projects to project order for display (all projects auto-sync by default)
     final updatedProjectOrder = [...currentPreferences.projectOrder];
-    final updatedSyncedProjects = [...currentPreferences.syncedProjects];
     
     for (final newProject in newSharedProjects) {
-      // Add to project order if not already there
+      // Add to project order if not already there (for display purposes)
       if (!updatedProjectOrder.contains(newProject.projectId)) {
         updatedProjectOrder.add(newProject.projectId);
-        AppLogger.info('UserSyncService: Added shared project ${newProject.projectId} to active synced list');
-      }
-      
-      // Add to synced projects if not already there
-      if (!updatedSyncedProjects.contains(newProject.projectId)) {
-        updatedSyncedProjects.add(newProject.projectId);
-        AppLogger.info('UserSyncService: Added shared project ${newProject.projectId} to synced projects list');
+        AppLogger.info('UserSyncService: Added shared project ${newProject.projectId} to project order (will auto-sync)');
       }
     }
     
     final updatedPreferences = currentPreferences.copyWith(
       projectOrder: updatedProjectOrder,
-      syncedProjects: updatedSyncedProjects,
     );
     
     await _userRepository.saveUserPreferencesWithoutSync(updatedPreferences);
