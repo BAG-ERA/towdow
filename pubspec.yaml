@@ -82,6 +82,7 @@ dependencies:
   aws_s3_api: ^2.0.0
   crypto: ^3.0.3
   pointycastle: ^3.9.1
+  msix: ^3.16.10
 
 dev_dependencies:
   flutter_test:
@@ -154,3 +155,12 @@ inno_bundle:
 
 dependency_overrides:
   uuid: ^4.5.1
+
+msix_config:
+  display_name: TowDow.app
+  publisher_display_name: TowDow.app
+  publisher: CN=984EC4C5-F88A-457D-A294-8FE3DC79F215
+  identity_name: TowDow.app.TowDow.app
+  logo_path: assets/icons/logo/Flow-it_icon-Default.png
+  capabilities: internetClient
+  # msix_version is set with --version during build
