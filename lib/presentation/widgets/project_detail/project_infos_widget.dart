@@ -242,6 +242,7 @@ class ProjectInfosWidget extends ConsumerWidget {
           sharedByAsync.when(
             data: (sharedBy) {
               final membersList = <String>[];
+              final isSharedWithMe = sharedBy.isNotEmpty;
               
               // Add shared members
               if (project.sharedWithEmails.isNotEmpty) {
@@ -249,10 +250,15 @@ class ProjectInfosWidget extends ConsumerWidget {
               }
               
               // Add current user (project owner or shared with me)
-              if (sharedBy.isNotEmpty) {
+              if (isSharedWithMe) {
                 // Project is shared with me, add the sharer to the list
                 if (!membersList.contains(sharedBy)) {
                   membersList.add(sharedBy);
+                }
+                // Also add current user to the list when project is shared with me
+                final currentUser = project.flowitOwner ?? project.flowitAuthor ?? '';
+                if (currentUser.isNotEmpty && !membersList.contains(currentUser)) {
+                  membersList.add(currentUser);
                 }
               } else {
                 // Project is owned by me, add myself to the list
@@ -268,28 +274,32 @@ class ProjectInfosWidget extends ConsumerWidget {
                   _buildDetailRow(context, 'Members', 
                     membersList.isNotEmpty ? membersList.join(', ') : 'No members'
                   ),
-                  const SizedBox(height: 4),
-                  GestureDetector(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => ProjectSharingDialog(project: project),
-                      );
-                    },
-                    child: Text(
-                      'Manage sharing',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                        decoration: TextDecoration.underline,
-                        fontWeight: FontWeight.w500,
+                  // Only show "Manage sharing" if project is not shared with me (i.e., I own it)
+                  if (!isSharedWithMe) ...[
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => ProjectSharingDialog(project: project),
+                        );
+                      },
+                      child: Text(
+                        'Manage sharing',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          decoration: TextDecoration.underline,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               );
             },
             loading: () {
               // While loading, show owner/author as fallback or "No members"
+              // Assume project is owned by me during loading (show manage sharing)
               final currentUser = project.flowitOwner ?? project.flowitAuthor ?? '';
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,6 +329,7 @@ class ProjectInfosWidget extends ConsumerWidget {
             },
             error: (_, __) {
               // On error, show owner/author as fallback or "No members"
+              // Assume project is owned by me during error (show manage sharing)
               final currentUser = project.flowitOwner ?? project.flowitAuthor ?? '';
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

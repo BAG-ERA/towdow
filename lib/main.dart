@@ -21,6 +21,7 @@ import 'data/models/calendar_event.dart';
 import 'data/models/offline_file.dart';
 import 'data/models/validator.dart';
 import 'data/models/category.dart';
+import 'data/services/user_preferences_queue_service.dart';
 
 // Import services and providers
 import 'core/logger.dart';
@@ -69,6 +70,10 @@ void main() async {
   
   // Register Category adapter
   Hive.registerAdapter(CategoryAdapter());
+  
+  // Register User Preferences Queue adapters
+  Hive.registerAdapter(UserPreferencesOperationAdapter());
+  Hive.registerAdapter(UserPreferencesQueueItemAdapter());
   
   AppLogger.info('Main: Hive adapters registered successfully');
   

@@ -2,6 +2,7 @@
 // Implements queue-based upload system similar to CalDAV sync
 
 import 'dart:async';
+import 'package:hive/hive.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/user_preferences.dart';
@@ -9,15 +10,29 @@ import '../repositories/user_repository.dart';
 import '../services/local_storage_service.dart';
 import 'user_sync_service.dart';
 
+part 'user_preferences_queue_service.g.dart';
+
+@HiveType(typeId: 40)
 enum UserPreferencesOperation {
+  @HiveField(0)
   upload,
 }
 
-class UserPreferencesQueueItem {
+@HiveType(typeId: 41)
+class UserPreferencesQueueItem extends HiveObject {
+  @HiveField(0)
   final String id;
+  
+  @HiveField(1)
   final UserPreferencesOperation operation;
+  
+  @HiveField(2)
   final UserPreferences data;
+  
+  @HiveField(3)
   final DateTime createdAt;
+  
+  @HiveField(4)
   final int retryCount;
 
   UserPreferencesQueueItem({

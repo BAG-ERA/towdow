@@ -6,15 +6,15 @@ import 'dart:async';
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/caldav_account.dart';
-import '../models/task_calendar.dart';
+
 import '../models/shared_with_me_project.dart';
-import '../models/user_preferences.dart';
+
 import '../repositories/account_repository.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/category_repository.dart';
 import '../repositories/user_repository.dart';
 import '../repositories/external_account_repository.dart';
-import '../repositories/external_calendar_repository.dart';
+
 import 'connection_monitor_service.dart';
 import 'sync_service.dart';
 import 'caldav_service.dart';
@@ -29,7 +29,7 @@ class CalDAVMonitor {
   final CalendarRepository _calendarRepository;
   final UserRepository _userRepository;
   final ExternalAccountRepository _externalAccountRepository;
-  final ExternalCalendarRepository _externalCalendarRepository;
+
   final ConnectionMonitorService _connectionMonitorService;
   final SyncService _syncService;
   final UserSyncService _userSyncService;
@@ -54,7 +54,6 @@ class CalDAVMonitor {
     required CategoryRepository categoryRepository,
     required UserRepository userRepository,
     required ExternalAccountRepository externalAccountRepository,
-    required ExternalCalendarRepository externalCalendarRepository,
     required ConnectionMonitorService connectionMonitorService,
     required SyncService syncService,
     required UserSyncService userSyncService,
@@ -63,7 +62,6 @@ class CalDAVMonitor {
         _calendarRepository = calendarRepository,
         _userRepository = userRepository,
         _externalAccountRepository = externalAccountRepository,
-        _externalCalendarRepository = externalCalendarRepository,
         _connectionMonitorService = connectionMonitorService,
         _syncService = syncService,
         _userSyncService = userSyncService,
@@ -223,78 +221,7 @@ class CalDAVMonitor {
     }
   }
 
-  /// Check for changes in a specific calendar
-  Future<bool> _checkCalendarChanges(CaldavAccount account, TaskCalendar calendar) async {
-    try {
-      final caldavService = CalDAVService(account: account);
-      
-                      // Get fresh calendar data from repository to ensure we have current state
-      AppLogger.debug('CalDAVMonitor: About to retrieve fresh calendar from repository for ${calendar.path}');
-      final freshCalendarResult = await _calendarRepository.getById(calendar.path);
-      return await freshCalendarResult.when(
-        success: (freshCalendar) async {
-          if (freshCalendar == null) {
-            AppLogger.warning('CalDAVMonitor: Calendar not found in repository: ${calendar.path}');
-            return false;
-          }
-          
-          // Use fresh calendar data from repository
-          final currentCalendar = freshCalendar;
-          AppLogger.debug('CalDAVMonitor: Retrieved fresh calendar from repository: ${currentCalendar.path}');
-          AppLogger.debug('CalDAVMonitor: Repository sync token: ${currentCalendar.syncToken ?? "(null)"}');
-          AppLogger.debug('CalDAVMonitor: Repository ETag: ${currentCalendar.etag ?? "(null)"}');
-          AppLogger.debug('CalDAVMonitor: Repository lastSyncAt: ${currentCalendar.lastSyncAt}');
-          
-                    // Get both sync token and ETag using CalDAVService
-          final serverPropertiesResult = await caldavService.getCalendarProperties(currentCalendar);
-          return await serverPropertiesResult.when(
-            success: (updatedCalendar) async {
-              final localSyncToken = currentCalendar.syncToken;
-              final localEtag = currentCalendar.etag;
-              final serverSyncToken = updatedCalendar.syncToken;
-              final serverEtag = updatedCalendar.etag;
-          
-              // Log sync token comparison for debugging
-              AppLogger.info('CalDAVMonitor: Sync token comparison for ${currentCalendar.displayName}:');
-              AppLogger.info('CalDAVMonitor:   Local sync token:  ${localSyncToken ?? "(null)"}');
-              AppLogger.info('CalDAVMonitor:   Server sync token: ${serverSyncToken ?? "(null)"}');
-              AppLogger.info('CalDAVMonitor:   Local ETag:       ${localEtag ?? "(null)"}');
-              AppLogger.info('CalDAVMonitor:   Server ETag:      ${serverEtag ?? "(null)"}');
-              
-              // Check sync tokens first
-              if (localSyncToken != serverSyncToken) {
-                // Sync tokens differ - delegate to SyncService
-                AppLogger.info('CalDAVMonitor: Sync tokens differ for ${currentCalendar.displayName}, delegating to SyncService');
-                await _syncService.syncCalendar(account, currentCalendar, []);
-                
-                // After sync, just return true - let the sync service handle all saving
-                AppLogger.info('CalDAVMonitor: Sync completed for ${currentCalendar.displayName}');
-                return true;
-              } else if (localEtag != serverEtag) {
-                // Sync tokens are equal but ETags differ - delegate to sync service
-                AppLogger.info('CalDAVMonitor: ETag differs for ${currentCalendar.displayName}, delegating to SyncService');
-                await _syncService.syncCalendar(account, currentCalendar, []);
-                return true;
-              }
-              
-              return false; // No changes detected
-            },
-            failure: (failure) async {
-              AppLogger.warning('CalDAVMonitor: Could not get server properties for ${currentCalendar.displayName}: ${failure.message}');
-              return false;
-            },
-          );
-        },
-        failure: (failure) async {
-          AppLogger.warning('CalDAVMonitor: Could not get fresh calendar from repository: ${failure.message}');
-          return false;
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('CalDAVMonitor: Failed to check changes for ${calendar.displayName}', e, stackTrace);
-      return false;
-    }
-  }
+
 
   /// Update interval based on whether changes were detected
   void _updateInterval(bool changesDetected) {
@@ -639,10 +566,8 @@ class CalDAVMonitor {
                 await _userRepository.saveUserPreferences(updatedPrefs);
                 AppLogger.info('CalDAVMonitor: Updated user preferences with ${newSharedProjects.length} shared projects and updated active lists');
                 
-                // Activate calendars for the updated project order to update UI
-                AppLogger.info('CalDAVMonitor: Starting calendar activation for updated project order');
-                await _activateCalendarsFromProjectOrder(updatedPrefs);
-                AppLogger.info('CalDAVMonitor: Calendar activation completed');
+                // Note: Calendar activation removed - projectOrder is UI state only
+                AppLogger.info('CalDAVMonitor: Updated project order - UI will reflect changes automatically');
               },
               failure: (failure) async {
                 AppLogger.error('CalDAVMonitor: Failed to update user preferences with shared projects: ${failure.message}');
@@ -727,98 +652,7 @@ class CalDAVMonitor {
     }
   }
 
-  /// Activate calendars for the given project order
-  Future<void> _activateCalendarsFromProjectOrder(UserPreferences prefs) async {
-    try {
-      AppLogger.info('CalDAVMonitor: Activating calendars for project order: ${prefs.projectOrder}');
-      
-      final accountResult = await _accountRepository.getActiveAccount();
-      await accountResult.when(
-        success: (account) async {
-          if (account == null) {
-            AppLogger.warning('CalDAVMonitor: No active account to activate calendars');
-            return;
-          }
 
-          AppLogger.info('CalDAVMonitor: Got active account, discovering capabilities');
-          final caldavService = CalDAVService(account: account);
-          final capabilitiesResult = await caldavService.discoverCapabilities();
-
-          await capabilitiesResult.when(
-            success: (capabilities) async {
-              final availableCalendars = capabilities.taskCalendars;
-              AppLogger.info('CalDAVMonitor: Discovered ${availableCalendars.length} available calendars');
-              
-              // Log all available calendars for debugging
-              for (final calendar in availableCalendars) {
-                AppLogger.debug('CalDAVMonitor: Available calendar: ${calendar.path} (${calendar.displayName})');
-              }
-              
-              final projectOrder = prefs.projectOrder;
-              AppLogger.info('CalDAVMonitor: Processing ${projectOrder.length} projects in project order');
-
-              for (final projectId in projectOrder) {
-                AppLogger.info('CalDAVMonitor: Looking for calendar for project: $projectId');
-                
-                // Try to find calendar by exact path match first
-                var matchingCalendar = availableCalendars
-                    .where((cal) => cal.path == projectId)
-                    .firstOrNull;
-                
-                // If not found, try to find by UID (for shared projects)
-                if (matchingCalendar == null) {
-                  AppLogger.debug('CalDAVMonitor: No exact path match, trying UID match for: $projectId');
-                  matchingCalendar = availableCalendars
-                      .where((cal) => cal.uid == projectId)
-                      .firstOrNull;
-                }
-                
-                // If still not found, try to construct path from UID
-                if (matchingCalendar == null) {
-                  AppLogger.debug('CalDAVMonitor: No UID match, trying path construction for: $projectId');
-                  final calendarHome = capabilities.calendarHome;
-                  final constructedPath = '$calendarHome$projectId/';
-                  AppLogger.debug('CalDAVMonitor: Constructed path: $constructedPath');
-                  
-                  matchingCalendar = availableCalendars
-                      .where((cal) => cal.path == constructedPath)
-                      .firstOrNull;
-                }
-                
-                // If still not found, try to find by path containing the project ID
-                if (matchingCalendar == null) {
-                  AppLogger.debug('CalDAVMonitor: No constructed path match, trying path contains for: $projectId');
-                  matchingCalendar = availableCalendars
-                      .where((cal) => cal.path.contains(projectId))
-                      .firstOrNull;
-                }
-                
-                if (matchingCalendar != null) {
-                  AppLogger.info('CalDAVMonitor: Found matching calendar for $projectId: ${matchingCalendar.displayName} (${matchingCalendar.path})');
-                  final saveResult = await _calendarRepository.save(matchingCalendar);
-                  saveResult.when(
-                    success: (_) => AppLogger.info('CalDAVMonitor: Successfully activated calendar $projectId'),
-                    failure: (failure) => AppLogger.warning('CalDAVMonitor: Failed to activate calendar $projectId: ${failure.message}'),
-                  );
-                } else {
-                  AppLogger.warning('CalDAVMonitor: Could not find calendar to activate: $projectId');
-                  AppLogger.debug('CalDAVMonitor: Available calendars: ${availableCalendars.map((c) => '${c.path} (${c.uid})').join(', ')}');
-                }
-              }
-            },
-            failure: (failure) async {
-              AppLogger.error('CalDAVMonitor: Failed to discover capabilities for calendar activation: ${failure.message}');
-            },
-          );
-        },
-        failure: (failure) async {
-          AppLogger.error('CalDAVMonitor: Failed to get active account for calendar activation: ${failure.message}');
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('CalDAVMonitor: Failed to activate calendars from project order', e, stackTrace);
-    }
-  }
 
   /// Dispose resources
   void dispose() {

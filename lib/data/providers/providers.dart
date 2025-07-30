@@ -90,7 +90,6 @@ final userSyncServiceProvider = Provider<UserSyncService>((ref) {
     externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
     externalCalendarRepository: ref.watch(externalCalendarRepositoryProvider),
     accountRepository: ref.watch(accountRepositoryProvider),
-    calendarRepository: ref.watch(calendarRepositoryProvider),
   );
 
   // Set up callback to invalidate user preferences provider when preferences are updated
@@ -285,7 +284,7 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
   final categoryRepository = ref.watch(categoryRepositoryProvider);
   final userRepository = ref.watch(userRepositoryProvider);
   final externalAccountRepository = ref.watch(externalAccountRepositoryProvider);
-  final externalCalendarRepository = ref.watch(externalCalendarRepositoryProvider);
+
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final syncService = ref.watch(syncServiceProvider);
   final userSyncService = ref.watch(userSyncServiceProvider);
@@ -299,7 +298,6 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
     categoryRepository: categoryRepository,
     userRepository: userRepository,
     externalAccountRepository: externalAccountRepository,
-    externalCalendarRepository: externalCalendarRepository,
     connectionMonitorService: connectionMonitorService,
     syncService: syncService,
     userSyncService: userSyncService,
