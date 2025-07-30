@@ -10,12 +10,12 @@ import '../utils/enhanced_text_field.dart';
 import '../utils/popup/project_sharing_dialog.dart';
 import '../../../data/models/task.dart';
 
-class ProjectDetailsWidget extends ConsumerWidget {
+class ProjectInfosWidget extends ConsumerWidget {
   final TaskCalendar project;
   final AsyncValue<List<Task>> tasksAsync;
   final Function(TaskCalendar) onProjectUpdated;
 
-  const ProjectDetailsWidget({
+  const ProjectInfosWidget({
     super.key,
     required this.project,
     required this.tasksAsync,

@@ -19,8 +19,7 @@ import '../../../core/theme/chart_theme.dart';
 import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/project_detail/project_kanban_view.dart';
-import '../../widgets/project_detail/project_details_widget.dart';
-import '../../../data/services/webdav_client.dart';
+import '../../widgets/project_detail/project_infos_widget.dart';
 
 // Provider for a specific project/calendar that watches only this specific calendar
 final projectProvider = StreamProvider.family<TaskCalendar?, String>((ref, projectPath) {
@@ -161,7 +160,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           // Project details layout
           projectAsync.when(
             data: (project) => project != null 
-                ? ProjectDetailsWidget(
+                ? ProjectInfosWidget(
                     project: project,
                     tasksAsync: tasksAsync,
                     onProjectUpdated: _updateProject,
@@ -223,7 +222,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   // Project Details Widget (replacing ProjectInfoCard)
                   projectAsync.when(
                     data: (project) => project != null 
-                        ? ProjectDetailsWidget(
+                        ? ProjectInfosWidget(
                             project: project,
                             tasksAsync: tasksAsync,
                             onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
