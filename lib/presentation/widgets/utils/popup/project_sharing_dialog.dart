@@ -313,6 +313,10 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
   void _saveChanges(ProjectSharingViewModel notifier) async {
     await notifier.saveChanges();
     
-    // Project sharing updated successfully - no notification needed
+    // Check if save was successful and close dialog
+    final state = ref.read(projectSharingViewModelProvider);
+    if (state.error == null && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 } 
