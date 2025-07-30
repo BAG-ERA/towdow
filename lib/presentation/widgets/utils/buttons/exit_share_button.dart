@@ -1,0 +1,241 @@
+// Exit Share Button component
+// Reusable button for exiting shared projects with consistent styling across the app
+// Uses FlowIt typography system with automatic capitalization
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/logger.dart';
+import '../../../../core/theme/chart_theme.dart';
+import '../../../../data/providers/providers.dart';
+
+class ExitShareButton extends ConsumerWidget {
+  /// Project path to exit share (required)
+  final String projectPath;
+  
+  /// Project display name for user feedback
+  final String projectDisplayName;
+  
+  /// Custom button color (defaults to theme error color for exit actions)
+  final Color? backgroundColor;
+  
+  /// Custom text color (defaults to white for primary buttons)
+  final Color? textColor;
+  
+  /// Button text (will be automatically capitalized)
+  final String text;
+  
+  /// Optional icon to display alongside text
+  final IconData? icon;
+  
+  /// Button size variant
+  final ExitShareButtonSize size;
+  
+  /// Whether the button should expand to fill available width
+  final bool isFullWidth;
+  
+  /// Custom callback when project share is exited (optional)
+  final VoidCallback? onShareExited;
+
+  const ExitShareButton({
+    super.key,
+    required this.projectPath,
+    required this.projectDisplayName,
+    this.backgroundColor,
+    this.textColor,
+    this.text = 'Exit Share',
+    this.icon = Icons.exit_to_app_rounded,
+    this.size = ExitShareButtonSize.medium,
+    this.isFullWidth = false,
+    this.onShareExited,
+  });
+
+  /// Factory constructor for a compact exit share button (commonly used in toolbars)
+  factory ExitShareButton.compact({
+    Key? key,
+    required String projectPath,
+    required String projectDisplayName,
+    Color? backgroundColor,
+    Color? textColor,
+    VoidCallback? onShareExited,
+  }) {
+    return ExitShareButton(
+      key: key,
+      projectPath: projectPath,
+      projectDisplayName: projectDisplayName,
+      backgroundColor: backgroundColor,
+      textColor: textColor,
+      text: 'Exit Share',
+      icon: Icons.exit_to_app_rounded,
+      size: ExitShareButtonSize.small,
+      onShareExited: onShareExited,
+    );
+  }
+
+  /// Factory constructor for a prominent exit share button (commonly used in main areas)
+  factory ExitShareButton.prominent({
+    Key? key,
+    required String projectPath,
+    required String projectDisplayName,
+    Color? backgroundColor,
+    Color? textColor,
+    bool isFullWidth = false,
+    VoidCallback? onShareExited,
+  }) {
+    return ExitShareButton(
+      key: key,
+      projectPath: projectPath,
+      projectDisplayName: projectDisplayName,
+      backgroundColor: backgroundColor,
+      textColor: textColor,
+      text: 'Exit Share',
+      icon: Icons.exit_to_app_rounded,
+      size: ExitShareButtonSize.large,
+      isFullWidth: isFullWidth,
+      onShareExited: onShareExited,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chartTheme = context.chartTheme;
+    final effectiveBackgroundColor = backgroundColor ?? chartTheme.colors.primary;
+    final effectiveTextColor = textColor ?? chartTheme.typography.primaryButton.color;
+    
+    final buttonPadding = _getPadding(chartTheme);
+    final fontSize = _getFontSize();
+    
+    return SizedBox(
+      width: isFullWidth ? double.infinity : null,
+      child: OutlinedButton.icon(
+        onPressed: () => _handleExitShare(context, ref),
+        icon: icon != null ? Icon(icon, size: _getIconSize()) : const SizedBox.shrink(),
+        label: Text(
+          text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
+          style: chartTheme.typography.primaryButton.copyWith(
+            color: effectiveBackgroundColor,
+            fontSize: fontSize,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: effectiveBackgroundColor,
+          side: BorderSide(color: effectiveBackgroundColor),
+          padding: buttonPadding,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(chartTheme.dimensions.cornerRadius),
+          ),
+        ),
+      ),
+    );
+  }
+
+  EdgeInsets _getPadding(ChartTheme chartTheme) {
+    switch (size) {
+      case ExitShareButtonSize.small:
+        return EdgeInsets.symmetric(
+          horizontal: chartTheme.dimensions.paddingMedium,
+          vertical: chartTheme.dimensions.paddingSmall,
+        );
+      case ExitShareButtonSize.medium:
+        return EdgeInsets.symmetric(
+          horizontal: chartTheme.dimensions.paddingLarge,
+          vertical: chartTheme.dimensions.paddingMedium,
+        );
+      case ExitShareButtonSize.large:
+        return EdgeInsets.symmetric(
+          horizontal: chartTheme.dimensions.paddingLarge * 1.5,
+          vertical: chartTheme.dimensions.paddingMedium * 1.2,
+        );
+    }
+  }
+
+  double _getFontSize() {
+    switch (size) {
+      case ExitShareButtonSize.small:
+        return 12;
+      case ExitShareButtonSize.medium:
+        return 14;
+      case ExitShareButtonSize.large:
+        return 16;
+    }
+  }
+
+  double _getIconSize() {
+    switch (size) {
+      case ExitShareButtonSize.small:
+        return 16;
+      case ExitShareButtonSize.medium:
+        return 20;
+      case ExitShareButtonSize.large:
+        return 24;
+    }
+  }
+
+  Future<void> _handleExitShare(BuildContext context, WidgetRef ref) async {
+    try {
+      AppLogger.info('ExitShareButton: Exiting share for project $projectPath');
+      
+      // Get the user repository to remove the shared project
+      final userRepository = ref.read(userRepositoryProvider);
+      
+      // Remove the shared project from user preferences
+      final preferencesResult = await userRepository.getUserPreferences();
+      
+      await preferencesResult.when(
+        success: (preferences) async {
+          // Remove the project from shared projects list using project UID
+          // Extract UID from path like /user-uuid/project-uuid/ -> project-uuid
+          final segments = projectPath.split('/').where((s) => s.isNotEmpty).toList();
+          final projectUid = segments.isNotEmpty ? segments.last : projectPath;
+          
+          AppLogger.info('ExitShareButton: Extracted project UID: $projectUid from path: $projectPath');
+          AppLogger.info('ExitShareButton: Current shared projects: ${preferences.sharedWithMeProjects.map((p) => p.projectId).toList()}');
+          
+          final updatedPreferences = preferences.copyWith(
+            sharedWithMeProjects: preferences.sharedWithMeProjects
+                .where((project) => project.projectId != projectUid)
+                .toList(),
+          );
+          
+          AppLogger.info('ExitShareButton: After removal, shared projects: ${updatedPreferences.sharedWithMeProjects.map((p) => p.projectId).toList()}');
+          
+          // Save updated preferences
+          final saveResult = await userRepository.saveUserPreferences(updatedPreferences);
+          
+          saveResult.when(
+            success: (_) {
+              AppLogger.info('ExitShareButton: Successfully exited share for project $projectPath');
+              
+              // Navigate away from project if currently viewing it
+              if (context.mounted) {
+                final currentRoute = GoRouterState.of(context).uri.path;
+                if (currentRoute == '/project/${Uri.encodeComponent(projectPath)}') {
+                  AppLogger.info('ExitShareButton: Navigating away from exited shared project');
+                  context.go('/');
+                }
+              }
+              
+              // Call optional callback
+              onShareExited?.call();
+            },
+            failure: (failure) {
+              AppLogger.error('ExitShareButton: Failed to save preferences after exiting share: ${failure.message}');
+            },
+          );
+        },
+        failure: (failure) {
+          AppLogger.error('ExitShareButton: Failed to get user preferences: ${failure.message}');
+        },
+      );
+    } catch (e) {
+      AppLogger.error('ExitShareButton: Exception while exiting share for project $projectPath: $e');
+    }
+  }
+}
+
+/// Size variants for the exit share button
+enum ExitShareButtonSize {
+  small,   // Compact size for toolbars and tight spaces
+  medium,  // Standard size for most use cases
+  large,   // Prominent size for main actions
+} 
