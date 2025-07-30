@@ -101,7 +101,7 @@ void main() {
       
       taskRepository = LocalTaskRepository(storageService);
       accountRepository = LocalAccountRepository(storageService);
-      calendarRepository = LocalCalendarRepository(storageService);
+      calendarRepository = LocalCalendarRepository(storageService, accountRepository);
       categoryRepository = CategoryRepository(calendarRepository, accountRepository);
       
       syncService = SyncService(
@@ -306,7 +306,7 @@ void main() {
         final errorStorageService = LocalStorageService();
         final errorTaskRepository = LocalTaskRepository(errorStorageService);
         final errorAccountRepository = LocalAccountRepository(errorStorageService);
-        final errorCalendarRepository = LocalCalendarRepository(errorStorageService);
+        final errorCalendarRepository = LocalCalendarRepository(errorStorageService, errorAccountRepository);
         final errorSyncService = SyncService(
           taskRepository: errorTaskRepository,
           accountRepository: errorAccountRepository,
