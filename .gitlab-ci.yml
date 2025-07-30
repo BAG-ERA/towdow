@@ -133,7 +133,8 @@ build_windows:
     - dart run inno_bundle:build --release --app-version "$env:CI_COMMIT_TAG" --no-gen-publisher --no-app
     - Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "build/windows/x64/runner/Release/towdow_app-$env:CI_COMMIT_TAG.zip"
     # build msix
-    - dart run msix:create --install-certificate false --version "$env:CI_COMMIT_TAG".0
+    - $version = "$env:CI_COMMIT_TAG.0"
+    - dart run msix:create --install-certificate false --version $version
     - Copy-Item "build\windows\x64\runner\Release\towdow_app.msix" -Destination "build\windows\x64\runner\Release\towdow_app.msix\$env:CI_COMMIT_TAG.msix"
     - dir "build/windows/x64/runner/Release/towdow_app-$env:CI_COMMIT_TAG.zip"
     - dir "build/windows/x64/installer/Release/TowdowApp-x86_64-$env:CI_COMMIT_TAG-Installer.exe"
