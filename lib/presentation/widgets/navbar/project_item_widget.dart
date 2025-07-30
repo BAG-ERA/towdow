@@ -300,6 +300,8 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
 
   void _handleArchiveProject(BuildContext context) async {
     try {
+      AppLogger.info('ProjectItem: Archiving project ${widget.project.path} (${widget.project.displayName})');
+      
       // Get the status service from providers
       final statusService = ref.read(statusServiceProvider);
       
@@ -308,13 +310,21 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
       
       result.when(
         success: (_) {
+          // Navigate away from project if currently viewing it
+          final currentRoute = GoRouterState.of(context).uri.path;
+          if (currentRoute == '/project/${Uri.encodeComponent(widget.project.path)}') {
+            AppLogger.info('ProjectItem: Navigating away from archived project');
+            context.go('/');
+          }
+          
+          AppLogger.info('ProjectItem: Successfully archived project ${widget.project.path}');
         },
         failure: (failure) {
-          AppLogger.error('Failed to archive project: ${failure.message}');
+          AppLogger.error('ProjectItem: Failed to archive project: ${failure.message}');
         },
       );
     } catch (e) {
-      AppLogger.error('Failed to archive project: $e');
+      AppLogger.error('ProjectItem: Failed to archive project: $e');
     }
   }
 

@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/logger.dart';
 import '../../../../core/theme/chart_theme.dart';
 import '../../../../data/providers/providers.dart';
@@ -184,6 +185,15 @@ class ArchiveProjectButton extends ConsumerWidget {
       result.when(
         success: (_) {
           AppLogger.info('ArchiveProjectButton: Successfully archived project $projectPath');
+          
+          // Navigate away from project if currently viewing it
+          if (context.mounted) {
+            final currentRoute = GoRouterState.of(context).uri.path;
+            if (currentRoute == '/project/${Uri.encodeComponent(projectPath)}') {
+              AppLogger.info('ArchiveProjectButton: Navigating away from archived project');
+              context.go('/');
+            }
+          }
           
           // Call optional callback
           onProjectArchived?.call();
