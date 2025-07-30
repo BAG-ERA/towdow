@@ -135,14 +135,14 @@ build_windows:
     # build msix
     - $version = "$env:CI_COMMIT_TAG.0"
     - dart run msix:create --install-certificate false --version $version
-    - Copy-Item "build\windows\x64\runner\Release\towdow_app.msix" -Destination "build\windows\x64\runner\Release\towdow_app.msix\$env:CI_COMMIT_TAG.msix"
+    - Copy-Item "build\windows\x64\runner\Release\towdow_app.msix" -Destination "build\windows\x64\runner\Release\$env:CI_COMMIT_TAG.msix"
     - dir "build/windows/x64/runner/Release/towdow_app-$env:CI_COMMIT_TAG.zip"
     - dir "build/windows/x64/installer/Release/TowdowApp-x86_64-$env:CI_COMMIT_TAG-Installer.exe"
   artifacts:
     paths:
       - "build/windows/x64/runner/Release/towdow_app-$CI_COMMIT_TAG.zip"
       - "build/windows/x64/installer/Release/TowdowApp-x86_64-$CI_COMMIT_TAG-Installer.exe"
-      - "build/windows/x64/runner/Release/towdow_app.msix/$CI_COMMIT_TAG.msix"
+      - "build/windows/x64/runner/Release/$CI_COMMIT_TAG.msix"
     expire_in: 1 week
     reports:
       dotenv: build.env
@@ -217,7 +217,7 @@ release:
         - name: "Towdow web"
           url: "$CI_PROJECT_URL/-/jobs/$WEB_JOB_ID/artifacts/file/build/web_${CI_COMMIT_TAG}.tar.gz"
         - name: "TowDow Windows msix"
-          url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/runner/Release/towdow_app.msix/$CI_COMMIT_TAG.msix"
+          url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/runner/Release/$CI_COMMIT_TAG.msix"
 
 deploy_web:
   stage: release
