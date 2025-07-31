@@ -22,6 +22,12 @@ class ShareService {
     _baseUrl = '${serverUri.scheme}://${serverUri.host}${serverUri.hasPort ? ':${serverUri.port}' : ''}';
   }
 
+  /// Extract UID from path (last non-empty segment after splitting on /)
+  String _extractUidFromPath(String path) {
+    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    return segments.isNotEmpty ? segments.last : path;
+  }
+
   /// Get project members from sharing API
   Future<Result<List<SharedProjectMember>>> getProjectMembers(String projectPath) async {
     AppLogger.debug('ShareService: Getting project members for path: $projectPath');
@@ -30,7 +36,7 @@ class ShareService {
     
     try {
       // For sharing API, we need to use direct HTTP client since it's not CalDAV
-      final url = '$_baseUrl/share/$projectPath';
+      final url = '$_baseUrl/share/$_extractUidFromPath(projectPath)';
       AppLogger.debug('ShareService: Making GET request to: $url');
       
       // Get auth headers from WebDAV client
@@ -77,7 +83,7 @@ class ShareService {
     
     try {
       // For sharing API, we need to use direct HTTP client since it's not CalDAV
-      final url = '$_baseUrl/share/$projectPath';
+      final url = '$_baseUrl/share/$_extractUidFromPath(projectPath)';
       final requestBody = jsonEncode(memberEmails);
       AppLogger.debug('ShareService: Making PUT request to: $url');
       AppLogger.debug('ShareService: PUT request body: $requestBody');
@@ -128,7 +134,7 @@ class ShareService {
     try {
       AppLogger.info('ShareService: Adding member $targetUserEmail to project $projectPath');
       
-      final url = Uri.parse('$_baseUrl/share/${Uri.encodeComponent(projectPath)}');
+      final url = Uri.parse('$_baseUrl/share/$_extractUidFromPath(projectPath)');
       final headers = await _client.getAuthHeaders();
       headers['Content-Type'] = 'application/json';
       
@@ -172,7 +178,7 @@ class ShareService {
     try {
       AppLogger.info('ShareService: Removing member $targetUserEmail from project $projectPath');
       
-      final url = Uri.parse('$_baseUrl/share/${Uri.encodeComponent(projectPath)}?targetUserEmail=${Uri.encodeComponent(targetUserEmail)}');
+      final url = Uri.parse('$_baseUrl/share/$_extractUidFromPath(projectPath)}?targetUserEmail=${Uri.encodeComponent(targetUserEmail)}');
       final headers = await _client.getAuthHeaders();
       
       final response = await http.delete(url, headers: headers);
@@ -195,6 +201,13 @@ class ShareService {
         stackTrace: stackTrace,
       ));
     }
+  }
+
+  /// Check if project is shared with me (GET /shared_with_me)
+  Future<bool> isSharedWithMe(String projectPath) async {
+    final projectId = _extractUidFromPath(projectPath);
+    final projects = await getProjectsSharedWithMe();
+    return projects.when(success: (projects) => projects.any((p) => p.projectPath == projectId), failure: (failure) => false);
   }
 
   /// Get projects shared with me (GET /shared_with_me)
@@ -230,28 +243,32 @@ class ShareService {
     }
   }
 
-  /// Exit share from project (POST /exitShare/{project_path})
-  Future<Result<void>> exitShare(String projectUid) async {
+  /// Exit share from project (POST /exitShare/{project_uid})
+  Future<Result<void>> exitShare(String projectPath) async {
     try {
-      AppLogger.info('ShareService: Exiting share for project $projectUid');
+      final projectUid = _extractUidFromPath(projectPath);
       
       final url = Uri.parse('$_baseUrl/exitShare/$projectUid');
-      final headers = await _client.getAuthHeaders();
+      AppLogger.info('ShareService: Full exit share URL: $url');
       
+      final headers = await _client.getAuthHeaders();
+   
+      AppLogger.info('ShareService: Making POST request to exit share...');
       final response = await http.post(url, headers: headers);
+      AppLogger.info('ShareService: Exit share response status: ${response.statusCode}');
+      AppLogger.info('ShareService: Exit share response body: ${response.body}');
       
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        AppLogger.info('ShareService: Successfully exited share');
+        AppLogger.info('ShareService: ✅ Successfully exited share');
         return const Result.success(null);
       } else {
-        AppLogger.error('ShareService: Failed to exit share: ${response.statusCode} ${response.body}');
+        AppLogger.error('ShareService: ❌ Failed to exit share: ${response.statusCode} ${response.body}');
         return Result.failure(Failure(
           message: 'Failed to exit share: ${response.statusCode}',
           exception: Exception('HTTP ${response.statusCode}: ${response.body}'),
         ));
       }
     } catch (e, stackTrace) {
-      AppLogger.error('ShareService: Error exiting share', e, stackTrace);
       return Result.failure(Failure(
         message: 'Error exiting share: $e',
         exception: e is Exception ? e : Exception(e.toString()),

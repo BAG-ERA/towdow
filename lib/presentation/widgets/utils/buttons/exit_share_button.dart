@@ -174,23 +174,22 @@ class ExitShareButton extends ConsumerWidget {
     try {
       AppLogger.info('ExitShareButton: Exiting share for project $projectPath');
       
-      // Extract project UID from path like /user-uuid/project-uuid/ -> project-uuid
-      final segments = projectPath.split('/').where((s) => s.isNotEmpty).toList();
-      final projectUid = segments.isNotEmpty ? segments.last : projectPath;
-      
-      AppLogger.info('ExitShareButton: Extracted project UID: $projectUid from path: $projectPath');
-      
-      // Use calendar repository delete - pass both UID and full path for shared project handling
+      // Use calendar repository delete with path directly
       final calendarRepository = ref.read(calendarRepositoryProvider);
-      final deleteResult = await calendarRepository.deleteSharedProject(projectUid, projectPath);
+      AppLogger.info('ExitShareButton: Got calendar repository, calling delete with path...');
+      final deleteResult = await calendarRepository.delete(projectPath);
+      
+      AppLogger.info('ExitShareButton: calendarRepository.delete completed, processing result...');
       
       await deleteResult.when(
         success: (_) async {
           AppLogger.info('ExitShareButton: Successfully exited share for project $projectPath');
           
-          // Invalidate providers to refresh UI
-          ref.invalidate(projectListProvider);
-          ref.invalidate(activeCalendarListProvider);
+          // Invalidate providers to refresh UI (check if still mounted)
+          if (context.mounted) {
+            ref.invalidate(projectListProvider);
+            ref.invalidate(activeCalendarListProvider);
+          }
           
           // Navigate away from project if currently viewing it
           if (context.mounted) {

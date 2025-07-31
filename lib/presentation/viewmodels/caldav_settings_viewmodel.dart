@@ -8,6 +8,7 @@ import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/services/caldav_service.dart';
 import '../../data/services/capability_discovery_service.dart';
+import '../../data/services/sync_service.dart';
 import '../../core/logger.dart';
 
 // CalDAV Settings ViewModel State
@@ -231,11 +232,25 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
         manager: account.email,
       );
 
-      // TODO: Implement calendar creation in CalDAVService
-      // For now, just add it locally
+      // Save calendar locally first, then queue for server creation
       final result = await _calendarRepository.save(newCalendar);
       await result.when(
         success: (_) async {
+          // Queue calendar creation on server
+          final syncService = SyncService.instance;
+          if (syncService != null) {
+            final queueResult = await syncService.queueCalendarCreation(newCalendar.uid);
+            queueResult.when(
+              success: (_) {
+                AppLogger.info('CaldavSettingsViewModel: Successfully queued calendar creation for: ${newCalendar.displayName}');
+              },
+              failure: (failure) {
+                AppLogger.warning('CaldavSettingsViewModel: Failed to queue calendar creation: ${failure.message}');
+              },
+            );
+          } else {
+            AppLogger.warning('CaldavSettingsViewModel: SyncService not available - calendar will not be synced to server');
+          }
           final updatedAvailable = [...state.availableCalendars, newCalendar];
           final updatedSelected = [...state.selectedCalendars, newCalendar];
           

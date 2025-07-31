@@ -614,8 +614,9 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
             return; // Already deleted
           }
 
-          // Delete through repository (handles sync internally)
-          final result = await _calendarRepository.delete(projectPath);
+          // Delete through repository using path directly (handles sync internally)
+          AppLogger.info('ProjectListViewModel: Deleting project with path: ${calendar.path}');
+          final result = await _calendarRepository.delete(calendar.path);
           await result.when(
             success: (_) async {
               AppLogger.info('ProjectListViewModel: Project deleted successfully: $projectPath');

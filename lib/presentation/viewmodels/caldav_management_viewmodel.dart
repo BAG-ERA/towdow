@@ -279,6 +279,7 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
 
     try {
       // Delete through repository (handles both server and local deletion)
+      // Use path for consistent storage key handling
       final deleteResult = await _calendarRepository.delete(calendar.path);
       deleteResult.when(
         success: (_) {

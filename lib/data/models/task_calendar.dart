@@ -55,6 +55,9 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(29) String? flowitManager, // X-FLOWIT-MANAGER - project manager (responsible person)
     @HiveField(30) DateTime? flowitCreatedAt, // X-FLOWIT-CREATED-AT - when project was created
     @HiveField(31) DateTime? flowitEndedAt, // X-FLOWIT-ENDED-AT - when project was completed/ended
+    
+    // Computed fields (set during sync)
+    @HiveField(32) @Default(false) bool isSharedWithMe, // Whether this calendar is shared with the current user (computed during sync)
   }) = _TaskCalendar;
 
   factory TaskCalendar.fromJson(Map<String, dynamic> json) => _$TaskCalendarFromJson(json);
@@ -128,6 +131,7 @@ extension TaskCalendarFactory on TaskCalendar {
     String? flowitManager,
     DateTime? flowitCreatedAt,
     DateTime? flowitEndedAt,
+    bool isSharedWithMe = false,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -153,6 +157,7 @@ extension TaskCalendarFactory on TaskCalendar {
       flowitManager: flowitManager,
       flowitCreatedAt: flowitCreatedAt,
       flowitEndedAt: flowitEndedAt,
+      isSharedWithMe: isSharedWithMe,
     );
   }
 }
@@ -309,15 +314,6 @@ extension TaskCalendarSharing on TaskCalendar {
   /// Computed property: Check if this project is shared with others  
   /// This is a project I own but have shared with other users
   bool get isSharedWithOthers => sharedWithMembers.isNotEmpty;
-
-  /// Extract username from calendar path or owner field
-  String _extractUserFromPath(String path) {
-    // Handle different CalDAV path formats:
-    // /calendars/username/ or /principals/users/username/ or similar
-    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
-    final userPath = segments.length >= 2 ? segments.first : '';
-    return userPath;
-  }
 
   /// Get list of users this project is shared with
   List<String> get sharedWithEmails {
