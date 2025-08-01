@@ -9,6 +9,7 @@ import '../utils/editable_title.dart';
 import '../utils/enhanced_text_field.dart';
 import '../utils/popup/project_sharing_dialog.dart';
 import '../../../data/models/task.dart';
+import '../../../data/repositories/account_repository.dart';
 
 class ProjectInfosWidget extends ConsumerWidget {
   final TaskCalendar project;
@@ -59,6 +60,9 @@ class ProjectInfosWidget extends ConsumerWidget {
                 
                 const SizedBox(height: 8),
               ],
+              
+              // Warning for attendees without project access
+              _buildAttendeeAccessWarning(context, ref),
               
               // Author email or Shared with me by
               sharedByAsync.when(
@@ -402,6 +406,121 @@ class ProjectInfosWidget extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Build warning widget for attendees without project access
+  Widget _buildAttendeeAccessWarning(BuildContext context, WidgetRef ref) {
+    return tasksAsync.when(
+      data: (tasks) {
+        // Get current user email from account repository
+        final accountRepository = ref.watch(accountRepositoryProvider);
+        
+        // Use FutureBuilder to handle async account lookup
+        return FutureBuilder<String?>(
+          future: _getCurrentUserEmail(accountRepository),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const SizedBox.shrink();
+            }
+            
+            final currentUserEmail = snapshot.data;
+            if (currentUserEmail == null) {
+              return const SizedBox.shrink();
+            }
+            
+            // Check if current user is project author
+            final isProjectAuthor = project.flowitAuthor == currentUserEmail || 
+                project.flowitOwner == currentUserEmail;
+            
+            if (!isProjectAuthor) {
+              return const SizedBox.shrink();
+            }
+            
+            // Get all unique attendees from tasks
+            final allAttendees = <String>{};
+            for (final task in tasks) {
+              for (final attendee in task.attendees) {
+                allAttendees.add(attendee.email);
+              }
+            }
+            
+            // Get project members
+            final projectMembers = <String>{};
+            if (project.sharedWithEmails.isNotEmpty) {
+              projectMembers.addAll(project.sharedWithEmails);
+            }
+            if (project.flowitOwner != null && project.flowitOwner!.isNotEmpty) {
+              projectMembers.add(project.flowitOwner!);
+            }
+            if (project.flowitAuthor != null && project.flowitAuthor!.isNotEmpty) {
+              projectMembers.add(project.flowitAuthor!);
+            }
+            
+            // Find attendees without project access
+            final attendeesWithoutAccess = allAttendees.where(
+              (attendee) => !projectMembers.contains(attendee)
+            ).toList();
+            
+            if (attendeesWithoutAccess.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Attendees without project access',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${attendeesWithoutAccess.length} attendee${attendeesWithoutAccess.length == 1 ? '' : 's'} have tasks but are not project members: ${attendeesWithoutAccess.join(', ')}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  /// Get current user email from account repository
+  Future<String?> _getCurrentUserEmail(AccountRepository accountRepository) async {
+    final accountResult = await accountRepository.getActiveAccount();
+    return accountResult.when(
+      success: (account) => account?.email ?? account?.username,
+      failure: (_) => null,
     );
   }
 
