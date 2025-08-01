@@ -498,15 +498,42 @@ class ProjectInfosWidget extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    '${attendeesWithoutAccess.length} attendee${attendeesWithoutAccess.length == 1 ? '' : 's'} have tasks but are not project members: ${attendeesWithoutAccess.join(', ')}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            );
+                                     Text(
+                     '${attendeesWithoutAccess.length} attendee${attendeesWithoutAccess.length == 1 ? '' : 's'} have tasks but are not project members: ${attendeesWithoutAccess.join(', ')}',
+                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                       color: Theme.of(context).colorScheme.onSurfaceVariant,
+                     ),
+                   ),
+                   const SizedBox(height: 8),
+                   Row(
+                     children: [
+                       Expanded(
+                         child: OutlinedButton.icon(
+                           onPressed: () {
+                             showDialog(
+                               context: context,
+                               builder: (context) => ProjectSharingDialog(
+                                 project: project,
+                                 suggestedMembers: attendeesWithoutAccess,
+                               ),
+                             );
+                           },
+                           icon: const Icon(Icons.person_add, size: 16),
+                           label: Text(
+                             'Add ${attendeesWithoutAccess.length == 1 ? 'them' : 'them'} as member${attendeesWithoutAccess.length == 1 ? '' : 's'}',
+                             style: Theme.of(context).textTheme.bodySmall,
+                           ),
+                           style: OutlinedButton.styleFrom(
+                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                             minimumSize: const Size(0, 32),
+                           ),
+                         ),
+                       ),
+                     ],
+                   ),
+                 ],
+               ),
+             );
           },
         );
       },

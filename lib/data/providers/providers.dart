@@ -50,6 +50,7 @@ import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
 import '../services/kanban_service.dart';
 import '../../app.dart';
 import '../services/share_service.dart';
+import '../services/users_api_service.dart';
 import '../models/user_preferences.dart';
 
 // Local storage service provider
@@ -228,6 +229,11 @@ final externalCalendarSyncServiceProvider = Provider<ExternalCalendarSyncService
 // Sharing service provider
 final shareServiceProvider = Provider.family<ShareService, CaldavAccount>((ref, account) {
   return ShareService(account: account);
+});
+
+// Users API service provider
+final usersApiServiceProvider = Provider.family<UsersApiService, CaldavAccount>((ref, account) {
+  return UsersApiService(account: account);
 });
 
 // Global navigator key for session expiry navigation

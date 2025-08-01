@@ -203,5 +203,87 @@ void main() {
       expect(allAttendees.isEmpty, true);
       expect(attendeesWithoutAccess.isEmpty, true);
     });
+
+    test('should provide correct suggested members for ProjectSharingDialog', () {
+      // Create a project with some members
+      final project = TaskCalendar(
+        path: '/test/project',
+        displayName: 'Test Project',
+        dtstamp: DateTime.now(),
+        created: DateTime.now(),
+        lastModified: DateTime.now(),
+        status: 'NEEDS-ACTION',
+        flowitAuthor: 'author@example.com',
+        sharedWith: '[{"targetUserEmail":"member1@example.com"}]',
+      );
+
+      // Create tasks with attendees, some without access
+      final tasks = [
+        Task(
+          uid: 'task-1',
+          summary: 'Task 1',
+          description: 'Description 1',
+          status: 'NEEDS-ACTION',
+          lastModified: DateTime.now(),
+          created: DateTime.now(),
+          dtstamp: DateTime.now(),
+          attendees: [
+            Attendee(email: 'member1@example.com'), // Has access
+            Attendee(email: 'outsider1@example.com'), // No access
+            Attendee(email: 'outsider2@example.com'), // No access
+          ],
+          projectPath: '/test/project',
+        ),
+        Task(
+          uid: 'task-2',
+          summary: 'Task 2',
+          description: 'Description 2',
+          status: 'NEEDS-ACTION',
+          lastModified: DateTime.now(),
+          created: DateTime.now(),
+          dtstamp: DateTime.now(),
+          attendees: [
+            Attendee(email: 'outsider1@example.com'), // No access (duplicate)
+            Attendee(email: 'outsider3@example.com'), // No access
+          ],
+          projectPath: '/test/project',
+        ),
+      ];
+
+      // Get all unique attendees from tasks
+      final allAttendees = <String>{};
+      for (final task in tasks) {
+        for (final attendee in task.attendees) {
+          allAttendees.add(attendee.email);
+        }
+      }
+
+      // Get project members
+      final projectMembers = <String>{};
+      if (project.sharedWithEmails.isNotEmpty) {
+        projectMembers.addAll(project.sharedWithEmails);
+      }
+      if (project.flowitOwner != null && project.flowitOwner!.isNotEmpty) {
+        projectMembers.add(project.flowitOwner!);
+      }
+      if (project.flowitAuthor != null && project.flowitAuthor!.isNotEmpty) {
+        projectMembers.add(project.flowitAuthor!);
+      }
+
+      // Find attendees without project access (these would be suggested members)
+      final suggestedMembers = allAttendees.where(
+        (attendee) => !projectMembers.contains(attendee)
+      ).toList();
+
+      // Verify suggested members
+      expect(suggestedMembers.length, 3);
+      expect(suggestedMembers, contains('outsider1@example.com'));
+      expect(suggestedMembers, contains('outsider2@example.com'));
+      expect(suggestedMembers, contains('outsider3@example.com'));
+      
+      // Verify that members with access are not in suggested list
+      expect(suggestedMembers, isNot(contains('member1@example.com')));
+      expect(suggestedMembers, isNot(contains('author@example.com')));
+    });
   });
 } 
