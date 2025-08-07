@@ -258,7 +258,8 @@ void main() {
         // Arrange
         final mockStorage = MockLocalStorageService();
         final mockAccountRepository = MockAccountRepository();
-        final calendarRepo = LocalCalendarRepository(mockStorage, mockAccountRepository);
+        final mockUserRepository = MockUserRepository();
+        final calendarRepo = LocalCalendarRepository(mockStorage, mockAccountRepository, mockUserRepository);
         final taskRepo = LocalTaskRepository(mockStorage);
 
         // Mock successful storage operations
@@ -266,6 +267,17 @@ void main() {
             .thenAnswer((_) async => const Result<Task?>.success(null)); // Task not found, which is fine for delete
         when(mockStorage.get(LocalStorageService.calendarsBoxName, 'calendar1'))
             .thenAnswer((_) async => const Result<TaskCalendar?>.success(null)); // Calendar not found, which is fine for delete
+        when(mockStorage.getAll(LocalStorageService.calendarsBoxName))
+            .thenAnswer((_) async => const Result<List<TaskCalendar>>.success([])); // Empty list for getAll
+        
+        // Create a mock calendar for the delete test
+        final mockCalendar = TaskCalendarFactory.createNew(
+          path: 'calendar1',
+          displayName: 'Test Calendar',
+        );
+        when(mockStorage.getAll<TaskCalendar>(LocalStorageService.calendarsBoxName))
+            .thenAnswer((_) async => Result<List<TaskCalendar>>.success([mockCalendar])); // Return the mock calendar
+        
         when(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1'))
             .thenAnswer((_) async => const Result.success(null));
         when(mockStorage.delete(LocalStorageService.tasksBoxName, 'task1'))
@@ -288,11 +300,23 @@ void main() {
         // Arrange
         final mockStorage = MockLocalStorageService();
         final mockAccountRepository = MockAccountRepository();
-        final calendarRepo = LocalCalendarRepository(mockStorage, mockAccountRepository);
+        final mockUserRepository = MockUserRepository();
+        final calendarRepo = LocalCalendarRepository(mockStorage, mockAccountRepository, mockUserRepository);
 
         // Mock storage failure
         when(mockStorage.get(LocalStorageService.calendarsBoxName, 'calendar1'))
             .thenAnswer((_) async => const Result<TaskCalendar?>.success(null)); // Calendar not found, which is fine for delete
+        when(mockStorage.getAll(LocalStorageService.calendarsBoxName))
+            .thenAnswer((_) async => const Result<List<TaskCalendar>>.success([])); // Empty list for getAll
+        
+        // Create a mock calendar for the delete test
+        final mockCalendar = TaskCalendarFactory.createNew(
+          path: 'calendar1',
+          displayName: 'Test Calendar',
+        );
+        when(mockStorage.getAll<TaskCalendar>(LocalStorageService.calendarsBoxName))
+            .thenAnswer((_) async => Result<List<TaskCalendar>>.success([mockCalendar])); // Return the mock calendar
+        
         when(mockStorage.delete(LocalStorageService.calendarsBoxName, 'calendar1'))
             .thenAnswer((_) async => Result.failure(
                 Failure(exception: Exception('Storage locked'), message: 'Storage is locked by another process')));

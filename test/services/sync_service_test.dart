@@ -12,6 +12,7 @@ import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/category_repository.dart';
+import 'package:towdow_app/data/repositories/user_repository.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/core/result.dart';
@@ -23,6 +24,7 @@ import 'sync_service_test.mocks.dart';
   AccountRepository,
   CalendarRepository,
   CategoryRepository,
+  UserRepository,
   LocalStorageService,
   CalDAVService,
 ])
@@ -33,6 +35,7 @@ void main() {
     late MockAccountRepository mockAccountRepository;
     late MockCalendarRepository mockCalendarRepository;
     late MockCategoryRepository mockCategoryRepository;
+    late MockUserRepository mockUserRepository;
     late MockLocalStorageService mockLocalStorage;
 
     // Test data
@@ -44,6 +47,7 @@ void main() {
       mockCalendarRepository = MockCalendarRepository();
       mockTaskRepository = MockTaskRepository();
       mockCategoryRepository = MockCategoryRepository();
+      mockUserRepository = MockUserRepository();
       mockLocalStorage = MockLocalStorageService();
 
       // Add stubs for commonly used methods
@@ -57,10 +61,11 @@ void main() {
           .thenAnswer((_) async {});
 
       syncService = SyncService(
+        taskRepository: mockTaskRepository,
         accountRepository: mockAccountRepository,
         calendarRepository: mockCalendarRepository,
-        taskRepository: mockTaskRepository,
         categoryRepository: mockCategoryRepository,
+        userRepository: mockUserRepository,
         localStorage: mockLocalStorage,
       );
 

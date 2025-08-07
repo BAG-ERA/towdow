@@ -8,6 +8,7 @@ import 'package:towdow_app/core/result.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
+import 'package:towdow_app/data/repositories/user_repository.dart';
 import 'package:towdow_app/data/services/domain_service.dart';
 import 'package:towdow_app/data/services/local_storage_service.dart';
 import 'package:towdow_app/data/services/sync_service.dart';
@@ -22,6 +23,7 @@ import 'domain_feature_test.mocks.dart';
   AccountRepository,
   TaskRepository,
   CategoryRepository,
+  UserRepository,
 ])
 void main() {
   group('Domain Feature Tests', () {
@@ -31,6 +33,7 @@ void main() {
     late MockAccountRepository mockAccountRepository;
     late MockTaskRepository mockTaskRepository;
     late MockCategoryRepository mockCategoryRepository;
+    late MockUserRepository mockUserRepository;
     late List<TaskCalendar> testCalendars;
 
     setUp(() {
@@ -39,6 +42,7 @@ void main() {
       mockAccountRepository = MockAccountRepository();
       mockTaskRepository = MockTaskRepository();
       mockCategoryRepository = MockCategoryRepository();
+      mockUserRepository = MockUserRepository();
       
       // Initialize SyncService singleton
       SyncService(
@@ -46,6 +50,7 @@ void main() {
         accountRepository: mockAccountRepository,
         calendarRepository: mockCalendarRepository,
         categoryRepository: mockCategoryRepository,
+        userRepository: mockUserRepository,
         localStorage: mockLocalStorageService,
       );
       

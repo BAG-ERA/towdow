@@ -8,6 +8,7 @@ import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/category_repository.dart';
+import 'package:towdow_app/data/repositories/user_repository.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/core/result.dart';
@@ -32,6 +33,7 @@ void main() {
     late AccountRepository accountRepository;
     late CalendarRepository calendarRepository;
     late CategoryRepository categoryRepository;
+    late UserRepository userRepository;
     late SyncService syncService;
     late Directory tempDir;
 
@@ -101,7 +103,8 @@ void main() {
       
       taskRepository = LocalTaskRepository(storageService);
       accountRepository = LocalAccountRepository(storageService);
-      calendarRepository = LocalCalendarRepository(storageService, accountRepository);
+      userRepository = LocalUserRepository(storageService);
+      calendarRepository = LocalCalendarRepository(storageService, accountRepository, userRepository);
       categoryRepository = CategoryRepository(calendarRepository, accountRepository);
       
       syncService = SyncService(
@@ -109,6 +112,7 @@ void main() {
         accountRepository: accountRepository,
         calendarRepository: calendarRepository,
         categoryRepository: categoryRepository,
+        userRepository: userRepository,
         localStorage: storageService,
       );
     });
@@ -306,12 +310,14 @@ void main() {
         final errorStorageService = LocalStorageService();
         final errorTaskRepository = LocalTaskRepository(errorStorageService);
         final errorAccountRepository = LocalAccountRepository(errorStorageService);
-        final errorCalendarRepository = LocalCalendarRepository(errorStorageService, errorAccountRepository);
+        final errorCalendarRepository = LocalCalendarRepository(errorStorageService, errorAccountRepository, userRepository);
+        final errorCategoryRepository = CategoryRepository(errorCalendarRepository, errorAccountRepository);
         final errorSyncService = SyncService(
           taskRepository: errorTaskRepository,
           accountRepository: errorAccountRepository,
           calendarRepository: errorCalendarRepository,
-          categoryRepository: categoryRepository,
+          categoryRepository: errorCategoryRepository,
+          userRepository: userRepository,
           localStorage: errorStorageService,
         );
 
