@@ -27,7 +27,7 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(5) String? color,
     @HiveField(6) DateTime? lastSyncAt,
     @HiveField(7) @Default(false) bool isReadOnly,
-    @HiveField(24) String? syncToken,
+    @HiveField(8) String? syncToken,
     
     // Required VCALENDAR properties for FlowIt projects
     @HiveField(9) required DateTime dtstamp,
@@ -40,21 +40,22 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(15) @Default('PROJECT') String flowitType, // X-FLOWIT-TYPE
     @HiveField(16) @Default(false) bool flowitAsFlow, // X-FLOWIT-ASFLOW
     @HiveField(17) @Default('[]') String flowitKanban, // X-FLOWIT-KANBAN JSON array
-    @HiveField(18) String? flowitOwner, // X-FLOWIT-OWNER
-    @HiveField(19) String? flowitTemplate, // X-FLOWIT-TEMPLATE
-    @HiveField(20) @Default(1) int calendarOrder, // CALENDAR-ORDER
-    @HiveField(21) String? organizer, // ORGANIZER
-    @HiveField(22) @Default([]) List<Attendee> attendees, // ATTENDEE
-    @HiveField(23) @Default('[]') String projectCategories, // JSON array of Category objects for project-level categories
-    @HiveField(25) String? flowitDomain, // X-FLOWIT-DOMAIN - domain for grouping projects
-    @HiveField(26) String? flowitStatus, // X-FLOWIT-STATUS - project status (DRAFT, CANCELED, ONGOING, STOPPED, ARCHIVE, COMPLETED, NEEDACTION, FAILED)
-    @HiveField(27) @Default('[]') String sharedWith, // JSON array of SharedProjectMember objects for project sharing
+    @HiveField(18) String? flowitTemplate, // X-FLOWIT-TEMPLATE
+    @HiveField(19) @Default(1) int calendarOrder, // CALENDAR-ORDER
+    @HiveField(21) @Default([]) List<Attendee> attendees, // ATTENDEE
+    @HiveField(22) @Default('[]') String projectCategories, // JSON array of Category objects for project-level categories
+    @HiveField(24) String? flowitDomain, // X-FLOWIT-DOMAIN - domain for grouping projects
+    @HiveField(25) String? flowitStatus, // X-FLOWIT-STATUS - project status (DRAFT, CANCELED, ONGOING, STOPPED, ARCHIVE, COMPLETED, NEEDACTION, FAILED)
+    @HiveField(26) @Default('[]') String sharedWith, // JSON array of SharedProjectMember objects for project sharing
     
     // Project management fields
-    @HiveField(28) String? flowitAuthor, // X-FLOWIT-AUTHOR - project author (user who created it)
-    @HiveField(29) String? flowitManager, // X-FLOWIT-MANAGER - project manager (responsible person)
-    @HiveField(30) DateTime? flowitCreatedAt, // X-FLOWIT-CREATED-AT - when project was created
-    @HiveField(31) DateTime? flowitEndedAt, // X-FLOWIT-ENDED-AT - when project was completed/ended
+    @HiveField(27) String? flowitAuthor, // X-FLOWIT-AUTHOR - project author (user who created it)
+    @HiveField(28) String? flowitOwner, // X-FLOWIT-OWNER - project owner (responsible person)
+    @HiveField(29) DateTime? flowitCreatedAt, // X-FLOWIT-CREATED-AT - when project was created
+    @HiveField(30) DateTime? flowitEndedAt, // X-FLOWIT-ENDED-AT - when project was completed/ended
+    
+    // Computed fields (set during sync)
+    @HiveField(33) @Default(false) bool isSharedWithMe, // Whether this calendar is shared with the current user (computed during sync)
   }) = _TaskCalendar;
 
   factory TaskCalendar.fromJson(Map<String, dynamic> json) => _$TaskCalendarFromJson(json);
@@ -81,12 +82,11 @@ extension TaskCalendarFactory on TaskCalendar {
     required String path,
     required String displayName,
     String description = '',
-    String? organizer,
     List<String> categories = const [],
     List<Attendee> attendees = const [],
     String? domain,
     String? author,
-    String? manager,
+    String? owner,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -97,14 +97,12 @@ extension TaskCalendarFactory on TaskCalendar {
       created: now,
       lastModified: now,
       status: 'NEEDS-ACTION',
-      organizer: organizer,
       attendees: attendees,
       // categories field removed - project categories now stored in projectCategories JSON
-      flowitOwner: organizer,
+      flowitOwner: owner,
       flowitDomain: domain,
       flowitStatus: 'ONGOING', // Default status as ONGOING
-      flowitAuthor: author ?? organizer, // Set author, fallback to organizer
-      flowitManager: manager ?? organizer, // Set manager, fallback to organizer  
+      flowitAuthor: author, // Set author
       flowitCreatedAt: now, // Set creation time
     );
   }
@@ -125,9 +123,9 @@ extension TaskCalendarFactory on TaskCalendar {
     String? flowitKanban,
     String? sharedWith,
     String? flowitAuthor,
-    String? flowitManager,
     DateTime? flowitCreatedAt,
     DateTime? flowitEndedAt,
+    bool isSharedWithMe = false,
   }) {
     final now = DateTime.now();
     return TaskCalendar(
@@ -150,9 +148,9 @@ extension TaskCalendarFactory on TaskCalendar {
       flowitKanban: flowitKanban ?? '[]',
       sharedWith: sharedWith ?? '[]',
       flowitAuthor: flowitAuthor,
-      flowitManager: flowitManager,
       flowitCreatedAt: flowitCreatedAt,
       flowitEndedAt: flowitEndedAt,
+      isSharedWithMe: isSharedWithMe,
     );
   }
 }
@@ -309,15 +307,6 @@ extension TaskCalendarSharing on TaskCalendar {
   /// Computed property: Check if this project is shared with others  
   /// This is a project I own but have shared with other users
   bool get isSharedWithOthers => sharedWithMembers.isNotEmpty;
-
-  /// Extract username from calendar path or owner field
-  String _extractUserFromPath(String path) {
-    // Handle different CalDAV path formats:
-    // /calendars/username/ or /principals/users/username/ or similar
-    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
-    final userPath = segments.length >= 2 ? segments.first : '';
-    return userPath;
-  }
 
   /// Get list of users this project is shared with
   List<String> get sharedWithEmails {
@@ -485,8 +474,8 @@ extension TaskCalendarProjectManagement on TaskCalendar {
   /// Check if this calendar has an author assigned
   bool get hasAuthor => flowitAuthor != null && flowitAuthor!.isNotEmpty;
   
-  /// Check if this calendar has a manager assigned  
-  bool get hasManager => flowitManager != null && flowitManager!.isNotEmpty;
+  /// Check if this calendar has an owner assigned  
+  bool get hasOwner => flowitOwner != null && flowitOwner!.isNotEmpty;
   
   /// Check if this calendar has a creation date
   bool get hasCreationDate => flowitCreatedAt != null;
@@ -500,8 +489,8 @@ extension TaskCalendarProjectManagement on TaskCalendar {
   /// Get the author name, or "Unknown" if none assigned
   String get authorDisplayName => flowitAuthor?.isNotEmpty == true ? flowitAuthor! : 'Unknown';
   
-  /// Get the manager name, or "Unknown" if none assigned  
-  String get managerDisplayName => flowitManager?.isNotEmpty == true ? flowitManager! : 'Unknown';
+  /// Get the owner name, or "Unknown" if none assigned  
+  String get ownerDisplayName => flowitOwner?.isNotEmpty == true ? flowitOwner! : 'Unknown';
   
   /// Create a copy with a new author
   TaskCalendar withAuthor(String? newAuthor) {
@@ -511,10 +500,10 @@ extension TaskCalendarProjectManagement on TaskCalendar {
     );
   }
   
-  /// Create a copy with a new manager
-  TaskCalendar withManager(String? newManager) {
+  /// Create a copy with a new owner
+  TaskCalendar withOwner(String? newOwner) {
     return copyWith(
-      flowitManager: newManager?.isEmpty == true ? null : newManager,
+      flowitOwner: newOwner?.isEmpty == true ? null : newOwner,
       lastModified: DateTime.now(),
     );
   }

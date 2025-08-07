@@ -548,7 +548,7 @@ class CalDAVService {
                 projectCategories: responseData['flowit-categories'] ?? calendar.projectCategories,
                 sharedWith: responseData['flowit-sharedWith'] ?? calendar.sharedWith,
                 flowitAuthor: responseData['flowit-author'] ?? calendar.flowitAuthor,
-                flowitManager: responseData['flowit-manager'] ?? calendar.flowitManager,
+                flowitOwner: responseData['flowit-owner'] ?? calendar.flowitOwner,
                 flowitCreatedAt: responseData['flowit-created-at'] != null 
                     ? DateTime.tryParse(responseData['flowit-created-at']) ?? calendar.flowitCreatedAt
                     : calendar.flowitCreatedAt,
@@ -597,7 +597,7 @@ class CalDAVService {
     String? kanban,
     String? categ,
     String? author,
-    String? manager,
+    String? owner,
   }) async {
     try {
       // First discover the proper calendar home for this account
@@ -619,7 +619,7 @@ class CalDAVService {
             kanban: kanban,
             categ: categ,
             author: author,
-            manager: manager,
+            owner: owner,
           );
         },
         failure: (failure) async {
@@ -642,7 +642,7 @@ class CalDAVService {
     String normalizedPath,
     String displayName,
     String? description,
-    {String? domain, String? kanban, String? categ, String? author, String? manager}
+    {String? domain, String? kanban, String? categ, String? author, String? owner}
   ) async {
     try {
       
@@ -667,7 +667,7 @@ class CalDAVService {
       ${kanban != null && kanban.isNotEmpty ? '<FLOWIT:kanban>$kanban</FLOWIT:kanban>' : ''}
       ${categ != null && categ.isNotEmpty ? '<FLOWIT:categories>$categ</FLOWIT:categories>' : ''}
       ${author != null && author.isNotEmpty ? '<FLOWIT:author>$author</FLOWIT:author>' : ''}
-      ${manager != null && manager.isNotEmpty ? '<FLOWIT:manager>$manager</FLOWIT:manager>' : ''}
+      ${owner != null && owner.isNotEmpty ? '<FLOWIT:owner>$owner</FLOWIT:owner>' : ''}
     </D:prop>
   </D:set>
 </C:mkcalendar>''';
@@ -693,7 +693,7 @@ class CalDAVService {
                displayName: displayName,
                description: description ?? 'Created by FlowIt',
                flowitAuthor: author,
-               flowitManager: manager,
+               flowitOwner: owner,
                flowitCreatedAt: DateTime.now(),
              ));
                      } else if (webDavResponse.statusCode == 409) {
@@ -970,10 +970,6 @@ class CalDAVService {
       vcalendar.writeln('DESCRIPTION:${_escapeCalendarText(calendar.description)}');
     }
     
-    if (calendar.organizer != null) {
-      vcalendar.writeln('ORGANIZER:${calendar.organizer}');
-    }
-    
     // FlowIt-specific properties
     vcalendar.writeln('X-FLOWIT-TYPE:${calendar.flowitType}');
     vcalendar.writeln('X-FLOWIT-ASFLOW:${calendar.flowitAsFlow.toString().toUpperCase()}');
@@ -1002,8 +998,8 @@ class CalDAVService {
       vcalendar.writeln('X-FLOWIT-AUTHOR:${_escapeCalendarText(calendar.flowitAuthor!)}');
     }
     
-    if (calendar.flowitManager != null && calendar.flowitManager!.isNotEmpty) {
-      vcalendar.writeln('X-FLOWIT-MANAGER:${_escapeCalendarText(calendar.flowitManager!)}');
+    if (calendar.flowitOwner != null && calendar.flowitOwner!.isNotEmpty) {
+      vcalendar.writeln('X-FLOWIT-OWNER:${_escapeCalendarText(calendar.flowitOwner!)}');
     }
     
     if (calendar.flowitCreatedAt != null) {
@@ -1051,7 +1047,6 @@ class CalDAVService {
       final status = properties['STATUS'] ?? 'NEEDS-ACTION';
       final percentComplete = int.tryParse(properties['PERCENT-COMPLETE'] ?? '0') ?? 0;
       final description = properties['DESCRIPTION'] ?? '';
-      final organizer = properties['ORGANIZER'];
       
       // Extract FlowIt-specific properties
       final flowitType = properties['X-FLOWIT-TYPE'] ?? 'PROJECT';
@@ -1062,7 +1057,6 @@ class CalDAVService {
       final flowitOwner = properties['X-FLOWIT-OWNER'];
       final flowitTemplate = properties['X-FLOWIT-TEMPLATE'];
       final flowitAuthor = properties['X-FLOWIT-AUTHOR'];
-      final flowitManager = properties['X-FLOWIT-MANAGER'];
       final flowitCreatedAt = _parseDateTime(properties['X-FLOWIT-CREATED-AT']);
       final flowitEndedAt = _parseDateTime(properties['X-FLOWIT-ENDED-AT']);
       final calendarOrder = int.tryParse(properties['CALENDAR-ORDER'] ?? '1') ?? 1;
@@ -1079,7 +1073,6 @@ class CalDAVService {
         lastModified: lastModified,
         status: status,
         percentComplete: percentComplete,
-        organizer: organizer,
         flowitType: flowitType,
         flowitAsFlow: flowitAsFlow,
         flowitDomain: flowitDomain,
@@ -1088,7 +1081,6 @@ class CalDAVService {
         flowitOwner: flowitOwner,
         flowitTemplate: flowitTemplate,
         flowitAuthor: flowitAuthor,
-        flowitManager: flowitManager,
         flowitCreatedAt: flowitCreatedAt,
         flowitEndedAt: flowitEndedAt,
         calendarOrder: calendarOrder,

@@ -104,6 +104,8 @@ void main() {
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
+        author: anyNamed('author'),
+        owner: anyNamed('owner'),
       )).thenAnswer((_) async => Result.success(testCalendar));
 
       when(mockCalendarRepository.save(testCalendar))
@@ -133,6 +135,8 @@ void main() {
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
+        author: anyNamed('author'),
+        owner: anyNamed('owner'),
       )).thenAnswer((_) async => Result.failure(const Failure(message: 'Calendar creation failed')));
 
       // Add stub for generateCalendarPath which is called when server creation fails
@@ -164,6 +168,8 @@ void main() {
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
+        author: anyNamed('author'),
+        owner: anyNamed('owner'),
       )).thenAnswer((_) async => Result.success(testCalendar));
 
       when(mockCalendarRepository.save(testCalendar))
@@ -188,6 +194,8 @@ void main() {
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
+        author: anyNamed('author'),
+        owner: anyNamed('owner'),
       )).called(1);
     });
 
@@ -199,6 +207,8 @@ void main() {
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
+        author: anyNamed('author'),
+        owner: anyNamed('owner'),
       )).thenAnswer((_) async => Result.success(testCalendar));
 
       when(mockCalendarRepository.save(testCalendar))
@@ -229,6 +239,8 @@ void main() {
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
+        author: anyNamed('author'),
+        owner: anyNamed('owner'),
       )).thenAnswer((_) async => Result.success(testCalendar));
 
       when(mockCalendarRepository.save(testCalendar))

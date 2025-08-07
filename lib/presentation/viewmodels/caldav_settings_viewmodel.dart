@@ -8,6 +8,7 @@ import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/services/caldav_service.dart';
 import '../../data/services/capability_discovery_service.dart';
+import '../../data/services/sync_service.dart';
 import '../../core/logger.dart';
 
 // CalDAV Settings ViewModel State
@@ -170,17 +171,17 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
       final isCurrentlySelected = state.selectedCalendars.any((cal) => cal.path == calendar.path);
       
       if (isCurrentlySelected) {
-        // Remove from selection
-        final result = await _calendarRepository.delete(calendar.path);
+        // Remove from selection (unsync - only delete locally, don't affect server)
+        final result = await _calendarRepository.unsyncCalendar(calendar.path);
         await result.when(
           success: (_) async {
             final updatedSelected = state.selectedCalendars.where((cal) => cal.path != calendar.path).toList();
             state = state.copyWith(selectedCalendars: updatedSelected);
-            // AppLogger.info('CaldavSettingsViewModel: Calendar removed from sync: ${calendar.displayName}');
+            AppLogger.info('CaldavSettingsViewModel: Calendar unsynced (removed from local storage): ${calendar.displayName}');
           },
           failure: (failure) async {
-            AppLogger.error('CaldavSettingsViewModel: Failed to remove calendar', failure.exception, failure.stackTrace);
-            state = state.copyWith(error: 'Failed to remove calendar: ${failure.message}');
+            AppLogger.error('CaldavSettingsViewModel: Failed to unsync calendar', failure.exception, failure.stackTrace);
+            state = state.copyWith(error: 'Failed to unsync calendar: ${failure.message}');
           },
         );
       } else {
@@ -226,16 +227,29 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
         path: '/calendars/${account.username}/${name.toLowerCase().replaceAll(' ', '_')}/',
         displayName: name,
         description: description,
-        organizer: account.email,
-        author: account.email,
-        manager: account.email,
+        author: account.email?.isNotEmpty == true ? account.email : account.username,
+        owner: account.email?.isNotEmpty == true ? account.email : account.username,
       );
 
-      // TODO: Implement calendar creation in CalDAVService
-      // For now, just add it locally
+      // Save calendar locally first, then queue for server creation
       final result = await _calendarRepository.save(newCalendar);
       await result.when(
         success: (_) async {
+          // Queue calendar creation on server
+          final syncService = SyncService.instance;
+          if (syncService != null) {
+            final queueResult = await syncService.queueCalendarCreation(newCalendar.uid);
+            queueResult.when(
+              success: (_) {
+                AppLogger.info('CaldavSettingsViewModel: Successfully queued calendar creation for: ${newCalendar.displayName}');
+              },
+              failure: (failure) {
+                AppLogger.warning('CaldavSettingsViewModel: Failed to queue calendar creation: ${failure.message}');
+              },
+            );
+          } else {
+            AppLogger.warning('CaldavSettingsViewModel: SyncService not available - calendar will not be synced to server');
+          }
           final updatedAvailable = [...state.availableCalendars, newCalendar];
           final updatedSelected = [...state.selectedCalendars, newCalendar];
           

@@ -1,5 +1,5 @@
-// Attendee management dialog for adding, editing, and removing task attendees
-// Provides a comprehensive interface for attendee collaboration management
+// Simplified attendee management dialog for adding attendees to tasks
+// Provides a clean interface for adding attendees by email address
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,17 +7,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/task.dart';
 import '../../../../data/models/attendee.dart';
 import '../../../../core/logger.dart';
-import '../enhanced_text_field.dart';
 
-/// Dialog for managing task attendees
+/// Simplified dialog for managing task attendees
 class AttendeeDialog extends ConsumerStatefulWidget {
   final Task task;
   final Function(Task) onTaskUpdated;
+  final List<String>? suggestedAttendees;
 
   const AttendeeDialog({
     super.key,
     required this.task,
     required this.onTaskUpdated,
+    this.suggestedAttendees,
   });
 
   @override
@@ -27,12 +28,7 @@ class AttendeeDialog extends ConsumerStatefulWidget {
 class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _displayNameController = TextEditingController();
   
-  AttendeeStatus _selectedStatus = AttendeeStatus.needsAction;
-  AttendeeRole _selectedRole = AttendeeRole.requiredParticipant;
-  CalendarUserType _selectedUserType = CalendarUserType.individual;
-  bool _rsvpRequested = false;
   bool _isLoading = false;
   String? _emailWarning;
 
@@ -46,7 +42,6 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
   void dispose() {
     _emailController.removeListener(_validateEmail);
     _emailController.dispose();
-    _displayNameController.dispose();
     super.dispose();
   }
 
@@ -60,7 +55,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
     // Basic email format validation
     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
     if (!emailRegex.hasMatch(email)) {
-      setState(() => _emailWarning = 'Invalid email format - this attendee may never receive notifications');
+      setState(() => _emailWarning = 'Invalid email format');
     } else {
       setState(() => _emailWarning = null);
     }
@@ -83,174 +78,143 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
           children: [
             Icon(Icons.person_add_rounded),
             SizedBox(width: 12),
-            Text('Manage Attendees'),
+            Text('Add Attendee'),
           ],
         ),
         content: SizedBox(
-          width: MediaQuery.of(context).size.width > 600 ? 500 : MediaQuery.of(context).size.width * 0.9,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Task: ${widget.task.summary}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
+          width: MediaQuery.of(context).size.width > 600 ? 400 : MediaQuery.of(context).size.width * 0.9,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Task: ${widget.task.summary}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
-                const SizedBox(height: 16),
-                
-                // Current attendees list
-                if (widget.task.attendees.isNotEmpty) ...[
-                  Text(
-                    'Current Attendees',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildAttendeesList(),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                ],
-                
-                // Add new attendee form
+              ),
+              const SizedBox(height: 16),
+              
+              // Current attendees list
+              if (widget.task.attendees.isNotEmpty) ...[
                 Text(
-                  'Add New Attendee',
+                  'Current attendees:',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 12),
-                _buildAddAttendeeForm(),
+                const SizedBox(height: 8),
+                ...widget.task.attendees.map((attendee) => _buildAttendeeItem(attendee)),
+                const SizedBox(height: 16),
               ],
-            ),
+              
+              // Suggested attendees
+              if (widget.suggestedAttendees != null && widget.suggestedAttendees!.isNotEmpty) ...[
+                Text(
+                  'Suggested attendees:',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildSuggestedAttendeesList(),
+                const SizedBox(height: 16),
+              ],
+              
+              // Add new attendee form
+              _buildAddAttendeeForm(),
+            ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: const Text('Cancel'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAttendeesList() {
+    Widget _buildAttendeeItem(Attendee attendee) {
     return Container(
-      constraints: const BoxConstraints(maxHeight: 200),
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: widget.task.attendees.length,
-        itemBuilder: (context, index) {
-          final attendee = widget.task.attendees[index];
-          return _buildAttendeeListItem(attendee);
-        },
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.person_rounded,
+            size: 16,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              attendee.effectiveDisplayName,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          IconButton(
+            onPressed: () => _removeAttendee(attendee),
+            icon: const Icon(Icons.remove_circle_rounded, size: 16, color: Colors.red),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            tooltip: 'Remove attendee',
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildAttendeeListItem(Attendee attendee) {
-    // Status color
-    Color statusColor;
-    String statusText;
-    
-    switch (attendee.status) {
-      case AttendeeStatus.accepted:
-        statusColor = Colors.green;
-        statusText = 'Accepted';
-        break;
-      case AttendeeStatus.declined:
-        statusColor = Colors.red;
-        statusText = 'Declined';
-        break;
-      case AttendeeStatus.tentative:
-        statusColor = Colors.orange;
-        statusText = 'Tentative';
-        break;
-      case AttendeeStatus.delegated:
-        statusColor = Colors.purple;
-        statusText = 'Delegated';
-        break;
-      default:
-        statusColor = Colors.grey;
-        statusText = 'No Response';
-    }
+  Widget _buildSuggestedAttendeesList() {
+    // Filter out suggested attendees that are already added
+    final availableSuggestions = widget.suggestedAttendees!
+        .where((email) => !widget.task.attendees.any((a) => a.email.toLowerCase() == email.toLowerCase()))
+        .toList();
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: statusColor.withValues(alpha: 0.2),
-          child: Icon(
-            attendee.userType == CalendarUserType.group 
-                ? Icons.group
-                : Icons.person,
-            color: statusColor,
-            size: 20,
+    if (availableSuggestions.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          'All suggested attendees are already added',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontStyle: FontStyle.italic,
           ),
         ),
-        title: Text(
-          attendee.effectiveDisplayName,
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              attendee.email,
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-            const SizedBox(height: 2),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                statusText,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: statusColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (action) => _handleAttendeeAction(action, attendee),
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit_rounded, size: 16),
-                  SizedBox(width: 8),
-                  Text('Edit Status'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'remove',
-              child: Row(
-                children: [
-                  Icon(Icons.remove_circle_rounded, size: 16, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Remove', style: TextStyle(color: Colors.red)),
-                ],
-              ),
-            ),
-          ],
-        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: availableSuggestions.map((email) => _buildSuggestedAttendeeChip(email)).toList(),
+    );
+  }
+
+  Widget _buildSuggestedAttendeeChip(String email) {
+    final displayName = _extractDisplayName(email);
+    
+    return ActionChip(
+      avatar: const Icon(Icons.person_add_rounded, size: 16),
+      label: Text(
+        displayName ?? email,
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      onPressed: () => _addSuggestedAttendee(email),
+      backgroundColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+      side: BorderSide(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+        width: 1,
       ),
     );
   }
@@ -261,16 +225,51 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
       child: Column(
         children: [
           // Email field
-          EnhancedTextFormField(
+          TextFormField(
             controller: _emailController,
             decoration: InputDecoration(
               labelText: 'Email Address',
               hintText: 'attendee@example.com',
               prefixIcon: const Icon(Icons.email_rounded),
-              border: const OutlineInputBorder(),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 2,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.error,
+                  width: 1,
+                ),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.error,
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               errorText: _emailWarning,
             ),
             keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.done,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Email is required';
@@ -278,182 +277,20 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
               
               // Check for duplicates
               final email = value.trim().toLowerCase();
-              final existingEmails = widget.task.attendees
-                  .map((a) => a.email.toLowerCase())
-                  .toList();
-              if (existingEmails.contains(email)) {
+              final isDuplicate = widget.task.attendees.any((a) => a.email.toLowerCase() == email);
+              if (isDuplicate) {
                 return 'This attendee is already added';
+              }
+              
+              // Basic email validation
+              final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+              if (!emailRegex.hasMatch(email)) {
+                return 'Please enter a valid email address';
               }
               
               return null;
             },
-          ),
-          
-          if (_emailWarning != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.warning_rounded, size: 16, color: Colors.orange.shade700),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _emailWarning!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.orange.shade700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          
-          const SizedBox(height: 16),
-          
-          // Display name field
-          EnhancedTextFormField(
-            controller: _displayNameController,
-            decoration: const InputDecoration(
-              labelText: 'Display Name (Optional)',
-              hintText: 'John Doe',
-              prefixIcon: Icon(Icons.badge_rounded),
-              border: OutlineInputBorder(),
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Status dropdown
-          DropdownButtonFormField<AttendeeStatus>(
-            value: _selectedStatus,
-            decoration: const InputDecoration(
-              labelText: 'Status',
-              border: OutlineInputBorder(),
-            ),
-            items: AttendeeStatus.values.map((status) {
-              String displayText;
-              switch (status) {
-                case AttendeeStatus.needsAction:
-                  displayText = 'No Response Yet';
-                  break;
-                case AttendeeStatus.accepted:
-                  displayText = 'Accepted';
-                  break;
-                case AttendeeStatus.declined:
-                  displayText = 'Declined';
-                  break;
-                case AttendeeStatus.tentative:
-                  displayText = 'Tentative';
-                  break;
-                case AttendeeStatus.delegated:
-                  displayText = 'Delegated';
-                  break;
-              }
-              
-              return DropdownMenuItem(
-                value: status,
-                child: Text(displayText),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() => _selectedStatus = value ?? AttendeeStatus.needsAction);
-            },
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Role dropdown
-          DropdownButtonFormField<AttendeeRole>(
-            value: _selectedRole,
-            decoration: const InputDecoration(
-              labelText: 'Role',
-              border: OutlineInputBorder(),
-            ),
-            items: AttendeeRole.values.map((role) {
-              String displayText;
-              switch (role) {
-                case AttendeeRole.requiredParticipant:
-                  displayText = 'Required Participant';
-                  break;
-                case AttendeeRole.optionalParticipant:
-                  displayText = 'Optional Participant';
-                  break;
-                case AttendeeRole.nonParticipant:
-                  displayText = 'Observer';
-                  break;
-                case AttendeeRole.chair:
-                  displayText = 'Chair/Leader';
-                  break;
-              }
-              
-              return DropdownMenuItem(
-                value: role,
-                child: Text(displayText),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() => _selectedRole = value ?? AttendeeRole.requiredParticipant);
-            },
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // User type dropdown
-          DropdownButtonFormField<CalendarUserType>(
-            value: _selectedUserType,
-            decoration: const InputDecoration(
-              labelText: 'Type',
-              border: OutlineInputBorder(),
-            ),
-            items: CalendarUserType.values.map((type) {
-              String displayText;
-              switch (type) {
-                case CalendarUserType.individual:
-                  displayText = 'Person';
-                  break;
-                case CalendarUserType.group:
-                  displayText = 'Group/Team';
-                  break;
-                case CalendarUserType.resource:
-                  displayText = 'Resource/Equipment';
-                  break;
-                case CalendarUserType.room:
-                  displayText = 'Room/Location';
-                  break;
-                case CalendarUserType.unknown:
-                  displayText = 'Unknown';
-                  break;
-              }
-              
-              return DropdownMenuItem(
-                value: type,
-                child: Text(displayText),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() => _selectedUserType = value ?? CalendarUserType.individual);
-            },
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // RSVP checkbox
-          CheckboxListTile(
-            title: const Text('Request Response (RSVP)'),
-            subtitle: const Text('Ask this attendee to respond to the invitation'),
-            value: _rsvpRequested,
-            onChanged: (value) {
-              setState(() => _rsvpRequested = value ?? false);
-            },
-            controlAffinity: ListTileControlAffinity.leading,
+            onFieldSubmitted: (_) => _addAttendee(),
           ),
           
           const SizedBox(height: 16),
@@ -461,7 +298,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
           // Add button
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
+            child: FilledButton.icon(
               onPressed: _isLoading ? null : _addAttendee,
               icon: _isLoading 
                   ? const SizedBox(
@@ -471,32 +308,15 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
                     )
                   : const Icon(Icons.person_add_rounded),
               label: Text(_isLoading ? 'Adding...' : 'Add Attendee'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _handleAttendeeAction(String action, Attendee attendee) {
-    switch (action) {
-      case 'edit':
-        _showEditAttendeeDialog(attendee);
-        break;
-      case 'remove':
-        _removeAttendee(attendee);
-        break;
-    }
-  }
-
-  void _showEditAttendeeDialog(Attendee attendee) {
-    showDialog(
-      context: context,
-      builder: (context) => AttendeeStatusDialog(
-        attendee: attendee,
-        onStatusUpdated: (updatedAttendee) {
-          _updateAttendeeStatus(attendee, updatedAttendee.status);
-        },
       ),
     );
   }
@@ -509,13 +329,11 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
     try {
       final newAttendee = Attendee(
         email: _emailController.text.trim(),
-        displayName: _displayNameController.text.trim().isNotEmpty 
-            ? _displayNameController.text.trim() 
-            : null,
-        status: _selectedStatus,
-        role: _selectedRole,
-        userType: _selectedUserType,
-        rsvpRequested: _rsvpRequested,
+        displayName: _extractDisplayName(_emailController.text.trim()),
+        status: AttendeeStatus.needsAction,
+        role: AttendeeRole.requiredParticipant,
+        userType: CalendarUserType.individual,
+        rsvpRequested: false,
       );
 
       AppLogger.info('AttendeeDialog: Adding attendee ${newAttendee.email} to task ${widget.task.uid}');
@@ -529,12 +347,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
 
       // Clear form
       _emailController.clear();
-      _displayNameController.clear();
       setState(() {
-        _selectedStatus = AttendeeStatus.needsAction;
-        _selectedRole = AttendeeRole.requiredParticipant;
-        _selectedUserType = CalendarUserType.individual;
-        _rsvpRequested = false;
         _emailWarning = null;
       });
 
@@ -555,6 +368,73 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
       }
     } catch (e) {
       AppLogger.error('AttendeeDialog: Failed to add attendee', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add attendee: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String? _extractDisplayName(String email) {
+    if (email.contains('@')) {
+      final namePart = email.split('@').first;
+      // Capitalize and replace separators with spaces
+      return namePart
+          .replaceAll(RegExp(r'[.\-_]'), ' ')
+          .split(' ')
+          .map((word) => word.isNotEmpty 
+              ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}'
+              : word)
+          .join(' ');
+    }
+    return null;
+  }
+
+  void _addSuggestedAttendee(String email) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final newAttendee = Attendee(
+        email: email,
+        displayName: _extractDisplayName(email),
+        status: AttendeeStatus.needsAction,
+        role: AttendeeRole.requiredParticipant,
+        userType: CalendarUserType.individual,
+        rsvpRequested: false,
+      );
+
+      AppLogger.info('AttendeeDialog: Adding suggested attendee ${newAttendee.email} to task ${widget.task.uid}');
+
+      final updatedTask = widget.task.copyWith(
+        attendees: [...widget.task.attendees, newAttendee],
+        lastModified: DateTime.now(),
+      );
+
+      widget.onTaskUpdated(updatedTask);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(child: Text('✅ Added ${newAttendee.effectiveDisplayName}')),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      AppLogger.error('AttendeeDialog: Failed to add suggested attendee', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -607,151 +487,16 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.remove_circle_rounded, color: Colors.white, size: 20),
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                 const SizedBox(width: 12),
-                Expanded(child: Text('🗑️ Removed ${attendee.effectiveDisplayName}')),
+                Expanded(child: Text('✅ Removed ${attendee.effectiveDisplayName}')),
               ],
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),
           ),
         );
       }
     }
-  }
-
-  void _updateAttendeeStatus(Attendee oldAttendee, AttendeeStatus newStatus) {
-    AppLogger.info('AttendeeDialog: Updating attendee ${oldAttendee.email} status to $newStatus');
-
-    final updatedAttendees = widget.task.attendees.map((attendee) {
-      if (attendee.email == oldAttendee.email) {
-        return attendee.copyWith(status: newStatus);
-      }
-      return attendee;
-    }).toList();
-
-    final updatedTask = widget.task.copyWith(
-      attendees: updatedAttendees,
-      lastModified: DateTime.now(),
-    );
-
-    widget.onTaskUpdated(updatedTask);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 12),
-              Expanded(child: Text('✅ Updated ${oldAttendee.effectiveDisplayName} status')),
-            ],
-          ),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-}
-
-/// Dialog for editing attendee status
-class AttendeeStatusDialog extends StatefulWidget {
-  final Attendee attendee;
-  final Function(Attendee) onStatusUpdated;
-
-  const AttendeeStatusDialog({
-    super.key,
-    required this.attendee,
-    required this.onStatusUpdated,
-  });
-
-  @override
-  State<AttendeeStatusDialog> createState() => _AttendeeStatusDialogState();
-}
-
-class _AttendeeStatusDialogState extends State<AttendeeStatusDialog> {
-  late AttendeeStatus _selectedStatus;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedStatus = widget.attendee.status;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.edit_rounded),
-          SizedBox(width: 12),
-          Text('Edit Attendee Status'),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Attendee: ${widget.attendee.effectiveDisplayName}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Text(
-            widget.attendee.email,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text('Select new status:'),
-          const SizedBox(height: 8),
-          ...AttendeeStatus.values.map((status) {
-            String displayText;
-            switch (status) {
-              case AttendeeStatus.needsAction:
-                displayText = 'No Response Yet';
-                break;
-              case AttendeeStatus.accepted:
-                displayText = 'Accepted';
-                break;
-              case AttendeeStatus.declined:
-                displayText = 'Declined';
-                break;
-              case AttendeeStatus.tentative:
-                displayText = 'Tentative';
-                break;
-              case AttendeeStatus.delegated:
-                displayText = 'Delegated';
-                break;
-            }
-
-            return RadioListTile<AttendeeStatus>(
-              title: Text(displayText),
-              value: status,
-              groupValue: _selectedStatus,
-              onChanged: (value) {
-                setState(() => _selectedStatus = value ?? AttendeeStatus.needsAction);
-              },
-            );
-          }),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            widget.onStatusUpdated(widget.attendee.copyWith(status: _selectedStatus));
-            Navigator.pop(context);
-          },
-          child: const Text('Update'),
-        ),
-      ],
-    );
   }
 }

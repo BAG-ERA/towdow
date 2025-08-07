@@ -301,6 +301,12 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
             selectedAttendees = updatedTask.attendees;
           });
         },
+        // Example: Add some suggested attendees based on project context
+        suggestedAttendees: [
+          'john.doe@example.com',
+          'jane.smith@example.com',
+          'team@example.com',
+        ],
       ),
     );
 

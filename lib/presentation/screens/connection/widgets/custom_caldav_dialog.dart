@@ -3,9 +3,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../data/models/caldav_account.dart';
 import '../../../../data/services/caldav_service.dart';
-import 'calendar_selection_screen.dart';
+import '../../../../data/providers/providers.dart';
 import 'package:uuid/uuid.dart';
 import '../../../widgets/utils/enhanced_text_field.dart';
 
@@ -318,8 +319,8 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
     });
 
     try {
-      // Create a temporary account for testing
-      final testAccount = CaldavAccount(
+      // Create account
+      final account = CaldavAccount(
         id: const Uuid().v4(),
         providerType: 'custom',
         serverUrl: _serverUrlController.text.trim(),
@@ -334,30 +335,31 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
       );
 
       // Test the CalDAV connection
-      final caldavService = CalDAVService(account: testAccount);
+      final caldavService = CalDAVService(account: account);
       final testResult = await caldavService.testConnection();
       
       await testResult.when(
         success: (capabilities) async {
-          // Connection successful, now show calendar selection
+          // Update account with discovered principal and calendarHome
+          final updatedAccount = account.copyWith(
+            principal: capabilities.principal,
+            calendarHome: capabilities.calendarHome,
+          );
+          
+          // Save the account
+          final accountRepository = ref.read(accountRepositoryProvider);
+          await accountRepository.save(updatedAccount);
+          
+          // Connection successful, redirect to today screen
           if (mounted) {
             // Close this dialog first
             Navigator.of(context).pop();
             
-            // Use a post-frame callback to ensure the dialog is closed
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                // Navigate to calendar selection screen
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => CalendarSelectionScreen(
-                      account: testAccount,
-                      capabilities: capabilities,
-                    ),
-                  ),
-                );
-              }
-            });
+            // Invalidate the account status provider to ensure router recognizes the account
+            ref.invalidate(hasActiveAccountProvider);
+            
+            // Navigate to today screen using GoRouter
+            GoRouter.of(context).go('/today');
           }
         },
         failure: (failure) {

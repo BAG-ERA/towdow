@@ -9,7 +9,6 @@ import 'package:go_router/go_router.dart';
 import 'package:towdow_app/core/logger.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../viewmodels/login_viewmodel.dart';
-import 'calendar_selection_screen.dart';
 
 enum AuthDialogType {
   cloud,
@@ -107,8 +106,8 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
   }
 
   void _handleLoginStateChange(LoginState state) {
-    if (state.hasExistingUserData) {
-      // User data found, go directly to home screen
+    // Always redirect to today screen after successful authentication
+    if (state.account != null) {
       if (mounted) {
         // Invalidate the account status provider to ensure router recognizes the account
         ref.invalidate(hasActiveAccountProvider);
@@ -116,19 +115,6 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
         Navigator.of(context).pop(); // Close dialog
         // Navigate to home screen using GoRouter
         GoRouter.of(context).go('/today');
-      }
-    } else if (state.account != null && state.capabilities != null) {
-      // No existing data, proceed with calendar selection
-      if (mounted) {
-        Navigator.of(context).pop(); // Close the dialog
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => CalendarSelectionScreen(
-              account: state.account!,
-              capabilities: state.capabilities!,
-            ),
-          ),
-        );
       }
     }
   }

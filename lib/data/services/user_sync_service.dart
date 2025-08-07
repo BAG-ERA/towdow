@@ -14,10 +14,8 @@ import '../repositories/user_repository.dart';
 import '../repositories/external_account_repository.dart';
 import '../repositories/external_calendar_repository.dart';
 import '../repositories/account_repository.dart';
-import '../repositories/calendar_repository.dart';
-import '../models/task_calendar.dart';
+
 import '../models/external_calendar.dart';
-import 'caldav_service.dart';
 import 's3_storage_service.dart';
 import 'share_service.dart';
 
@@ -27,7 +25,6 @@ class UserSyncService {
   final ExternalAccountRepository _externalAccountRepository;
   final ExternalCalendarRepository _externalCalendarRepository;
   final AccountRepository _accountRepository;
-  final CalendarRepository _calendarRepository;
   
   Timer? _periodicWatcher;
   DateTime? _lastSyncTime;
@@ -40,12 +37,10 @@ class UserSyncService {
     required ExternalAccountRepository externalAccountRepository,
     required ExternalCalendarRepository externalCalendarRepository,
     required AccountRepository accountRepository,
-    required CalendarRepository calendarRepository,
   }) : _userRepository = userRepository,
        _externalAccountRepository = externalAccountRepository,
        _externalCalendarRepository = externalCalendarRepository,
-       _accountRepository = accountRepository,
-       _calendarRepository = calendarRepository;
+       _accountRepository = accountRepository;
 
   /// Check if user sync is available (only for cloud/self-hosted users)
   Future<bool> isSyncAvailable() async {
@@ -94,11 +89,9 @@ class UserSyncService {
           // Get current user preferences to preserve existing acknowledgments
           final currentPreferencesResult = await _userRepository.getUserPreferences();
           final currentAcknowledgments = <String, bool>{};
-          UserPreferences? currentPreferences;
           
           await currentPreferencesResult.when(
             success: (prefs) async {
-              currentPreferences = prefs;
               // Build map of existing acknowledgments
               for (final existingProject in prefs.sharedWithMeProjects) {
                 currentAcknowledgments[existingProject.projectId] = existingProject.ack;
@@ -106,7 +99,6 @@ class UserSyncService {
             },
             failure: (_) async {
               // If we can't get current preferences, continue with defaults
-              currentPreferences = null;
             },
           );
 
@@ -187,87 +179,7 @@ class UserSyncService {
     }
   }
 
-  /// Activate calendars from downloaded project order
-  Future<void> _activateCalendarsFromProjectOrder(UserPreferences preferences) async {
-    if (preferences.projectOrder.isEmpty) {
-      AppLogger.info('UserSyncService: No projects in project order to activate');
-      return;
-    }
 
-    try {
-      // Get active account to discover calendars
-      final accountResult = await _accountRepository.getActiveAccount();
-      final account = accountResult.when(
-        success: (acc) => acc,
-        failure: (_) => null,
-      );
-
-      if (account == null) {
-        AppLogger.warning('UserSyncService: No active account available for calendar activation');
-        return;
-      }
-
-      // Discover available calendars using CalDAV service
-      final caldavService = CalDAVService(account: account);
-      final capabilitiesResult = await caldavService.discoverCapabilities();
-
-      await capabilitiesResult.when(
-        success: (capabilities) async {
-          final availableCalendars = capabilities.taskCalendars;
-          AppLogger.info('UserSyncService: Discovered ${availableCalendars.length} available calendars');
-
-          // Filter calendars that match project order paths
-          final calendarsToActivate = <TaskCalendar>[];
-          for (final projectPath in preferences.projectOrder) {
-            final matchingCalendar = availableCalendars
-                .where((cal) => cal.path == projectPath)
-                .firstOrNull;
-            
-            if (matchingCalendar != null) {
-              calendarsToActivate.add(matchingCalendar);
-            } else {
-              AppLogger.warning('UserSyncService: Calendar not found for project path: $projectPath');
-            }
-          }
-
-          // Clear existing calendars by getting all and deleting them
-          final existingCalendarsResult = await _calendarRepository.getAll();
-          await existingCalendarsResult.when(
-            success: (existingCalendars) async {
-              // Delete existing calendars
-              for (final calendar in existingCalendars) {
-                await _calendarRepository.delete(calendar.path);
-              }
-              AppLogger.info('UserSyncService: Cleared ${existingCalendars.length} existing calendars');
-              
-              // Save each activated calendar
-              for (final calendar in calendarsToActivate) {
-                final saveResult = await _calendarRepository.save(calendar);
-                await saveResult.when(
-                  success: (_) {
-                    AppLogger.info('UserSyncService: Activated calendar: ${calendar.displayName} (${calendar.path})');
-                  },
-                  failure: (failure) {
-                    AppLogger.error('UserSyncService: Failed to save calendar ${calendar.path}: ${failure.message}');
-                  },
-                );
-              }
-              
-              AppLogger.info('UserSyncService: Successfully activated ${calendarsToActivate.length} calendars from project order');
-            },
-            failure: (failure) {
-              AppLogger.error('UserSyncService: Failed to get existing calendars for clearing: ${failure.message}');
-            },
-          );
-        },
-        failure: (failure) {
-          AppLogger.error('UserSyncService: Failed to discover calendars: ${failure.message}');
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('UserSyncService: Error activating calendars from project order', e, stackTrace);
-    }
-  }
 
   /// Generate user-specific S3 path for preferences
   String _getUserPreferencesPath(S3StorageService s3Service) {
@@ -505,8 +417,7 @@ class UserSyncService {
             );
             AppLogger.debug('UserSyncService: Verified saved ETag: $savedEtag');
             
-            // Activate calendars for the downloaded project order to update UI
-            await _activateCalendarsFromProjectOrder(preferencesWithEtag);
+            // Note: Calendar activation removed - projectOrder is UI state only
             
             // Notify that preferences have been updated
             if (_onPreferencesUpdated != null) {
@@ -665,7 +576,7 @@ class UserSyncService {
       'enableNotifications': preferences.enableNotifications,
       'defaultProjectView': preferences.defaultProjectView,
       'customSettings': preferences.customSettings,
-      'syncedProjects': preferences.syncedProjects,
+      'excludedProjects': preferences.excludedProjects,
       'userPrincipal': preferences.userPrincipal,
       'sharedWithMeProjects': preferences.sharedWithMeProjects.map((project) => {
         'projectId': project.projectId,
@@ -701,7 +612,7 @@ class UserSyncService {
       enableNotifications: json['enableNotifications'] as bool?,
       defaultProjectView: json['defaultProjectView'] as String?,
       customSettings: json['customSettings'] as Map<String, dynamic>?,
-      syncedProjects: (json['syncedProjects'] as List<dynamic>?)?.cast<String>() ?? [],
+      excludedProjects: (json['excludedProjects'] as List<dynamic>?)?.cast<String>() ?? [],
       userPrincipal: json['userPrincipal'] as String?,
       sharedWithMeProjects: sharedProjects,
     );
@@ -743,34 +654,25 @@ class UserSyncService {
       failure: (_) => UserPreferences.defaultPreferences(),
     );
 
-    // Add new shared projects to active synced list (project order and synced projects)
+    // Add new shared projects to project order for display (all projects auto-sync by default)
     final updatedProjectOrder = [...currentPreferences.projectOrder];
-    final updatedSyncedProjects = [...currentPreferences.syncedProjects];
     
     for (final newProject in newSharedProjects) {
-      // Add to project order if not already there
+      // Add to project order if not already there (for display purposes)
       if (!updatedProjectOrder.contains(newProject.projectId)) {
         updatedProjectOrder.add(newProject.projectId);
-        AppLogger.info('UserSyncService: Added shared project ${newProject.projectId} to active synced list');
-      }
-      
-      // Add to synced projects if not already there
-      if (!updatedSyncedProjects.contains(newProject.projectId)) {
-        updatedSyncedProjects.add(newProject.projectId);
-        AppLogger.info('UserSyncService: Added shared project ${newProject.projectId} to synced projects list');
+        AppLogger.info('UserSyncService: Added shared project ${newProject.projectId} to project order (will auto-sync)');
       }
     }
     
     final updatedPreferences = currentPreferences.copyWith(
       projectOrder: updatedProjectOrder,
-      syncedProjects: updatedSyncedProjects,
     );
     
     await _userRepository.saveUserPreferencesWithoutSync(updatedPreferences);
     AppLogger.info('UserSyncService: Added ${newSharedProjects.length} new shared projects to active synced list');
     
-    // Activate calendars for the updated project order to update UI
-    await _activateCalendarsFromProjectOrder(updatedPreferences);
+    // Note: Calendar activation removed - projectOrder is UI state only
   }
 
   /// Set callback to be called when preferences are updated from server

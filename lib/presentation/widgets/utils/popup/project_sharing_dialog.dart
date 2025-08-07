@@ -10,10 +10,12 @@ import '../../../viewmodels/project_sharing_viewmodel.dart';
 
 class ProjectSharingDialog extends ConsumerStatefulWidget {
   final TaskCalendar project;
+  final List<String>? suggestedMembers;
 
   const ProjectSharingDialog({
     super.key,
     required this.project,
+    this.suggestedMembers,
   });
 
   @override
@@ -22,6 +24,7 @@ class ProjectSharingDialog extends ConsumerStatefulWidget {
 
 class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
   final _emailController = TextEditingController();
+  bool _isInputActive = false;
 
   @override
   void initState() {
@@ -43,31 +46,57 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
     final sharingState = ref.watch(projectSharingViewModelProvider);
     final sharingNotifier = ref.read(projectSharingViewModelProvider.notifier);
     
-    return AlertDialog(
-      title: Text('Share ${widget.project.displayName}'),
-      content: SizedBox(
-        width: 500,
-        height: 400,
-        child: _buildContent(context, sharingState, sharingNotifier),
+    return PopScope(
+      canPop: !sharingState.hasUnsavedChanges,
+      child: AlertDialog(
+        title: Row(
+          children: [
+            Expanded(
+              child: Text('Share ${widget.project.displayName}'),
+            ),
+            if (sharingState.hasUnsavedChanges) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Unsaved',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        content: SizedBox(
+          width: 500,
+          height: 400,
+          child: _buildContent(context, sharingState, sharingNotifier),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: sharingState.hasUnsavedChanges && !sharingState.isSaving 
+                ? () => _saveChanges(sharingNotifier)
+                : null,
+            child: sharingState.isSaving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Save'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: sharingState.hasUnsavedChanges && !sharingState.isSaving 
-              ? () => _saveChanges(sharingNotifier)
-              : null,
-          child: sharingState.isSaving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Save'),
-        ),
-      ],
     );
   }
 
@@ -123,8 +152,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                       final result = await accountRepo.getActiveAccount();
                       result.when(
                         success: (account) {
-                          final providerType = account?.providerType ?? 'Unknown';
-                          // Account provider type retrieved - no notification needed
+                          AppLogger.debug('Account provider type: ${account?.providerType ?? 'Unknown'}');
                         },
                         failure: (failure) {
                           AppLogger.error('Failed to get account info: ${failure.message}');
@@ -145,28 +173,165 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Add member section
+        // Members list header
         Row(
           children: [
-            Expanded(
-              child: TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email address',
-                  hintText: 'user@example.com',
-                  border: OutlineInputBorder(),
+            Text(
+              'Members (${state.editedMembers.length}):',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            if (state.hasUnsavedChanges) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                enabled: !state.isSaving,
-                onSubmitted: (_) => _addMember(notifier),
+                child: Text(
+                  'Unsaved',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: state.isSaving ? null : () => _addMember(notifier),
-              child: const Text('Invite'),
-            ),
+            ],
+            const Spacer(),
+            if (!state.hasUnsavedChanges) ...[
+              TextButton.icon(
+                onPressed: state.isSaving ? null : () => notifier.refresh(),
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Refresh'),
+              ),
+            ],
           ],
         ),
+        const SizedBox(height: 8),
+        
+        // Members list (showing edited members) - fit content height
+        state.editedMembers.isEmpty
+            ? const Center(
+                child: Text(
+                  'No members yet.\nAdd an email address below to share this project.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: state.editedMembers.length,
+                itemBuilder: (context, index) {
+                  final member = state.editedMembers[index];
+                  final isNew = !state.members.any((m) => m.targetUserEmail == member.targetUserEmail);
+                  
+                  return ListTile(
+                    leading: Icon(
+                      Icons.person,
+                      color: isNew ? Theme.of(context).colorScheme.primary : null,
+                    ),
+                    title: Text(
+                      member.targetUserEmail,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isNew ? Theme.of(context).colorScheme.primary : null,
+                        fontWeight: isNew ? FontWeight.w500 : FontWeight.normal,
+                      ),
+                    ),
+                    subtitle: isNew ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'NEW',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ) : null,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.remove_circle_outline),
+                      onPressed: state.isSaving ? null : () => notifier.removeMemberFromEdit(member),
+                      tooltip: 'Remove from list',
+                    ),
+                  );
+                },
+              ),
+        
+        const SizedBox(height: 16),
+        
+        // Add member section
+        _isInputActive
+            ? Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        hintText: 'Enter email address',
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        filled: false,
+                      ),
+                      enabled: !state.isSaving,
+                      onSubmitted: (_) => _addMember(notifier),
+                      autofocus: true,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: state.isSaving ? null : () => _addMember(notifier),
+                    icon: const Icon(Icons.check, color: Colors.green),
+                    tooltip: 'Add member',
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _isInputActive = false;
+                        _emailController.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.close, color: Colors.red),
+                    tooltip: 'Cancel',
+                  ),
+                ],
+              )
+            : GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isInputActive = true;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.person_add,
+                        size: 20,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Add member',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
         
         const SizedBox(height: 16),
         
@@ -205,95 +370,59 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
           const SizedBox(height: 16),
         ],
         
-        // Members list header
-        Row(
-          children: [
-            Text(
-              'Members (${state.editedMembers.length}):',
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-            if (state.hasUnsavedChanges) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
+        // Suggested members section
+        if (widget.suggestedMembers != null && widget.suggestedMembers!.isNotEmpty) ...[
+          const SizedBox(height: 44),
+          Row(
+            children: [
+              Text(
+                'Suggested Members:',
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: widget.suggestedMembers!.map((email) {
+              final isAlreadyAdded = state.editedMembers.any((m) => m.targetUserEmail == email);
+              return ActionChip(
+                avatar: Icon(
+                  isAlreadyAdded ? Icons.check : Icons.person_add,
+                  size: 16,
+                  color: isAlreadyAdded 
+                      ? Theme.of(context).colorScheme.onSecondary 
+                      : Theme.of(context).colorScheme.onPrimary,
                 ),
-                child: Text(
-                  'Unsaved',
+                label: Text(
+                  email,
                   style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    fontSize: 12,
+                    color: isAlreadyAdded 
+                        ? Theme.of(context).colorScheme.onSecondary 
+                        : Theme.of(context).colorScheme.onPrimary,
                   ),
                 ),
-              ),
-            ],
-            const Spacer(),
-            if (!state.hasUnsavedChanges) ...[
-              TextButton.icon(
-                onPressed: state.isSaving ? null : () => notifier.refresh(),
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Refresh'),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 8),
-        
-        // Members list (showing edited members)
-        Expanded(
-          child: state.editedMembers.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No members yet.\nAdd an email address above to share this project.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: state.editedMembers.length,
-                  itemBuilder: (context, index) {
-                    final member = state.editedMembers[index];
-                    final isNew = !state.members.any((m) => m.targetUserEmail == member.targetUserEmail);
-                    
-                    return ListTile(
-                      leading: Icon(
-                        Icons.person,
-                        color: isNew ? Theme.of(context).colorScheme.primary : null,
-                      ),
-                      title: Text(
-                        member.targetUserEmail,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isNew ? Theme.of(context).colorScheme.primary : null,
-                          fontWeight: isNew ? FontWeight.w500 : FontWeight.normal,
-                        ),
-                      ),
-                      subtitle: isNew ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'NEW',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ) : null,
-                      trailing: IconButton(
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: state.isSaving ? null : () => notifier.removeMemberFromEdit(member),
-                        tooltip: 'Remove from list',
-                      ),
-                    );
-                  },
-                ),
-        ),
+                backgroundColor: isAlreadyAdded 
+                    ? Theme.of(context).colorScheme.secondary 
+                    : Theme.of(context).colorScheme.primary,
+                onPressed: isAlreadyAdded || state.isSaving 
+                    ? null 
+                    : () {
+                        setState(() {
+                          _isInputActive = true;
+                        });
+                        _emailController.text = email;
+                        _addMember(notifier);
+                      },
+                tooltip: isAlreadyAdded 
+                    ? 'Already added' 
+                    : 'Click to add this member',
+              );
+            }).toList(),
+          ),
+        ],
       ],
     );
   }
@@ -301,18 +430,35 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
   void _addMember(ProjectSharingViewModel notifier) {
     final email = _emailController.text.trim();
     
+    if (email.isEmpty) return;
+    
     notifier.addMemberToEdit(email);
     
-    // Clear the text field if no error
+    // Clear the text field and reset input state if no error
     final state = ref.read(projectSharingViewModelProvider);
     if (state.error == null) {
       _emailController.clear();
+      setState(() {
+        _isInputActive = false;
+      });
     }
   }
 
   void _saveChanges(ProjectSharingViewModel notifier) async {
     await notifier.saveChanges();
     
-    // Project sharing updated successfully - no notification needed
+    // Check if save was successful and close dialog
+    final state = ref.read(projectSharingViewModelProvider);
+    if (state.error == null && mounted) {
+      // Wait a brief moment for any background operations to complete
+      await Future.delayed(const Duration(milliseconds: 200));
+      
+      // Invalidate related providers to ensure UI refresh
+      // Note: These providers will be refreshed automatically by the repository updates
+      
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 } 

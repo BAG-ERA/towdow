@@ -188,16 +188,6 @@ class XMLResponseParser {
         }
       }
       
-      // If no calendars found, add a default one to create
-      if (calendars.isEmpty) {
-        AppLogger.info('XMLResponseParser: No existing calendars found, suggesting default');
-        calendars.add(TaskCalendarFactory.fromCalDAVDiscovery(
-          path: '${calendarHome}flowit-tasks/',
-          displayName: 'FlowIt Tasks',
-          description: 'Default task calendar (to be created)',
-        ));
-      }
-      
     } catch (e) {
       AppLogger.error('XMLResponseParser: Failed to parse calendars response', e, StackTrace.current);
       

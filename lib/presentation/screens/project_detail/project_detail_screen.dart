@@ -9,6 +9,7 @@ import '../../widgets/kanban_board.dart';
 import '../../widgets/agenda_calendar.dart';
 import '../../widgets/utils/tasklist_toolbar.dart';
 import '../../widgets/utils/buttons/archive_project_button.dart';
+import '../../widgets/utils/buttons/exit_share_button.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
@@ -19,8 +20,7 @@ import '../../../core/theme/chart_theme.dart';
 import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/project_detail/project_kanban_view.dart';
-import '../../widgets/project_detail/project_details_widget.dart';
-import '../../../data/services/webdav_client.dart';
+import '../../widgets/project_detail/project_infos_widget.dart';
 
 // Provider for a specific project/calendar that watches only this specific calendar
 final projectProvider = StreamProvider.family<TaskCalendar?, String>((ref, projectPath) {
@@ -111,6 +111,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   Widget _buildDesktopLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       body: Row(
         children: [
           // Column 1: Title/Header area (fixed width) with full project info
@@ -123,6 +124,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               ],
             ),
           ),
+          
+          // Gap between columns
+          const SizedBox(width: 48),
           
           // Column 2: View content (expanded) with tabs and content
           Expanded(
@@ -161,7 +165,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           // Project details layout
           projectAsync.when(
             data: (project) => project != null 
-                ? ProjectDetailsWidget(
+                ? ProjectInfosWidget(
                     project: project,
                     tasksAsync: tasksAsync,
                     onProjectUpdated: _updateProject,
@@ -213,6 +217,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   Widget _buildMobileLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       body: Column(
         children: [
           // Scrollable content area
@@ -223,7 +228,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   // Project Details Widget (replacing ProjectInfoCard)
                   projectAsync.when(
                     data: (project) => project != null 
-                        ? ProjectDetailsWidget(
+                        ? ProjectInfosWidget(
                             project: project,
                             tasksAsync: tasksAsync,
                             onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
@@ -328,20 +333,46 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         children: [
           projectAsync.when(
             data: (project) => project != null
-                ? ArchiveProjectButton.compact(
-                    projectPath: project.path,
-                    projectDisplayName: project.displayName,
-                    onProjectArchived: () {
-                      // Navigate back to home after archiving
-                      Navigator.of(context).pop();
-                    },
-                  )
+                ? _buildProjectActionButton(context, project)
                 : const SizedBox.shrink(),
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProjectActionButton(BuildContext context, TaskCalendar project) {
+    // Check if this project is shared with the current user using the same logic as _acknowledgeSharedProjectIfNeeded
+    final userPreferencesAsync = ref.watch(userPreferencesProvider);
+    
+    return userPreferencesAsync.when(
+      data: (preferences) {
+        final sharedProject = preferences.getSharedProject(project.uid);
+        final isSharedWithMe = sharedProject != null;
+        
+        if (isSharedWithMe) {
+          // Show exit share button for shared projects
+          return ExitShareButton.compact(
+            projectPath: project.path,
+            projectDisplayName: project.displayName,
+            // Navigation is handled internally by ExitShareButton
+          );
+        } else {
+          // Show archive button for owned projects
+          return ArchiveProjectButton.compact(
+            projectPath: project.path,
+            projectDisplayName: project.displayName,
+            onProjectArchived: () {
+              // Navigate back to home after archiving
+              Navigator.of(context).pop();
+            },
+          );
+        }
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
@@ -850,16 +881,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
   }
 
-
-
   void _refreshProjectTasks(WidgetRef ref) {
     // Refresh the project tasks list
     ref.invalidate(projectTasksProvider(widget.projectPath));
   }
-
-
-
-
 
   Future<void> _updateProject(TaskCalendar updatedProject) async {
     try {

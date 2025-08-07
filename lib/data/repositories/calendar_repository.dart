@@ -7,8 +7,9 @@ import '../../core/logger.dart';
 import '../models/task_calendar.dart';
 import '../services/local_storage_service.dart';
 import '../services/sync_service.dart';
-import '../services/caldav_service.dart';
+import '../services/share_service.dart';
 import 'account_repository.dart';
+import 'user_repository.dart';
 
 // Abstract repository interface
 abstract class CalendarRepository {
@@ -16,7 +17,8 @@ abstract class CalendarRepository {
   Future<Result<TaskCalendar?>> getById(String uid);
   Future<Result<TaskCalendar?>> getByPath(String path);
   Future<Result<void>> save(TaskCalendar calendar);
-  Future<Result<void>> delete(String uid);
+  Future<Result<void>> delete(String path);
+  Future<Result<void>> unsyncCalendar(String path);
   Stream<List<TaskCalendar>> watchCalendars();
   Future<Result<List<TaskCalendar>>> getProjectCalendars();
   
@@ -47,8 +49,9 @@ abstract class CalendarRepository {
 class LocalCalendarRepository implements CalendarRepository {
   final LocalStorageService _storageService;
   final AccountRepository _accountRepository;
+  final UserRepository _userRepository;
 
-  LocalCalendarRepository(this._storageService, this._accountRepository);
+  LocalCalendarRepository(this._storageService, this._accountRepository, this._userRepository);
 
   @override
   Future<Result<List<TaskCalendar>>> getAll() async {
@@ -84,10 +87,37 @@ class LocalCalendarRepository implements CalendarRepository {
 
   @override
   Future<Result<void>> save(TaskCalendar calendar) async {
-    final result = await _storageService.put(LocalStorageService.calendarsBoxName, calendar.path, calendar);
+    // Check if this calendar is shared with me using ShareService API
+    bool isSharedWithMe = false;
+    
+    try {
+      final accountResult = await _accountRepository.getActiveAccount();
+      await accountResult.when(
+        success: (account) async {
+          if (account != null) {
+            final shareService = ShareService(account: account);
+            isSharedWithMe = await shareService.isSharedWithMe(calendar.path);
+            AppLogger.debug('CalendarRepository: Project ${calendar.path} isSharedWithMe: $isSharedWithMe');
+          }
+        },
+        failure: (failure) async {
+          AppLogger.warning('CalendarRepository: No active account found, assuming calendar is not shared');
+          isSharedWithMe = false;
+        },
+      );
+    } catch (e) {
+      AppLogger.warning('CalendarRepository: Exception checking share status for ${calendar.path}: $e. Assuming not shared.');
+      isSharedWithMe = false;
+    }
+    
+    // Update calendar with shared status
+    final calendarToSave = calendar.copyWith(isSharedWithMe: isSharedWithMe);
+    
+    final result = await _storageService.put(LocalStorageService.calendarsBoxName, calendarToSave.path, calendarToSave);
     
     return await result.when(
       success: (_) async {
+        AppLogger.debug('CalendarRepository: Saved calendar ${calendar.path} with isSharedWithMe: $isSharedWithMe');
         return Result.success(null);
       },
       failure: (failure) async {
@@ -98,69 +128,65 @@ class LocalCalendarRepository implements CalendarRepository {
   }
 
   @override
-  Future<Result<void>> delete(String uid) async {
-    AppLogger.info('LocalCalendarRepository: Deleting calendar: $uid');
+  Future<Result<void>> delete(String path) async {
+    AppLogger.info('LocalCalendarRepository: Deleting calendar: $path');
     
     try {
-      // First, get the calendar to obtain its path for server deletion
-      final calendarResult = await getById(uid);
-      await calendarResult.when(
+      // Get the calendar to check if it's shared with me
+      final calendarResult = await getByPath(path);
+      return await calendarResult.when(
         success: (calendar) async {
           if (calendar == null) {
-            AppLogger.warning('LocalCalendarRepository: Calendar $uid not found for deletion');
-            return; // Already deleted
+            AppLogger.warning('LocalCalendarRepository: Calendar at $path not found');
+            return Result.failure(Failure(
+              message: 'Calendar not found at path: $path',
+              exception: Exception('Calendar not found'),
+            ));
           }
 
-          // Try to delete from server first
-          final accountResult = await _accountRepository.getActiveAccount();
-          await accountResult.when(
-            success: (account) async {
-              if (account != null) {
-                try {
-                  final caldavService = CalDAVService(account: account);
-                  final serverDeleteResult = await caldavService.deleteCalendar(calendar.path);
-                  
-                  serverDeleteResult.when(
-                    success: (_) {
-                      AppLogger.info('LocalCalendarRepository: Successfully deleted calendar from server: ${calendar.displayName}');
-                    },
-                    failure: (failure) {
-                      AppLogger.warning('LocalCalendarRepository: Failed to delete calendar from server: ${failure.message}');
-                      // Continue with local deletion even if server deletion fails
-                    },
-                  );
-                } catch (e) {
-                  AppLogger.warning('LocalCalendarRepository: Exception during server deletion: $e');
-                  // Continue with local deletion even if server deletion fails
-                }
-              } else {
-                AppLogger.info('LocalCalendarRepository: No active account - skipping server deletion');
-              }
-            },
-            failure: (failure) {
-              AppLogger.warning('LocalCalendarRepository: Failed to get account for server deletion: ${failure.message}');
-              // Continue with local deletion even if we can't get account
-            },
-          );
-        },
-        failure: (failure) {
-          AppLogger.warning('LocalCalendarRepository: Failed to get calendar for deletion: ${failure.message}');
-          // Continue with local deletion attempt
-        },
-      );
+          // Check the intrinsic isSharedWithMe field (set by ShareService API during save)
+          if (calendar.isSharedWithMe) {
+            AppLogger.info('LocalCalendarRepository: Project at $path is SHARED WITH ME, using exitShare API');
+            
+            // Queue exit share operation
+            final syncService = SyncService.instance;
+            if (syncService != null) {
+              final queueResult = await syncService.queueExitShare(path);
+              queueResult.when(
+                success: (_) => AppLogger.info('LocalCalendarRepository: Successfully queued exit share for path: $path'),
+                failure: (failure) => AppLogger.warning('LocalCalendarRepository: Failed to queue exit share: ${failure.message}'),
+              );
+            }
+          } else {
+            AppLogger.info('LocalCalendarRepository: Project is owned by me, using delete: ${calendar.displayName}');
+            
+            // Queue calendar deletion for owned projects
+            final syncService = SyncService.instance;
+            if (syncService != null) {
+              final queueResult = await syncService.queueCalendarDeletion(path);
+              queueResult.when(
+                success: (_) => AppLogger.info('LocalCalendarRepository: Successfully queued calendar deletion for: ${calendar.displayName}'),
+                failure: (failure) => AppLogger.warning('LocalCalendarRepository: Failed to queue calendar deletion: ${failure.message}'),
+              );
+            }
+          }
 
-      // Always attempt local deletion regardless of server deletion result
-      final localDeleteResult = await _storageService.delete(LocalStorageService.calendarsBoxName, uid);
-      localDeleteResult.when(
-        success: (_) {
-          AppLogger.info('LocalCalendarRepository: Successfully deleted calendar from local storage: $uid');
+          // Always delete from local storage
+          AppLogger.info('LocalCalendarRepository: Deleting from local storage with path: $path');
+          final localDeleteResult = await _storageService.delete(LocalStorageService.calendarsBoxName, path);
+          
+          localDeleteResult.when(
+            success: (_) => AppLogger.info('LocalCalendarRepository: Successfully deleted calendar from local storage: $path'),
+            failure: (failure) => AppLogger.error('LocalCalendarRepository: Failed to delete calendar from local storage: ${failure.message}'),
+          );
+          
+          return localDeleteResult;
         },
-        failure: (failure) {
-          AppLogger.error('LocalCalendarRepository: Failed to delete calendar from local storage: ${failure.message}');
+        failure: (failure) async {
+          AppLogger.warning('LocalCalendarRepository: Failed to get calendar for deletion: ${failure.message}');
+          return Result.failure(failure);
         },
       );
-      
-      return localDeleteResult;
     } catch (e, stackTrace) {
       AppLogger.error('LocalCalendarRepository: Exception during calendar deletion', e, stackTrace);
       return Result.failure(Failure(
@@ -172,22 +198,56 @@ class LocalCalendarRepository implements CalendarRepository {
   }
 
   @override
+  Future<Result<void>> unsyncCalendar(String path) async {
+    AppLogger.info('LocalCalendarRepository: Unsyncing calendar: $path');
+    
+    try {
+      // Only delete from local storage - do NOT queue server deletion
+      final result = await _storageService.delete(LocalStorageService.calendarsBoxName, path);
+      
+      return await result.when(
+        success: (_) async {
+          AppLogger.info('LocalCalendarRepository: Successfully unsynced calendar from local storage: $path');
+          return Result.success(null);
+        },
+        failure: (failure) async {
+          AppLogger.error('LocalCalendarRepository: Failed to unsync calendar from local storage: ${failure.message}');
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('LocalCalendarRepository: Exception during calendar unsync', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to unsync calendar: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+
+  @override
   Stream<List<TaskCalendar>> watchCalendars() async* {
     // Emit initial value
     final result = await getAll();
-    yield result.when(
+    final initialCalendars = result.when(
       success: (calendars) => calendars,
       failure: (_) => <TaskCalendar>[],
     );
+    AppLogger.info('LocalCalendarRepository: DEBUG - watchCalendars initial emit: ${initialCalendars.length} calendars');
+    yield initialCalendars;
     
     // Then listen to changes
     yield* _storageService.getStream(LocalStorageService.calendarsBoxName)
-        .asyncMap((_) async {
+        .asyncMap((boxEvent) async {
+          AppLogger.info('LocalCalendarRepository: DEBUG - watchCalendars received box event: ${boxEvent.key} ${boxEvent.deleted ? "DELETED" : "UPDATED"}');
           final result = await getAll();
-          return result.when(
+          final calendars = result.when(
             success: (calendars) => calendars,
             failure: (_) => <TaskCalendar>[],
           );
+          AppLogger.info('LocalCalendarRepository: DEBUG - watchCalendars emitting: ${calendars.length} calendars');
+          return calendars;
         });
   }
 

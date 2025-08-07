@@ -268,13 +268,20 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
         success: (_) async {
           AppLogger.debug('ProjectSharingViewModel: Successfully updated sharing data via repository');
           
-          // Update state with success
+          // Update state with success - ensure members list is properly synchronized
           state = state.copyWith(
             isSaving: false,
             currentProject: updatedCalendar,
             members: List.from(state.editedMembers),
             hasUnsavedChanges: false,
           );
+          
+          // Add a small delay to ensure sync operations complete before potential refresh
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          // Refresh the state to ensure we have the latest data from storage
+          // This helps avoid conflicts with background sync operations
+          await _refreshAfterSave();
         },
         failure: (failure) async {
           AppLogger.error('ProjectSharingViewModel: Failed to update calendar properties: ${failure.message}');
@@ -290,6 +297,43 @@ class ProjectSharingViewModel extends StateNotifier<ProjectSharingState> {
         isSaving: false,
         error: 'Error saving changes: $e',
       );
+    }
+  }
+
+  /// Refresh state after save to ensure consistency with background sync operations
+  Future<void> _refreshAfterSave() async {
+    try {
+      AppLogger.debug('ProjectSharingViewModel: Refreshing state after save to ensure consistency');
+      
+      // Reload calendar from repository to get the most up-to-date data
+      final calendarResult = await _calendarRepository.getById(state.currentProject!.path);
+      await calendarResult.when(
+        success: (calendar) async {
+          if (calendar != null) {
+            // Parse the latest sharing data
+            final latestMembers = calendar.sharedWithMembers.map((memberJson) {
+              return SharedProjectMember.fromJson(memberJson);
+            }).toList();
+            
+            AppLogger.debug('ProjectSharingViewModel: Post-save refresh found ${latestMembers.length} members');
+            
+            // Update state with refreshed data
+            state = state.copyWith(
+              currentProject: calendar,
+              members: latestMembers,
+              editedMembers: List.from(latestMembers),
+              hasUnsavedChanges: false,
+            );
+          }
+        },
+        failure: (failure) async {
+          AppLogger.warning('ProjectSharingViewModel: Failed to refresh after save: ${failure.message}');
+          // Don't update error state here as the save itself was successful
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.warning('ProjectSharingViewModel: Exception during post-save refresh', e, stackTrace);
+      // Don't propagate this error as the save operation was successful
     }
   }
 

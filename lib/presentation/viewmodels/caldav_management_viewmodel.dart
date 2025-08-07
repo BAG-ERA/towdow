@@ -279,6 +279,7 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
 
     try {
       // Delete through repository (handles both server and local deletion)
+      // Use path for consistent storage key handling
       final deleteResult = await _calendarRepository.delete(calendar.path);
       deleteResult.when(
         success: (_) {
@@ -355,7 +356,6 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Save account (no longer stores selectedCalendars - just use current account)
       final updatedAccount = state.currentAccount!;
       final saveResult = await _accountRepository.save(updatedAccount);
 
@@ -398,10 +398,14 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
           // Create project order from selected calendars (using calendar path as project UID)
           final projectOrder = state.selectedCalendars.map((c) => c.path).toList();
           
-          // Update preferences with new project order
+          // Update preferences with new project order and excluded projects
+          // In new architecture: sync all available projects except excluded ones
+          final availableCalendarPaths = state.capabilities?.taskCalendars.map((c) => c.path).toSet() ?? <String>{};
+          final excludedProjects = availableCalendarPaths.where((path) => !projectOrder.contains(path)).toList();
+          
           final updatedPreferences = preferences.copyWith(
             projectOrder: projectOrder,
-            syncedProjects: projectOrder, // Also update synced projects list
+            excludedProjects: excludedProjects, // Exclude unselected calendars from sync
           );
           
           // Save updated preferences
@@ -443,12 +447,20 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
 
   /// Clear existing calendars and save selected calendars as local projects
   Future<void> _createProjectsForSelectedCalendars() async {
-    // First, clear all existing calendars using repository
     final allCalendarsResult = await _calendarRepository.getAll();
     await allCalendarsResult.when(
       success: (calendars) async {
+        // Get selected calendar paths
+        final selectedPaths = state.selectedCalendars.map((c) => c.path).toSet();
+        
+        // For each existing calendar, either unsync it (if not selected) or keep it (if selected)
         for (final calendar in calendars) {
-          await _calendarRepository.delete(calendar.path);
+          if (!selectedPaths.contains(calendar.path)) {
+            // Calendar is no longer selected - unsync it (remove from local storage only)
+            AppLogger.info('CalDAVManagement: Unsyncing calendar ${calendar.displayName} (no longer selected)');
+            await _calendarRepository.unsyncCalendar(calendar.path);
+          }
+          // If calendar is still selected, keep it as is
         }
       },
       failure: (failure) {
@@ -456,17 +468,24 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
       },
     );
     
-    // Now save only the selected calendars
+    final existingPaths = (await _calendarRepository.getAll()).when(
+      success: (calendars) => calendars.map((c) => c.path).toSet(),
+      failure: (_) => <String>{},
+    );
+    
     for (final calendar in state.selectedCalendars) {
-      final saveResult = await _calendarRepository.save(calendar);
-      saveResult.when(
-        success: (_) {
-          // Successfully saved calendar
-        },
-        failure: (failure) {
-          AppLogger.error('CalDAVManagement: Failed to save calendar ${calendar.displayName}: ${failure.message}');
-        },
-      );
+      if (!existingPaths.contains(calendar.path)) {
+        // Only save calendars that aren't already in local storage
+        final saveResult = await _calendarRepository.save(calendar);
+        saveResult.when(
+          success: (_) {
+            AppLogger.info('CalDAVManagement: Saved newly selected calendar ${calendar.displayName}');
+          },
+          failure: (failure) {
+            AppLogger.error('CalDAVManagement: Failed to save calendar ${calendar.displayName}: ${failure.message}');
+          },
+        );
+      }
     }
   }
 

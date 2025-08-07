@@ -280,25 +280,6 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
     if (state.error == null && mounted) {
       if (mounted) {
         Navigator.of(context).pop(projectName);
-        
-        String msg;
-        if (state.wasCreatedLocally) {
-          msg = selectedDomain != null
-              ? 'Project "$projectName" created locally in domain "$selectedDomain" (will sync when connection improves)'
-              : 'Project "$projectName" created locally (will sync when connection improves)';
-        } else {
-          msg = selectedDomain != null
-              ? 'Project "$projectName" created in domain "$selectedDomain"'
-              : 'Project "$projectName" created successfully';
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg), 
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            duration: state.wasCreatedLocally ? const Duration(seconds: 4) : const Duration(seconds: 2),
-          ),
-        );
 
         // Navigate to the created project's detail page if we have the project path
         if (state.createdProjectPath != null) {
@@ -310,10 +291,6 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
           });
         }
       }
-    } else if (state.error != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: ${state.error}'), backgroundColor: Theme.of(context).colorScheme.error),
-      );
     }
 
     if (mounted) setState(() => isLoading = false);

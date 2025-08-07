@@ -2,11 +2,9 @@
 // Provides a singleton instance with CRUD operations following repository pattern
 
 import 'dart:convert';
-import '../services/local_storage_service.dart';
 import '../models/category.dart';
 import '../models/task_calendar.dart';
 import 'calendar_repository.dart';
-import '../services/caldav_service.dart';
 import '../services/sync_service.dart';
 import 'account_repository.dart';
 import '../../core/result.dart';
