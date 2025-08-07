@@ -173,24 +173,8 @@ class _MoveToDomainDialogState extends ConsumerState<MoveToDomainDialog> {
       }
       
       Navigator.of(context).pop();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            selectedDomain == null 
-                ? 'Removed "${widget.project.displayName}" from domain'
-                : 'Moved "${widget.project.displayName}" to "$selectedDomain"'
-          ),
-        ),
-      );
     } catch (e) {
       AppLogger.error('MoveToDomain: Failed to move project to domain: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to move project: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
     } finally {
       if (mounted) {
         setState(() => isLoading = false);
