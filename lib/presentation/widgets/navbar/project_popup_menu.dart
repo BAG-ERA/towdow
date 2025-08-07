@@ -3,9 +3,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
+import '../../../data/models/task_calendar.dart';
 
 /// Callback function type for menu actions
 typedef ProjectMenuActionCallback = void Function(String action);
@@ -34,11 +34,11 @@ class ProjectPopupMenu extends ConsumerWidget {
   }
 
   List<PopupMenuEntry<String>> _buildMenuItems(BuildContext context, WidgetRef ref) {
-    return _buildMenuItemsStatic(context, ref);
+    return _buildMenuItemsStatic(context, ref, project: null);
   }
 
   /// Static method to build menu items for use in context menus
-  static List<PopupMenuEntry<String>> _buildMenuItemsStatic(BuildContext context, WidgetRef ref) {
+  static List<PopupMenuEntry<String>> _buildMenuItemsStatic(BuildContext context, WidgetRef ref, {TaskCalendar? project}) {
     // Check if current account supports sharing
     final accountAsync = ref.watch(activeAccountProvider);
     final supportsSharing = accountAsync.when(
@@ -90,12 +90,12 @@ class ProjectPopupMenu extends ConsumerWidget {
         child: Row(
           children: [
             Icon(
-              Icons.archive,
+              project?.isArchived == true ? Icons.unarchive : Icons.archive,
               size: 16,
               color: Theme.of(context).colorScheme.onSurface,
             ),
             const SizedBox(width: 8),
-            const Text('Archive project'),
+            Text(project?.isArchived == true ? 'Unarchive project' : 'Archive project'),
           ],
         ),
       ),
@@ -145,7 +145,7 @@ class ProjectPopupMenu extends ConsumerWidget {
   }
 
   /// Static method to get menu items for context menus
-  static List<PopupMenuEntry<String>> getMenuItems(BuildContext context, WidgetRef ref) {
-    return _buildMenuItemsStatic(context, ref);
+  static List<PopupMenuEntry<String>> getMenuItems(BuildContext context, WidgetRef ref, {TaskCalendar? project}) {
+    return _buildMenuItemsStatic(context, ref, project: project);
   }
 } 

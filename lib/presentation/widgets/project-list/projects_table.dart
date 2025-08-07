@@ -389,7 +389,7 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
       icon: const Icon(Icons.more_vert_rounded),
       tooltip: 'Project actions',
       onSelected: (value) => widget.onProjectAction(value, projectWithStats),
-      itemBuilder: (context) => ProjectPopupMenu.getMenuItems(context, ref),
+      itemBuilder: (context) => ProjectPopupMenu.getMenuItems(context, ref, project: projectWithStats.project),
     );
   }
 }
