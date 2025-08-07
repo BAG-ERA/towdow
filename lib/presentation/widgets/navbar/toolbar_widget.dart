@@ -27,7 +27,6 @@ class ToolbarWidget extends ConsumerWidget {
 
   Widget _buildToolbarContent(BuildContext context, String currentLocation, WidgetRef ref) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
     
     return Container(
@@ -49,20 +48,6 @@ class ToolbarWidget extends ConsumerWidget {
             child: CreateProjectOrDomainButton.compact(
               isFullWidth: true,
             ),
-          ),
-          
-          const SizedBox(width: 8),
-          
-          // Archive button (right side)
-          _buildIconButton(
-            context: context,
-            icon: Icons.archive_rounded,
-            tooltip: 'Archived Projects',
-            isSelected: isDesktop && currentLocation == '/archived',
-            onPressed: () {
-              context.go('/archived');
-              _closeDrawerIfMobile(context, ref);
-            },
           ),
           
           const SizedBox(width: 8),

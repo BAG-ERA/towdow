@@ -204,10 +204,7 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     bool isDetailScreen = false;
       final location = GoRouterState.of(context).uri.path;
     
-      if (location.startsWith('/archived')) {
-        title = 'Archived Projects';
-      isDetailScreen = true;
-    } else if (location.startsWith('/settings')) {
+      if (location.startsWith('/settings')) {
       title = 'Settings';
       isDetailScreen = true;
     } else if (location.startsWith('/project/')) {
@@ -350,23 +347,6 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
       );
     } catch (e) {
       AppLogger.error('Failed to archive project: $e');
-    }
-  }
-
-  void _handleUnarchiveProject(BuildContext context, WidgetRef ref, TaskCalendar project) async {
-    try {
-      final statusService = ref.read(statusServiceProvider);
-      final result = await statusService.unarchiveCalendar(project.path);
-      
-      result.when(
-        success: (_) {
-        },
-        failure: (failure) {
-          AppLogger.error('Failed to unarchive project: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('Failed to unarchive project: $e');
     }
   }
 

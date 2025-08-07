@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/connection/connection_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
-import 'presentation/screens/archived_projects/archived_projects_screen.dart';
 import 'presentation/screens/projects_list/projects_list_screen.dart';
 
 import 'presentation/screens/project_detail/project_detail_screen.dart';
@@ -93,8 +92,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           
           if (location.startsWith('/settings')) {
             currentDestination = null; // Settings handled by toolbar
-          } else if (location.startsWith('/archived')) {
-            currentDestination = null; // Archived projects have no main navigation active
           } else if (location.startsWith('/project/')) {
             currentDestination = null; // Project details have no main navigation active
           } else if (location == '/today' || location == '/') {
@@ -153,10 +150,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
           ),
-          GoRoute(
-            path: '/archived',
-            builder: (context, state) => const ArchivedProjectsScreen(),
-          ),
+          
           GoRoute(
             path: '/projects',
             builder: (context, state) => const ProjectsListScreen(),
