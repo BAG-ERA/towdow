@@ -725,7 +725,7 @@ class SyncService {
               domain: calendar.flowitDomain,
               kanban: calendar.flowitKanban,
               author: calendar.flowitAuthor,
-              manager: calendar.flowitManager,
+              owner: calendar.flowitOwner,
             );
             await result.when(
               success: (createdCalendar) async {
@@ -1757,8 +1757,8 @@ class SyncService {
       final createResult = await caldavService.createCalendar(
         displayName: calendar.displayName,
         description: calendar.description,
-        author: account.email,
-        manager: account.email,
+        author: account.email?.isNotEmpty == true ? account.email : account.username,
+        owner: account.email?.isNotEmpty == true ? account.email : account.username,
       );
 
       return await createResult.when(

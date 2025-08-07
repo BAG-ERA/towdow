@@ -186,7 +186,7 @@ class CalendarSelectionViewModel extends StateNotifier<CalendarSelectionState> {
         displayName: name,
         description: description ?? 'Project portfolio created by FlowIt',
         author: currentUser,
-        manager: currentUser,
+        owner: currentUser,
       );
       await result.when(
         success: (calendar) async {

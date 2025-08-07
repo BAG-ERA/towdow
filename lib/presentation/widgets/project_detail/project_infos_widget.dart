@@ -226,11 +226,9 @@ class ProjectInfosWidget extends ConsumerWidget {
           
           const SizedBox(height: 12),
           
-          // Project Manager
-          _buildDetailRow(context, 'Manager', 
-            project.flowitManager != null && project.flowitManager!.isNotEmpty
-                ? project.flowitManager!
-                : '-'
+                    // Project Owner
+          _buildDetailRow(context, 'Owner', 
+            project.flowitOwner != null && project.flowitOwner!.isNotEmpty ? project.flowitOwner! : '-'
           ),
           const SizedBox(height: 8),
           

@@ -227,9 +227,8 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
         path: '/calendars/${account.username}/${name.toLowerCase().replaceAll(' ', '_')}/',
         displayName: name,
         description: description,
-        organizer: account.email,
-        author: account.email,
-        manager: account.email,
+        author: account.email?.isNotEmpty == true ? account.email : account.username,
+        owner: account.email?.isNotEmpty == true ? account.email : account.username,
       );
 
       // Save calendar locally first, then queue for server creation
