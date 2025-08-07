@@ -19,8 +19,6 @@ import 'package:uuid/uuid.dart';
 import '../../core/logger.dart';
 
 import '../../data/models/caldav_account.dart';
-import '../../data/services/caldav_service.dart';
-import '../../data/services/user_sync_service.dart';
 import '../../data/services/external_sync_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/providers/providers.dart';
@@ -30,44 +28,33 @@ class LoginState {
   final bool isLoading;
   final String? error;
   final CaldavAccount? account;
-  final bool hasExistingUserData;
-  final CalDAVCapabilities? capabilities;
 
   const LoginState({
     this.isLoading = false,
     this.error,
     this.account,
-    this.hasExistingUserData = false,
-    this.capabilities,
   });
 
   LoginState copyWith({
     bool? isLoading,
     String? error,
     CaldavAccount? account,
-    bool? hasExistingUserData,
-    CalDAVCapabilities? capabilities,
   }) => LoginState(
     isLoading: isLoading ?? this.isLoading,
     error: error,
     account: account ?? this.account,
-    hasExistingUserData: hasExistingUserData ?? this.hasExistingUserData,
-    capabilities: capabilities ?? this.capabilities,
   );
 }
 
 // Login ViewModel
 class LoginViewModel extends StateNotifier<LoginState> {
   final AccountRepository _accountRepository;
-  final UserSyncService _userSyncService;
   final ExternalCalendarSyncService _externalSyncService;
 
   LoginViewModel({
     required AccountRepository accountRepository,
-    required UserSyncService userSyncService,
     required ExternalCalendarSyncService externalSyncService,
   }) : _accountRepository = accountRepository,
-       _userSyncService = userSyncService,
        _externalSyncService = externalSyncService,
        super(const LoginState());
 
@@ -171,79 +158,37 @@ class LoginViewModel extends StateNotifier<LoginState> {
         isActive: true,
       );
 
-      // Save account temporarily for user sync check
+      // Save account
       await _accountRepository.save(account);
 
-        // Trigger external calendar sync
-        try {
-          final syncResult = await _externalSyncService.syncAllAccounts();
-          syncResult.when(
-            success: (_) => AppLogger.info(
-              'Login: External calendar sync completed successfully',
-            ),
-            failure: (failure) => AppLogger.warning(
-              'Login: External calendar sync failed: ${failure.message}',
-            ),
-          );
-        } catch (e, stackTrace) {
-          AppLogger.error(
-            'Login: Failed to trigger external calendar sync',
-            e,
-            stackTrace,
-          );
-        }
-
-        state = state.copyWith(
-          account: account,
-          hasExistingUserData: true,
-          isLoading: false,
+      // Trigger external calendar sync
+      try {
+        final syncResult = await _externalSyncService.syncAllAccounts();
+        syncResult.when(
+          success: (_) => AppLogger.info(
+            'Login: External calendar sync completed successfully',
+          ),
+          failure: (failure) => AppLogger.warning(
+            'Login: External calendar sync failed: ${failure.message}',
+          ),
         );
-        return;
+      } catch (e, stackTrace) {
+        AppLogger.error(
+          'Login: Failed to trigger external calendar sync',
+          e,
+          stackTrace,
+        );
+      }
+
+      // Set account and complete authentication
+      state = state.copyWith(
+        account: account,
+        isLoading: false,
+      );
     } catch (e, stackTrace) {
       AppLogger.error('Login: Authentication failed', e, stackTrace);
       state = state.copyWith(
         error: 'Authentication failed: $e',
-        isLoading: false,
-      );
-    }
-  }
-
-  Future<void> _testConnectionAndDiscoverCapabilities(
-    CaldavAccount account,
-  ) async {
-    try {
-      final caldavService = CalDAVService(account: account);
-      final testResult = await caldavService.testConnection();
-
-      await testResult.when(
-        success: (capabilities) async {
-          // Update account with discovered principal and calendarHome
-          final updatedAccount = account.copyWith(
-            principal: capabilities.principal,
-            calendarHome: capabilities.calendarHome,
-          );
-          
-          // Save the updated account with principal and calendarHome
-          await _accountRepository.save(updatedAccount);
-          
-          state = state.copyWith(
-            account: updatedAccount,
-            capabilities: capabilities,
-            hasExistingUserData: false,
-            isLoading: false,
-          );
-        },
-        failure: (failure) async {
-          state = state.copyWith(
-            error: 'Connection test failed: ${failure.message}',
-            isLoading: false,
-          );
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('Login: Connection test failed', e, stackTrace);
-      state = state.copyWith(
-        error: 'Connection test failed: $e',
         isLoading: false,
       );
     }
@@ -318,7 +263,6 @@ class LoginViewModel extends StateNotifier<LoginState> {
         clientId: clientId,
         issuerUrl: issuerUrl,
         firstName: null,
-        // Would need to decode JWT token to get these
         lastName: null,
         email: email,
         createdAt: DateTime.now(),
@@ -326,51 +270,33 @@ class LoginViewModel extends StateNotifier<LoginState> {
         isActive: true,
       );
 
-      // Save account temporarily for user sync check
+      // Save account
       await _accountRepository.save(account);
 
-      // Check for existing user data
-      final syncDownloadResult = await _userSyncService.downloadUserData();
-      final hasExistingData = syncDownloadResult.when(
-        success: (hasData) => hasData,
-        failure: (failure) {
-          AppLogger.warning(
-            'Login: Failed to check for existing user data: ${failure.message}',
-          );
-          return false;
-        },
-      );
-
-      if (hasExistingData) {
-        // Trigger external calendar sync
-        try {
-          final syncResult = await _externalSyncService.syncAllAccounts();
-          syncResult.when(
-            success: (_) => AppLogger.info(
-              'Login: External calendar sync completed successfully',
-            ),
-            failure: (failure) => AppLogger.warning(
-              'Login: External calendar sync failed: ${failure.message}',
-            ),
-          );
-        } catch (e, stackTrace) {
-          AppLogger.error(
-            'Login: Failed to trigger external calendar sync',
-            e,
-            stackTrace,
-          );
-        }
-
-        state = state.copyWith(
-          account: account,
-          hasExistingUserData: true,
-          isLoading: false,
+      // Trigger external calendar sync
+      try {
+        final syncResult = await _externalSyncService.syncAllAccounts();
+        syncResult.when(
+          success: (_) => AppLogger.info(
+            'Login: External calendar sync completed successfully',
+          ),
+          failure: (failure) => AppLogger.warning(
+            'Login: External calendar sync failed: ${failure.message}',
+          ),
         );
-        return;
+      } catch (e, stackTrace) {
+        AppLogger.error(
+          'Login: Failed to trigger external calendar sync',
+          e,
+          stackTrace,
+        );
       }
 
-      // No existing data, test connection for capability discovery
-      await _testConnectionAndDiscoverCapabilities(account);
+      // Always set hasExistingUserData to true to skip calendar selection
+      state = state.copyWith(
+        account: account,
+        isLoading: false,
+      );
     } catch (e, stackTrace) {
       AppLogger.error(
         'Login: Authentication with credentials failed',
@@ -394,7 +320,6 @@ final loginViewModelProvider =
     StateNotifierProvider.autoDispose<LoginViewModel, LoginState>(
       (ref) => LoginViewModel(
         accountRepository: ref.read(accountRepositoryProvider),
-        userSyncService: ref.read(userSyncServiceProvider),
         externalSyncService: ref.read(externalCalendarSyncServiceProvider),
       ),
     );
