@@ -16,6 +16,7 @@ import 'package:towdow_app/data/repositories/user_repository.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/data/models/user_preferences.dart';
+import 'package:towdow_app/data/models/sync_queue_item.dart';
 import 'package:towdow_app/core/result.dart';
 
 import 'sync_service_test.mocks.dart';
@@ -215,7 +216,8 @@ void main() {
       });
 
       test('should handle missing active account', () async {
-        // Arrange
+        // Arrange - Reset the mock to ensure clean state
+        reset(mockAccountRepository);
         when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => const Result.success(null));
 
@@ -227,7 +229,7 @@ void main() {
           success: (_) => false,
           failure: (failure) {
             print('DEBUG: Actual failure message: "${failure.message}"');
-            return failure.message.contains('No active CalDAV account');
+            return failure.message.contains('No active CalDAV account configured');
           },
         );
         expect(isFailure, true);
@@ -235,7 +237,8 @@ void main() {
       });
 
       test('should handle account repository failure', () async {
-        // Arrange
+        // Arrange - Reset the mock to ensure clean state
+        reset(mockAccountRepository);
         when(mockAccountRepository.getActiveAccount())
             .thenAnswer((_) async => Result.failure(Failure(
                   message: 'Account fetch failed',
@@ -414,5 +417,86 @@ void main() {
       expect(result.failedItems, 1);
       expect(result.errors, ['Error 1']);
     });
+  });
+
+  test('SyncService should skip calendars with pending deletions', () async {
+    // Arrange
+    final mockCalendarRepository = MockCalendarRepository();
+    final mockTaskRepository = MockTaskRepository();
+    final mockCategoryRepository = MockCategoryRepository();
+    final mockAccountRepository = MockAccountRepository();
+    final mockUserRepository = MockUserRepository();
+    final mockLocalStorage = MockLocalStorageService();
+    
+    final syncService = SyncService(
+      taskRepository: mockTaskRepository,
+      accountRepository: mockAccountRepository,
+      calendarRepository: mockCalendarRepository,
+      categoryRepository: mockCategoryRepository,
+      userRepository: mockUserRepository,
+      localStorage: mockLocalStorage,
+    );
+
+    // Mock calendar with pending deletion
+    final testCalendar = TaskCalendar(
+      path: '/test-calendar/',
+      displayName: 'Test Calendar',
+      description: 'Test Calendar Description',
+      supportsTodos: true,
+      dtstamp: DateTime.now(),
+      created: DateTime.now(),
+      lastModified: DateTime.now(),
+      status: 'NEEDS-ACTION',
+    );
+
+    // Mock queue with pending deletion
+    final pendingDeletionItem = SyncQueueItem(
+      id: 'test-deletion',
+      operation: SyncOperation.deleteCalendar,
+      itemId: 'test-calendar',
+      data: {'calendarPath': '/test-calendar/'},
+      retryCount: 0,
+      createdAt: DateTime.now(),
+    );
+
+    when(mockAccountRepository.getActiveAccount()).thenAnswer(
+      (_) async => Result.success(testAccount),
+    );
+    when(mockCalendarRepository.getProjectCalendars()).thenAnswer(
+      (_) async => Result.success([testCalendar]),
+    );
+    when(mockUserRepository.getUserPreferences()).thenAnswer(
+      (_) async => Result.success(UserPreferences.defaultPreferences()),
+    );
+    when(mockLocalStorage.getAll<Map<String, dynamic>>('sync_queue')).thenAnswer(
+      (_) async => Result.success([
+        {
+          'id': pendingDeletionItem.id,
+          'operation': pendingDeletionItem.operation.name,
+          'itemId': pendingDeletionItem.itemId,
+          'data': pendingDeletionItem.data,
+          'retryCount': pendingDeletionItem.retryCount,
+          'createdAt': pendingDeletionItem.createdAt.millisecondsSinceEpoch,
+        }
+      ]),
+    );
+    when(mockLocalStorage.getAll<CaldavAccount>('accounts')).thenAnswer(
+      (_) async => const Result.success([]),
+    );
+    when(mockLocalStorage.put(any, any, any)).thenAnswer(
+      (_) async => const Result.success(null),
+    );
+    when(mockLocalStorage.debugAllBoxes()).thenAnswer(
+      (_) async {},
+    );
+
+
+    // Act
+    final result = await syncService.syncAllActiveCaldav();
+
+    // Assert
+    expect(result.isSuccess, true);
+    // Verify that the calendar was skipped (no sync operations should be called)
+    verifyNever(mockCalendarRepository.save(any));
   });
 } 

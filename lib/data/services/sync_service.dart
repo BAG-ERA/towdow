@@ -317,6 +317,13 @@ class SyncService {
         //AppLogger.debug('🔄 SyncService: Starting sync for ${calendarsToSync.length} calendars');
         
         for (final calendar in calendarsToSync) {
+          // Check if calendar has pending deletion
+          final hasPendingDeletion = await _hasPendingDeletionForCalendar(calendar.path);
+          if (hasPendingDeletion) {
+            AppLogger.info('🔄 SyncService: Skipping calendar ${calendar.path} - pending deletion');
+            continue; // Skip this calendar
+          }
+          
           //AppLogger.debug('🔄 SyncService: Processing calendar ${calendar.path}');
           
           final calendarResult = await _syncCalendar(caldavService, calendar, errors);
@@ -329,6 +336,9 @@ class SyncService {
           _progressController.add(0.2 + (0.6 * (calendarsToSync.indexOf(calendar) + 1) / calendarsToSync.length));
         }
       }
+
+      // Process queue items for calendars that no longer exist locally
+      await _processOrphanedQueueItems(caldavService, errors);
 
       _progressController.add(1.0);
       _lastSyncTime = DateTime.now();
@@ -1030,6 +1040,42 @@ class SyncService {
     }
   }
 
+  /// Check if a calendar has pending deletion operations
+  Future<bool> _hasPendingDeletionForCalendar(String calendarPath) async {
+    try {
+      final queueResult = await _localStorage.getAll<Map<String, dynamic>>(syncQueueBoxName);
+      return await queueResult.when(
+        success: (queueData) async {
+          final queueItems = queueData
+              .map((data) => _mapToSyncQueueItem(data))
+              .where((item) => item != null)
+              .cast<SyncQueueItem>()
+              .toList();
+          
+          // Check if any queue item is a delete operation for this calendar
+          final deleteItems = queueItems.where((item) => 
+            (item.operation == SyncOperation.deleteCalendar || 
+             item.operation == SyncOperation.exitShare) &&
+            item.data['calendarPath'] == calendarPath
+          ).toList();
+          
+          if (deleteItems.isNotEmpty) {
+            AppLogger.debug('🔄 SyncService: Found ${deleteItems.length} pending deletion(s) for calendar $calendarPath');
+          }
+          
+          return deleteItems.isNotEmpty;
+        },
+        failure: (failure) async {
+          AppLogger.warning('SyncService: Could not check pending deletions for calendar $calendarPath: ${failure.message}');
+          return false;
+        },
+      );
+    } catch (e) {
+      AppLogger.error('SyncService: Error checking pending deletions for calendar $calendarPath', e, StackTrace.current);
+      return false;
+    }
+  }
+
   /// Get current sync token from server for a calendar
   Future<Result<String>> _getServerSyncToken(CalDAVService caldavService, TaskCalendar calendar) async {
     try {
@@ -1262,6 +1308,64 @@ class SyncService {
     } catch (e) {
       AppLogger.error('SyncService: Failed to process sync queue for calendar $calendarPath', e, StackTrace.current);
       errors.add('Failed to process sync queue for calendar $calendarPath: $e');
+    }
+  }
+
+  /// Process queue items for calendars that no longer exist locally
+  Future<void> _processOrphanedQueueItems(CalDAVService caldavService, List<String> errors) async {
+    try {
+      AppLogger.debug('🔄 SyncService: Processing orphaned queue items');
+      
+      final queueResult = await _localStorage.getAll<Map<String, dynamic>>(syncQueueBoxName);
+      await queueResult.when(
+        success: (queueData) async {
+          final queueItems = queueData
+              .map((data) => _mapToSyncQueueItem(data))
+              .where((item) => item != null)
+              .cast<SyncQueueItem>()
+              .toList();
+
+          // Find queue items for calendars that no longer exist locally
+          for (final item in queueItems) {
+            final calendarPath = item.data['calendarPath'] as String?;
+            if (calendarPath != null) {
+              final calendarResult = await _calendarRepository.getById(calendarPath);
+              await calendarResult.when(
+                success: (calendar) async {
+                  if (calendar == null) {
+                    // Calendar no longer exists locally, process the queue item
+                    AppLogger.info('🔄 SyncService: Processing orphaned queue item for deleted calendar: $calendarPath');
+                    try {
+                      await _processSyncQueueItem(item, caldavService);
+                      // Remove from queue on success
+                      await _localStorage.delete(syncQueueBoxName, item.id);
+                      AppLogger.info('🔄 SyncService: Successfully processed orphaned queue item ${item.id}');
+                    } catch (e) {
+                      AppLogger.error('SyncService: Failed to process orphaned queue item ${item.id}', e, StackTrace.current);
+                      if (item.retryCount >= maxRetryCount) {
+                        errors.add('Max retries reached for orphaned item ${item.id}: $e');
+                        await _localStorage.delete(syncQueueBoxName, item.id);
+                      } else {
+                        // Increment retry count
+                        final updatedItem = item.copyWith(retryCount: item.retryCount + 1);
+                        await _localStorage.put(syncQueueBoxName, item.id, _mapFromSyncQueueItem(updatedItem));
+                      }
+                    }
+                  }
+                },
+                failure: (failure) async {
+                  AppLogger.warning('SyncService: Could not check calendar existence for orphaned queue item: ${failure.message}');
+                },
+              );
+            }
+          }
+        },
+        failure: (failure) async {
+          AppLogger.warning('SyncService: Could not load queue for orphaned items: ${failure.message}');
+        },
+      );
+    } catch (e) {
+      AppLogger.error('SyncService: Error processing orphaned queue items', e, StackTrace.current);
     }
   }
 

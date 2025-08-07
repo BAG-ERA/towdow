@@ -262,12 +262,6 @@ void main() {
       const baseStyle = TextStyle(fontSize: 14);
 
       final spans = viewModel.decode(text, baseStyle);
-
-      // Print all spans for debugging
-      for (int i = 0; i < spans.length; i++) {
-        print('Span $i: text="${spans[i].text}", color=${spans[i].style?.color}, weight=${spans[i].style?.fontWeight}');
-      }
-
       expect(spans.length, greaterThan(0));
     });
   });
