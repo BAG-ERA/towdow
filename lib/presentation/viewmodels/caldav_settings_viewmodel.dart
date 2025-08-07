@@ -171,17 +171,17 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
       final isCurrentlySelected = state.selectedCalendars.any((cal) => cal.path == calendar.path);
       
       if (isCurrentlySelected) {
-        // Remove from selection
-        final result = await _calendarRepository.delete(calendar.path);
+        // Remove from selection (unsync - only delete locally, don't affect server)
+        final result = await _calendarRepository.unsyncCalendar(calendar.path);
         await result.when(
           success: (_) async {
             final updatedSelected = state.selectedCalendars.where((cal) => cal.path != calendar.path).toList();
             state = state.copyWith(selectedCalendars: updatedSelected);
-            // AppLogger.info('CaldavSettingsViewModel: Calendar removed from sync: ${calendar.displayName}');
+            AppLogger.info('CaldavSettingsViewModel: Calendar unsynced (removed from local storage): ${calendar.displayName}');
           },
           failure: (failure) async {
-            AppLogger.error('CaldavSettingsViewModel: Failed to remove calendar', failure.exception, failure.stackTrace);
-            state = state.copyWith(error: 'Failed to remove calendar: ${failure.message}');
+            AppLogger.error('CaldavSettingsViewModel: Failed to unsync calendar', failure.exception, failure.stackTrace);
+            state = state.copyWith(error: 'Failed to unsync calendar: ${failure.message}');
           },
         );
       } else {

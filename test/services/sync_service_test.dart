@@ -15,6 +15,7 @@ import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
+import 'package:towdow_app/data/models/user_preferences.dart';
 import 'package:towdow_app/core/result.dart';
 
 import 'sync_service_test.mocks.dart';
@@ -59,7 +60,10 @@ void main() {
           .thenAnswer((_) async => const Result.success(null));
       when(mockLocalStorage.debugAllBoxes())
           .thenAnswer((_) async {});
+      when(mockUserRepository.getUserPreferences())
+          .thenAnswer((_) async => Result.success(UserPreferences.defaultPreferences()));
 
+      // Create a new SyncService instance for each test
       syncService = SyncService(
         taskRepository: mockTaskRepository,
         accountRepository: mockAccountRepository,
@@ -105,6 +109,11 @@ void main() {
           flowitValidator: '{"type":"default"}',
         ),
       ];
+    });
+
+    tearDown(() {
+      // Reset sync service state between tests
+      // Don't dispose as it closes streams that are still needed
     });
 
     group('initialization', () {
@@ -213,14 +222,16 @@ void main() {
         // Act
         final result = await syncService.syncAllActiveCaldav();
 
-        // Assert - Should succeed but with 0 items synced
-        final syncResult = result.when(
-          success: (syncResult) => syncResult,
-          failure: (_) => null,
+        // Assert - Should fail when no account is available
+        final isFailure = result.when(
+          success: (_) => false,
+          failure: (failure) {
+            print('DEBUG: Actual failure message: "${failure.message}"');
+            return failure.message.contains('No active CalDAV account');
+          },
         );
-        expect(syncResult, isNotNull);
-        expect(syncResult!.syncedItems, 0);
-        // Don't check specific status as it might be affected by previous tests
+        expect(isFailure, true);
+        expect(syncService.status, SyncStatus.offline);
       });
 
       test('should handle account repository failure', () async {
@@ -234,13 +245,12 @@ void main() {
         // Act
         final result = await syncService.syncAllActiveCaldav();
 
-        // Assert - Should succeed but with 0 items synced due to no account
-        final syncResult = result.when(
-          success: (syncResult) => syncResult,
-          failure: (_) => null,
+        // Assert - Should fail when account repository fails
+        final isFailure = result.when(
+          success: (_) => false,
+          failure: (failure) => failure.message.contains('Database error'),
         );
-        expect(syncResult, isNotNull);
-        expect(syncResult!.syncedItems, 0);
+        expect(isFailure, true);
         expect(syncService.status, SyncStatus.error);
       });
     });
@@ -306,17 +316,20 @@ void main() {
             .thenAnswer((_) async => const Result.success([]));
         when(mockTaskRepository.getAll())
             .thenAnswer((_) async => const Result.success([]));
+        when(mockUserRepository.getUserPreferences())
+            .thenAnswer((_) async => Result.success(UserPreferences.defaultPreferences()));
 
         // Act
         final result = await syncService.syncAllActiveCaldav();
 
-        // Assert - Sync should succeed but with errors
+        // Assert - Sync should succeed but with errors due to no calendars
         final syncResult = result.when(
           success: (syncResult) => syncResult,
           failure: (_) => null,
         );
         expect(syncResult, isNotNull);
         expect(syncResult!.errors.isNotEmpty, true);
+        expect(syncResult.errors.any((error) => error.contains('No calendars available')), true);
         expect(syncService.status, SyncStatus.error);
       });
 
@@ -333,6 +346,8 @@ void main() {
                   message: 'Repository error',
                   exception: Exception('Repository error'),
                 )));
+        when(mockUserRepository.getUserPreferences())
+            .thenAnswer((_) async => Result.success(UserPreferences.defaultPreferences()));
 
         // Act
         final result = await syncService.syncAllActiveCaldav();
@@ -344,7 +359,7 @@ void main() {
         );
         expect(syncResult, isNotNull);
         expect(syncResult!.errors.isNotEmpty, true);
-        expect(syncResult.errors.any((error) => error.contains('No calendars selected')), true);
+        expect(syncResult.errors.any((error) => error.contains('No calendars available')), true);
         expect(syncService.status, SyncStatus.error);
       });
     });

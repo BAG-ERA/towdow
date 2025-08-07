@@ -18,6 +18,7 @@ abstract class CalendarRepository {
   Future<Result<TaskCalendar?>> getByPath(String path);
   Future<Result<void>> save(TaskCalendar calendar);
   Future<Result<void>> delete(String path);
+  Future<Result<void>> unsyncCalendar(String path);
   Stream<List<TaskCalendar>> watchCalendars();
   Future<Result<List<TaskCalendar>>> getProjectCalendars();
   
@@ -196,6 +197,33 @@ class LocalCalendarRepository implements CalendarRepository {
     }
   }
 
+  @override
+  Future<Result<void>> unsyncCalendar(String path) async {
+    AppLogger.info('LocalCalendarRepository: Unsyncing calendar: $path');
+    
+    try {
+      // Only delete from local storage - do NOT queue server deletion
+      final result = await _storageService.delete(LocalStorageService.calendarsBoxName, path);
+      
+      return await result.when(
+        success: (_) async {
+          AppLogger.info('LocalCalendarRepository: Successfully unsynced calendar from local storage: $path');
+          return Result.success(null);
+        },
+        failure: (failure) async {
+          AppLogger.error('LocalCalendarRepository: Failed to unsync calendar from local storage: ${failure.message}');
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('LocalCalendarRepository: Exception during calendar unsync', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to unsync calendar: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
 
 
   @override

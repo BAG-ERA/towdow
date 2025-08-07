@@ -150,7 +150,7 @@ void main() {
           selectedCalendars: [testCalendar],
         );
 
-        when(mockCalendarRepository.delete(any))
+        when(mockCalendarRepository.unsyncCalendar(testCalendar.path))
             .thenAnswer((_) async => Result.success(null));
 
         // Act
@@ -158,7 +158,7 @@ void main() {
 
         // Assert
         expect(viewModel.state.selectedCalendars, isEmpty);
-        verify(mockCalendarRepository.delete(testCalendar.path)).called(1);
+        verify(mockCalendarRepository.unsyncCalendar(testCalendar.path)).called(1);
       });
 
       test('should handle save failure', () async {
