@@ -136,9 +136,7 @@ class ProjectInfosWidget extends ConsumerWidget {
                     child: _buildDetailRow(
                       context,
                       'Created at', 
-                      project.flowitCreatedAt != null 
-                          ? _formatProjectDate(project.flowitCreatedAt!)
-                          : 'Unknown'
+                      project.flowitStartedAt != null ? _formatProjectDate(project.flowitStartedAt!) : 'Unknown'
                     ),
                   ),
                   const SizedBox(width: 16),

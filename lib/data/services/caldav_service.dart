@@ -549,9 +549,9 @@ class CalDAVService {
                 sharedWith: responseData['flowit-sharedWith'] ?? calendar.sharedWith,
                 flowitAuthor: responseData['flowit-author'] ?? calendar.flowitAuthor,
                 flowitOwner: responseData['flowit-owner'] ?? calendar.flowitOwner,
-                flowitCreatedAt: responseData['flowit-created-at'] != null 
-                    ? DateTime.tryParse(responseData['flowit-created-at']) ?? calendar.flowitCreatedAt
-                    : calendar.flowitCreatedAt,
+                flowitStartedAt: responseData['flowit-started-at'] != null
+                  ? DateTime.tryParse(responseData['flowit-started-at']) ?? calendar.flowitStartedAt
+                  : calendar.flowitStartedAt,
                 flowitEndedAt: responseData['flowit-ended-at'] != null 
                     ? DateTime.tryParse(responseData['flowit-ended-at']) ?? calendar.flowitEndedAt
                     : calendar.flowitEndedAt,
@@ -694,7 +694,7 @@ class CalDAVService {
                description: description ?? 'Created by FlowIt',
                flowitAuthor: author,
                flowitOwner: owner,
-               flowitCreatedAt: DateTime.now(),
+               flowitStartedAt: DateTime.now(),
              ));
                      } else if (webDavResponse.statusCode == 409) {
              // 409 Conflict - calendar already exists
@@ -1002,8 +1002,8 @@ class CalDAVService {
       vcalendar.writeln('X-FLOWIT-OWNER:${_escapeCalendarText(calendar.flowitOwner!)}');
     }
     
-    if (calendar.flowitCreatedAt != null) {
-      vcalendar.writeln('X-FLOWIT-CREATED-AT:${calendar.flowitCreatedAt!.toIso8601String()}');
+    if (calendar.flowitStartedAt != null) {
+      vcalendar.writeln('X-FLOWIT-STARTED-AT:${calendar.flowitStartedAt!.toIso8601String()}');
     }
     
     if (calendar.flowitEndedAt != null) {
@@ -1057,7 +1057,7 @@ class CalDAVService {
       final flowitOwner = properties['X-FLOWIT-OWNER'];
       final flowitTemplate = properties['X-FLOWIT-TEMPLATE'];
       final flowitAuthor = properties['X-FLOWIT-AUTHOR'];
-      final flowitCreatedAt = _parseDateTime(properties['X-FLOWIT-CREATED-AT']);
+      final flowitStartedAt = _parseDateTime(properties['X-FLOWIT-STARTED-AT']);
       final flowitEndedAt = _parseDateTime(properties['X-FLOWIT-ENDED-AT']);
       final calendarOrder = int.tryParse(properties['CALENDAR-ORDER'] ?? '1') ?? 1;
       
@@ -1081,7 +1081,7 @@ class CalDAVService {
         flowitOwner: flowitOwner,
         flowitTemplate: flowitTemplate,
         flowitAuthor: flowitAuthor,
-        flowitCreatedAt: flowitCreatedAt,
+        flowitStartedAt: flowitStartedAt,
         flowitEndedAt: flowitEndedAt,
         calendarOrder: calendarOrder,
         // projectCategories will be set by the caller via X-FLOWIT-CATEGORIES

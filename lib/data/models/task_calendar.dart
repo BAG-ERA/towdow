@@ -51,7 +51,7 @@ class TaskCalendar with _$TaskCalendar {
     // Project management fields
     @HiveField(27) String? flowitAuthor, // X-FLOWIT-AUTHOR - project author (user who created it)
     @HiveField(28) String? flowitOwner, // X-FLOWIT-OWNER - project owner (responsible person)
-    @HiveField(29) DateTime? flowitCreatedAt, // X-FLOWIT-CREATED-AT - when project was created
+    @HiveField(29) DateTime? flowitStartedAt, // X-FLOWIT-STARTED-AT - when project was started (defaults to created)
     @HiveField(30) DateTime? flowitEndedAt, // X-FLOWIT-ENDED-AT - when project was completed/ended
     
     // Computed fields (set during sync)
@@ -103,7 +103,7 @@ extension TaskCalendarFactory on TaskCalendar {
       flowitDomain: domain,
       flowitStatus: 'ONGOING', // Default status as ONGOING
       flowitAuthor: author, // Set author
-      flowitCreatedAt: now, // Set creation time
+      flowitStartedAt: now, // Set start time (defaults to creation time)
     );
   }
   
@@ -123,7 +123,7 @@ extension TaskCalendarFactory on TaskCalendar {
     String? flowitKanban,
     String? sharedWith,
     String? flowitAuthor,
-    DateTime? flowitCreatedAt,
+    DateTime? flowitStartedAt,
     DateTime? flowitEndedAt,
     bool isSharedWithMe = false,
   }) {
@@ -148,7 +148,7 @@ extension TaskCalendarFactory on TaskCalendar {
       flowitKanban: flowitKanban ?? '[]',
       sharedWith: sharedWith ?? '[]',
       flowitAuthor: flowitAuthor,
-      flowitCreatedAt: flowitCreatedAt,
+      flowitStartedAt: flowitStartedAt,
       flowitEndedAt: flowitEndedAt,
       isSharedWithMe: isSharedWithMe,
     );
@@ -477,8 +477,8 @@ extension TaskCalendarProjectManagement on TaskCalendar {
   /// Check if this calendar has an owner assigned  
   bool get hasOwner => flowitOwner != null && flowitOwner!.isNotEmpty;
   
-  /// Check if this calendar has a creation date
-  bool get hasCreationDate => flowitCreatedAt != null;
+  /// Check if this calendar has a start date
+  bool get hasStartDate => flowitStartedAt != null;
   
   /// Check if this calendar has an end date
   bool get hasEndDate => flowitEndedAt != null;
