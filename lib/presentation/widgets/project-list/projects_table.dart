@@ -14,6 +14,7 @@ class ProjectsTable extends ConsumerStatefulWidget {
   final Function(TaskCalendar) onProjectTap;
   final Function(String, ProjectWithStats) onProjectAction;
   final Function(ProjectSort) onSortChanged;
+  final List<PopupMenuEntry<String>> Function(BuildContext, WidgetRef, TaskCalendar)? menuBuilder;
 
   const ProjectsTable({
     super.key,
@@ -21,6 +22,7 @@ class ProjectsTable extends ConsumerStatefulWidget {
     required this.onProjectTap,
     required this.onProjectAction,
     required this.onSortChanged,
+    this.menuBuilder,
   });
 
   @override
@@ -385,9 +387,17 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
   }
 
   Widget _buildActionMenu(BuildContext context, WidgetRef ref, ProjectWithStats projectWithStats) {
+    if (widget.menuBuilder != null) {
+      return PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert_rounded),
+        tooltip: 'Options',
+        onSelected: (value) => widget.onProjectAction(value, projectWithStats),
+        itemBuilder: (context) => widget.menuBuilder!(context, ref, projectWithStats.project),
+      );
+    }
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert_rounded),
-      tooltip: 'Project actions',
+      tooltip: 'Options',
       onSelected: (value) => widget.onProjectAction(value, projectWithStats),
       itemBuilder: (context) => ProjectPopupMenu.getMenuItems(context, ref, project: projectWithStats.project),
     );

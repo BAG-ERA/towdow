@@ -49,6 +49,23 @@ class ProjectPopupMenu extends ConsumerWidget {
 
     return [
       PopupMenuItem<String>(
+        value: project?.flowitAsFlow == true || (project?.flowitType.toUpperCase() == 'WORKFLOW')
+            ? 'convert_to_project'
+            : 'convert_to_workflow',
+        child: Row(
+          children: [
+            Icon(
+              Icons.transform_rounded,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            const SizedBox(width: 8),
+            Text('Convert to workflow'),
+          ],
+        ),
+      ),
+      const PopupMenuDivider(),
+      PopupMenuItem<String>(
         value: 'move_to_domain',
         child: Row(
           children: [

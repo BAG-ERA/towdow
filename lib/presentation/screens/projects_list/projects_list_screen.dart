@@ -155,6 +155,12 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
 
   void _handleProjectAction(String action, ProjectWithStats projectWithStats) {
     switch (action) {
+      case 'convert_to_workflow':
+        _convertProjectToWorkflow(projectWithStats.project);
+        break;
+      case 'convert_to_project':
+        _convertWorkflowToProject(projectWithStats.project);
+        break;
       case 'move_to_domain':
         AppLogger.info('Move project to domain: ${projectWithStats.project.displayName}');
         _showMoveToDomainDialog(projectWithStats.project);
@@ -183,6 +189,14 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     }
   }
 
+  Future<void> _convertProjectToWorkflow(TaskCalendar project) async {
+    await ref.read(projectListViewModelProvider.notifier).convertProjectToWorkflow(project.path);
+  }
+
+  Future<void> _convertWorkflowToProject(TaskCalendar project) async {
+    await ref.read(projectListViewModelProvider.notifier).convertWorkflowToProject(project.path);
+  }
+
   void _showMoveToDomainDialog(TaskCalendar project) {
     showDialog(
       context: context,
@@ -198,56 +212,12 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   }
 
   void _handleArchiveProject(TaskCalendar project) async {
-    try {
-      AppLogger.info('ProjectsListScreen: Archiving project ${project.path} (${project.displayName})');
-      
-      // Get the status service from providers
-      final statusService = ref.read(statusServiceProvider);
-      
-      // Archive the project
-      final result = await statusService.archiveCalendar(project.path);
-      
-      result.when(
-        success: (_) {
-          // Navigate away from project if currently viewing it
-          final currentRoute = GoRouterState.of(context).uri.path;
-          if (currentRoute == '/project/${Uri.encodeComponent(project.path)}') {
-            AppLogger.info('ProjectsListScreen: Navigating away from archived project');
-            context.go('/');
-          }
-          
-          AppLogger.info('ProjectsListScreen: Successfully archived project ${project.path}');
-        },
-        failure: (failure) {
-          AppLogger.error('ProjectsListScreen: Failed to archive project: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('ProjectsListScreen: Failed to archive project: $e');
-    }
+    await ref.read(projectListViewModelProvider.notifier).archiveProject(project.path);
+
   }
 
   void _handleUnarchiveProject(TaskCalendar project) async {
-    try {
-      AppLogger.info('ProjectsListScreen: Unarchiving project ${project.path} (${project.displayName})');
-      
-      // Get the status service from providers
-      final statusService = ref.read(statusServiceProvider);
-      
-      // Unarchive the project
-      final result = await statusService.unarchiveCalendar(project.path);
-      
-      result.when(
-        success: (_) {
-          AppLogger.info('ProjectsListScreen: Successfully unarchived project ${project.path}');
-        },
-        failure: (failure) {
-          AppLogger.error('ProjectsListScreen: Failed to unarchive project: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('ProjectsListScreen: Failed to unarchive project: $e');
-    }
+    await ref.read(projectListViewModelProvider.notifier).unarchiveProject(project.path);
   }
 
   void _showDeleteConfirmation(TaskCalendar project) {
@@ -280,32 +250,10 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   }
 
   void _deleteProject(TaskCalendar project) async {
-    try {
-      AppLogger.info('ProjectsListScreen: Deleting project ${project.path} (${project.displayName})');
-      
-      // Get the calendar repository from providers
-      final calendarRepository = ref.read(calendarRepositoryProvider);
-      
-      // Delete the project
-      final result = await calendarRepository.delete(project.path);
-      
-      result.when(
-        success: (_) {
-          // Navigate away from project if currently viewing it
-          final currentRoute = GoRouterState.of(context).uri.path;
-          if (currentRoute == '/project/${Uri.encodeComponent(project.path)}') {
-            AppLogger.info('ProjectsListScreen: Navigating away from deleted project');
-            context.go('/');
-          }
-          
-          AppLogger.info('ProjectsListScreen: Successfully deleted project ${project.path}');
-        },
-        failure: (failure) {
-          AppLogger.error('ProjectsListScreen: Failed to delete project: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('ProjectsListScreen: Failed to delete project: $e');
+    await ref.read(projectListViewModelProvider.notifier).deleteProject(project.path);
+    final currentRoute = GoRouterState.of(context).uri.path;
+    if (currentRoute == '/project/${Uri.encodeComponent(project.path)}') {
+      context.go('/projects');
     }
   }
 

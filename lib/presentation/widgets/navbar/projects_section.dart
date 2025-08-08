@@ -8,8 +8,6 @@ import '../../../core/logger.dart';
 import '../../../core/theme/chart_theme_usage.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task_calendar.dart';
-import '../../../data/repositories/user_repository.dart';
-import '../../viewmodels/project_list_viewmodel.dart';
 import '../utils/popup/domain_rename_dialog.dart';
 import '../utils/popup/project_creation_dialog.dart';
 import 'project_item_widget.dart';
@@ -26,10 +24,9 @@ class ProjectsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final projectsAsync = ref.watch(projectListProvider);
-    final projectListState = ref.watch(projectListViewModelProvider);
     
     return projectsAsync.when(
-      data: (projects) => _buildProjectsSection(context, ref, projects.cast<TaskCalendar>(), projectListState),
+      data: (projects) => _buildProjectsSection(context, ref, projects.cast<TaskCalendar>(), null),
       loading: () => _buildLoadingState(context),
       error: (error, stackTrace) => _buildErrorState(context, error),
     );
@@ -50,18 +47,21 @@ class ProjectsSection extends ConsumerWidget {
   }
 
   Widget _buildProjectsContent(BuildContext context, WidgetRef ref, List<TaskCalendar> projects, dynamic projectListState) {
+    // Exclude workflows from the sidebar project list
+    final nonWorkflowProjects = projects.where((p) => !(p.flowitAsFlow == true || p.flowitType.toUpperCase() == 'WORKFLOW')).toList();
+
     // Group projects by domain
-    final projectsWithoutDomain = projects.where((project) => !project.hasDomain).toList();
+    final projectsWithoutDomain = nonWorkflowProjects.where((project) => !project.hasDomain).toList();
     final domainGroups = <String, List<TaskCalendar>>{};
     
-    for (final project in projects.where((project) => project.hasDomain)) {
+    for (final project in nonWorkflowProjects.where((project) => project.hasDomain)) {
       final domain = project.flowitDomain!;
       domainGroups.putIfAbsent(domain, () => []).add(project);
     }
     
     // Get all available domains (including empty ones) and sort them
     // Watch project list state but don't use it as key to prevent widget recreation
-    final projectListState = ref.watch(projectListViewModelProvider);
+    // Intentionally not reading projectListViewModelProvider here to avoid unnecessary rebuilds
     final availableDomainsAsync = ref.watch(availableDomainsProvider);
     
     final allDomains = availableDomainsAsync.when(
@@ -84,7 +84,7 @@ class ProjectsSection extends ConsumerWidget {
         
         // Projects list
         Expanded(
-          child: projects.isEmpty && sortedDomains.isEmpty
+          child: nonWorkflowProjects.isEmpty && sortedDomains.isEmpty
               ? _buildEmptyProjectsState(context)
               : ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -510,7 +510,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
   @override
   Widget build(BuildContext context) {
     // Watch the ViewModel state to trigger rebuilds when domain expansion changes
-    final projectListState = ref.watch(projectListViewModelProvider);
+    ref.watch(projectListViewModelProvider);
     final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
     final isExpanded = projectListViewModel.isDomainExpanded(widget.domain);
     

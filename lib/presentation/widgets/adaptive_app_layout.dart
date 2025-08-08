@@ -46,6 +46,11 @@ enum AppDestination {
     label: 'Projects',
     icon: Icons.folder_rounded,
     route: '/projects',
+  ),
+  workflows(
+    label: 'Workflows',
+    icon: Icons.route_rounded,
+    route: '/workflows',
   );
 
   const AppDestination({

@@ -598,6 +598,7 @@ class CalDAVService {
     String? categ,
     String? author,
     String? owner,
+    bool asWorkflow = false,
   }) async {
     try {
       // First discover the proper calendar home for this account
@@ -620,6 +621,7 @@ class CalDAVService {
             categ: categ,
             author: author,
             owner: owner,
+            asWorkflow: asWorkflow,
           );
         },
         failure: (failure) async {
@@ -642,7 +644,7 @@ class CalDAVService {
     String normalizedPath,
     String displayName,
     String? description,
-    {String? domain, String? kanban, String? categ, String? author, String? owner}
+    {String? domain, String? kanban, String? categ, String? author, String? owner, bool asWorkflow = false}
   ) async {
     try {
       
@@ -661,7 +663,8 @@ class CalDAVService {
         <C:comp name="VEVENT"/>
       </C:supported-calendar-component-set>
       <C:calendar-description><![CDATA[${description ?? 'Created by FlowIt'}]]></C:calendar-description>
-      <FLOWIT:type>PROJECT</FLOWIT:type>
+      <FLOWIT:type>${asWorkflow ? 'WORKFLOW' : 'PROJECT'}</FLOWIT:type>
+      <FLOWIT:asflow>${asWorkflow ? 'true' : 'false'}</FLOWIT:asflow>
       <FLOWIT:status>ONGOING</FLOWIT:status>
       ${domain != null && domain.isNotEmpty ? '<FLOWIT:domain>$domain</FLOWIT:domain>' : ''}
       ${kanban != null && kanban.isNotEmpty ? '<FLOWIT:kanban>$kanban</FLOWIT:kanban>' : ''}
@@ -695,6 +698,8 @@ class CalDAVService {
                flowitAuthor: author,
                flowitOwner: owner,
                flowitStartedAt: DateTime.now(),
+               flowitType: asWorkflow ? 'WORKFLOW' : 'PROJECT',
+               flowitAsFlow: asWorkflow,
              ));
                      } else if (webDavResponse.statusCode == 409) {
              // 409 Conflict - calendar already exists

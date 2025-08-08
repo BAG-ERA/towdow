@@ -81,7 +81,6 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              
               EnhancedTextField(
                 controller: nameController,
                 decoration: const InputDecoration(

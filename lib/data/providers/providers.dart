@@ -52,6 +52,7 @@ import '../../app.dart';
 import '../services/share_service.dart';
 import '../services/users_api_service.dart';
 import '../models/user_preferences.dart';
+import '../services/workflow_service.dart';
 
 // Local storage service provider
 // This must be overridden in main.dart with an initialized instance
@@ -183,6 +184,12 @@ final kanbanRepositoryProvider = Provider<KanbanRepository>((ref) {
 // CalDAV service provider  
 final caldavServiceProvider = Provider.family<CalDAVService, CaldavAccount>((ref, account) {
   return CalDAVService(account: account);
+});
+
+// Workflow service provider
+final workflowServiceProvider = Provider<WorkflowService>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  return WorkflowService(calendarRepository);
 });
 
 // External CalDAV service provider
@@ -419,13 +426,7 @@ final caldavSettingsViewModelProvider = StateNotifierProvider<CaldavSettingsView
 
 
 
-final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
-  final calendarRepository = ref.watch(calendarRepositoryProvider);
-  final taskRepository = ref.watch(taskRepositoryProvider);
-  final accountRepository = ref.watch(accountRepositoryProvider);
-  final userRepository = ref.watch(userRepositoryProvider);
-  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository);
-});
+// Project list view model provider is declared later to co-locate with workflow variant
 
 final validatorViewModelProvider = StateNotifierProvider.family<ValidatorViewModel, ValidatorViewModelState, String>((ref, taskUid) {
   final taskRepository = ref.watch(taskRepositoryProvider);
@@ -723,6 +724,23 @@ final unregisteredTasksProvider = anytimeTasksProvider;
 
 // Backward compatibility alias - use active calendars for navbar
 final projectListProvider = activeCalendarListProvider;
+
+// ViewModel providers for listing projects vs workflows (MVVM)
+final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final userRepository = ref.watch(userRepositoryProvider);
+  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository, workflowsMode: false);
+});
+
+final workflowListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final userRepository = ref.watch(userRepositoryProvider);
+  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository, workflowsMode: true);
+});
 
 // Selected project provider  
 final selectedProjectProvider = StateProvider<String?>((ref) => null);
