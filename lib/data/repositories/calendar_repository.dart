@@ -7,7 +7,7 @@ import '../../core/logger.dart';
 import '../models/task_calendar.dart';
 import '../services/local_storage_service.dart';
 import '../services/sync_service.dart';
-import '../services/share_service.dart';
+// import '../services/share_service.dart';
 import 'account_repository.dart';
 import 'user_repository.dart';
 
@@ -48,6 +48,7 @@ abstract class CalendarRepository {
 // Local implementation using Hive
 class LocalCalendarRepository implements CalendarRepository {
   final LocalStorageService _storageService;
+  // Kept for future use (sharing-related flows during discovery/sync)
   final AccountRepository _accountRepository;
   final UserRepository _userRepository;
 
@@ -87,37 +88,15 @@ class LocalCalendarRepository implements CalendarRepository {
 
   @override
   Future<Result<void>> save(TaskCalendar calendar) async {
-    // Check if this calendar is shared with me using ShareService API
-    bool isSharedWithMe = false;
-    
-    try {
-      final accountResult = await _accountRepository.getActiveAccount();
-      await accountResult.when(
-        success: (account) async {
-          if (account != null) {
-            final shareService = ShareService(account: account);
-            isSharedWithMe = await shareService.isSharedWithMe(calendar.path);
-            AppLogger.debug('CalendarRepository: Project ${calendar.path} isSharedWithMe: $isSharedWithMe');
-          }
-        },
-        failure: (failure) async {
-          AppLogger.warning('CalendarRepository: No active account found, assuming calendar is not shared');
-          isSharedWithMe = false;
-        },
-      );
-    } catch (e) {
-      AppLogger.warning('CalendarRepository: Exception checking share status for ${calendar.path}: $e. Assuming not shared.');
-      isSharedWithMe = false;
-    }
-    
-    // Update calendar with shared status
-    final calendarToSave = calendar.copyWith(isSharedWithMe: isSharedWithMe);
+    // Offline-first: save immediately to local storage without network checks.
+    // isSharedWithMe is computed during discovery/sync flows, not during local saves.
+    final calendarToSave = calendar;
     
     final result = await _storageService.put(LocalStorageService.calendarsBoxName, calendarToSave.path, calendarToSave);
     
     return await result.when(
       success: (_) async {
-        AppLogger.debug('CalendarRepository: Saved calendar ${calendar.path} with isSharedWithMe: $isSharedWithMe');
+        AppLogger.debug('CalendarRepository: Saved calendar ${calendar.path} (local only)');
         return Result.success(null);
       },
       failure: (failure) async {

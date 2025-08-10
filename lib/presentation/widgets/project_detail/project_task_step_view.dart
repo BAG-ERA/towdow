@@ -11,8 +11,9 @@ import '../../../data/models/step.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../task_item/task_item.dart';
-import '../utils/overlay_draggable_task.dart';
-import 'step_header.dart';
+import '../step_item/step_container.dart';
+import '../step_item/step_tasklist.dart';
+import '../utils/popup/step_dialog.dart';
 
 class ProjectTaskStepView extends ConsumerStatefulWidget {
   final String projectPath;
@@ -64,7 +65,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
 
         return Column(
           children: [
-            if (stepsAsync.isLoading)
+            if (stepsAsync.isLoading && !stepsAsync.hasValue)
               const LinearProgressIndicator(minHeight: 2),
             Expanded(
               child: SingleChildScrollView(
@@ -74,14 +75,31 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                   children: [
                     // Unassigned section first if any
                     if ((tasksByStep['unassigned'] ?? const <Task>[]).isNotEmpty) ...[
-                      StepHeader(
+                      StepContainer(
+                        stepId: 'unassigned',
                         title: 'Unassigned',
                         count: tasksByStep['unassigned']!.length,
                         onExpandAll: _expandAllTasks,
                         onCollapseAll: _collapseAllTasks,
+                        isEmpty: false,
+                        child: StepTaskList(
+                          sectionKey: 'unassigned',
+                          tasks: tasksByStep['unassigned']!,
+                          sectionControllers: _sectionControllers,
+                          onTasksRefresh: widget.onTasksRefresh,
+                          onToggleComplete: (task) async => _toggleTaskComplete(context, ref, task),
+                          onTaskUpdated: (updated) async {
+                            await ref.read(taskViewModelProvider.notifier).updateTask(updated);
+                          },
+                          onTaskDeleted: (task) async => _deleteTask(context, ref, task),
+                        ),
+                        onTaskDropped: (task, targetStepId) async {
+                          if (task.stepId == targetStepId) return;
+                          final taskViewModel = ref.read(taskViewModelProvider.notifier);
+                          await taskViewModel.updateTask(task.copyWith(stepId: targetStepId));
+                          widget.onTasksRefresh?.call();
+                        },
                       ),
-                      const SizedBox(height: 8),
-                      _buildResponsiveTaskGrid(context, 'unassigned', tasksByStep['unassigned']!),
                       const SizedBox(height: 24),
                     ],
 
@@ -91,23 +109,100 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                     ],
 
                     // Render steps in order
-                    for (final s in steps) ...[
-                      StepHeader(
-                        title: s.name,
-                        count: tasksByStep[s.id]?.length ?? 0,
+                      for (int idx = 0; idx < steps.length; idx++) ...[
+                      _buildStepReorderTarget(context, steps, idx),
+                      StepContainer(
+                        stepId: steps[idx].id,
+                        title: steps[idx].name,
+                        count: tasksByStep[steps[idx].id]?.length ?? 0,
                         onExpandAll: _expandAllTasks,
                         onCollapseAll: _collapseAllTasks,
-                      ),
-                      const SizedBox(height: 8),
-                      if ((tasksByStep[s.id] ?? const <Task>[]).isEmpty)
-                        _buildEmptyStepPlaceholder(
+                        canMoveUp: idx > 0,
+                        canMoveDown: idx < steps.length - 1,
+                        onMoveUp: () async {
+                          final stepRepository = ref.read(stepRepositoryProvider);
+                          final encodedProjectPath = widget.projectPath.replaceAll('@', '%40');
+                          await stepRepository.moveStepAndFixDependencies(encodedProjectPath, steps[idx].id, idx - 1);
+                          if (mounted) ref.invalidate(projectStepsProvider(widget.projectPath));
+                        },
+                        onMoveDown: () async {
+                          final stepRepository = ref.read(stepRepositoryProvider);
+                          final encodedProjectPath = widget.projectPath.replaceAll('@', '%40');
+                          await stepRepository.moveStepAndFixDependencies(encodedProjectPath, steps[idx].id, idx + 1);
+                          if (mounted) ref.invalidate(projectStepsProvider(widget.projectPath));
+                        },
+                        onMarkAsFinal: () async {
+                          final stepVm = ref.read(projectStepViewModelProvider(widget.projectPath).notifier);
+                          await stepVm.updateStep(steps[idx].copyWith(endWorkflow: true));
+                          if (mounted) ref.invalidate(projectStepsProvider(widget.projectPath));
+                        },
+                        onDelete: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Delete step?'),
+                              content: Text('Are you sure you want to delete "${steps[idx].name}"? Tasks assigned to this step will become unassigned.'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed == true) {
+                            final stepVm = ref.read(projectStepViewModelProvider(widget.projectPath).notifier);
+                            await stepVm.deleteStep(steps[idx].id);
+                            if (mounted) {
+                              ref.invalidate(projectStepsProvider(widget.projectPath));
+                              widget.onTasksRefresh?.call();
+                            }
+                          }
+                        },
+                        draggable: true,
+                        dragHandle: _buildStepDragHandle(context, steps[idx]),
+                        editable: true,
+                        onTitleSubmitted: (newTitle) async {
+                          final stepVm = ref.read(projectStepViewModelProvider(widget.projectPath).notifier);
+                          await stepVm.updateStep(steps[idx].copyWith(name: newTitle));
+                          if (mounted) {
+                            ref.invalidate(projectStepsProvider(widget.projectPath));
+                          }
+                        },
+                        isEmpty: (tasksByStep[steps[idx].id] ?? const <Task>[]).isEmpty,
+                        statusColor: _colorForStepStatus(context, steps[idx].status),
+                        emptyChild: _buildEmptyStepPlaceholder(
                           context,
-                          _colorForStepStatus(context, s.status),
-                        )
-                      else
-                        _buildResponsiveTaskGrid(context, s.id, tasksByStep[s.id] ?? const <Task>[]),
+                          _colorForStepStatus(context, steps[idx].status),
+                        ),
+                        child: StepTaskList(
+                          sectionKey: steps[idx].id,
+                          tasks: tasksByStep[steps[idx].id] ?? const <Task>[],
+                          sectionControllers: _sectionControllers,
+                          onTasksRefresh: widget.onTasksRefresh,
+                          onToggleComplete: (task) async => _toggleTaskComplete(context, ref, task),
+                          onTaskUpdated: (updated) async {
+                            await ref.read(taskViewModelProvider.notifier).updateTask(updated);
+                          },
+                          onTaskDeleted: (task) async => _deleteTask(context, ref, task),
+                        ),
+                        onTaskDropped: (task, targetStepId) async {
+                          if (task.stepId == targetStepId) return;
+                          final taskViewModel = ref.read(taskViewModelProvider.notifier);
+                          await taskViewModel.updateTask(task.copyWith(stepId: targetStepId));
+                          widget.onTasksRefresh?.call();
+                        },
+                      ),
                       const SizedBox(height: 24),
+                      if (idx == steps.length - 1) _buildStepReorderTarget(context, steps, steps.length),
                     ],
+
+                    // Add Step button
+                    _buildAddStepButton(context, steps),
                   ],
                 ),
               ),
@@ -161,6 +256,89 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
 
   // Header extracted to StepHeader widget
 
+  
+
+  Widget _buildAddStepButton(BuildContext context, List<ProjectStep> steps) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () async {
+          final nextOrder = steps.isEmpty ? 0 : (steps.map((s) => s.order).fold<int>(0, (p, c) => c > p ? c : p) + 1);
+          // Determine previous step id to set dependency
+          String? previousStepId;
+          if (steps.isNotEmpty) {
+            // Get the last step by order
+            final sorted = [...steps]..sort((a, b) => a.order.compareTo(b.order));
+            previousStepId = sorted.last.id;
+          }
+          final created = await StepDialog.show(
+            context,
+            projectPath: widget.projectPath,
+            initialOrder: nextOrder,
+            previousStepId: previousStepId,
+          );
+          if (created == true && mounted) {
+            ref.invalidate(projectStepsProvider(widget.projectPath));
+          }
+        },
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Add step'),
+      ),
+    );
+  }
+
+  
+
+  // Drag handle for a step header
+  Widget _buildStepDragHandle(BuildContext context, ProjectStep step) {
+    return LongPressDraggable<ProjectStep>(
+      data: step,
+      feedback: Material(
+        elevation: 6,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          color: Theme.of(context).colorScheme.surface,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.drag_indicator_rounded, size: 18),
+              const SizedBox(width: 6),
+              Text(step.name, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ),
+      child: const Icon(Icons.drag_indicator_rounded, size: 18),
+    );
+  }
+
+  // Drop target between steps at a given index
+  Widget _buildStepReorderTarget(BuildContext context, List<ProjectStep> steps, int insertIndex) {
+    return DragTarget<ProjectStep>(
+      onAcceptWithDetails: (details) async {
+        final moved = details.data;
+        final stepRepository = ref.read(stepRepositoryProvider);
+        final encodedProjectPath = widget.projectPath.replaceAll('@', '%40');
+        await stepRepository.moveStepAndFixDependencies(encodedProjectPath, moved.id, insertIndex);
+        // Refresh
+        ref.invalidate(projectStepsProvider(widget.projectPath));
+      },
+      builder: (context, candidate, rejected) {
+        final hovering = candidate.isNotEmpty;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          height: 8,
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: hovering ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        );
+      },
+    );
+  }
+
   void _initializeControllers(String sectionKey, List<Task> tasks) {
     if (!_sectionControllers.containsKey(sectionKey)) {
       _sectionControllers[sectionKey] = {};
@@ -203,42 +381,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
     AppLogger.info('ProjectTaskStepView: Collapsed all tasks');
   }
 
-  Widget _buildResponsiveTaskGrid(BuildContext context, String sectionKey, List<Task> tasks) {
-    return Wrap(
-      spacing: 12.0,
-      runSpacing: 12.0,
-      alignment: WrapAlignment.center,
-      runAlignment: WrapAlignment.center,
-      children: tasks.map((task) {
-        return ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 420,
-            minWidth: 300,
-          ),
-          child: OverlayDraggableTask(
-            task: task,
-            onDragStarted: () {
-              AppLogger.info('ProjectTaskStepView: Started dragging task ${task.summary}');
-            },
-            onDragEnd: () {
-              AppLogger.info('ProjectTaskStepView: Ended dragging task ${task.summary}');
-            },
-            child: TaskItem(
-              task: task,
-              controller: _sectionControllers[sectionKey]?[task.uid],
-              onTap: () => _viewTask(context, task),
-              onToggleComplete: () => _toggleTaskComplete(context, ref, task),
-              onTaskUpdated: (updatedTask) async {
-                await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                widget.onTasksRefresh?.call();
-              },
-              onTaskDeleted: () => _deleteTask(context, ref, task),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
+  
 
   Widget _buildEmptyStepPlaceholder(BuildContext context, Color color) {
     return Container(
@@ -312,9 +455,6 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
     );
   }
 
-  void _viewTask(BuildContext context, Task task) {
-    // Navigate to task detail (future)
-  }
 
   Future<void> _toggleTaskComplete(BuildContext context, WidgetRef ref, Task task) async {
     final taskViewModel = ref.read(taskViewModelProvider.notifier);

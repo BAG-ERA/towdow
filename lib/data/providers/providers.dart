@@ -390,11 +390,15 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final userSyncService = ref.watch(userSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
+  final stepRepository = ref.watch(stepRepositoryProvider);
   
   // Initialize user preferences queue setup
   ref.watch(userPreferencesQueueSetupProvider);
 
   final caldavMonitor = ref.watch(caldavMonitorProvider);
+
+  // Pre-initialize steps cache from local storage so first views render without extra flicker
+  await stepRepository.initialize();
 
   final result = await lifecycleManager.initialize(
     syncService: syncService,
@@ -903,27 +907,33 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   return filteredTasks;
 });
 
-final projectStepsProvider = FutureProvider.family<List<ProjectStep>, String>((ref, projectPath) async {
-  // Watch calendar list to refresh when calendars change (sync/import)
-  ref.watch(calendarListProvider);
-
+final projectStepsProvider = StreamProvider.family<List<ProjectStep>, String>((ref, projectPath) {
   final stepRepository = ref.watch(stepRepositoryProvider);
-  // Ensure encoded path consistency
   final encodedProjectPath = projectPath.replaceAll('@', '%40');
-  final result = await stepRepository.getProjectSteps(encodedProjectPath);
-  return await result.when(
-    success: (steps) async {
-      if (steps.isNotEmpty) return steps;
-      // Auto-heal: create a default step when none exist (mirrors category pattern resilience)
-      await stepRepository.ensureDefaultStep(encodedProjectPath);
-      final secondTry = await stepRepository.getProjectSteps(encodedProjectPath);
-      return secondTry.when(
-        success: (s) => s,
-        failure: (_) => <ProjectStep>[],
-      );
-    },
-    failure: (_) async => <ProjectStep>[],
-  );
+
+  // React to calendar changes without forcing a load-state each time
+  return ref.watch(calendarListProvider.stream).asyncMap((_) async {
+    // Update step cache only if calendars actually changed
+    final calendars = await ref.watch(calendarRepositoryProvider).getAll().then((r) => r.when(
+      success: (cals) => cals,
+      failure: (_) => <TaskCalendar>[],
+    ));
+    await stepRepository.refreshIfChanged(calendars);
+    final result = await stepRepository.getProjectSteps(encodedProjectPath);
+    return await result.when(
+      success: (steps) async {
+        if (steps.isNotEmpty) return steps;
+        // Auto-heal: create a default step when none exist
+        await stepRepository.ensureDefaultStep(encodedProjectPath);
+        final secondTry = await stepRepository.getProjectSteps(encodedProjectPath);
+        return secondTry.when(
+          success: (s) => s,
+          failure: (_) => <ProjectStep>[],
+        );
+      },
+      failure: (_) async => <ProjectStep>[],
+    );
+  });
 });
 
 // Project sharing notification provider - reactive to user preferences changes

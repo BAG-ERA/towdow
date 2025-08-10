@@ -16,6 +16,7 @@ class StepRepository {
 
   final Map<String, ProjectStep> _stepCache = {};
   final Map<String, Set<String>> _projectStepsMap = {};
+  String? _lastSignature;
 
   StepRepository(this._calendarRepository, this._taskRepository);
 
@@ -24,21 +25,48 @@ class StepRepository {
     final calendarsResult = await _calendarRepository.getAll();
     return calendarsResult.when(
       success: (calendars) async {
-        _stepCache.clear();
-        _projectStepsMap.clear();
-        for (final calendar in calendars) {
-          final steps = calendar.projectStepsList;
-          final ids = <String>{};
-          for (final step in steps) {
-            _stepCache[step.id] = step;
-            ids.add(step.id);
-          }
-          _projectStepsMap[calendar.path] = ids;
-        }
+        _initializeFromCalendars(calendars);
         return const Result.success(null);
       },
       failure: (f) async => Result.failure(f),
     );
+  }
+
+  /// Refresh cache only if the calendars' steps signature changed
+  Future<void> refreshIfChanged(List<TaskCalendar> calendars) async {
+    final newSignature = _computeSignature(calendars);
+    if (newSignature != _lastSignature) {
+      AppLogger.info('StepRepository: Detected steps change; rebuilding cache');
+      _initializeFromCalendars(calendars);
+      _lastSignature = newSignature;
+    }
+  }
+
+  void _initializeFromCalendars(List<TaskCalendar> calendars) {
+    _stepCache.clear();
+    _projectStepsMap.clear();
+    for (final calendar in calendars) {
+      final steps = calendar.projectStepsList;
+      final ids = <String>{};
+      for (final step in steps) {
+        _stepCache[step.id] = step;
+        ids.add(step.id);
+      }
+      _projectStepsMap[calendar.path] = ids;
+    }
+  }
+
+  String _computeSignature(List<TaskCalendar> calendars) {
+    // Build a deterministic string from project path + projectSteps JSON
+    final buffer = StringBuffer();
+    final sorted = [...calendars]..sort((a, b) => a.path.compareTo(b.path));
+    for (final cal in sorted) {
+      buffer.write(cal.path);
+      buffer.write('|');
+      buffer.write(cal.projectSteps);
+      buffer.write(';');
+    }
+    return buffer.toString();
   }
 
   Future<Result<List<ProjectStep>>> getProjectSteps(String projectPath) async {
@@ -160,7 +188,36 @@ class StepRepository {
       await calRes.when(
         success: (calendar) async {
           if (calendar != null) {
-            final updatedCal = calendar.removeStep(stepId);
+            // Update dependencies of other steps: any step depending on the deleted step
+            // should inherit the deleted step's dependencies (flatten one level)
+            final steps = calendar.projectStepsList;
+            final deletedStep = steps.firstWhere((s) => s.id == stepId, orElse: () => ProjectStep(
+              id: stepId,
+              name: 'deleted',
+            ));
+
+            final updatedSteps = <ProjectStep>[];
+            for (final s in steps) {
+              if (s.id == stepId) {
+                continue; // Removed later by removeStep
+              }
+              if (s.dependsOn.contains(stepId)) {
+                final filtered = s.dependsOn.where((id) => id != stepId).toSet();
+                // Merge in deleted step's dependencies
+                for (final dep in deletedStep.dependsOn) {
+                  if (dep != s.id) {
+                    filtered.add(dep);
+                  }
+                }
+                updatedSteps.add(s.copyWith(dependsOn: filtered.toList()));
+              } else {
+                updatedSteps.add(s);
+              }
+            }
+
+            // Apply dependency updates, then remove the step
+            var intermediateCal = calendar.withProjectSteps(updatedSteps);
+            final updatedCal = intermediateCal.removeStep(stepId);
             await _calendarRepository.save(updatedCal);
             await _queueCalendarUpdate(updatedCal.path);
           }
@@ -288,6 +345,78 @@ class StepRepository {
         final saveRes = await _calendarRepository.save(updatedCal);
         return saveRes.when(
           success: (_) async {
+            await _queueCalendarUpdate(updatedCal.path);
+            return const Result.success(null);
+          },
+          failure: (f) async => Result.failure(f),
+        );
+      },
+      failure: (f) async => Result.failure(f),
+    );
+  }
+
+  /// Move a step to a new index and adjust dependencies according to rules:
+  /// - Clear moved step dependsOn
+  /// - Remove moved step id from all other steps' dependsOn
+  /// - If there is a previous step, add it to moved step dependsOn
+  /// - If there is a next step, add moved step id to next step dependsOn
+  /// - Finally, reorder and persist
+  Future<Result<void>> moveStepAndFixDependencies(String projectPath, String movedStepId, int insertIndex) async {
+    final calRes = await _calendarRepository.getByPath(projectPath);
+    return calRes.when(
+      success: (calendar) async {
+        if (calendar == null) {
+          return Result.failure(Failure(message: 'Project not found: $projectPath'));
+        }
+        final original = [...calendar.projectStepsList]..sort((a, b) => a.order.compareTo(b.order));
+        final currentIndex = original.indexWhere((s) => s.id == movedStepId);
+        if (currentIndex == -1) {
+          return Result.failure(Failure(message: 'Step not in project: $movedStepId'));
+        }
+
+        // Remove moved step and compute bounded target index
+        final moved = original.removeAt(currentIndex);
+        int targetIndex = insertIndex.clamp(0, original.length);
+        original.insert(targetIndex, moved);
+
+        // Identify neighbors after insertion
+        final ProjectStep? prev = targetIndex > 0 ? original[targetIndex - 1] : null;
+        final ProjectStep? next = targetIndex < original.length - 1 ? original[targetIndex + 1] : null;
+
+        // Adjust dependencies
+        final updated = <ProjectStep>[];
+        for (final s in original) {
+          if (s.id == moved.id) {
+            final newDeps = <String>[];
+            if (prev != null) newDeps.add(prev.id);
+            updated.add(s.copyWith(dependsOn: newDeps));
+          } else {
+            // Remove moved id from all others
+            final newDeps = s.dependsOn.where((id) => id != moved.id).toList();
+            // If this is the next step, add moved id
+            if (next != null && s.id == next.id) {
+              if (!newDeps.contains(moved.id)) newDeps.add(moved.id);
+            }
+            updated.add(s.copyWith(dependsOn: newDeps));
+          }
+        }
+
+        // Apply new order indices
+        final withOrder = <ProjectStep>[];
+        for (int i = 0; i < updated.length; i++) {
+          final s = updated[i];
+          withOrder.add(s.copyWith(order: i));
+        }
+
+        final updatedCal = calendar.withProjectSteps(withOrder);
+        final saveRes = await _calendarRepository.save(updatedCal);
+        return await saveRes.when(
+          success: (_) async {
+            // Update cache
+            _projectStepsMap[projectPath] = withOrder.map((s) => s.id).toSet();
+            for (final s in withOrder) {
+              _stepCache[s.id] = s;
+            }
             await _queueCalendarUpdate(updatedCal.path);
             return const Result.success(null);
           },

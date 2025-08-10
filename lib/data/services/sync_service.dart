@@ -421,6 +421,7 @@ class SyncService {
                 flowitStatus: serverCalendar.flowitStatus,
                 flowitKanban: serverCalendar.flowitKanban,
                 projectCategories: serverCalendar.projectCategories,
+                projectSteps: serverCalendar.projectSteps,
                 sharedWith: serverCalendar.sharedWith,
                 lastModified: serverCalendar.lastModified,
                 // Keep attendees from server if they exist, otherwise keep local ones
@@ -1204,6 +1205,7 @@ class SyncService {
             flowitStatus: serverCalendar.flowitStatus,
             flowitKanban: serverCalendar.flowitKanban,
             projectCategories: serverCalendar.projectCategories,
+            projectSteps: serverCalendar.projectSteps,
             sharedWith: serverCalendar.sharedWith,
             lastModified: serverCalendar.lastModified,
             attendees: serverCalendar.attendees,

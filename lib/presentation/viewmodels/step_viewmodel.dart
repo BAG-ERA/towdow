@@ -30,7 +30,6 @@ class StepViewModel extends StateNotifier<StepViewModelState> {
     final normalizedPath = projectPath?.replaceAll('@', '%40');
     state = state.copyWith(isLoading: true, error: null, currentProjectPath: normalizedPath);
     try {
-      await _stepRepository.initialize();
       await _loadSteps();
     } catch (e) {
       AppLogger.error('StepViewModel: initialize failed', e);
