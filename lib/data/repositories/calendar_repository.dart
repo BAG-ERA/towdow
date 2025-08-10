@@ -42,7 +42,7 @@ abstract class CalendarRepository {
   Future<Result<void>> updateCalendarProperties(TaskCalendar calendar);
   
   // Domain-related methods with sync
-  Future<Result<void>> assignDomainToCalendar(String calendarUid, String? domain);
+  Future<Result<void>> assignDomainToCalendar(String calendarPath, String? domain);
 }
 
 // Local implementation using Hive
@@ -542,9 +542,9 @@ class LocalCalendarRepository implements CalendarRepository {
   }
 
   @override
-  Future<Result<void>> assignDomainToCalendar(String calendarUid, String? domain) async {
+  Future<Result<void>> assignDomainToCalendar(String calendarPath, String? domain) async {
     // Get the calendar and update its domain
-    final calendarResult = await getById(calendarUid);
+    final calendarResult = await getById(calendarPath);
     return calendarResult.when(
       success: (calendar) async {
         if (calendar == null) {

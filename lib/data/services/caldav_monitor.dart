@@ -444,8 +444,8 @@ class CalDAVMonitor {
       AppLogger.info('CalDAVMonitor: Discovering all available calendars from server');
       
       // Use CalDAV service to discover all available calendars
-      final caldavService = CalDAVService(account: account);
-      final capabilitiesResult = await caldavService.discoverCapabilities();
+      final ICalDAVService caldavService = CalDAVService(account: account);
+      final capabilitiesResult = await caldavService.testConnection();
       
       return await capabilitiesResult.when(
         success: (capabilities) async {

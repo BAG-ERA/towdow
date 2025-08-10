@@ -187,15 +187,14 @@ class SettingsScreen extends ConsumerWidget {
         await _clearWebStorageAndCache();
       }
 
-      final result = await storageService.clearAllData();
+      // Perform full on-disk wipe to ensure nothing lingers
+      await SyncService.reset();
+      final result = await storageService.emergencyReset();
+      // Re-initialize empty boxes for a clean app state
+      await storageService.initialize();
 
       result.when(
         success: (_) async {
-          // Reset SyncService singleton to clean up timers and streams
-          await SyncService.reset();
-          
-
-
           // Invalidate all relevant providers to clear cached data
           ref.invalidate(taskListProvider);
           ref.invalidate(calendarListProvider);

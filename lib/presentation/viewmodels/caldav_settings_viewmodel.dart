@@ -291,7 +291,7 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final caldavService = CalDAVService(account: account);
+      final ICalDAVService caldavService = CalDAVService(account: account);
       final testResult = await caldavService.testConnection();
       
       await testResult.when(

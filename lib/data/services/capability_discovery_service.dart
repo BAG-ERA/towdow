@@ -404,9 +404,9 @@ class CapabilityDiscoveryService {
         final href = hrefMatch.group(1)!.trim();
         if (href == calendarHome || href == '$calendarHome/') continue; // Skip home itself
         
-        // Check if it's a calendar collection
-        final isCalendar = responseContent.contains('<C:calendar/>') || 
-                          responseContent.contains('<calendar/>');
+        // Check if it's a calendar collection (tolerate spacing and prefixes)
+        final isCalendar = RegExp(r'<(?:C:)?calendar\s*/?>', caseSensitive: false)
+            .hasMatch(responseContent);
         if (!isCalendar) continue;
         
         // Extract display name

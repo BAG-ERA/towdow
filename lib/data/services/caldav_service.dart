@@ -19,8 +19,46 @@ import 'capability_discovery_service.dart';
 import 'parsers/vtodo_parser.dart';
 import 'parsers/xml_response_parser.dart';
 import 'share_service.dart';
+/// Interface for CalDAV operations used across the app.
+///
+/// Why this exists
+/// - Testability: Allows mocking CalDAV calls (create/update/delete/report)
+///   without performing real network I/O. Queue-processing tests depend on this.
+/// - Decoupling: UI/ViewModels/Services can depend on an interface instead of
+///   the concrete `CalDAVService`, making it easier to evolve/replace.
+/// - DI compatibility: Combined with `SyncService.caldavFactory` and the
+///   `caldavServiceProvider`, this enables dependency injection.
+///
+/// How to use
+/// - Production: Use the provider returning `ICalDAVService` or the default
+///   factory in `SyncService` which constructs `CalDAVService`.
+/// - Tests: Override `SyncService.caldavFactory` to return a mock
+///   (e.g., Mockito) or override the provider to inject a fake.
+/// - Prefer typing against `ICalDAVService` everywhere. Only the DI composition
+///   code should reference `CalDAVService` directly.
+abstract class ICalDAVService {
+  CaldavAccount get account;
+  Future<Result<CalDAVCapabilities>> testConnection();
+  Future<Result<String>> createTask(Task task, String calendarPath);
+  Future<Result<void>> updateTask(Task task, String taskUrl, {String? etag});
+  Future<Result<void>> deleteTask(String taskUrl, {String? etag});
+  Future<Result<List<Task>>> fetchTasks({required String calendarPath});
+  Future<Result<void>> deleteCalendar(String calendarPath);
+  Future<Result<TaskCalendar>> getCalendarProperties(TaskCalendar calendar);
+  Future<Result<TaskCalendar>> createCalendar({
+    required String displayName,
+    String? description,
+    String? domain,
+    String? kanban,
+    String? categ,
+    String? author,
+    String? owner,
+    bool asWorkflow = false,
+  });
+  Future<Result<void>> updateCalendarProperties(TaskCalendar calendar);
+}
 
-class CalDAVService {
+class CalDAVService implements ICalDAVService {
   final CaldavAccount account;
   late final WebDAVClient _client;
 
@@ -117,7 +155,7 @@ class CalDAVService {
       final putResult = await _client.put(taskUrl, vtodoContent, etag: etag);
       return await putResult.when(
         success: (response) async {
-          if (response.statusCode == 204 || response.statusCode == 200) {
+          if (response.statusCode == 204 || response.statusCode == 200 || response.statusCode == 201) {
             // AppLogger.info('CalDAVService: Task updated successfully');
             return Result.success(null);
           } else {
@@ -180,12 +218,10 @@ class CalDAVService {
   }
 
   /// Fetch all tasks from a calendar using REPORT query
-  Future<Result<List<Task>>> fetchTasks({String? calendarPath}) async {
+  Future<Result<List<Task>>> fetchTasks({required String calendarPath}) async {
     try {
       // AppLogger.debug('CalDAVService: Fetching tasks from calendar');
-      
-      calendarPath ??= '/calendars/${account.username}/tasks/';
-      
+            
       // CalDAV REPORT query to fetch all VTODOs
       final reportQuery = '''<?xml version="1.0" encoding="utf-8" ?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -597,7 +633,6 @@ class CalDAVService {
   Future<Result<TaskCalendar>> createCalendar({
     required String displayName,
     String? description,
-    String? uid,
     String? domain,
     String? kanban,
     String? categ,
@@ -607,15 +642,14 @@ class CalDAVService {
   }) async {
     try {
       // First discover the proper calendar home for this account
-      final capabilitiesResult = await discoverCapabilities();
+      final capabilitiesResult = await testConnection();
       return await capabilitiesResult.when(
         success: (capabilities) async {
-          // Generate UUID for unique calendar path
+          // Generate a new calendar collection path under the discovered home
           final calendarUuid = const Uuid().v4();
           final calendarHome = capabilities.calendarHome;
-          final calendarPath = '$calendarHome$calendarUuid/';
-          final normalizedPath = calendarPath.endsWith('/') ? calendarPath : '$calendarPath/';
-          AppLogger.info('CalDAVService: Creating calendar $displayName at $normalizedPath using calendar home: $calendarHome');
+          final normalizedPath = '$calendarHome$calendarUuid/';
+          AppLogger.info('CalDAVService: Creating calendar $displayName at $normalizedPath');
           
           return await _performCalendarCreation(
             normalizedPath, 

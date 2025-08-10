@@ -11,19 +11,19 @@ import '../../../data/models/task_calendar.dart';
 /// Command to assign a status to a single calendar
 class AssignStatusToCalendarCommand extends VoidCommand {
   final StatusService _statusService;
-  final String calendarUid;
+  final String calendarPath;
   final String? status;
 
   AssignStatusToCalendarCommand(
     this._statusService,
-    this.calendarUid,
+    this.calendarPath,
     this.status,
   );
 
   @override
   Future<void> run() async {
-    AppLogger.info('AssignStatusToCalendarCommand: Assigning status "$status" to calendar $calendarUid');
-    final result = await _statusService.assignStatusToCalendar(calendarUid, status);
+    AppLogger.info('AssignStatusToCalendarCommand: Assigning status "$status" to calendar $calendarPath');
+    final result = await _statusService.assignStatusToCalendar(calendarPath, status);
     
     result.when(
       success: (_) => null,
@@ -35,17 +35,17 @@ class AssignStatusToCalendarCommand extends VoidCommand {
 /// Command to remove status from a calendar
 class RemoveStatusFromCalendarCommand extends VoidCommand {
   final StatusService _statusService;
-  final String calendarUid;
+  final String calendarPath;
 
   RemoveStatusFromCalendarCommand(
     this._statusService,
-    this.calendarUid,
+    this.calendarPath,
   );
 
   @override
   Future<void> run() async {
-    AppLogger.info('RemoveStatusFromCalendarCommand: Removing status from calendar $calendarUid');
-    final result = await _statusService.removeStatusFromCalendar(calendarUid);
+    AppLogger.info('RemoveStatusFromCalendarCommand: Removing status from calendar $calendarPath');
+    final result = await _statusService.removeStatusFromCalendar(calendarPath);
     
     result.when(
       success: (_) => null,
@@ -57,17 +57,17 @@ class RemoveStatusFromCalendarCommand extends VoidCommand {
 /// Command to archive a calendar
 class ArchiveCalendarCommand extends VoidCommand {
   final StatusService _statusService;
-  final String calendarUid;
+  final String calendarPath;
 
   ArchiveCalendarCommand(
     this._statusService,
-    this.calendarUid,
+    this.calendarPath,
   );
 
   @override
   Future<void> run() async {
-    AppLogger.info('ArchiveCalendarCommand: Archiving calendar $calendarUid');
-    final result = await _statusService.archiveCalendar(calendarUid);
+    AppLogger.info('ArchiveCalendarCommand: Archiving calendar $calendarPath');
+    final result = await _statusService.archiveCalendar(calendarPath);
     
     result.when(
       success: (_) => null,
@@ -79,17 +79,17 @@ class ArchiveCalendarCommand extends VoidCommand {
 /// Command to unarchive a calendar
 class UnarchiveCalendarCommand extends VoidCommand {
   final StatusService _statusService;
-  final String calendarUid;
+  final String calendarPath;
 
   UnarchiveCalendarCommand(
     this._statusService,
-    this.calendarUid,
+    this.calendarPath,
   );
 
   @override
   Future<void> run() async {
-    AppLogger.info('UnarchiveCalendarCommand: Unarchiving calendar $calendarUid');
-    final result = await _statusService.unarchiveCalendar(calendarUid);
+    AppLogger.info('UnarchiveCalendarCommand: Unarchiving calendar $calendarPath');
+    final result = await _statusService.unarchiveCalendar(calendarPath);
     
     result.when(
       success: (_) => null,
@@ -101,19 +101,19 @@ class UnarchiveCalendarCommand extends VoidCommand {
 /// Command to bulk assign status to multiple calendars
 class BulkAssignStatusCommand extends VoidCommand {
   final StatusService _statusService;
-  final List<String> calendarUids;
+  final List<String> calendarPaths;
   final String? status;
 
   BulkAssignStatusCommand(
     this._statusService,
-    this.calendarUids,
+    this.calendarPaths,
     this.status,
   );
 
   @override
   Future<void> run() async {
-    AppLogger.info('BulkAssignStatusCommand: Bulk assigning status "$status" to ${calendarUids.length} calendars');
-    final result = await _statusService.bulkAssignStatus(calendarUids, status);
+    AppLogger.info('BulkAssignStatusCommand: Bulk assigning status "$status" to ${calendarPaths.length} calendars');
+    final result = await _statusService.bulkAssignStatus(calendarPaths, status);
     
     result.when(
       success: (_) => null,
@@ -324,28 +324,28 @@ class StatusCommandFactory {
   StatusCommandFactory(this._statusService);
 
   /// Create command to assign status to calendar
-  AssignStatusToCalendarCommand assignStatusToCalendar(String calendarUid, String? status) {
-    return AssignStatusToCalendarCommand(_statusService, calendarUid, status);
+  AssignStatusToCalendarCommand assignStatusToCalendar(String calendarPath, String? status) {
+    return AssignStatusToCalendarCommand(_statusService, calendarPath, status);
   }
 
   /// Create command to remove status from calendar
-  RemoveStatusFromCalendarCommand removeStatusFromCalendar(String calendarUid) {
-    return RemoveStatusFromCalendarCommand(_statusService, calendarUid);
+  RemoveStatusFromCalendarCommand removeStatusFromCalendar(String calendarPath) {
+    return RemoveStatusFromCalendarCommand(_statusService, calendarPath);
   }
 
   /// Create command to archive calendar
-  ArchiveCalendarCommand archiveCalendar(String calendarUid) {
-    return ArchiveCalendarCommand(_statusService, calendarUid);
+  ArchiveCalendarCommand archiveCalendar(String calendarPath) {
+    return ArchiveCalendarCommand(_statusService, calendarPath);
   }
 
   /// Create command to unarchive calendar
-  UnarchiveCalendarCommand unarchiveCalendar(String calendarUid) {
-    return UnarchiveCalendarCommand(_statusService, calendarUid);
+  UnarchiveCalendarCommand unarchiveCalendar(String calendarPath) {
+    return UnarchiveCalendarCommand(_statusService, calendarPath);
   }
 
   /// Create command to bulk assign status
-  BulkAssignStatusCommand bulkAssignStatus(List<String> calendarUids, String? status) {
-    return BulkAssignStatusCommand(_statusService, calendarUids, status);
+  BulkAssignStatusCommand bulkAssignStatus(List<String> calendarPaths, String? status) {
+    return BulkAssignStatusCommand(_statusService, calendarPaths, status);
   }
 
   /// Create command to rename status

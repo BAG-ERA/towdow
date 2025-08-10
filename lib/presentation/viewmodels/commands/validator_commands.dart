@@ -8,7 +8,6 @@ import '../../../data/repositories/account_repository.dart';
 import '../../../data/services/sync_service.dart';
 import '../../../data/services/validator_service.dart';
 import '../../../core/logger.dart';
-import '../../../core/result.dart';
 
 /// Parameters for updating validator state
 class UpdateValidatorStateParams {
@@ -134,11 +133,11 @@ class UpdateValidatorStateCommand extends ParameterizedCommand<Task, UpdateValid
   Future<void> _queueSyncOperation(Task task) async {
     if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
       final syncData = <String, dynamic>{
-        'calendarUid': task.projectPath,
+        'calendarPath': task.projectPath,
         'taskUid': task.uid,
       };
       
-      final syncResult = await _syncService!.queueSyncOperation(
+      final syncResult = await _syncService.queueSyncOperation(
         SyncOperation.update,
         task.uid,
         syncData,
@@ -272,11 +271,11 @@ class AddValidatorFromTemplateCommand extends ParameterizedCommand<Task, AddVali
   Future<void> _queueSyncOperation(Task task) async {
     if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
       final syncData = <String, dynamic>{
-        'calendarUid': task.projectPath,
+        'calendarPath': task.projectPath,
         'taskUid': task.uid,
       };
       
-      final syncResult = await _syncService!.queueSyncOperation(
+      final syncResult = await _syncService.queueSyncOperation(
         SyncOperation.update,
         task.uid,
         syncData,
@@ -370,11 +369,11 @@ class RemoveValidatorCommand extends ParameterizedCommand<Task, UpdateValidatorS
   Future<void> _queueSyncOperation(Task task) async {
     if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
       final syncData = <String, dynamic>{
-        'calendarUid': task.projectPath,
+        'calendarPath': task.projectPath,
         'taskUid': task.uid,
       };
       
-      final syncResult = await _syncService!.queueSyncOperation(
+      final syncResult = await _syncService.queueSyncOperation(
         SyncOperation.update,
         task.uid,
         syncData,
@@ -440,11 +439,11 @@ class CompleteTaskWithValidatorsCommand extends ParameterizedCommand<Task, Compl
   Future<void> _queueSyncOperation(Task task) async {
     if (_syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
       final syncData = <String, dynamic>{
-        'calendarUid': task.projectPath,
+        'calendarPath': task.projectPath,
         'taskUid': task.uid,
       };
       
-      final syncResult = await _syncService!.queueSyncOperation(
+      final syncResult = await _syncService.queueSyncOperation(
         SyncOperation.update,
         task.uid,
         syncData,

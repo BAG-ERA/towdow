@@ -504,13 +504,12 @@ class ExportImportService {
       if (account == null) {
         return Result.failure(Failure(message: 'No active account found'));
       }
-      final caldavService = CalDAVService(account: account);
+      final ICalDAVService caldavService = CalDAVService(account: account);
       
       // Create the calendar using CalDAV MKCOL method
       final result = await caldavService.createCalendar(
         displayName: calendar.displayName,
         description: calendar.description,
-        uid: calendar.path,
         author: account.email?.isNotEmpty == true ? account.email : account.username,
         owner: account.email?.isNotEmpty == true ? account.email : account.username,
       );
@@ -543,7 +542,7 @@ class ExportImportService {
       if (account == null) {
         return Result.failure(Failure(message: 'No active account found'));
       }
-      final caldavService = CalDAVService(account: account);
+      final ICalDAVService caldavService = CalDAVService(account: account);
       
       // Create the task using CalDAV PUT method
       final result = await caldavService.createTask(task, calendarPath);

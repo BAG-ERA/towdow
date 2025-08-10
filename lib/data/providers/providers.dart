@@ -192,7 +192,7 @@ final kanbanRepositoryProvider = Provider<KanbanRepository>((ref) {
 });
 
 // CalDAV service provider  
-final caldavServiceProvider = Provider.family<CalDAVService, CaldavAccount>((ref, account) {
+final caldavServiceProvider = Provider.family<ICalDAVService, CaldavAccount>((ref, account) {
   return CalDAVService(account: account);
 });
 

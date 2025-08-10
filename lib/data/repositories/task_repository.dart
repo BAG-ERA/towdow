@@ -38,11 +38,7 @@ class LocalTaskRepository implements TaskRepository {
   @override
   Future<Result<List<Task>>> getAll() async {
     final result = await _storageService.getAll<Task>(LocalStorageService.tasksBoxName);
-    if (result is Success) {
-      final tasks = (result as Success<List<Task>>).data;
-      // AppLogger.debug('TaskRepository: getAll() returned ${tasks.length} tasks');
-      
-    }
+
     return result;
   }
 
@@ -129,7 +125,7 @@ class LocalTaskRepository implements TaskRepository {
     // Queue sync if sync service is available and task has project path
     if (saveResult is Success && _syncService != null && task.projectPath != null && task.projectPath!.isNotEmpty) {
       final syncData = <String, dynamic>{
-        'calendarUid': task.projectPath,
+        'calendarPath': task.projectPath,
         'taskUid': task.uid,
       };
       
@@ -161,7 +157,7 @@ class LocalTaskRepository implements TaskRepository {
     if (deleteResult is Success && _syncService != null && taskToDelete != null && 
         taskToDelete.projectPath != null && taskToDelete.projectPath!.isNotEmpty) {
       final syncData = <String, dynamic>{
-        'calendarUid': taskToDelete.projectPath,
+        'calendarPath': taskToDelete.projectPath,
         'taskUid': uid,
       };
       

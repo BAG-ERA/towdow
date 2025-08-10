@@ -3,7 +3,6 @@
 
 import '../../../core/command.dart';
 import '../../../data/models/task.dart';
-import '../../../data/models/attendee.dart';
 import '../../../data/repositories/task_repository.dart';
 import '../../../data/repositories/account_repository.dart';
 import '../../../data/services/sync_service.dart';
@@ -73,11 +72,11 @@ class AddTaskCommand extends ParameterizedCommand<Task, AddTaskParams> {
       AppLogger.debug('AddTaskCommand: Queuing create operation for ${task.uid}');
       
       final createData = <String, dynamic>{
-        'calendarUid': task.projectPath,
+        'calendarPath': task.projectPath,
         'taskUid': task.uid,
       };
       
-      final createResult = await _syncService!.queueSyncOperation(
+        final createResult = await _syncService!.queueSyncOperation(
         SyncOperation.create,
         task.uid,
         createData,
@@ -225,15 +224,15 @@ class MoveTaskCommand extends ParameterizedCommand<Task, MoveTaskParams> {
   }
 
   /// Queue sync operations for moving a task between calendars
-  Future<void> _queueMoveOperations(Task movedTask, String? oldCalendarUid, String targetCalendarUid) async {
+  Future<void> _queueMoveOperations(Task movedTask, String? oldCalendarPath, String targetCalendarPath) async {
     try {
       // Only queue operations if both calendars are valid
-      if (oldCalendarUid != null && oldCalendarUid.isNotEmpty && targetCalendarUid.isNotEmpty) {
+      if (oldCalendarPath != null && oldCalendarPath.isNotEmpty && targetCalendarPath.isNotEmpty) {
         AppLogger.debug('MoveTaskCommand: Queuing move operations for ${movedTask.uid}');
         
         // Queue DELETE operation from source calendar
         final deleteData = <String, dynamic>{
-          'calendarUid': oldCalendarUid,
+          'calendarPath': oldCalendarPath,
           'taskUid': movedTask.uid,
         };
         
@@ -245,7 +244,7 @@ class MoveTaskCommand extends ParameterizedCommand<Task, MoveTaskParams> {
         
         await deleteResult.when(
           success: (_) async {
-            AppLogger.debug('MoveTaskCommand: Successfully queued DELETE operation for ${movedTask.uid} from $oldCalendarUid');
+            AppLogger.debug('MoveTaskCommand: Successfully queued DELETE operation for ${movedTask.uid} from $oldCalendarPath');
           },
           failure: (failure) async {
             AppLogger.warning('MoveTaskCommand: Failed to queue DELETE operation for ${movedTask.uid}: ${failure.message}');
@@ -254,11 +253,11 @@ class MoveTaskCommand extends ParameterizedCommand<Task, MoveTaskParams> {
 
         // Queue CREATE operation in target calendar
         final createData = <String, dynamic>{
-          'calendarUid': targetCalendarUid,
+          'calendarPath': targetCalendarPath,
           'taskUid': movedTask.uid,
         };
         
-        final createResult = await _syncService!.queueSyncOperation(
+        final createResult = await _syncService.queueSyncOperation(
           SyncOperation.create,
           movedTask.uid,
           createData,
@@ -266,14 +265,14 @@ class MoveTaskCommand extends ParameterizedCommand<Task, MoveTaskParams> {
         
         await createResult.when(
           success: (_) async {
-            AppLogger.debug('MoveTaskCommand: Successfully queued CREATE operation for ${movedTask.uid} in $targetCalendarUid');
+            AppLogger.debug('MoveTaskCommand: Successfully queued CREATE operation for ${movedTask.uid} in $targetCalendarPath');
           },
           failure: (failure) async {
             AppLogger.warning('MoveTaskCommand: Failed to queue CREATE operation for ${movedTask.uid}: ${failure.message}');
           },
         );
       } else {
-        AppLogger.warning('MoveTaskCommand: Invalid calendar UIDs - oldCalendarUid: $oldCalendarUid, targetCalendarUid: $targetCalendarUid');
+        AppLogger.warning('MoveTaskCommand: Invalid calendar UIDs - oldCalendarUid: $oldCalendarPath, targetCalendarUid: $targetCalendarPath');
       }
     } catch (e, stackTrace) {
       AppLogger.error('MoveTaskCommand: Exception during move sync operations', e, stackTrace);
