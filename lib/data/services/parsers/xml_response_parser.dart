@@ -370,6 +370,7 @@ class XMLResponseParser {
         responseData['flowit-status'] = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
         responseData['flowit-kanban'] = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
         responseData['flowit-categories'] = _extractFlowItPropertyWithPrefixes(responseContent, 'categories', globalFlowItPrefixes);
+        responseData['flowit-steps'] = _extractFlowItPropertyWithPrefixes(responseContent, 'steps', globalFlowItPrefixes);
         responseData['flowit-type'] = _extractFlowItPropertyWithPrefixes(responseContent, 'type', globalFlowItPrefixes);
         responseData['flowit-asflow'] = _extractFlowItPropertyWithPrefixes(responseContent, 'asflow', globalFlowItPrefixes);
         responseData['flowit-owner'] = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);

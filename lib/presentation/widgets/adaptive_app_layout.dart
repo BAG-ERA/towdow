@@ -207,9 +207,9 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     // Determine title for mobile based on route
     String title = 'FlowIt';
     bool isDetailScreen = false;
-      final location = GoRouterState.of(context).uri.path;
-    
-      if (location.startsWith('/settings')) {
+    final location = GoRouterState.of(context).uri.path;
+
+    if (location.startsWith('/settings')) {
       title = 'Settings';
       isDetailScreen = true;
     } else if (location.startsWith('/project/')) {
@@ -218,11 +218,17 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     } else if (location == '/projects') {
       title = 'All Projects';
       isDetailScreen = true;
-    } else if (location == '/' || location.startsWith('/today') || location.startsWith('/soon') || 
-               location.startsWith('/next-week') || location.startsWith('/later') || location.startsWith('/anytime')) {
+    } else if (location.startsWith('/workflow/')) {
+      title = ref.watch(mobileTitleProvider) ?? 'Workflow Details';
+      isDetailScreen = true;
+    } else if (location == '/workflows') {
+      title = 'All Workflows';
+      isDetailScreen = true;
+    } else if (location == '/' || location.startsWith('/today') || location.startsWith('/soon') ||
+        location.startsWith('/next-week') || location.startsWith('/later') || location.startsWith('/anytime')) {
       title = 'My Tasks';
       isDetailScreen = true;
-    }    
+    }
     return Scaffold(
       key: _scaffoldKey,
       appBar: isDetailScreen ? AppBar(

@@ -5,12 +5,19 @@ import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
+import '../repositories/step_repository.dart';
+// No direct use here; step creation is delegated to repository
 import 'sync_service.dart';
 
 class WorkflowService {
   final CalendarRepository _calendarRepository;
+  StepRepository? _stepRepository; // injected lazily to avoid cycles
 
   WorkflowService(this._calendarRepository);
+
+  void setStepRepository(StepRepository stepRepository) {
+    _stepRepository = stepRepository;
+  }
 
   Future<Result<void>> convertToWorkflow(String calendarPath) async {
     final getResult = await _calendarRepository.getByPath(calendarPath);
@@ -19,6 +26,13 @@ class WorkflowService {
         if (calendar == null) {
           return Result.failure(const Failure(message: 'Calendar not found'));
         }
+        // Ensure a default step when turning into a workflow
+        final hasSteps = calendar.projectStepsList.isNotEmpty;
+        // Delegate default step creation to repository to respect architecture
+        if (!hasSteps && _stepRepository != null) {
+          await _stepRepository!.ensureDefaultStep(calendar.path);
+        }
+
         final updated = calendar.copyWith(
           flowitAsFlow: true,
           flowitType: 'WORKFLOW',
@@ -41,6 +55,7 @@ class WorkflowService {
         if (calendar == null) {
           return Result.failure(const Failure(message: 'Calendar not found'));
         }
+        // Keep steps as-is when converting back to project
         final updated = calendar.copyWith(
           flowitAsFlow: false,
           flowitType: 'PROJECT',

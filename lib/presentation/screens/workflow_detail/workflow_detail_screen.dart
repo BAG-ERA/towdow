@@ -8,6 +8,8 @@ import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../../widgets/project_detail/project_infos_widget.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
+import '../../widgets/utils/tasklist_toolbar.dart';
+import '../../widgets/project_detail/project_task_step_view.dart';
 import '../project_detail/project_detail_screen.dart' show projectProvider;
 
 class WorkflowDetailScreen extends ConsumerStatefulWidget {
@@ -47,6 +49,11 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
             children: [
               _buildViewTabs(context),
               Expanded(child: _buildTabContent(context, tasksAsync)),
+              // Bottom toolbar with search and create task button (same as Project screen)
+              TaskListToolbar(
+                projectPath: widget.workflowPath,
+                projectName: projectAsync.asData?.value?.displayName,
+              ),
             ],
           ),
         ),
@@ -63,6 +70,11 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
           error: (_, __) => const SizedBox.shrink(),
         ),
         Expanded(child: _buildTabContent(context, tasksAsync)),
+        // Bottom toolbar with search and create task button (same as Project screen)
+        TaskListToolbar(
+          projectPath: widget.workflowPath,
+          projectName: projectAsync.asData?.value?.displayName,
+        ),
       ],
     );
   }
@@ -93,17 +105,29 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
         onTabSelected: (index) => setState(() => _selectedTabIndex = index),
         items: const [
           StyledTabItem(label: 'List', icon: Icons.checklist_rounded),
+          StyledTabItem(label: 'Steps', icon: Icons.stairs_outlined),
         ],
       ),
     );
   }
 
   Widget _buildTabContent(BuildContext context, AsyncValue<List<Task>> tasksAsync) {
-    return ProjectTaskListView(
-      projectPath: widget.workflowPath,
-      tasksAsync: tasksAsync,
-      onTasksRefresh: () {},
-    );
+    switch (_selectedTabIndex) {
+      case 0:
+        return ProjectTaskListView(
+          projectPath: widget.workflowPath,
+          tasksAsync: tasksAsync,
+          onTasksRefresh: () {},
+        );
+      case 1:
+        return ProjectTaskStepView(
+          projectPath: widget.workflowPath,
+          tasksAsync: tasksAsync,
+          onTasksRefresh: () {},
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 }
 

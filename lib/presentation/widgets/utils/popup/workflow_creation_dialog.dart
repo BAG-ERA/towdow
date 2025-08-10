@@ -86,9 +86,14 @@ class _WorkflowCreationDialogState extends ConsumerState<WorkflowCreationDialog>
       }
 
       final caldavService = ref.read(caldavServiceProvider(account));
+      // Determine current user identifier for author/owner (prefer email, fallback to username)
+      final currentUser =
+          (account.email != null && account.email!.isNotEmpty) ? account.email : account.username;
       final createResult = await caldavService.createCalendar(
         displayName: name,
         description: description.isEmpty ? 'Workflow created by FlowIt' : description,
+        author: currentUser,
+        owner: currentUser,
         asWorkflow: true,
       );
 

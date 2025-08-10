@@ -16,6 +16,7 @@ import '../repositories/external_calendar_repository.dart';
 import '../repositories/external_event_repository.dart';
 import '../repositories/category_repository.dart';
 import '../repositories/kanban_repository.dart';
+import '../repositories/step_repository.dart';
 import '../models/task.dart';
 import '../models/task_calendar.dart';
 import '../models/caldav_account.dart';
@@ -47,12 +48,14 @@ import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/category_viewmodel.dart';
 import '../../presentation/viewmodels/project_kanban_viewmodel.dart';
 import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
+import '../../presentation/viewmodels/step_viewmodel.dart';
 import '../services/kanban_service.dart';
 import '../../app.dart';
 import '../services/share_service.dart';
 import '../services/users_api_service.dart';
 import '../models/user_preferences.dart';
 import '../services/workflow_service.dart';
+import '../models/step.dart';
 
 // Local storage service provider
 // This must be overridden in main.dart with an initialized instance
@@ -165,6 +168,13 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   return CategoryRepository(calendarRepository, accountRepository);
 });
 
+// Step repository provider
+final stepRepositoryProvider = Provider<StepRepository>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  return StepRepository(calendarRepository, taskRepository);
+});
+
 // Kanban service provider
 final kanbanServiceProvider = Provider<KanbanService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
@@ -189,7 +199,10 @@ final caldavServiceProvider = Provider.family<CalDAVService, CaldavAccount>((ref
 // Workflow service provider
 final workflowServiceProvider = Provider<WorkflowService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
-  return WorkflowService(calendarRepository);
+  final service = WorkflowService(calendarRepository);
+  // Inject step repository for default step creation in conversions
+  service.setStepRepository(ref.watch(stepRepositoryProvider));
+  return service;
 });
 
 // External CalDAV service provider
@@ -325,15 +338,13 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
 final domainServiceProvider = Provider<DomainService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final localStorageService = ref.watch(localStorageServiceProvider);
-  final accountRepository = ref.watch(accountRepositoryProvider);
-  return DomainService(calendarRepository, localStorageService, accountRepository);
+  return DomainService(calendarRepository, localStorageService, ref.watch(accountRepositoryProvider));
 });
 
 // Status service provider
 final statusServiceProvider = Provider<StatusService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final localStorageService = ref.watch(localStorageServiceProvider);
-  final accountRepository = ref.watch(accountRepositoryProvider);
   return StatusService(calendarRepository, localStorageService);
 });
 
@@ -474,6 +485,14 @@ final projectCategoryViewModelProvider = StateNotifierProvider.family<CategoryVi
   final categoryRepository = ref.watch(categoryRepositoryProvider);
   final viewModel = CategoryViewModel(categoryRepository);
   // Initialize with project path
+  viewModel.initialize(projectPath);
+  return viewModel;
+});
+
+// Step ViewModel provider for specific project
+final projectStepViewModelProvider = StateNotifierProvider.family<StepViewModel, StepViewModelState, String>((ref, projectPath) {
+  final stepRepository = ref.watch(stepRepositoryProvider);
+  final viewModel = StepViewModel(stepRepository);
   viewModel.initialize(projectPath);
   return viewModel;
 });
@@ -680,6 +699,7 @@ final anytimeTasksProvider = StreamProvider<List<Task>>((ref) {
 final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, projectPath) {
   final taskRepository = ref.read(taskRepositoryProvider);
   final categoryRepository = ref.read(categoryRepositoryProvider);
+  final stepRepository = ref.read(stepRepositoryProvider);
   
   return taskRepository.watchTasks().asyncMap((allTasks) async {
     // Encode special characters in the project path to match encoded storage format
@@ -715,6 +735,7 @@ final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, pro
       return task;
     }).toList();
     
+    Future.microtask(() => stepRepository.recomputeProjectSteps(encodedProjectPath));
     return filteredTasks;
   });
 });
@@ -819,8 +840,8 @@ final enabledExternalEventListProvider = Provider<AsyncValue<List<CalendarEvent>
   
   // Handle data
   if (eventsAsync.hasValue && enabledCalendarsAsync.hasValue) {
-    final events = eventsAsync.value!;
-    final enabledCalendars = enabledCalendarsAsync.value!;
+    final events = eventsAsync.value ?? const <CalendarEvent>[];
+    final enabledCalendars = enabledCalendarsAsync.value ?? const <ExternalCalendar>[];
     final enabledCalendarUids = enabledCalendars.map((cal) => cal.uid).toSet();
     final filteredEvents = events.where((event) => enabledCalendarUids.contains(event.sourceCalendarUid)).toList();
     return AsyncValue.data(filteredEvents);
@@ -858,10 +879,9 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   final projectTasksAsync = ref.watch(projectTasksProvider(projectPath));
   final searchQuery = ref.watch(projectSearchQueryProvider(projectPath));
   
-  final allTasks = projectTasksAsync.when(
+  final allTasks = projectTasksAsync.maybeWhen(
     data: (tasks) => tasks,
-    loading: () => <Task>[],
-    error: (_, __) => <Task>[],
+    orElse: () => <Task>[],
   );
   
   if (searchQuery.trim().isEmpty) {
@@ -872,7 +892,7 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   
   final filteredTasks = allTasks.where((task) {
     final summaryMatch = task.summary.toLowerCase().contains(searchLower);
-    final descriptionMatch = task.description != null && task.description!.toLowerCase().contains(searchLower);
+    final descriptionMatch = task.description.toLowerCase().contains(searchLower);
     final categoriesMatch = task.categoryIds.any(
       (categoryId) => categoryId.toLowerCase().contains(searchLower),
     );
@@ -881,6 +901,29 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   }).toList();
   
   return filteredTasks;
+});
+
+final projectStepsProvider = FutureProvider.family<List<ProjectStep>, String>((ref, projectPath) async {
+  // Watch calendar list to refresh when calendars change (sync/import)
+  ref.watch(calendarListProvider);
+
+  final stepRepository = ref.watch(stepRepositoryProvider);
+  // Ensure encoded path consistency
+  final encodedProjectPath = projectPath.replaceAll('@', '%40');
+  final result = await stepRepository.getProjectSteps(encodedProjectPath);
+  return await result.when(
+    success: (steps) async {
+      if (steps.isNotEmpty) return steps;
+      // Auto-heal: create a default step when none exist (mirrors category pattern resilience)
+      await stepRepository.ensureDefaultStep(encodedProjectPath);
+      final secondTry = await stepRepository.getProjectSteps(encodedProjectPath);
+      return secondTry.when(
+        success: (s) => s,
+        failure: (_) => <ProjectStep>[],
+      );
+    },
+    failure: (_) async => <ProjectStep>[],
+  );
 });
 
 // Project sharing notification provider - reactive to user preferences changes
