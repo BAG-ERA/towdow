@@ -431,6 +431,7 @@ class CalDAVService implements ICalDAVService {
     <FLOWIT:template/>
     <FLOWIT:status/>
     <FLOWIT:categories/>
+    <FLOWIT:requirements/>
     <FLOWIT:steps/>
     <FLOWIT:sharedWith/>
   </D:prop>
@@ -556,6 +557,7 @@ class CalDAVService implements ICalDAVService {
     <FLOWIT:status />
     <FLOWIT:kanban />
     <FLOWIT:categories />
+    <FLOWIT:requirements />
     <FLOWIT:steps />
     <FLOWIT:sharedWith />
     <FLOWIT:author />
@@ -586,6 +588,7 @@ class CalDAVService implements ICalDAVService {
                 flowitStatus: responseData['flowit-status'],
                 flowitKanban: responseData['flowit-kanban'] ?? calendar.flowitKanban,
                 projectCategories: responseData['flowit-categories'] ?? calendar.projectCategories,
+                projectRequirements: responseData['flowit-requirements'] ?? calendar.projectRequirements,
                 projectSteps: responseData['flowit-steps'] ?? calendar.projectSteps,
                 sharedWith: responseData['flowit-sharedWith'] ?? calendar.sharedWith,
                 flowitAuthor: responseData['flowit-author'] ?? calendar.flowitAuthor,
@@ -941,9 +944,13 @@ class CalDAVService implements ICalDAVService {
       xml.writeln('      <FLOWIT:kanban><![CDATA[${calendar.flowitKanban}]]></FLOWIT:kanban>');
     }
     
-      // Set project categories as JSON
+    // Set project categories as JSON
     if (calendar.projectCategories.isNotEmpty && calendar.projectCategories != '[]') {
       xml.writeln('      <FLOWIT:categories><![CDATA[${calendar.projectCategories}]]></FLOWIT:categories>');
+    }
+    // Set project requirements as JSON
+    if (calendar.projectRequirements.isNotEmpty && calendar.projectRequirements != '[]') {
+      xml.writeln('      <FLOWIT:requirements><![CDATA[${calendar.projectRequirements}]]></FLOWIT:requirements>');
     }
     // Set project steps as JSON
     if (calendar.projectSteps.isNotEmpty && calendar.projectSteps != '[]') {
@@ -963,6 +970,7 @@ class CalDAVService implements ICalDAVService {
         (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) ||
         (calendar.flowitKanban.isEmpty || calendar.flowitKanban == '[]') ||
         (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') ||
+        (calendar.projectRequirements.isEmpty || calendar.projectRequirements == '[]') ||
         (calendar.sharedWith.isEmpty || calendar.sharedWith == '[]')) {
       xml.writeln('  <D:remove>');
       xml.writeln('    <D:prop>');
@@ -981,6 +989,9 @@ class CalDAVService implements ICalDAVService {
       
       if (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') {
         xml.writeln('      <FLOWIT:categories/>');
+      }
+      if (calendar.projectRequirements.isEmpty || calendar.projectRequirements == '[]') {
+        xml.writeln('      <FLOWIT:requirements/>');
       }
       if (calendar.projectSteps.isEmpty || calendar.projectSteps == '[]') {
         xml.writeln('      <FLOWIT:steps/>');

@@ -16,6 +16,8 @@ import '../repositories/external_calendar_repository.dart';
 import '../repositories/external_event_repository.dart';
 import '../repositories/category_repository.dart';
 import '../repositories/kanban_repository.dart';
+import '../repositories/requirement_repository.dart';
+import '../models/requirement.dart';
 import '../repositories/step_repository.dart';
 import '../models/task.dart';
 import '../models/task_calendar.dart';
@@ -166,6 +168,12 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   return CategoryRepository(calendarRepository, accountRepository);
+});
+
+// Requirement repository provider
+final requirementRepositoryProvider = Provider<RequirementRepository>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  return RequirementRepository(calendarRepository);
 });
 
 // Step repository provider
@@ -742,6 +750,18 @@ final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, pro
     Future.microtask(() => stepRepository.recomputeProjectSteps(encodedProjectPath));
     return filteredTasks;
   });
+});
+
+// Project requirements provider
+final projectRequirementsProvider = FutureProvider.family<List<Requirement>, String>((ref, projectPath) async {
+  final requirementRepository = ref.watch(requirementRepositoryProvider);
+  await requirementRepository.initialize();
+  final encoded = projectPath.replaceAll('@', '%40');
+  final res = await requirementRepository.getProjectRequirements(encoded);
+  return res.when(
+    success: (reqs) => reqs,
+    failure: (_) => <Requirement>[],
+  );
 });
 
 // Deprecated: Keep for backward compatibility

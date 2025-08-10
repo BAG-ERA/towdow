@@ -49,6 +49,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
     List<String> categories = const [],
     List<Attendee> attendees = const [],
     String? projectPath,
+    String? flowitRequirement,
   }) async {
     AppLogger.debug('🔄 TaskViewModel: Creating task with summary: $summary');
     
@@ -83,6 +84,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
         attendees: attendees,
         projectPath: encodedProjectPath,
         organizer: organizer,
+        flowitRequirement: flowitRequirement ?? '{}',
       );
 
       final result = await _taskRepository.save(task);

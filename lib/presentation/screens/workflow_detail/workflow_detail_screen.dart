@@ -53,6 +53,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
               TaskListToolbar(
                 projectPath: widget.workflowPath,
                 projectName: projectAsync.asData?.value?.displayName,
+                workflowVariant: true,
               ),
             ],
           ),
@@ -74,6 +75,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
         TaskListToolbar(
           projectPath: widget.workflowPath,
           projectName: projectAsync.asData?.value?.displayName,
+          workflowVariant: true,
         ),
       ],
     );

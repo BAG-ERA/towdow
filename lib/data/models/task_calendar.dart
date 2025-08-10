@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'task.dart';
 import 'attendee.dart';
 import 'category.dart';
+  import 'requirement.dart';
 import 'step.dart';
 import '../providers/providers.dart';
 
@@ -45,6 +46,7 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(19) @Default(1) int calendarOrder, // CALENDAR-ORDER
     @HiveField(21) @Default([]) List<Attendee> attendees, // ATTENDEE
     @HiveField(22) @Default('[]') String projectCategories, // JSON array of Category objects for project-level categories
+     @HiveField(31) @Default('[]') String projectRequirements, // JSON array of Requirement objects for project-level requirements
     @HiveField(23) @Default('[]') String projectSteps, // JSON array of Step objects for project-level steps
     @HiveField(24) String? flowitDomain, // X-FLOWIT-DOMAIN - domain for grouping projects
     @HiveField(25) String? flowitStatus, // X-FLOWIT-STATUS - project status (DRAFT, CANCELED, ONGOING, STOPPED, ARCHIVE, COMPLETED, NEEDACTION, FAILED)
@@ -408,6 +410,59 @@ extension TaskCalendarStatus on TaskCalendar {
       return jsonList.map((json) => Category.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
       return [];
+    }
+  }
+  
+  /// Get parsed project requirements from JSON string
+  List<Requirement> get projectRequirementsList {
+    try {
+      if (projectRequirements.isEmpty || projectRequirements == '[]') {
+        return [];
+      }
+      final List<dynamic> jsonList = json.decode(projectRequirements);
+      return jsonList.map((json) => Requirement.fromJson(json as Map<String, dynamic>)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+  
+  /// Update project requirements with a list of Requirement objects
+  TaskCalendar withProjectRequirements(List<Requirement> requirements) {
+    final jsonString = json.encode(requirements.map((r) => r.toJson()).toList());
+    return copyWith(
+      projectRequirements: jsonString,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Add or update a requirement in the project
+  TaskCalendar addOrUpdateRequirement(Requirement requirement) {
+    final current = projectRequirementsList;
+    final index = current.indexWhere((r) => r.id == requirement.id);
+    if (index != -1) {
+      current[index] = requirement;
+    } else {
+      current.add(requirement);
+    }
+    return withProjectRequirements(current);
+  }
+  
+  /// Remove a requirement by id
+  TaskCalendar removeRequirement(String requirementId) {
+    final current = projectRequirementsList;
+    current.removeWhere((r) => r.id == requirementId);
+    return withProjectRequirements(current);
+  }
+  
+  /// Check if project has a requirement id
+  bool hasRequirement(String requirementId) => projectRequirementsList.any((r) => r.id == requirementId);
+  
+  /// Get a requirement by id
+  Requirement? getRequirementById(String requirementId) {
+    try {
+      return projectRequirementsList.firstWhere((r) => r.id == requirementId);
+    } catch (_) {
+      return null;
     }
   }
   

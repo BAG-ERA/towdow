@@ -9,6 +9,8 @@ import '../popup/task_creation_dialog.dart';
 class CreateTaskButton extends StatelessWidget {
   /// Optional project context to assign the task to (recommended)
   final String? projectCalendarUid;
+  /// When true, open workflow-variant of the dialog
+  final bool workflowVariant;
   
   /// Custom button color (defaults to theme primary color)
   final Color? backgroundColor;
@@ -41,6 +43,7 @@ class CreateTaskButton extends StatelessWidget {
     this.size = CreateTaskButtonSize.medium,
     this.isFullWidth = false,
     this.onTaskCreated,
+    this.workflowVariant = false,
   });
 
   /// Factory constructor for a compact create task button (commonly used in toolbars)
@@ -50,6 +53,7 @@ class CreateTaskButton extends StatelessWidget {
     Color? backgroundColor,
     Color? textColor,
     Function(String)? onTaskCreated,
+    bool workflowVariant = false,
   }) {
     return CreateTaskButton(
       key: key,
@@ -60,6 +64,7 @@ class CreateTaskButton extends StatelessWidget {
       icon: Icons.add,
       size: CreateTaskButtonSize.small,
       onTaskCreated: onTaskCreated,
+      workflowVariant: workflowVariant,
     );
   }
 
@@ -71,6 +76,7 @@ class CreateTaskButton extends StatelessWidget {
     Color? textColor,
     bool isFullWidth = false,
     Function(String)? onTaskCreated,
+    bool workflowVariant = false,
   }) {
     return CreateTaskButton(
       key: key,
@@ -82,6 +88,7 @@ class CreateTaskButton extends StatelessWidget {
       size: CreateTaskButtonSize.large,
       isFullWidth: isFullWidth,
       onTaskCreated: onTaskCreated,
+      workflowVariant: workflowVariant,
     );
   }
 
@@ -166,6 +173,7 @@ class CreateTaskButton extends StatelessWidget {
       context: context,
       builder: (context) => TaskCreationDialog(
         projectPath: projectCalendarUid,
+        workflowVariant: workflowVariant,
       ),
     );
   }
