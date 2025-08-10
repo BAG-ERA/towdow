@@ -8,6 +8,7 @@ import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/connection/connection_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
 import 'presentation/screens/archived_projects/archived_projects_screen.dart';
+import 'presentation/screens/projects_list/projects_list_screen.dart';
 
 import 'presentation/screens/project_detail/project_detail_screen.dart';
 import 'presentation/widgets/adaptive_app_layout.dart';
@@ -102,6 +103,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             currentDestination = AppDestination.soon;
           } else if (location == '/anytime') {
             currentDestination = AppDestination.anytime;
+          } else if (location == '/projects') {
+            currentDestination = AppDestination.projects;
           } else if (location == '/next-week' || location == '/later') {
             // Next week and later tabs exist but are not shown in sidebar
             currentDestination = null;
@@ -153,6 +156,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/archived',
             builder: (context, state) => const ArchivedProjectsScreen(),
+          ),
+          GoRoute(
+            path: '/projects',
+            builder: (context, state) => const ProjectsListScreen(),
           ),
         ],
       ),

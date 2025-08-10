@@ -41,6 +41,11 @@ enum AppDestination {
     label: 'Anytime',
     icon: Icons.inbox_rounded,
     route: '/anytime',
+  ),
+  projects(
+    label: 'Projects',
+    icon: Icons.folder_rounded,
+    route: '/projects',
   );
 
   const AppDestination({
@@ -207,6 +212,9 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
       isDetailScreen = true;
     } else if (location.startsWith('/project/')) {
       title = ref.watch(mobileTitleProvider) ?? 'Project Details';
+      isDetailScreen = true;
+    } else if (location == '/projects') {
+      title = 'All Projects';
       isDetailScreen = true;
     } else if (location == '/' || location.startsWith('/today') || location.startsWith('/soon') || 
                location.startsWith('/next-week') || location.startsWith('/later') || location.startsWith('/anytime')) {

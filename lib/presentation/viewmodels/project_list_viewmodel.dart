@@ -101,6 +101,22 @@ class DomainStats {
   });
 }
 
+enum ProjectSort {
+  name,
+  progress,
+  created,
+  lastModified,
+  taskCount,
+  domain,
+  custom, // User-defined ordering
+}
+
+enum SortDirection {
+  none,
+  ascending,
+  descending,
+}
+
 // Project List ViewModel State
 class ProjectListState {
   final bool isLoading;
@@ -110,6 +126,7 @@ class ProjectListState {
   final List<DomainGroup> domainGroups;
   final ProjectFilter filter;
   final ProjectSort sortBy;
+  final SortDirection sortDirection;
   final String searchQuery;
   final String? selectedDomain;
   final bool isDomainGroupingEnabled;
@@ -126,6 +143,7 @@ class ProjectListState {
     this.domainGroups = const [],
     this.filter = ProjectFilter.all,
     this.sortBy = ProjectSort.custom,
+    this.sortDirection = SortDirection.none,
     this.searchQuery = '',
     this.selectedDomain,
     this.isDomainGroupingEnabled = true,
@@ -143,6 +161,7 @@ class ProjectListState {
     List<DomainGroup>? domainGroups,
     ProjectFilter? filter,
     ProjectSort? sortBy,
+    SortDirection? sortDirection,
     String? searchQuery,
     String? selectedDomain,
     bool? isDomainGroupingEnabled,
@@ -159,6 +178,7 @@ class ProjectListState {
       domainGroups: domainGroups ?? this.domainGroups,
       filter: filter ?? this.filter,
       sortBy: sortBy ?? this.sortBy,
+      sortDirection: sortDirection ?? this.sortDirection,
       searchQuery: searchQuery ?? this.searchQuery,
       selectedDomain: selectedDomain,
       isDomainGroupingEnabled: isDomainGroupingEnabled ?? this.isDomainGroupingEnabled,
@@ -197,9 +217,13 @@ class ProjectListState {
         case ProjectFilter.all:
           return true;
         case ProjectFilter.active:
-          return stats.progressPercentage < 100;
+          // Active projects are all projects except TEMPLATE, STOPPED, ARCHIVE
+          final status = project.flowitStatus?.toUpperCase() ?? 'ONGOING';
+          return status != 'TEMPLATE' && status != 'STOPPED' && status != 'ARCHIVE';
         case ProjectFilter.completed:
-          return stats.progressPercentage == 100;
+          // Completed projects are STOPPED or ARCHIVE
+          final status = project.flowitStatus?.toUpperCase() ?? 'ONGOING';
+          return status == 'STOPPED' || status == 'ARCHIVE';
         case ProjectFilter.inProgress:
           return stats.progressPercentage > 0 && stats.progressPercentage < 100;
         case ProjectFilter.notStarted:
@@ -208,35 +232,55 @@ class ProjectListState {
     }).toList();
     
     // Apply sorting
-    switch (sortBy) {
-      case ProjectSort.name:
-        filtered.sort((a, b) => a.project.displayName.compareTo(b.project.displayName));
-        break;
-      case ProjectSort.progress:
-        filtered.sort((a, b) => b.stats.progressPercentage.compareTo(a.stats.progressPercentage));
-        break;
-      case ProjectSort.created:
-        filtered.sort((a, b) => b.project.created.compareTo(a.project.created));
-        break;
-      case ProjectSort.lastModified:
-        filtered.sort((a, b) => b.project.lastModified.compareTo(a.project.lastModified));
-        break;
-      case ProjectSort.taskCount:
-        filtered.sort((a, b) => b.stats.totalTasks.compareTo(a.stats.totalTasks));
-        break;
-      case ProjectSort.domain:
-        filtered.sort((a, b) {
-          final domainA = a.project.domainDisplayName;
-          final domainB = b.project.domainDisplayName;
-          final domainCompare = domainA.compareTo(domainB);
-          if (domainCompare != 0) return domainCompare;
-          return a.project.displayName.compareTo(b.project.displayName);
-        });
-        break;
-      case ProjectSort.custom:
-        // Custom ordering will be handled by the ViewModel
-        // For now, keep the original order
-        break;
+    if (sortDirection != SortDirection.none) {
+      switch (sortBy) {
+        case ProjectSort.name:
+          filtered.sort((a, b) {
+            final comparison = a.project.displayName.compareTo(b.project.displayName);
+            return sortDirection == SortDirection.ascending ? comparison : -comparison;
+          });
+          break;
+        case ProjectSort.progress:
+          filtered.sort((a, b) {
+            final comparison = a.stats.progressPercentage.compareTo(b.stats.progressPercentage);
+            return sortDirection == SortDirection.ascending ? comparison : -comparison;
+          });
+          break;
+        case ProjectSort.created:
+          filtered.sort((a, b) {
+            final comparison = a.project.created.compareTo(b.project.created);
+            return sortDirection == SortDirection.ascending ? comparison : -comparison;
+          });
+          break;
+        case ProjectSort.lastModified:
+          filtered.sort((a, b) {
+            final comparison = a.project.lastModified.compareTo(b.project.lastModified);
+            return sortDirection == SortDirection.ascending ? comparison : -comparison;
+          });
+          break;
+        case ProjectSort.taskCount:
+          filtered.sort((a, b) {
+            final comparison = a.stats.totalTasks.compareTo(b.stats.totalTasks);
+            return sortDirection == SortDirection.ascending ? comparison : -comparison;
+          });
+          break;
+        case ProjectSort.domain:
+          filtered.sort((a, b) {
+            final domainA = a.project.domainDisplayName;
+            final domainB = b.project.domainDisplayName;
+            final domainCompare = domainA.compareTo(domainB);
+            if (domainCompare != 0) {
+              return sortDirection == SortDirection.ascending ? domainCompare : -domainCompare;
+            }
+            final nameCompare = a.project.displayName.compareTo(b.project.displayName);
+            return sortDirection == SortDirection.ascending ? nameCompare : -nameCompare;
+          });
+          break;
+        case ProjectSort.custom:
+          // Custom ordering will be handled by the ViewModel
+          // For now, keep the original order
+          break;
+      }
     }
     
     return filtered;
@@ -266,16 +310,6 @@ enum ProjectFilter {
   completed,
   inProgress,
   notStarted,
-}
-
-enum ProjectSort {
-  name,
-  progress,
-  created,
-  lastModified,
-  taskCount,
-  domain,
-  custom, // User-defined ordering
 }
 
 // Project List ViewModel
@@ -523,12 +557,35 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     }
   }
 
-  /// Set project sort order
+  /// Set project sort order with three-state cycling: none -> ascending -> descending -> none
   void setSortBy(ProjectSort sortBy) {
     // AppLogger.info('ProjectListViewModel: Setting sort: $sortBy');
     // Check if still mounted before updating state
     if (mounted) {
-      state = state.copyWith(sortBy: sortBy);
+      SortDirection newDirection;
+      
+      if (state.sortBy == sortBy) {
+        // Same column clicked - cycle through directions
+        switch (state.sortDirection) {
+          case SortDirection.none:
+            newDirection = SortDirection.ascending;
+            break;
+          case SortDirection.ascending:
+            newDirection = SortDirection.descending;
+            break;
+          case SortDirection.descending:
+            newDirection = SortDirection.none;
+            break;
+        }
+      } else {
+        // Different column clicked - start with ascending
+        newDirection = SortDirection.ascending;
+      }
+      
+      state = state.copyWith(
+        sortBy: sortBy,
+        sortDirection: newDirection,
+      );
     }
   }
 
