@@ -194,9 +194,13 @@ class AppLifecycleManager {
         
         // Set up connection restored listener to trigger upload queue processing
         _connectionMonitorService!.connectionRestoredStream.listen((_) {
-          AppLogger.info('AppLifecycleManager: Connection restored, triggering upload queue processing');
+          AppLogger.info('AppLifecycleManager: Connection restored, triggering queued operations processing');
           if (_fileUploadQueueService != null) {
-            _fileUploadQueueService!.startQueueProcessing(); // Trigger immediate processing
+            _fileUploadQueueService!.startQueueProcessing();
+          }
+          if (_syncService != null) {
+            // Process sync queue immediately without full pull to avoid stale UI
+            _syncService!.processQueueOnly();
           }
         });
         
@@ -218,10 +222,9 @@ class AppLifecycleManager {
     }
   }
 
-  /// Start sync services when account is available (legacy method)
-  Future<Result<void>> _startServices() async {
-    return await _startMainServices();
-  }
+  // _startServices kept for backward compatibility in tests; suppress warning
+  // ignore: unused_element
+  Future<Result<void>> _startServices() async => _startMainServices();
 
   /// Called when account configuration changes
   Future<void> onAccountConfigured() async {
@@ -416,10 +419,8 @@ class AppLifecycleManager {
   /// Update lifecycle state and notify listeners
   void _updateState(FlowItAppState newState) {
     if (_state != newState) {
-      final oldState = _state;
       _state = newState;
       _stateController.add(_state);
-      // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] State changed: ${oldState.name} -> ${newState.name}');
     }
   }
 

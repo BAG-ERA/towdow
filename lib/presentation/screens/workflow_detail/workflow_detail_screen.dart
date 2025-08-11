@@ -1,18 +1,19 @@
 // Workflow detail screen - thin wrapper around ProjectDetailScreen for separate route and future specialization
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../../widgets/project_detail/project_infos_widget.dart';
-import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/utils/tasklist_toolbar.dart';
 import '../../widgets/utils/popup/requirement_mapping_dialog.dart';
 import '../../widgets/project_detail/project_task_step_view.dart';
 import '../../widgets/project_detail/project_bottleneck_view.dart';
 import '../project_detail/project_detail_screen.dart' show projectProvider;
+import '../../widgets/project_detail/project_warnings_banner.dart';
 
 class WorkflowDetailScreen extends ConsumerStatefulWidget {
   final String workflowPath;
@@ -68,8 +69,61 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
   Widget _buildMobileLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
     return Column(
       children: [
+        // Warnings banner on mobile (if any)
         projectAsync.when(
-          data: (project) => project != null ? ProjectInfosWidget(project: project, tasksAsync: tasksAsync, onProjectUpdated: (p) {}) : const SizedBox.shrink(),
+          data: (project) => project != null
+              ? ProjectWarningsBanner(project: project, tasksAsync: tasksAsync)
+              : const SizedBox.shrink(),
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+        projectAsync.when(
+          data: (project) => project != null
+              ? Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ExpansionTile(
+                        initiallyExpanded: false,
+                        backgroundColor: Colors.transparent,
+                        collapsedBackgroundColor: Colors.transparent,
+                        tilePadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                        title: tasksAsync.when(
+                          data: (tasks) {
+                            final completed = tasks.where((t) => t.status == 'COMPLETED').length;
+                            final total = tasks.length;
+                            return Text(
+                              'Tasks $completed/$total',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                            );
+                          },
+                          loading: () => Text(
+                            'Tasks ...',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          error: (_, __) => Text(
+                            'Tasks 0/0',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: ProjectInfosWidget(project: project, tasksAsync: tasksAsync, onProjectUpdated: (p) {}),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Divider(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                        height: 1,
+                      ),
+                    ),
+                  ],
+                )
+              : const SizedBox.shrink(),
           loading: () => const SizedBox.shrink(),
           error: (_, __) => const SizedBox.shrink(),
         ),
@@ -162,9 +216,50 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
     buttons.add(OutlinedButton.icon(
       icon: const Icon(Icons.content_copy_rounded),
       label: const Text('Duplicate workflow'),
-      onPressed: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Duplicate workflow is not yet implemented.')),
+      onPressed: () async {
+        final name = await showDialog<String>(
+          context: context,
+          builder: (ctx) {
+            final controller = TextEditingController(text: '${project.displayName} (copy)');
+            return AlertDialog(
+              title: const Text('Duplicate workflow'),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'New workflow name'),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+                  child: const Text('Create'),
+                ),
+              ],
+            );
+          },
+        );
+        if (name == null || name.isEmpty) return;
+
+        final workflowService = ref.read(workflowServiceProvider);
+        final result = await workflowService.duplicateWorkflow(
+          sourceCalendarPath: widget.workflowPath,
+          newDisplayName: name,
+        );
+        await result.when(
+          success: (newPath) async {
+            final encoded = Uri.encodeComponent(newPath);
+            if (mounted) context.go('/workflow/$encoded');
+          },
+          failure: (f) async {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to duplicate: ${f.message}')),
+              );
+            }
+          },
         );
       },
     ));
@@ -197,9 +292,8 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
         selectedIndex: _selectedTabIndex,
         onTabSelected: (index) => setState(() => _selectedTabIndex = index),
         items: const [
-          StyledTabItem(label: 'List', icon: Icons.checklist_rounded),
-          StyledTabItem(label: 'Bottleneck', icon: Icons.timeline),
           StyledTabItem(label: 'Steps', icon: Icons.stairs_outlined),
+          StyledTabItem(label: 'Bottleneck', icon: Icons.timeline),
         ],
       ),
     );
@@ -208,10 +302,11 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
   Widget _buildTabContent(BuildContext context, AsyncValue<List<Task>> tasksAsync) {
     switch (_selectedTabIndex) {
       case 0:
-        return ProjectTaskListView(
+        return ProjectTaskStepView(
           projectPath: widget.workflowPath,
           tasksAsync: tasksAsync,
           onTasksRefresh: () {},
+          workflowVariant: true,
         );
       case 1:
         return tasksAsync.when(
@@ -222,12 +317,6 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
           ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => Center(child: Text('Error loading tasks: $error')),
-        );
-      case 2:
-        return ProjectTaskStepView(
-          projectPath: widget.workflowPath,
-          tasksAsync: tasksAsync,
-          onTasksRefresh: () {},
         );
       default:
         return const SizedBox.shrink();

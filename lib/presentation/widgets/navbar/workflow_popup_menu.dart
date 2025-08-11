@@ -27,6 +27,17 @@ class WorkflowPopupMenu extends ConsumerWidget {
   static List<PopupMenuEntry<String>> getMenuItems(BuildContext context, WidgetRef ref, {TaskCalendar? project}) {
     return [
       PopupMenuItem<String>(
+        value: 'see_details',
+        child: Row(
+          children: [
+            Icon(Icons.open_in_new_rounded, size: 16, color: Theme.of(context).colorScheme.onSurface),
+            const SizedBox(width: 8),
+            const Text('See details'),
+          ],
+        ),
+      ),
+      const PopupMenuDivider(),
+      PopupMenuItem<String>(
         value: 'convert_to_project',
         child: Row(
           children: [
@@ -57,6 +68,16 @@ class WorkflowPopupMenu extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
             Text((project?.isArchived ?? false) ? 'Unarchive' : 'Archive'),
+          ],
+        ),
+      ),
+      PopupMenuItem<String>(
+        value: 'duplicate_workflow',
+        child: Row(
+          children: [
+            Icon(Icons.content_copy_rounded, size: 16, color: Theme.of(context).colorScheme.onSurface),
+            const SizedBox(width: 8),
+            const Text('Duplicate'),
           ],
         ),
       ),

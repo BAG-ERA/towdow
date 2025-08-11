@@ -9,6 +9,8 @@ import '../repositories/task_repository.dart';
 import '../models/task.dart';
 import '../models/attendee.dart';
 import '../repositories/step_repository.dart';
+import '../models/step.dart';
+import '../models/requirement.dart';
 // No direct use here; step creation is delegated to repository
 import 'sync_service.dart';
 import 'dart:convert';
@@ -22,6 +24,163 @@ class WorkflowService {
 
   void setStepRepository(StepRepository stepRepository) {
     _stepRepository = stepRepository;
+  }
+
+  /// Duplicate a workflow into a new workflow in DRAFT state.
+  ///
+  /// - Creates a new calendar based on the source with same description, color, categories
+  /// - Copies steps but resets status to WAITING and clears available/completion dates
+  /// - Copies requirements but clears attendee emails
+  /// - Copies tasks into the new calendar, resetting status to NEEDS-ACTION and percentComplete to 0
+  /// - Sets new workflow status to DRAFT and clears started/ended dates
+  ///
+  /// Returns the newly created workflow path on success.
+  Future<Result<String>> duplicateWorkflow({
+    required String sourceCalendarPath,
+    required String newDisplayName,
+    String? targetCalendarPath,
+  }) async {
+    try {
+      // Preconditions
+      if (_taskRepository == null) {
+        return Result.failure(const Failure(message: 'TaskRepository not initialized in WorkflowService'));
+      }
+
+      // Load source calendar (paths are stored percent-encoded)
+      final encodedSourcePath = sourceCalendarPath.replaceAll('@', '%40');
+      final getRes = await _calendarRepository.getByPath(encodedSourcePath);
+      final sourceCal = await getRes.when(
+        success: (c) async => c,
+        failure: (f) async => null,
+      );
+      if (sourceCal == null) {
+        return Result.failure(const Failure(message: 'Source workflow not found'));
+      }
+
+      // Compute target path from source path when not provided
+      final String newPath = targetCalendarPath ?? _buildSiblingPathWithName(sourceCal.path, newDisplayName);
+
+      final now = DateTime.now();
+      // Build new calendar with fields reset for a fresh DRAFT workflow
+      var newCalendar = TaskCalendar(
+        path: newPath,
+        displayName: newDisplayName,
+        description: sourceCal.description,
+        supportsTodos: sourceCal.supportsTodos,
+        etag: null,
+        color: sourceCal.color,
+        lastSyncAt: null,
+        isReadOnly: false,
+        syncToken: null,
+        dtstamp: now,
+        created: now,
+        lastModified: now,
+        status: 'NEEDS-ACTION',
+        percentComplete: 0,
+        flowitType: 'WORKFLOW',
+        flowitAsFlow: true,
+        flowitKanban: sourceCal.flowitKanban,
+        flowitTemplate: sourceCal.flowitTemplate,
+        calendarOrder: sourceCal.calendarOrder,
+        attendees: sourceCal.attendees,
+        projectCategories: sourceCal.projectCategories,
+        projectRequirements: sourceCal.projectRequirements,
+        projectSteps: sourceCal.projectSteps,
+        flowitDomain: sourceCal.flowitDomain,
+        flowitStatus: 'DRAFT',
+        sharedWith: '[]',
+        flowitAuthor: sourceCal.flowitAuthor,
+        flowitOwner: sourceCal.flowitOwner,
+        flowitStartedAt: null,
+        flowitEndedAt: null,
+        isSharedWithMe: false,
+      );
+
+      // Reset steps (status and dates) but keep ids/dependencies/orders
+      final resetSteps = <ProjectStep>[];
+      for (final step in sourceCal.projectStepsList) {
+        resetSteps.add(step.copyWith(
+          status: StepStatus.waiting,
+          availableDate: null,
+          completionDate: null,
+        ));
+      }
+      newCalendar = newCalendar.withProjectSteps(resetSteps);
+
+      // Reset requirements (clear emails)
+      final resetRequirements = <Requirement>[];
+      for (final req in sourceCal.projectRequirementsList) {
+        resetRequirements.add(req.copyWith(attendeeEmails: const <String>[]));
+      }
+      newCalendar = newCalendar.withProjectRequirements(resetRequirements);
+
+      // Persist new calendar
+      final saveCalRes = await _calendarRepository.save(newCalendar);
+      final saved = await saveCalRes.when(
+        success: (_) async => true,
+        failure: (f) async => false,
+      );
+      if (!saved) {
+        return Result.failure(const Failure(message: 'Failed to save duplicated workflow'));
+      }
+
+      // Queue calendar creation on server
+      final syncService = SyncService.instance;
+      if (syncService != null) {
+        await syncService.queueCalendarCreation(newCalendar.path);
+      }
+
+      // Duplicate tasks into new calendar
+      final tasksRes = await _taskRepository!.getByProject(sourceCal.path);
+      final sourceTasks = await tasksRes.when(
+        success: (t) async => t,
+        failure: (_) async => <Task>[],
+      );
+
+      for (final t in sourceTasks) {
+        final cloned = _cloneTaskForNewProject(t, newCalendar.path);
+        await _taskRepository!.save(cloned);
+      }
+
+      // Ensure a default step exists if none (edge case)
+      if (resetSteps.isEmpty && _stepRepository != null) {
+        await _stepRepository!.ensureDefaultStep(newCalendar.path);
+      }
+
+      return Result.success(newCalendar.path);
+    } catch (e, st) {
+      AppLogger.error('WorkflowService: Failed to duplicate workflow', e, st);
+      return Result.failure(Failure(message: 'Failed to duplicate workflow: $e', exception: e is Exception ? e : Exception(e.toString()), stackTrace: st));
+    }
+  }
+
+  String _buildSiblingPathWithName(String sourcePath, String name) {
+    final slug = name
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[^a-z0-9._-]'), '');
+    final parts = sourcePath.split('/')..removeWhere((s) => s.isEmpty);
+    if (parts.isEmpty) {
+      return '/$slug/';
+    }
+    // Replace last segment with slug
+    parts[parts.length - 1] = slug;
+    return '/${parts.join('/')}/';
+  }
+
+  Task _cloneTaskForNewProject(Task task, String newProjectPath) {
+    final now = DateTime.now();
+    final newUid = 'task-${now.millisecondsSinceEpoch}-${(task.summary.hashCode % 10000).abs()}';
+    return task.copyWith(
+      uid: newUid,
+      projectPath: newProjectPath,
+      status: 'NEEDS-ACTION',
+      percentComplete: 0,
+      created: now,
+      dtstamp: now,
+      lastModified: now,
+    );
   }
 
   void setTaskRepository(TaskRepository taskRepository) {

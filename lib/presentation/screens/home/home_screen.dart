@@ -3,15 +3,17 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../widgets/task_item/task_item.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/external_calendar/external_events_list.dart';
-import '../../widgets/adaptive_app_layout.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/task_calendar.dart';
 import '../../../data/models/calendar_event.dart';
 import '../../../data/services/sync_service.dart';
 import '../../providers/home_providers.dart';
+import '../../../core/theme/chart_theme_usage.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -254,6 +256,29 @@ class _TaskListTab extends ConsumerWidget {
         ),
       ),
       data: (tasks) {
+        // Calendars map for grouping headers and navigation (projects and workflows)
+        final calendars = ref.watch(calendarListProvider).maybeWhen(
+          data: (list) => list,
+          orElse: () => <TaskCalendar>[],
+        );
+        final calendarByPath = {for (final c in calendars) c.path: c};
+
+        // Group tasks by project/workflow path (nullable when task has no project)
+        final Map<String?, List<Task>> tasksByProject = {};
+        for (final t in tasks) {
+          final key = t.projectPath; // stored as encoded path (may contain %40)
+          (tasksByProject[key] ??= <Task>[]).add(t);
+        }
+
+        // Sort groups by project/workflow display name (unknowns last)
+        final groupKeys = tasksByProject.keys.toList()
+          ..sort((a, b) {
+            final ca = a != null ? calendarByPath[a] : null;
+            final cb = b != null ? calendarByPath[b] : null;
+            final na = ca?.displayName ?? '\uFFFF';
+            final nb = cb?.displayName ?? '\uFFFF';
+            return na.toLowerCase().compareTo(nb.toLowerCase());
+          });
         if (tasks.isEmpty) {
           return Center(
             child: Column(
@@ -361,47 +386,107 @@ class _TaskListTab extends ConsumerWidget {
                         )
                       else
                         Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Wrap(
-                            spacing: 12.0, // Horizontal spacing between tasks
-                            runSpacing: 12.0, // Vertical spacing between rows
-                            alignment: WrapAlignment.center,
-                            runAlignment: WrapAlignment.center,
-                            children: tasks.map((task) {
-                              return ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 420,
-                                  minWidth: 300,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final key in groupKeys) ...[
+                                // Group header: project/workflow name, tappable to navigate
+                                Builder(
+                                  builder: (context) {
+                                    final calendar = key != null ? calendarByPath[key] : null;
+                                    final title = calendar?.displayName ?? 'No Project';
+                                    final isWorkflow = (calendar?.flowitAsFlow == true) ||
+                                        ((calendar?.flowitType.toUpperCase() ?? '') == 'WORKFLOW');
+
+                                    void onTapHeader() {
+                                      if (calendar == null) return;
+                                      final rawPath = Uri.decodeComponent(calendar.path);
+                                      final routeSegment = Uri.encodeComponent(rawPath);
+                                      final route = isWorkflow ? '/workflow/$routeSegment' : '/project/$routeSegment';
+                                      context.go(route);
+                                    }
+
+                                    return Padding(
+                                      padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(8),
+                                        onTap: calendar != null ? onTapHeader : null,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                          child: Row(
+                                            crossAxisAlignment: CrossAxisAlignment.center,
+                                            children: [
+                                              Expanded(
+                                                child: Wrap(
+                                                  spacing: 8,
+                                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                                  children: [
+                                                    Text(
+                                                      title,
+                                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    if (calendar != null)
+                                                      Text(
+                                                        calendar.domainDisplayName,
+                                                        style: context.domainNameStyle.copyWith(
+                                                          color: Theme.of(context)
+                                                              .colorScheme
+                                                              .onSurface
+                                                              .withValues(alpha: 0.55),
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
-                                child: TaskItem(
-                                  task: task,
-                                  onToggleComplete: () async {
-                                    // Toggle task completion
-                                    await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
-                                    
-                                    // Refresh the task lists
-                                    ref.invalidate(taskListProvider);
-                                    ref.invalidate(todayTasksProvider);
-                                    ref.invalidate(soonTasksProvider);
-                                    ref.invalidate(nextWeekTasksProvider);
-                                    ref.invalidate(laterTasksProvider);
-                                    ref.invalidate(anytimeTasksProvider);
-                                  },
-                                  onTaskUpdated: (updatedTask) async {
-                                    // Handle task updates - save to repository and sync
-                                    await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                                    
-                                    // Note: Task lists will auto-update via repository streams
-                                  },
-                                  onTaskDeleted: () async {
-                                    // Handle task deletion
-                                    await ref.read(taskViewModelProvider.notifier).deleteTask(task.uid);
-                                    
-                                    // Note: Task lists will auto-update via repository streams
-                                  },
+                                const SizedBox(height: 6),
+                                // Grouped tasks
+                                Wrap(
+                                  spacing: 12.0,
+                                  runSpacing: 12.0,
+                                  alignment: WrapAlignment.start,
+                                  runAlignment: WrapAlignment.start,
+                                  children: [
+                                    for (final task in tasksByProject[key]!)
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 420,
+                                          minWidth: 300,
+                                        ),
+                                        child: TaskItem(
+                                          task: task,
+                                          onToggleComplete: () async {
+                                            await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
+                                            ref.invalidate(taskListProvider);
+                                            ref.invalidate(todayTasksProvider);
+                                            ref.invalidate(soonTasksProvider);
+                                            ref.invalidate(nextWeekTasksProvider);
+                                            ref.invalidate(laterTasksProvider);
+                                            ref.invalidate(anytimeTasksProvider);
+                                          },
+                                          onTaskUpdated: (updatedTask) async {
+                                            await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
+                                          },
+                                          onTaskDeleted: () async {
+                                            await ref.read(taskViewModelProvider.notifier).deleteTask(task.uid);
+                                          },
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                              );
-                            }).toList(),
+                              ],
+                            ],
                           ),
                         ),
                     ],

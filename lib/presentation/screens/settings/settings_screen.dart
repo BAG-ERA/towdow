@@ -15,6 +15,7 @@ import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
 import '../../../data/services/web_storage.dart';
 import '../../../data/services/sync_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -80,29 +81,20 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-          const _SettingsSection(
-            title: 'Appearance',
-            children: [
-              _SettingsItem(
-                title: 'Theme',
-                subtitle: 'Light, dark, or system',
-                icon: Icons.palette_rounded,
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const _SettingsSection(
+          _SettingsSection(
             title: 'About',
             children: [
               _SettingsItem(
-                title: 'Version',
-                subtitle: '1.0.0+1',
-                icon: Icons.info_rounded,
+                title: 'About us',
+                subtitle: 'Learn more about TowDow',
+                icon: Icons.public_rounded,
+                onTap: () => _openExternalUrl('https://gettowdow.com'),
               ),
               _SettingsItem(
                 title: 'License',
-                subtitle: 'View open source licenses',
+                subtitle: 'Mozilla Public License 2.0',
                 icon: Icons.description_rounded,
+                onTap: () => _openExternalUrl('https://gitlab.com/towdow/towdow-flutter/-/blob/develop/LICENSE'),
               ),
             ],
           ),
@@ -121,16 +113,6 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Future<void> _showConnectionManagement(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    // Navigate directly to the CalDAV management screen
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const CalDAVManagementScreen()),
     );
   }
 
@@ -328,6 +310,23 @@ class SettingsScreen extends ConsumerWidget {
       } catch (e) {
         AppLogger.error('Failed to reload page', e);
       }
+    }
+  }
+
+  Future<void> _openExternalUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      final canLaunch = await canLaunchUrl(uri);
+      if (!canLaunch) {
+        AppLogger.error('Cannot launch URL: $url');
+        return;
+      }
+      final didLaunch = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!didLaunch) {
+        AppLogger.error('Failed to launch URL: $url');
+      }
+    } catch (e, stacktrace) {
+      AppLogger.error('Error launching URL: $url', e, stacktrace);
     }
   }
 }

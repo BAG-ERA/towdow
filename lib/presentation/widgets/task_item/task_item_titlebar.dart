@@ -13,6 +13,8 @@ class TaskItemTitlebar extends StatefulWidget {
   final VoidCallback? onToggleComplete;
   final VoidCallback? onToggleExpanded;
   final Function(Task)? onTaskUpdated;
+  // Optional trailing widget to override the default expand/collapse icon
+  final Widget? trailing;
 
   const TaskItemTitlebar({
     super.key,
@@ -22,6 +24,7 @@ class TaskItemTitlebar extends StatefulWidget {
     this.onToggleComplete,
     this.onToggleExpanded,
     this.onTaskUpdated,
+    this.trailing,
   });
 
   @override
@@ -76,21 +79,24 @@ class _TaskItemTitlebarState extends State<TaskItemTitlebar> {
         
         const SizedBox(width: 4),
         
-        // Expand/Reduce button
-        InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: widget.onToggleExpanded,
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: Icon(
-              widget.isExpanded 
-                  ? Icons.expand_less_rounded 
-                  : Icons.expand_more_rounded,
-              size: 20,
-              color: colorScheme.onSurface.withValues(alpha: 0.6),
+        // Trailing override (e.g., close button in popup) or default expand/collapse
+        if (widget.trailing != null)
+          widget.trailing!
+        else
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: widget.onToggleExpanded,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(
+                widget.isExpanded 
+                    ? Icons.expand_less_rounded 
+                    : Icons.expand_more_rounded,
+                size: 20,
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
             ),
           ),
-        ),
       ],
     );
   }

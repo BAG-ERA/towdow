@@ -399,14 +399,16 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final userSyncService = ref.watch(userSyncServiceProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final stepRepository = ref.watch(stepRepositoryProvider);
+  final requirementRepository = ref.watch(requirementRepositoryProvider);
   
   // Initialize user preferences queue setup
   ref.watch(userPreferencesQueueSetupProvider);
 
   final caldavMonitor = ref.watch(caldavMonitorProvider);
 
-  // Pre-initialize steps cache from local storage so first views render without extra flicker
+  // Pre-initialize caches from local storage so first views render without extra flicker
   await stepRepository.initialize();
+  await requirementRepository.initialize();
 
   final result = await lifecycleManager.initialize(
     syncService: syncService,
@@ -753,15 +755,25 @@ final projectTasksProvider = StreamProvider.family<List<Task>, String>((ref, pro
 });
 
 // Project requirements provider
-final projectRequirementsProvider = FutureProvider.family<List<Requirement>, String>((ref, projectPath) async {
+final projectRequirementsProvider = StreamProvider.family<List<Requirement>, String>((ref, projectPath) async* {
   final requirementRepository = ref.watch(requirementRepositoryProvider);
-  await requirementRepository.initialize();
   final encoded = projectPath.replaceAll('@', '%40');
-  final res = await requirementRepository.getProjectRequirements(encoded);
-  return res.when(
+
+  // Emit cached requirements immediately (no await initialize to avoid blocking)
+  final initial = await requirementRepository.getProjectRequirements(encoded);
+  yield initial.when(
     success: (reqs) => reqs,
     failure: (_) => <Requirement>[],
   );
+
+  // Re-emit on calendar changes because requirements are stored on calendars
+  await for (final _ in ref.watch(calendarListProvider.stream)) {
+    final res = await requirementRepository.getProjectRequirements(encoded);
+    yield res.when(
+      success: (reqs) => reqs,
+      failure: (_) => <Requirement>[],
+    );
+  }
 });
 
 // Deprecated: Keep for backward compatibility
@@ -927,33 +939,37 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   return filteredTasks;
 });
 
-final projectStepsProvider = StreamProvider.family<List<ProjectStep>, String>((ref, projectPath) {
+final projectStepsProvider = StreamProvider.family<List<ProjectStep>, String>((ref, projectPath) async* {
   final stepRepository = ref.watch(stepRepositoryProvider);
   final encodedProjectPath = projectPath.replaceAll('@', '%40');
 
-  // React to calendar changes without forcing a load-state each time
-  return ref.watch(calendarListProvider.stream).asyncMap((_) async {
-    // Update step cache only if calendars actually changed
+  // Emit cached steps immediately
+  final initialResult = await stepRepository.getProjectSteps(encodedProjectPath);
+  final initialSteps = await initialResult.when(
+    success: (steps) async {
+      if (steps.isNotEmpty) return steps;
+      await stepRepository.ensureDefaultStep(encodedProjectPath);
+      final secondTry = await stepRepository.getProjectSteps(encodedProjectPath);
+      return secondTry.when(success: (s) => s, failure: (_) => <ProjectStep>[]);
+    },
+    failure: (_) async => <ProjectStep>[],
+  );
+  yield initialSteps;
+
+  // React to calendar changes and refresh cache when needed
+  await for (final _ in ref.watch(calendarListProvider.stream)) {
     final calendars = await ref.watch(calendarRepositoryProvider).getAll().then((r) => r.when(
-      success: (cals) => cals,
-      failure: (_) => <TaskCalendar>[],
-    ));
+          success: (cals) => cals,
+          failure: (_) => <TaskCalendar>[],
+        ));
     await stepRepository.refreshIfChanged(calendars);
     final result = await stepRepository.getProjectSteps(encodedProjectPath);
-    return await result.when(
-      success: (steps) async {
-        if (steps.isNotEmpty) return steps;
-        // Auto-heal: create a default step when none exist
-        await stepRepository.ensureDefaultStep(encodedProjectPath);
-        final secondTry = await stepRepository.getProjectSteps(encodedProjectPath);
-        return secondTry.when(
-          success: (s) => s,
-          failure: (_) => <ProjectStep>[],
-        );
-      },
+    final steps = await result.when(
+      success: (s) async => s,
       failure: (_) async => <ProjectStep>[],
     );
-  });
+    yield steps;
+  }
 });
 
 // Project sharing notification provider - reactive to user preferences changes

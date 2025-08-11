@@ -49,6 +49,21 @@ class ProjectPopupMenu extends ConsumerWidget {
 
     return [
       PopupMenuItem<String>(
+        value: 'see_details',
+        child: Row(
+          children: [
+            Icon(
+              Icons.open_in_new_rounded,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            const SizedBox(width: 8),
+            const Text('See details'),
+          ],
+        ),
+      ),
+      const PopupMenuDivider(),
+      PopupMenuItem<String>(
         value: project?.flowitAsFlow == true || (project?.flowitType.toUpperCase() == 'WORKFLOW')
             ? 'convert_to_project'
             : 'convert_to_workflow',

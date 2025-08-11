@@ -18,38 +18,57 @@ class MainNavigation extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final List<_NavItem> items = [
+      _NavItem(
+        label: 'My task',
+        icon: Icons.task_alt_rounded,
+        route: '/today',
+        isSelected: (d) => isDesktop && (d == AppDestination.today || d == AppDestination.soon || d == AppDestination.anytime),
+      ),
+      _NavItem(
+        label: 'My workflow',
+        icon: Icons.route_rounded,
+        route: '/workflows',
+        isSelected: (d) => isDesktop && d == AppDestination.workflows,
+      ),
+      _NavItem(
+        label: 'My Projects',
+        icon: Icons.folder_rounded,
+        route: '/projects',
+        isSelected: (d) => isDesktop && d == AppDestination.projects,
+      ),
+    ];
+
     return Column(
-      children: AppDestination.values.map((destination) {
-        // Only show selected state on desktop, not on mobile
-        final isSelected = isDesktop && destination == currentDestination;
+      children: items.map((item) {
+        final bool selected = item.isSelected(currentDestination);
         final borderRadius = isDesktop ? BorderRadius.circular(12) : BorderRadius.zero;
-        
+
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           child: Material(
-            color: isSelected 
+            color: selected
                 ? Theme.of(context).colorScheme.secondaryContainer
                 : Colors.transparent,
             borderRadius: borderRadius,
             child: ListTile(
               leading: Icon(
-                destination.icon,
-                color: isSelected
+                item.icon,
+                color: selected
                     ? Theme.of(context).colorScheme.onSecondaryContainer
                     : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               title: Text(
-                destination.label,
+                item.label,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isSelected
+                  color: selected
                       ? Theme.of(context).colorScheme.onSecondaryContainer
                       : Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
               onTap: () {
-                context.go(destination.route);
-                // Close drawer on mobile using provided controller
+                context.go(item.route);
                 if (!isDesktop) {
                   final closeDrawer = ref.read(drawerControllerProvider);
                   closeDrawer?.call();
@@ -66,3 +85,17 @@ class MainNavigation extends ConsumerWidget {
     );
   }
 } 
+
+class _NavItem {
+  const _NavItem({
+    required this.label,
+    required this.icon,
+    required this.route,
+    required this.isSelected,
+  });
+
+  final String label;
+  final IconData icon;
+  final String route;
+  final bool Function(AppDestination?) isSelected;
+}

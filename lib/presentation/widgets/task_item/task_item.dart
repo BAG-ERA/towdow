@@ -7,7 +7,7 @@ import '../../../data/services/validator_service.dart';
 import 'task_item_titlebar.dart';
 import 'task_item_description.dart';
 import 'task_item_validatorlist.dart';
-import 'task_item_toolbar.dart';
+import '../utils/popup/task_item_popup.dart';
 
 class TaskItemController {
   _TaskItemState? _state;
@@ -43,6 +43,7 @@ class TaskItem extends StatefulWidget {
 
 class _TaskItemState extends State<TaskItem> {
   bool _isExpanded = false;
+  final GlobalKey _cardKey = GlobalKey();
 
   @override
   void initState() {
@@ -77,6 +78,7 @@ class _TaskItemState extends State<TaskItem> {
     final isCompleted = widget.task.status == 'COMPLETED';
 
     return Container(
+      key: _cardKey,
       margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
       decoration: BoxDecoration(
         color: Colors.transparent,
@@ -97,10 +99,32 @@ class _TaskItemState extends State<TaskItem> {
               isExpanded: _isExpanded,
               isCompleted: isCompleted,
               onToggleComplete: () => _handleTaskCompletion(),
-              onToggleExpanded: () {
-                setState(() {
-                  _isExpanded = !_isExpanded;
-                });
+              onToggleExpanded: () async {
+                if (!_isExpanded) {
+                  final sourceContext = _cardKey.currentContext;
+                  if (sourceContext != null) {
+                    await TaskItemPopup.showFromContext(
+                      context,
+                      sourceContext: sourceContext,
+                      task: widget.task,
+                      onTaskUpdated: widget.onTaskUpdated,
+                      onTaskDeleted: widget.onTaskDeleted,
+                      onToggleComplete: widget.onToggleComplete,
+                    );
+                  } else {
+                    await TaskItemPopup.show(
+                      context,
+                      task: widget.task,
+                      onTaskUpdated: widget.onTaskUpdated,
+                      onTaskDeleted: widget.onTaskDeleted,
+                      onToggleComplete: widget.onToggleComplete,
+                    );
+                  }
+                } else {
+                  setState(() {
+                    _isExpanded = false;
+                  });
+                }
               },
               onTaskUpdated: widget.onTaskUpdated,
             ),
@@ -122,13 +146,7 @@ class _TaskItemState extends State<TaskItem> {
                 onTaskUpdated: widget.onTaskUpdated,
               ),
               
-              // Action buttons toolbar
-              const SizedBox(height: 4),
-              TaskItemToolbar(
-                task: widget.task,
-                onTaskUpdated: widget.onTaskUpdated,
-                onTaskDeleted: widget.onTaskDeleted,
-              ),
+              // Toolbar removed from extended item; shown externally in popup layout
             ],
           ],
         ),

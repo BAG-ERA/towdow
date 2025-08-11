@@ -34,6 +34,8 @@ class StepContainer extends StatelessWidget {
   final VoidCallback? onMarkAsFinal;
   final VoidCallback? onDelete;
   final String? markAsFinalLabel;
+  // Optional extra actions to display before the popup menu in the header
+  final Widget? extraTrailing;
 
   const StepContainer({
     super.key,
@@ -61,6 +63,7 @@ class StepContainer extends StatelessWidget {
     this.onMarkAsFinal,
     this.onDelete,
     this.markAsFinalLabel,
+    this.extraTrailing,
   });
 
   @override
@@ -75,7 +78,7 @@ class StepContainer extends StatelessWidget {
           count: count,
           onExpandAll: onExpandAll,
           onCollapseAll: onCollapseAll,
-          trailing: trailing ?? _buildPopupMenu(context),
+          trailing: trailing ?? _composeTrailing(context),
           draggable: draggable,
           dragHandle: dragHandle,
           editable: editable,
@@ -111,6 +114,19 @@ class StepContainer extends StatelessWidget {
             );
           },
         ),
+      ],
+    );
+  }
+
+  Widget? _composeTrailing(BuildContext context) {
+    final popup = _buildPopupMenu(context);
+    if (extraTrailing == null && popup == null) return null;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (extraTrailing != null) extraTrailing!,
+        if (extraTrailing != null && popup != null) const SizedBox(width: 8),
+        if (popup != null) popup,
       ],
     );
   }

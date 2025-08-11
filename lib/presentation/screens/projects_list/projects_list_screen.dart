@@ -11,6 +11,7 @@ import '../../viewmodels/project_list_viewmodel.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../../data/models/task_calendar.dart';
+import '../../../core/theme/chart_theme_usage.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/project-list/projects_table.dart';
 import '../../widgets/utils/buttons/create_project_button.dart';
@@ -40,13 +41,13 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   void _applyFilter() {
     switch (_selectedTabIndex) {
       case 0:
-        ref.read(projectListViewModelProvider.notifier).setFilter(ProjectFilter.all);
-        break;
-      case 1:
         ref.read(projectListViewModelProvider.notifier).setFilter(ProjectFilter.active);
         break;
-      case 2:
+      case 1:
         ref.read(projectListViewModelProvider.notifier).setFilter(ProjectFilter.completed);
+        break;
+      case 2:
+        ref.read(projectListViewModelProvider.notifier).setFilter(ProjectFilter.all);
         break;
     }
   }
@@ -63,17 +64,13 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Colors.transparent,
-        actions: [
-          _buildCreateProjectButton(),
-          const SizedBox(width: 16),
-        ],
-        bottom: PreferredSize(
+          bottom: PreferredSize(
           preferredSize: const Size.fromHeight(80),
           child: StyledTabBar(
             items: const [
-              StyledTabItem(label: 'All'),
               StyledTabItem(label: 'Ongoing'),
               StyledTabItem(label: 'Archived'),
+              StyledTabItem(label: 'All'),
             ],
             selectedIndex: _selectedTabIndex,
             onTabSelected: (index) {
@@ -86,13 +83,17 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
         ),
       ) : null,
       body: _buildBody(projectListState),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: SafeArea(
+        child: _buildCreateProjectButton(),
+      ),
     );
   }
 
 
 
   Widget _buildCreateProjectButton() {
-    return CreateProjectButton.compact(
+    return CreateProjectButton.prominent(
       onProjectCreated: (projectName) {
         ref.read(projectListViewModelProvider.notifier).refresh();
       },
@@ -141,13 +142,31 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
 
     return RefreshIndicator(
       onRefresh: () => ref.read(projectListViewModelProvider.notifier).refresh(),
-      child: ProjectsTable(
-        state: state,
-        onProjectTap: _navigateToProject,
-        onProjectAction: _handleProjectAction,
-        onSortChanged: (sortType) {
-          ref.read(projectListViewModelProvider.notifier).setSortBy(sortType);
-        },
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          for (final group in state.domainGroups)
+            _DomainTableSection(
+              title: group.domain,
+              projects: group.projects,
+              isExpanded: ref.read(projectListViewModelProvider.notifier).isDomainExpanded(group.domain),
+              onToggle: () => ref.read(projectListViewModelProvider.notifier).toggleDomainExpansion(group.domain),
+              buildTable: (projects) => ProjectsTable(
+                state: state,
+                projectsOverride: projects,
+                onProjectTap: _navigateToProject,
+                onProjectAction: _handleProjectAction,
+                onSortChanged: (sortType) {
+                  ref.read(projectListViewModelProvider.notifier).setSortBy(sortType);
+                },
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: _ProjectsExplanationHeader(),
+          ),
+          const SizedBox(height: 96),
+        ],
       ),
     );
   }
@@ -185,6 +204,9 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
       case 'copy_path':
         AppLogger.info('Copy project path: ${projectWithStats.project.path}');
         _copyProjectPath(projectWithStats.project);
+        break;
+      case 'see_details':
+        _navigateToProject(projectWithStats.project);
         break;
     }
   }
@@ -273,6 +295,92 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   void _navigateToProject(TaskCalendar project) {
     final encodedPath = Uri.encodeComponent(project.path);
     context.go('/project/$encodedPath');
+  }
+}
+
+class _ProjectsExplanationHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Projects are conventional containers that group related tasks. '
+            'Use them to organize work like app development, event planning, or any multi-step initiative. '
+            'This table lets you browse, sort, and manage your projects at a glance.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DomainTableSection extends StatelessWidget {
+  final String title;
+  final List<ProjectWithStats> projects;
+  final Widget Function(List<ProjectWithStats>) buildTable;
+  final bool isExpanded;
+  final VoidCallback? onToggle;
+
+  const _DomainTableSection({
+    required this.title,
+    required this.projects,
+    required this.buildTable,
+    this.isExpanded = true,
+    this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: InkWell(
+              onTap: onToggle,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: context.domainNameStyle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Icon(
+                      isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (isExpanded) ...[
+            const SizedBox(height: 8),
+            buildTable(projects),
+          ],
+        ],
+      ),
+    );
   }
 }
 

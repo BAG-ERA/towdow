@@ -326,7 +326,7 @@ class StepRepository {
           _stepCache[changed.id] = changed;
         }
 
-        // Only persist and sync if any status actually changed
+        // Detect if any step data changed
         bool anyChanged = false;
         for (int i = 0; i < steps.length; i++) {
           if (steps[i].status != updatedSteps[i].status ||
@@ -337,11 +337,23 @@ class StepRepository {
           }
         }
 
-        if (!anyChanged) {
+        // If a step marked as end of workflow is completed, mark the workflow as COMPLETED
+        final bool finalStepCompleted = updatedSteps.any((s) => s.endWorkflow && s.status == StepStatus.completed);
+        final String currentProjectStatus = (calendar.flowitStatus ?? 'ONGOING').toUpperCase();
+        final bool shouldCompleteWorkflow = finalStepCompleted && currentProjectStatus != 'COMPLETED';
+
+        // If neither steps nor workflow status need update, short-circuit
+        if (!anyChanged && !shouldCompleteWorkflow) {
           return const Result.success(null);
         }
 
-        final updatedCal = calendar.withProjectSteps(updatedSteps);
+        // Build updated calendar with new steps and possibly updated status/end date
+        var updatedCal = calendar.withProjectSteps(updatedSteps);
+        if (shouldCompleteWorkflow) {
+          AppLogger.info('StepRepository: Final step completed; marking workflow as COMPLETED for project ${calendar.path}');
+          updatedCal = updatedCal.withStatus('COMPLETED').markAsEnded();
+        }
+
         final saveRes = await _calendarRepository.save(updatedCal);
         return saveRes.when(
           success: (_) async {

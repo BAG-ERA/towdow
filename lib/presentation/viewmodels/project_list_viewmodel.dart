@@ -942,7 +942,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
 
   /// Get domain expansion state
   bool isDomainExpanded(String domain) {
-    return state.domainExpandedState[domain] ?? false;
+    // Default to expanded when no explicit state is stored
+    return state.domainExpandedState[domain] ?? true;
   }
 
   /// Assign domain to project

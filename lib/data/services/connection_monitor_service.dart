@@ -2,7 +2,6 @@
 // Triggers upload queue processing when connection is restored
 
 import 'dart:async';
-import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../core/logger.dart';
 
@@ -28,9 +27,7 @@ class ConnectionMonitorService {
   
   // Configuration
   static const Duration _checkInterval = Duration(seconds: 10);
-  static const String _testHost = 'api.towdow.app';
-  static const int _testPort = 80;
-  static const Duration _testTimeout = Duration(seconds: 5);
+  // Simple, interface-only connectivity check (no reachability probes)
   
   /// Stream of connection status changes
   Stream<ConnectionStatus> get statusStream => _statusController.stream;
@@ -92,34 +89,12 @@ class ConnectionMonitorService {
       if (connectivityResults.contains(ConnectivityResult.none) || connectivityResults.isEmpty) {
         AppLogger.debug('ConnectionMonitorService: No network interface available');
         _updateStatus(ConnectionStatus.disconnected);
-        return;
+      } else {
+        _updateStatus(ConnectionStatus.connected);
       }
-      
-      // Test actual internet connectivity
-      AppLogger.debug('ConnectionMonitorService: Testing actual internet connection...');
-      final isConnected = await _testInternetConnection();
-      AppLogger.debug('ConnectionMonitorService: Internet connection test result: $isConnected');
-      
-      final newStatus = isConnected ? ConnectionStatus.connected : ConnectionStatus.disconnected;
-      
-      _updateStatus(newStatus);
     } catch (e) {
       AppLogger.warning('ConnectionMonitorService: Failed to check connectivity: $e');
       _updateStatus(ConnectionStatus.unknown);
-    }
-  }
-
-  /// Test actual internet connection by connecting to a reliable host
-  Future<bool> _testInternetConnection() async {
-    try {
-      AppLogger.debug('ConnectionMonitorService: Attempting socket connection to $_testHost:$_testPort');
-      final socket = await Socket.connect(_testHost, _testPort, timeout: _testTimeout);
-      socket.destroy();
-      AppLogger.debug('ConnectionMonitorService: Socket connection successful');
-      return true;
-    } catch (e) {
-      AppLogger.debug('ConnectionMonitorService: Internet connection test failed: $e');
-      return false;
     }
   }
 

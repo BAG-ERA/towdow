@@ -18,12 +18,14 @@ class TaskCreationDialog extends ConsumerStatefulWidget {
   final List<String>? initialCategories; // Optional initial categories to assign
 
   final bool workflowVariant; // When true, show Profile/Attendee compact widgets
+  final String? stepId; // Optional step to assign the task to
 
   const TaskCreationDialog({
     super.key,
     this.projectPath,
     this.initialCategories,
     this.workflowVariant = false,
+    this.stepId,
   });
 
   @override
@@ -388,6 +390,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         attendees: selectedAttendees,
         projectPath: widget.projectPath,
         flowitRequirement: flowitRequirement,
+        stepId: widget.stepId,
       );
 
               // Check if there was an error during creation

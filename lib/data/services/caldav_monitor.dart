@@ -457,6 +457,12 @@ class CalDAVMonitor {
           int existingCount = 0;
           
           for (final serverCalendar in availableCalendars) {
+            // Skip calendars with pending deletion in sync queue to avoid UI re-introducing them
+            final pendingDeletion = await _syncService.hasPendingDeletionForCalendar(serverCalendar.path);
+            if (pendingDeletion) {
+              AppLogger.info('CalDAVMonitor: Skipping discovered calendar pending deletion: ${serverCalendar.path}');
+              continue;
+            }
             final existingCalendarResult = await _calendarRepository.getByPath(serverCalendar.path);
             await existingCalendarResult.when(
               success: (existingCalendar) async {

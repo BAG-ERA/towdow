@@ -30,9 +30,8 @@ class ProjectBottleneckView extends ConsumerWidget {
     final stepsAsync = ref.watch(projectStepsProvider(projectPath));
     final requirementsAsync = ref.watch(projectRequirementsProvider(projectPath));
 
-    if (stepsAsync.isLoading || requirementsAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    // Local-first: render with whatever is available; show a thin progress when any is still loading
+    final isLoading = stepsAsync.isLoading || requirementsAsync.isLoading;
     if (stepsAsync.hasError) {
       return Center(child: Text('Error loading steps: ${stepsAsync.error}'));
     }
@@ -110,17 +109,25 @@ class ProjectBottleneckView extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: (availableWidth > totalWidth ? availableWidth : totalWidth)),
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (int i = 0; i < state.columns.length; i++) ...[
-                  _StepColumnWidget(
-                    column: state.columns[i],
-                    width: widths[i],
-                    getRequirementColor: (id) => requirementColor.colorFor(id),
-                  ),
-                  if (i < state.columns.length - 1) SizedBox(width: columnGap),
-                ],
+                if (isLoading)
+                  const LinearProgressIndicator(minHeight: 2),
+                if (isLoading) const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (int i = 0; i < state.columns.length; i++) ...[
+                      _StepColumnWidget(
+                        column: state.columns[i],
+                        width: widths[i],
+                        getRequirementColor: (id) => requirementColor.colorFor(id),
+                      ),
+                      if (i < state.columns.length - 1) SizedBox(width: columnGap),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),

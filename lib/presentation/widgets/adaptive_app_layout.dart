@@ -243,8 +243,22 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-            tooltip: 'Back to navigation',
+            onPressed: () {
+              // On mobile detail pages, navigate back to the corresponding list
+              if (location.startsWith('/project/')) {
+                context.go('/projects');
+              } else if (location.startsWith('/workflow/')) {
+                context.go('/workflows');
+              } else {
+                // Fallback: open navigation drawer
+                Scaffold.of(context).openDrawer();
+              }
+            },
+            tooltip: location.startsWith('/project/')
+                ? 'Back to projects'
+                : location.startsWith('/workflow/')
+                    ? 'Back to workflows'
+                    : 'Back to navigation',
           ),
         ),
         actions: location.startsWith('/project/') 

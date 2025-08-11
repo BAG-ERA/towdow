@@ -22,7 +22,7 @@ import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/project_detail/project_kanban_view.dart';
 import '../../widgets/project_detail/project_infos_widget.dart';
-import '../../widgets/project_detail/project_bottleneck_view.dart';
+import '../../widgets/project_detail/project_warnings_banner.dart';
 
 // Provider for a specific project/calendar that watches only this specific calendar
 final projectProvider = StreamProvider.family<TaskCalendar?, String>((ref, projectPath) {
@@ -121,8 +121,12 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             width: 320,
             child: Column(
               children: [
-                // Project title and full project info
-                _buildDesktopHeader(context, projectAsync, tasksAsync),
+                // Project title and full project info (scrollable to avoid overflow)
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: _buildDesktopHeader(context, projectAsync, tasksAsync),
+                  ),
+                ),
               ],
             ),
           ),
@@ -227,13 +231,66 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Project Details Widget (replacing ProjectInfoCard)
+                  // Warnings banner on mobile (if any)
                   projectAsync.when(
-                    data: (project) => project != null 
-                        ? ProjectInfosWidget(
-                            project: project,
-                            tasksAsync: tasksAsync,
-                            onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                    data: (project) => project != null
+                        ? ProjectWarningsBanner(project: project, tasksAsync: tasksAsync)
+                        : const SizedBox.shrink(),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+                  // Project Details - collapsible on mobile
+                  projectAsync.when(
+                    data: (project) => project != null
+                        ? Column(
+                            children: [
+                              // Collapsible header with tasks count
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: ExpansionTile(
+                                  initiallyExpanded: false,
+                                  backgroundColor: Colors.transparent,
+                                  collapsedBackgroundColor: Colors.transparent,
+                                  tilePadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                                  title: tasksAsync.when(
+                                    data: (tasks) {
+                                      final completed = tasks.where((t) => t.status == 'COMPLETED').length;
+                                      final total = tasks.length;
+                                      return Text(
+                                        'Tasks $completed/$total',
+                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                                      );
+                                    },
+                                    loading: () => Text(
+                                      'Tasks ...',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                                    ),
+                                    error: (_, __) => Text(
+                                      'Tasks 0/0',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: ProjectInfosWidget(
+                                        project: project,
+                                        tasksAsync: tasksAsync,
+                                        onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Separator under the header
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Divider(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                                  height: 1,
+                                ),
+                              ),
+                            ],
                           )
                         : Container(
                             margin: const EdgeInsets.all(16),
@@ -253,8 +310,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                   child: Text(
                                     'Project not found: ${widget.projectPath}',
                                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Theme.of(context).colorScheme.onErrorContainer,
-                                    ),
+                                          color: Theme.of(context).colorScheme.onErrorContainer,
+                                        ),
                                   ),
                                 ),
                               ],
@@ -293,8 +350,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                             child: Text(
                               'Failed to load project: $error',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.onErrorContainer,
-                              ),
+                                    color: Theme.of(context).colorScheme.onErrorContainer,
+                                  ),
                             ),
                           ),
                         ],
@@ -394,10 +451,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             icon: Icons.checklist_rounded,
           ),
           StyledTabItem(
-            label: 'Bottleneck',
-            icon: Icons.timeline,
-          ),
-          StyledTabItem(
             label: 'Timing',
             icon: Icons.schedule_rounded,
           ),
@@ -425,11 +478,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         tasksAsync: tasksAsync,
         onTasksRefresh: () => _refreshProjectTasks(ref),
       ),
-      1 => _buildBottleneckView(context, ref, tasksAsync),
-      2 => _buildTimingView(context, ref, tasksAsync),
-      3 => _buildAttendeeView(context, ref, tasksAsync),
-      4 => _buildKanbanView(context, ref, tasksAsync),
-      5 => _buildAgendaView(context, ref, tasksAsync),
+      1 => _buildTimingView(context, ref, tasksAsync),
+      2 => _buildAttendeeView(context, ref, tasksAsync),
+      3 => _buildKanbanView(context, ref, tasksAsync),
+      4 => _buildAgendaView(context, ref, tasksAsync),
       _ => ProjectTaskListView(
         projectPath: widget.projectPath,
         tasksAsync: tasksAsync,
@@ -912,18 +964,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     ref.invalidate(projectTasksProvider(widget.projectPath));
   }
 
-  // Bottleneck View
-  Widget _buildBottleneckView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
-    return tasksAsync.when(
-      data: (tasks) => ProjectBottleneckView(
-        projectPath: widget.projectPath,
-        tasks: tasks,
-        onTasksRefresh: () => _refreshProjectTasks(ref),
-      ),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('Error loading tasks: $error')),
-    );
-  }
+  
 
   Future<void> _updateProject(TaskCalendar updatedProject) async {
     try {

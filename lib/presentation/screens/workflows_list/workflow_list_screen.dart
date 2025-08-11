@@ -14,6 +14,7 @@ import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/utils/buttons/create_workflow_button.dart';
 import '../../widgets/navbar/workflow_popup_menu.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
+import '../../../core/theme/chart_theme_usage.dart';
 
 class WorkflowListScreen extends ConsumerStatefulWidget {
   const WorkflowListScreen({super.key});
@@ -37,13 +38,13 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   void _applyFilter() {
     switch (_selectedTabIndex) {
       case 0:
-        ref.read(workflowListViewModelProvider.notifier).setFilter(ProjectFilter.all);
-        break;
-      case 1:
         ref.read(workflowListViewModelProvider.notifier).setFilter(ProjectFilter.active);
         break;
-      case 2:
+      case 1:
         ref.read(workflowListViewModelProvider.notifier).setFilter(ProjectFilter.completed);
+        break;
+      case 2:
+        ref.read(workflowListViewModelProvider.notifier).setFilter(ProjectFilter.all);
         break;
     }
   }
@@ -61,17 +62,13 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
               elevation: 0,
               backgroundColor: Theme.of(context).colorScheme.surface,
               surfaceTintColor: Colors.transparent,
-              actions: [
-                _buildCreateWorkflowButton(context),
-                const SizedBox(width: 16),
-              ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(80),
                 child: StyledTabBar(
                   items: const [
-                    StyledTabItem(label: 'All'),
                     StyledTabItem(label: 'Ongoing'),
                     StyledTabItem(label: 'Archived'),
+                    StyledTabItem(label: 'All'),
                   ],
                   selectedIndex: _selectedTabIndex,
                   onTabSelected: (index) {
@@ -85,11 +82,15 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
             )
           : null,
       body: _buildBody(state),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: SafeArea(
+        child: _buildCreateWorkflowButton(context),
+      ),
     );
   }
 
   Widget _buildCreateWorkflowButton(BuildContext context) {
-    return CreateWorkflowButton.compact(
+    return CreateWorkflowButton.prominent(
       onWorkflowCreated: () {
         ref.read(workflowListViewModelProvider.notifier).refresh();
       },
@@ -108,14 +109,62 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
     }
     return RefreshIndicator(
       onRefresh: () => ref.read(workflowListViewModelProvider.notifier).refresh(),
-      child: ProjectsTable(
-        state: state,
-        onProjectTap: _navigateToWorkflow,
-        onProjectAction: _handleWorkflowAction,
-        onSortChanged: (sortType) {
-          ref.read(workflowListViewModelProvider.notifier).setSortBy(sortType);
-        },
-        menuBuilder: (context, ref, project) => WorkflowPopupMenu.getMenuItems(context, ref, project: project),
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          for (final group in state.domainGroups)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: InkWell(
+                      onTap: () => ref.read(workflowListViewModelProvider.notifier).toggleDomainExpansion(group.domain),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                group.domain,
+                                style: context.domainNameStyle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Icon(
+                              ref.read(workflowListViewModelProvider.notifier).isDomainExpanded(group.domain)
+                                  ? Icons.expand_less_rounded
+                                  : Icons.expand_more_rounded,
+                              size: 20,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (ref.read(workflowListViewModelProvider.notifier).isDomainExpanded(group.domain)) ...[
+                    const SizedBox(height: 8),
+                    ProjectsTable(
+                      state: state,
+                      projectsOverride: group.projects,
+                      onProjectTap: _navigateToWorkflow,
+                      onProjectAction: _handleWorkflowAction,
+                      onSortChanged: (sortType) {
+                        ref.read(workflowListViewModelProvider.notifier).setSortBy(sortType);
+                      },
+                      menuBuilder: (context, ref, project) => WorkflowPopupMenu.getMenuItems(context, ref, project: project),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          const SizedBox(height: 96),
+        ],
       ),
     );
   }
@@ -127,6 +176,12 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
 
   void _handleWorkflowAction(String action, ProjectWithStats projectWithStats) {
     switch (action) {
+      case 'see_details':
+        _navigateToWorkflow(projectWithStats.project);
+        break;
+      case 'duplicate_workflow':
+        _duplicateWorkflow(projectWithStats.project);
+        break;
       case 'convert_to_project':
         _convertWorkflowToProject(projectWithStats.project);
         break;
@@ -178,6 +233,47 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
     }
   }
 
+  Future<void> _duplicateWorkflow(TaskCalendar project) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController(text: '${project.displayName} (copy)');
+        return AlertDialog(
+          title: const Text('Duplicate workflow'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'New workflow name'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('Create')),
+          ],
+        );
+      },
+    );
+    if (name == null || name.isEmpty) return;
+
+    final workflowService = ref.read(workflowServiceProvider);
+    final result = await workflowService.duplicateWorkflow(
+      sourceCalendarPath: project.path,
+      newDisplayName: name,
+    );
+    await result.when(
+      success: (newPath) async {
+        final encoded = Uri.encodeComponent(newPath);
+        if (mounted) context.go('/workflow/$encoded');
+      },
+      failure: (f) async {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to duplicate: ${f.message}')),
+          );
+        }
+      },
+    );
+  }
+
   void _copyWorkflowPath(TaskCalendar project) {
     Clipboard.setData(ClipboardData(text: project.path));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -185,5 +281,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
     );
   }
 }
+
+// Removed unused _WorkflowsExplanationHeader after domain grouping refactor
 
 

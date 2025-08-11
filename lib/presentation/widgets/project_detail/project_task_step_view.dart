@@ -14,18 +14,21 @@ import '../task_item/task_item.dart';
 import '../step_item/step_container.dart';
 import '../step_item/step_tasklist.dart';
 import '../utils/popup/step_dialog.dart';
+import '../utils/popup/task_creation_dialog.dart';
 import '../../screens/project_detail/project_detail_screen.dart' show projectProvider;
 
 class ProjectTaskStepView extends ConsumerStatefulWidget {
   final String projectPath;
   final AsyncValue<List<Task>> tasksAsync;
   final VoidCallback? onTasksRefresh;
+  final bool workflowVariant;
 
   const ProjectTaskStepView({
     super.key,
     required this.projectPath,
     required this.tasksAsync,
     this.onTasksRefresh,
+    this.workflowVariant = false,
   });
 
   @override
@@ -89,6 +92,13 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                         count: tasksByStep['unassigned']!.length,
                         onExpandAll: _expandAllTasks,
                         onCollapseAll: _collapseAllTasks,
+                        extraTrailing: widget.workflowVariant
+                            ? TextButton.icon(
+                                onPressed: () => _addTaskInStep(context, ref, null),
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: const Text('Add task'),
+                              )
+                            : null,
                         isEmpty: false,
                         child: StepTaskList(
                           sectionKey: 'unassigned',
@@ -125,6 +135,13 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                         count: tasksByStep[steps[idx].id]?.length ?? 0,
                         onExpandAll: _expandAllTasks,
                         onCollapseAll: _collapseAllTasks,
+                        extraTrailing: widget.workflowVariant
+                            ? TextButton.icon(
+                                onPressed: () => _addTaskInStep(context, ref, steps[idx].id),
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: const Text('Add task'),
+                              )
+                            : null,
                         canMoveUp: (isStoppedFlow ? steps[idx].status != StepStatus.completed : !isOngoingFlow) && idx > 0,
                         canMoveDown: (isStoppedFlow ? steps[idx].status != StepStatus.completed : !isOngoingFlow) && idx < steps.length - 1,
                         onMoveUp: () async {
@@ -505,6 +522,21 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
     final taskViewModel = ref.read(taskViewModelProvider.notifier);
     await taskViewModel.deleteTask(task.uid);
     widget.onTasksRefresh?.call();
+  }
+
+  Future<void> _addTaskInStep(BuildContext context, WidgetRef ref, String? stepId) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => TaskCreationDialog(
+        projectPath: widget.projectPath,
+        workflowVariant: true,
+        stepId: stepId,
+      ),
+    );
+    if (result != null && mounted) {
+      widget.onTasksRefresh?.call();
+      ref.invalidate(projectTasksProvider(widget.projectPath));
+    }
   }
 
   Color _colorForStepStatus(BuildContext context, StepStatus status) {

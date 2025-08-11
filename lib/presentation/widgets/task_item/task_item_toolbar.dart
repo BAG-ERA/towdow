@@ -1,7 +1,6 @@
 // Task item toolbar component
-// Contains all action buttons with responsive behavior and dialog handling
+// Contains all action buttons with vertical layout (icon + text) and dialog handling
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/task.dart';
@@ -15,106 +14,60 @@ class TaskItemToolbar extends ConsumerWidget {
   final Task task;
   final Function(Task)? onTaskUpdated;
   final VoidCallback? onTaskDeleted;
+  // If true, shows a vertical toolbar with icon + text entries.
+  final bool vertical;
+  // If true in vertical mode, align tiles to the right edge (used when toolbar is on the left side of the card)
+  final bool alignRight;
 
   const TaskItemToolbar({
     super.key,
     required this.task,
     this.onTaskUpdated,
     this.onTaskDeleted,
+    this.vertical = false,
+    this.alignRight = false,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Prevent toolbar clicks from bubbling up to parent task item widgets
+    // Always render vertical toolbar
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () {
-        // Absorb tap events to prevent them from reaching parent widgets
-      },
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+      onTap: () {},
+      child: Column(
+        crossAxisAlignment: alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-        // Primary actions - always visible
-        _buildPrimaryAction(
-          context: context,
-          icon: Icons.calendar_today_rounded,
-          tooltip: 'Set Due Date',
-          onPressed: () => DueDateDialog.show(
-            context,
-            task: task,
-            onTaskUpdated: onTaskUpdated,
+          _buildVerticalAction(
+            context: context,
+            icon: Icons.calendar_today_rounded,
+            label: 'Due date',
+            onPressed: () => DueDateDialog.show(
+              context,
+              task: task,
+              onTaskUpdated: onTaskUpdated,
+            ),
           ),
-        ),
-        const SizedBox(width: 4),
-        
-        // Validator button (organizer only)
-        if (_isOrganizer()) ...[
-                      _buildValidatorPopupButton(context, ref),
-          const SizedBox(width: 4),
-        ],
-        
-        _buildPrimaryAction(
-          context: context,
-          icon: Icons.person_add_rounded,
-          tooltip: 'Add Attendee',
-          onPressed: () => _showAttendeeDialog(context),
-        ),
-        const SizedBox(width: 4),
-        
-        // Secondary actions menu
-        _buildSecondaryActionsMenu(context),
-        ],
+          if (_isOrganizer()) _buildVerticalValidatorAction(context, ref),
+          _buildVerticalAction(
+            context: context,
+            icon: Icons.person_add_rounded,
+            label: 'Attendee',
+            onPressed: () => _showAttendeeDialog(context),
+          ),
+          _buildVerticalMenu(context),
+        ].expand<Widget>((w) => [w, const SizedBox(height: 8)]).toList(),
       ),
     );
   }
 
-  /// Builds a primary action button (always visible)
-  Widget _buildPrimaryAction({
-    required BuildContext context,
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onPressed,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    return Tooltip(
-      message: tooltip,
-      waitDuration: const Duration(milliseconds: 500),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onPressed,
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            size: 20,
-            color: colorScheme.onSurface.withValues(alpha: 0.6),
-          ),
-        ),
-      ),
-    );
-  }
+  // Secondary actions menu trigger for vertical layout (internal helper)
+  // Note: kept for future API parity if needed
 
-  /// Builds the secondary actions menu with vertical 3-dot icon
-  Widget _buildSecondaryActionsMenu(BuildContext context) {
+  // Vertical variant of 3-dots menu rendered as a labeled row
+  Widget _buildVerticalMenu(BuildContext context) {
     return PopupMenuButton<String>(
-      icon: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          Icons.more_vert_rounded,
-          size: 20,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-        ),
-      ),
-      tooltip: 'More Actions',
+      tooltip: '',
       onSelected: (action) => _handleMenuAction(context, action),
       itemBuilder: (context) => [
         const PopupMenuItem(
@@ -133,14 +86,6 @@ class TaskItemToolbar extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
           ),
         ),
-//        const PopupMenuItem(
-//          value: 'gps',
-//          child: ListTile(
-//            leading: Icon(Icons.pin_drop),
-//            title: Text('Add GPS Location'),
-//            contentPadding: EdgeInsets.zero,
-//          ),
-//        ),
         const PopupMenuItem(
           value: 'delete',
           child: ListTile(
@@ -149,39 +94,24 @@ class TaskItemToolbar extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
           ),
         ),
-        if (kDebugMode)
-          const PopupMenuItem(
-            value: 'debug',
-            child: ListTile(
-              leading: Icon(Icons.info_rounded),
-              title: Text('Show UID'),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
       ],
+      child: const _ToolbarTile(icon: Icons.more_vert_rounded, label: 'More'),
     );
   }
 
+  Widget _buildVerticalAction({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return _ToolbarTile(icon: icon, label: label, onTap: onPressed);
+  }
 
-
-
-
-  Widget _buildValidatorPopupButton(BuildContext context, WidgetRef ref) {
+  Widget _buildVerticalValidatorAction(BuildContext context, WidgetRef ref) {
     return PopupMenuButton<String>(
-      offset: const Offset(0, 40),
-      icon: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          Icons.fact_check,
-          size: 20,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-        ),
-      ),
-      tooltip: 'Add Validator',
+      offset: const Offset(0, 36),
+      tooltip: '',
       onSelected: (validatorType) => _addValidator(context, ref, validatorType),
       itemBuilder: (context) => [
         const PopupMenuItem(
@@ -230,8 +160,11 @@ class TaskItemToolbar extends ConsumerWidget {
           ),
         ),
       ],
+      child: const _ToolbarTile(icon: Icons.fact_check, label: 'Validator'),
     );
   }
+  
+  // (removed old horizontal validator trigger)
 
   void _handleMenuAction(BuildContext context, String action) {
     switch (action) {
@@ -258,8 +191,6 @@ class TaskItemToolbar extends ConsumerWidget {
     // For now, return true to allow testing
     return true;
   }
-
-
 
   void _addValidator(BuildContext context, WidgetRef ref, String validatorType) {
     // Use ValidatorViewModel to add validator properly
@@ -390,4 +321,63 @@ class TaskItemToolbar extends ConsumerWidget {
       ),
     );
   }
-} 
+
+}
+
+class _ToolbarTile extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  const _ToolbarTile({required this.icon, required this.label, this.onTap});
+
+  @override
+  State<_ToolbarTile> createState() => _ToolbarTileState();
+}
+
+class _ToolbarTileState extends State<_ToolbarTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color base = Colors.white;
+    final Color bg = _hovered ? base.withValues(alpha: 1.0) : base.withValues(alpha: 0.7);
+    final content = AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(widget.icon, size: 16, color: Colors.black87),
+          const SizedBox(width: 6),
+          Text(
+            widget.label,
+            style: const TextStyle(fontSize: 12, color: Colors.black87),
+          ),
+        ],
+      ),
+    );
+
+    final tile = MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: widget.onTap != null
+          ? Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: widget.onTap,
+                child: content,
+              ),
+            )
+          : content,
+    );
+
+    return tile;
+  }
+}
