@@ -14,6 +14,7 @@ import '../task_item/task_item.dart';
 import '../step_item/step_container.dart';
 import '../step_item/step_tasklist.dart';
 import '../utils/popup/step_dialog.dart';
+import '../../screens/project_detail/project_detail_screen.dart' show projectProvider;
 
 class ProjectTaskStepView extends ConsumerStatefulWidget {
   final String projectPath;
@@ -62,6 +63,12 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
           _initializeControllers(s.id, tasksByStep[s.id] ?? const <Task>[]);
         }
         _initializeControllers('unassigned', tasksByStep['unassigned'] ?? const <Task>[]);
+
+        // Determine flow state for gating edits
+        final project = ref.watch(projectProvider(widget.projectPath)).asData?.value;
+        final isFlow = project?.flowitAsFlow == true;
+        final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
+        final isOngoingFlow = isFlow && status == 'ONGOING';
 
         return Column(
           children: [
@@ -117,8 +124,8 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                         count: tasksByStep[steps[idx].id]?.length ?? 0,
                         onExpandAll: _expandAllTasks,
                         onCollapseAll: _collapseAllTasks,
-                        canMoveUp: idx > 0,
-                        canMoveDown: idx < steps.length - 1,
+                        canMoveUp: !isOngoingFlow && idx > 0,
+                        canMoveDown: !isOngoingFlow && idx < steps.length - 1,
                         onMoveUp: () async {
                           final stepRepository = ref.read(stepRepositoryProvider);
                           final encodedProjectPath = widget.projectPath.replaceAll('@', '%40');
@@ -163,9 +170,9 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                             }
                           }
                         },
-                        draggable: true,
-                        dragHandle: _buildStepDragHandle(context, steps[idx]),
-                        editable: true,
+                        draggable: !isOngoingFlow,
+                        dragHandle: isOngoingFlow ? null : _buildStepDragHandle(context, steps[idx]),
+                        editable: !isOngoingFlow,
                         onTitleSubmitted: (newTitle) async {
                           final stepVm = ref.read(projectStepViewModelProvider(widget.projectPath).notifier);
                           await stepVm.updateStep(steps[idx].copyWith(name: newTitle));
@@ -175,6 +182,8 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                         },
                         isEmpty: (tasksByStep[steps[idx].id] ?? const <Task>[]).isEmpty,
                         statusColor: _colorForStepStatus(context, steps[idx].status),
+                        stepStatus: steps[idx].status,
+                        disabled: isOngoingFlow && steps[idx].status == StepStatus.waiting,
                         emptyChild: _buildEmptyStepPlaceholder(
                           context,
                           _colorForStepStatus(context, steps[idx].status),
@@ -190,12 +199,14 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                           },
                           onTaskDeleted: (task) async => _deleteTask(context, ref, task),
                         ),
-                        onTaskDropped: (task, targetStepId) async {
-                          if (task.stepId == targetStepId) return;
-                          final taskViewModel = ref.read(taskViewModelProvider.notifier);
-                          await taskViewModel.updateTask(task.copyWith(stepId: targetStepId));
-                          widget.onTasksRefresh?.call();
-                        },
+                        onTaskDropped: isOngoingFlow
+                            ? null
+                            : (task, targetStepId) async {
+                                if (task.stepId == targetStepId) return;
+                                final taskViewModel = ref.read(taskViewModelProvider.notifier);
+                                await taskViewModel.updateTask(task.copyWith(stepId: targetStepId));
+                                widget.onTasksRefresh?.call();
+                              },
                       ),
                       const SizedBox(height: 24),
                       if (idx == steps.length - 1) _buildStepReorderTarget(context, steps, steps.length),
@@ -457,6 +468,26 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
 
 
   Future<void> _toggleTaskComplete(BuildContext context, WidgetRef ref, Task task) async {
+    // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
+    final project = ref.read(projectProvider(widget.projectPath)).asData?.value;
+    final stepRepo = ref.read(stepRepositoryProvider);
+    ProjectStep? step;
+    if (task.stepId != null && task.stepId!.isNotEmpty) {
+      final stepRes = await stepRepo.getStepById(task.stepId!);
+      step = stepRes.when(success: (s) => s, failure: (_) => null);
+    }
+
+    final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
+    final isFlow = project?.flowitAsFlow == true;
+    final stepIsAvailable = step?.status == StepStatus.available;
+
+    if (isFlow && status == 'ONGOING' && !stepIsAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This task belongs to a waiting step and cannot be completed yet.')),
+      );
+      return;
+    }
+
     final taskViewModel = ref.read(taskViewModelProvider.notifier);
     await taskViewModel.toggleTaskCompletion(task);
     widget.onTasksRefresh?.call();

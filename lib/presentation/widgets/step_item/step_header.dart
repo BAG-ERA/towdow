@@ -2,6 +2,7 @@
 // Reusable header for sections in the Step view: title and actions (expand/collapse) with optional inline editing
 
 import 'package:flutter/material.dart';
+import '../../../data/models/step.dart';
 
 class StepHeader extends StatefulWidget {
   final String title;
@@ -13,6 +14,7 @@ class StepHeader extends StatefulWidget {
   final Widget? dragHandle;
   final bool editable;
   final ValueChanged<String>? onTitleSubmitted;
+  final StepStatus? stepStatus;
 
   const StepHeader({
     super.key,
@@ -25,6 +27,7 @@ class StepHeader extends StatefulWidget {
     this.dragHandle,
     this.editable = false,
     this.onTitleSubmitted,
+    this.stepStatus,
   });
 
   @override
@@ -91,9 +94,14 @@ class _StepHeaderState extends State<StepHeader> {
 
   @override
   Widget build(BuildContext context) {
+    final isCompleted = widget.stepStatus == StepStatus.completed;
+    final isWaiting = widget.stepStatus == StepStatus.waiting;
     final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
           fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.onSurface,
+          color: isWaiting
+              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+              : Theme.of(context).colorScheme.onSurface,
+          decoration: isCompleted ? TextDecoration.lineThrough : null,
         );
 
     Widget titleWidget;

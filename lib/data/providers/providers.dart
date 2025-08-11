@@ -208,8 +208,8 @@ final caldavServiceProvider = Provider.family<ICalDAVService, CaldavAccount>((re
 final workflowServiceProvider = Provider<WorkflowService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final service = WorkflowService(calendarRepository);
-  // Inject step repository for default step creation in conversions
   service.setStepRepository(ref.watch(stepRepositoryProvider));
+  service.setTaskRepository(ref.watch(taskRepositoryProvider));
   return service;
 });
 

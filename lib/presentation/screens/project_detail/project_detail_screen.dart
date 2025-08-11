@@ -12,6 +12,7 @@ import '../../widgets/utils/buttons/archive_project_button.dart';
 import '../../widgets/utils/buttons/exit_share_button.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/step.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../viewmodels/commands/attendee_commands.dart';
@@ -539,6 +540,25 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         // Navigate to task detail
       },
       onTaskToggle: (task) async {
+        // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
+        final project = ref.read(projectProvider(widget.projectPath)).asData?.value;
+        final stepRepo = ref.read(stepRepositoryProvider);
+        ProjectStep? step;
+        if (task.stepId != null && task.stepId!.isNotEmpty) {
+          final stepRes = await stepRepo.getStepById(task.stepId!);
+          step = stepRes.when(success: (s) => s, failure: (_) => null);
+        }
+        final isFlow = project?.flowitAsFlow == true;
+        final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
+        final stepIsAvailable = step?.status == StepStatus.available;
+
+        if (isFlow && status == 'ONGOING' && !stepIsAvailable) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This task belongs to a waiting step and cannot be completed yet.')),
+          );
+          return;
+        }
+
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
         await taskViewModel.toggleTaskCompletion(task);
         

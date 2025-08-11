@@ -304,11 +304,11 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
             onDragEnd: () {
               AppLogger.info('ProjectTaskListView: Ended dragging task ${task.summary}');
             },
-            child: TaskItem(
+              child: TaskItem(
               task: task,
               controller: _sectionControllers[sectionKey]?[task.uid],
               onTap: () => _viewTask(context, task),
-              onToggleComplete: () => _toggleTaskComplete(context, ref, task),
+                onToggleComplete: () => _toggleTaskComplete(context, ref, task),
               onTaskUpdated: (updatedTask) async {
                 await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
                 widget.onTasksRefresh?.call();

@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/step.dart';
 import 'step_header.dart';
 
 class StepContainer extends StatelessWidget {
@@ -22,6 +23,8 @@ class StepContainer extends StatelessWidget {
   final Widget? emptyChild;
   final Color? statusColor;
   final Future<void> Function(Task task, String? targetStepId)? onTaskDropped;
+  final StepStatus? stepStatus;
+  final bool disabled;
 
   // Optional built-in menu actions
   final bool canMoveUp;
@@ -48,6 +51,8 @@ class StepContainer extends StatelessWidget {
     this.emptyChild,
     this.statusColor,
     this.onTaskDropped,
+    this.stepStatus,
+    this.disabled = false,
     this.canMoveUp = false,
     this.canMoveDown = false,
     this.onMoveUp,
@@ -73,6 +78,7 @@ class StepContainer extends StatelessWidget {
           dragHandle: dragHandle,
           editable: editable,
           onTitleSubmitted: onTitleSubmitted,
+          stepStatus: stepStatus,
         ),
         const SizedBox(height: 8),
         DragTarget<Task>(
@@ -85,6 +91,8 @@ class StepContainer extends StatelessWidget {
           },
           builder: (context, candidateData, rejectedData) {
             final isHovering = candidateData.isNotEmpty;
+            final effectiveOpacity = disabled ? 0.5 : 1.0;
+            final isCompleted = stepStatus == StepStatus.completed;
             return AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               decoration: BoxDecoration(
@@ -92,11 +100,12 @@ class StepContainer extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 border: isHovering
                     ? Border.all(color: hoverColor.withValues(alpha: 0.5), width: 2)
-                    : null,
+                    : (isCompleted ? Border.all(color: Theme.of(context).colorScheme.secondary, width: 2) : null),
               ),
-              child: isEmpty
-                  ? (emptyChild ?? const SizedBox.shrink())
-                  : child,
+              child: Opacity(
+                opacity: effectiveOpacity,
+                child: isEmpty ? (emptyChild ?? const SizedBox.shrink()) : child,
+              ),
             );
           },
         ),
