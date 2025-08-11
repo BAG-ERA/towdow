@@ -290,7 +290,7 @@ class _TaskListTab extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 32),
-                const Text('No tasks yet. Tap + to create your first task!'),
+                const Text('No tasks yet. Go to my projects to create your first task!'),
               ],
             ),
           );
@@ -379,7 +379,7 @@ class _TaskListTab extends ConsumerWidget {
                                 const SizedBox(height: 8),
                                 Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
                                 const SizedBox(height: 32),
-                                const Text('No tasks yet. Tap + to create your first task!'),
+                                const Text('No tasks yet. Go to my projects to create your first task!'),
                               ],
                             ),
                           ),

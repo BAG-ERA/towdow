@@ -105,7 +105,22 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
       return Center(child: Text(state.error!));
     }
     if (state.filteredProjects.isEmpty) {
-      return const Center(child: Text('No workflows found'));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.route_rounded, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+            const SizedBox(height: 16),
+            Text('No workflows found', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 8),
+            Text(
+              'Workflows define steps to move tasks through. Click on CREATE NEW WORKFLOW to get started.',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
     }
     return RefreshIndicator(
       onRefresh: () => ref.read(workflowListViewModelProvider.notifier).refresh(),

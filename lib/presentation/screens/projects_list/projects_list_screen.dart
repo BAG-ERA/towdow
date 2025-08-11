@@ -134,7 +134,11 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
             const SizedBox(height: 16),
             Text('No projects found', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
-            Text('Create your first project to get started', style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
+            Text(
+              'Projects group tasks and help you keep them organized. Click on CREATE NEW PROJECT to get started.',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       );
