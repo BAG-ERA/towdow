@@ -89,8 +89,14 @@ class AppLifecycleManager {
       accountResult.when(
         success: (account) async {
           if (account != null) {
-            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Active account found: ${account.username}');
-            await _startMainServices();
+            // Skip starting sync services for offline scheme (offline-only)
+            if (account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost')) {
+              AppLogger.info('AppLifecycleManager: Offline-only mode detected - skipping sync services start');
+              _updateState(FlowItAppState.ready);
+            } else {
+              // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Active account found: ${account.username}');
+              await _startMainServices();
+            }
           } else {
             // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] No active account - main services will start when account is configured');
             _updateState(FlowItAppState.ready);

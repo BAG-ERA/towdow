@@ -115,7 +115,7 @@ class ConnectionInfoScreen extends ConsumerWidget {
             ),
             _InfoItem(
               label: 'Provider Type',
-              value: _formatProviderType(account.providerType),
+              value: _formatProviderType(account.providerType, account.serverUrl),
               icon: Icons.category_rounded,
             ),
             _InfoItem(
@@ -178,7 +178,11 @@ class ConnectionInfoScreen extends ConsumerWidget {
     );
   }
 
-  String _formatProviderType(String providerType) {
+  String _formatProviderType(String providerType, String serverUrl) {
+    // Detect offline-only via localhost URL hint
+    if (serverUrl.startsWith('https://localhost') || serverUrl.startsWith('http://localhost')) {
+      return 'Offline only';
+    }
     switch (providerType.toLowerCase()) {
       case 'towdow_cloud':
         return 'TowDow Cloud';
@@ -194,6 +198,9 @@ class ConnectionInfoScreen extends ConsumerWidget {
   }
 
   String _getAuthType(CaldavAccount account) {
+    if (account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost')) {
+      return 'None (offline mode)';
+    }
     if (account.accessToken != null) {
       return 'OAuth 2.0';
     } else if (account.password != null) {

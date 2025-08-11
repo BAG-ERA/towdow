@@ -113,8 +113,15 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
         ref.invalidate(hasActiveAccountProvider);
 
         Navigator.of(context).pop(); // Close dialog
-        // Navigate to home screen using GoRouter
-        GoRouter.of(context).go('/today');
+        // Navigate based on returning/new detection; default to projects when custom/offline/new
+        final account = state.account;
+        final isOffline = account != null && (account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost'));
+        final destination = (isOffline || state.isReturningUser == false) ? '/projects' : '/today';
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            GoRouter.of(context).go(destination);
+          }
+        });
       }
     }
   }

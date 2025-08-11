@@ -52,12 +52,12 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: globalNavigatorKey,
-    initialLocation: '/today',
+    initialLocation: '/projects',
     refreshListenable: Listenable.merge([accountNotifier, ValueNotifier(sessionEpoch)]),
     redirect: (context, state) {
-      // Redirect root path to today view
+      // Redirect root path to projects on first-run
       if (state.uri.path == '/') {
-        return '/today';
+        return '/projects';
       }
       
       // Skip account check if already on connection screen

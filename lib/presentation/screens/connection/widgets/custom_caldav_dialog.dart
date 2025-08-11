@@ -155,22 +155,22 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
               ),
               const SizedBox(height: 16),
               
-              // Email field
+              // Email field (mandatory)
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(
-                  labelText: 'Email Address',
+                  labelText: 'Email Address *',
                   hintText: 'john.doe@example.com',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.email_rounded),
                 ),
                 validator: (value) {
-                  if (value != null && value.trim().isNotEmpty) {
-                    // Basic email validation
-                    final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-                    if (!emailRegex.hasMatch(value.trim())) {
-                      return 'Please enter a valid email address';
-                    }
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Email is required';
+                  }
+                  final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+                  if (!emailRegex.hasMatch(value.trim())) {
+                    return 'Please enter a valid email address';
                   }
                   return null;
                 },
@@ -358,8 +358,12 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
             // Invalidate the account status provider to ensure router recognizes the account
             ref.invalidate(hasActiveAccountProvider);
             
-            // Navigate to today screen using GoRouter
-            GoRouter.of(context).go('/today');
+            // Navigate to projects screen on first connection (delay to avoid router race)
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (mounted) {
+                GoRouter.of(context).go('/projects');
+              }
+            });
           }
         },
         failure: (failure) {
