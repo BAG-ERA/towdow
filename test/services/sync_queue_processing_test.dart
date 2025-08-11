@@ -107,8 +107,17 @@ void main() {
     });
 
     Future<void> _stubQueue(List<Map<String, dynamic>> rawItems) async {
-      when(mockStorage.getAll<Map<String, dynamic>>('sync_queue'))
-          .thenAnswer((_) async => Result.success(rawItems.cast<Map<String, dynamic>>()));
+      int syncQueueCalls = 0;
+      when(mockStorage.getAll<Map<String, dynamic>>(any)).thenAnswer((invocation) async {
+        final boxName = invocation.positionalArguments[0] as String;
+        if (boxName == 'sync_queue') {
+          // Return items on first three calls (pending deletion check + early check + processing), then empty
+          final resultItems = syncQueueCalls < 3 ? rawItems.cast<Map<String, dynamic>>() : <Map<String, dynamic>>[];
+          syncQueueCalls++;
+          return Result.success(resultItems);
+        }
+        return const Result.success([]);
+      });
       when(mockStorage.put(any, any, any))
           .thenAnswer((_) async => const Result.success(null));
       when(mockStorage.delete(any, any))

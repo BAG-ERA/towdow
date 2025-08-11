@@ -100,7 +100,6 @@ void main() {
       when(mockCalDAVService.createCalendar(
         displayName: 'Test Project',
         description: 'Test Description',
-        uid: anyNamed('uid'),
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
@@ -131,7 +130,6 @@ void main() {
       when(mockCalDAVService.createCalendar(
         displayName: 'Test Project',
         description: 'Test Description',
-        uid: anyNamed('uid'),
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
@@ -164,7 +162,6 @@ void main() {
       when(mockCalDAVService.createCalendar(
         displayName: 'Test Project',
         description: 'Test Description',
-        uid: anyNamed('uid'),
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
@@ -190,7 +187,6 @@ void main() {
       verify(mockCalDAVService.createCalendar(
         displayName: 'Test Project',
         description: 'Test Description',
-        uid: anyNamed('uid'),
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
@@ -203,7 +199,6 @@ void main() {
       when(mockCalDAVService.createCalendar(
         displayName: 'Test Project',
         description: 'Test Description',
-        uid: anyNamed('uid'),
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
@@ -235,7 +230,6 @@ void main() {
       when(mockCalDAVService.createCalendar(
         displayName: 'Test Project',
         description: 'Test Description',
-        uid: anyNamed('uid'),
         domain: anyNamed('domain'),
         kanban: anyNamed('kanban'),
         categ: anyNamed('categ'),
