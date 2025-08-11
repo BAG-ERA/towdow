@@ -69,6 +69,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
         final isFlow = project?.flowitAsFlow == true;
         final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
         final isOngoingFlow = isFlow && status == 'ONGOING';
+        final isStoppedFlow = isFlow && status == 'STOPPED';
 
         return Column(
           children: [
@@ -124,8 +125,8 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                         count: tasksByStep[steps[idx].id]?.length ?? 0,
                         onExpandAll: _expandAllTasks,
                         onCollapseAll: _collapseAllTasks,
-                        canMoveUp: !isOngoingFlow && idx > 0,
-                        canMoveDown: !isOngoingFlow && idx < steps.length - 1,
+                        canMoveUp: (isStoppedFlow ? steps[idx].status != StepStatus.completed : !isOngoingFlow) && idx > 0,
+                        canMoveDown: (isStoppedFlow ? steps[idx].status != StepStatus.completed : !isOngoingFlow) && idx < steps.length - 1,
                         onMoveUp: () async {
                           final stepRepository = ref.read(stepRepositoryProvider);
                           final encodedProjectPath = widget.projectPath.replaceAll('@', '%40');
@@ -143,6 +144,9 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                           await stepVm.updateStep(steps[idx].copyWith(endWorkflow: true));
                           if (mounted) ref.invalidate(projectStepsProvider(widget.projectPath));
                         },
+                        markAsFinalLabel: (steps[idx].endWorkflow && steps[idx].status == StepStatus.completed)
+                            ? 'Mark workflow as completed'
+                            : null,
                         onDelete: () async {
                           final confirmed = await showDialog<bool>(
                             context: context,
@@ -170,9 +174,11 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                             }
                           }
                         },
-                        draggable: !isOngoingFlow,
-                        dragHandle: isOngoingFlow ? null : _buildStepDragHandle(context, steps[idx]),
-                        editable: !isOngoingFlow,
+                        draggable: isStoppedFlow ? steps[idx].status != StepStatus.completed : !isOngoingFlow,
+                        dragHandle: (isStoppedFlow ? steps[idx].status != StepStatus.completed : !isOngoingFlow)
+                            ? _buildStepDragHandle(context, steps[idx])
+                            : null,
+                        editable: isStoppedFlow ? steps[idx].status != StepStatus.completed : !isOngoingFlow,
                         onTitleSubmitted: (newTitle) async {
                           final stepVm = ref.read(projectStepViewModelProvider(widget.projectPath).notifier);
                           await stepVm.updateStep(steps[idx].copyWith(name: newTitle));
@@ -183,7 +189,9 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                         isEmpty: (tasksByStep[steps[idx].id] ?? const <Task>[]).isEmpty,
                         statusColor: _colorForStepStatus(context, steps[idx].status),
                         stepStatus: steps[idx].status,
-                        disabled: isOngoingFlow && steps[idx].status == StepStatus.waiting,
+                        disabled: isStoppedFlow
+                            ? steps[idx].status == StepStatus.completed
+                            : (isOngoingFlow && steps[idx].status == StepStatus.waiting),
                         emptyChild: _buildEmptyStepPlaceholder(
                           context,
                           _colorForStepStatus(context, steps[idx].status),

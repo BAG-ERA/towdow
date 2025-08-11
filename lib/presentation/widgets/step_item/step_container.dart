@@ -33,6 +33,7 @@ class StepContainer extends StatelessWidget {
   final VoidCallback? onMoveDown;
   final VoidCallback? onMarkAsFinal;
   final VoidCallback? onDelete;
+  final String? markAsFinalLabel;
 
   const StepContainer({
     super.key,
@@ -59,6 +60,7 @@ class StepContainer extends StatelessWidget {
     this.onMoveDown,
     this.onMarkAsFinal,
     this.onDelete,
+    this.markAsFinalLabel,
   });
 
   @override
@@ -157,13 +159,13 @@ class StepContainer extends StatelessWidget {
             ],
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'set_end',
           child: Row(
             children: [
-              Icon(Icons.flag_circle_outlined, size: 18),
-              SizedBox(width: 8),
-              Text('Mark as final step'),
+              const Icon(Icons.flag_circle_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(markAsFinalLabel ?? 'Mark as final step'),
             ],
           ),
         ),

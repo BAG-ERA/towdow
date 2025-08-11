@@ -22,6 +22,7 @@ import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/project_detail/project_kanban_view.dart';
 import '../../widgets/project_detail/project_infos_widget.dart';
+import '../../widgets/project_detail/project_bottleneck_view.dart';
 
 // Provider for a specific project/calendar that watches only this specific calendar
 final projectProvider = StreamProvider.family<TaskCalendar?, String>((ref, projectPath) {
@@ -393,6 +394,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             icon: Icons.checklist_rounded,
           ),
           StyledTabItem(
+            label: 'Bottleneck',
+            icon: Icons.timeline,
+          ),
+          StyledTabItem(
             label: 'Timing',
             icon: Icons.schedule_rounded,
           ),
@@ -420,10 +425,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         tasksAsync: tasksAsync,
         onTasksRefresh: () => _refreshProjectTasks(ref),
       ),
-      1 => _buildTimingView(context, ref, tasksAsync),
-      2 => _buildAttendeeView(context, ref, tasksAsync),
-      3 => _buildKanbanView(context, ref, tasksAsync),
-      4 => _buildAgendaView(context, ref, tasksAsync),
+      1 => _buildBottleneckView(context, ref, tasksAsync),
+      2 => _buildTimingView(context, ref, tasksAsync),
+      3 => _buildAttendeeView(context, ref, tasksAsync),
+      4 => _buildKanbanView(context, ref, tasksAsync),
+      5 => _buildAgendaView(context, ref, tasksAsync),
       _ => ProjectTaskListView(
         projectPath: widget.projectPath,
         tasksAsync: tasksAsync,
@@ -904,6 +910,19 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   void _refreshProjectTasks(WidgetRef ref) {
     // Refresh the project tasks list
     ref.invalidate(projectTasksProvider(widget.projectPath));
+  }
+
+  // Bottleneck View
+  Widget _buildBottleneckView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
+    return tasksAsync.when(
+      data: (tasks) => ProjectBottleneckView(
+        projectPath: widget.projectPath,
+        tasks: tasks,
+        onTasksRefresh: () => _refreshProjectTasks(ref),
+      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(child: Text('Error loading tasks: $error')),
+    );
   }
 
   Future<void> _updateProject(TaskCalendar updatedProject) async {

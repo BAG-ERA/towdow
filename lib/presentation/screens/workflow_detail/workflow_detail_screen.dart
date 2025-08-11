@@ -11,6 +11,7 @@ import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/utils/tasklist_toolbar.dart';
 import '../../widgets/utils/popup/requirement_mapping_dialog.dart';
 import '../../widgets/project_detail/project_task_step_view.dart';
+import '../../widgets/project_detail/project_bottleneck_view.dart';
 import '../project_detail/project_detail_screen.dart' show projectProvider;
 
 class WorkflowDetailScreen extends ConsumerStatefulWidget {
@@ -126,11 +127,21 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
     } else if (status == 'ONGOING') {
       buttons.add(FilledButton.tonalIcon(
         icon: const Icon(Icons.pause_rounded),
-        label: const Text('Pause workflow'),
+        label: const Text('Stop workflow'),
         onPressed: () async {
           final statusService = ref.read(statusServiceProvider);
-          await statusService.assignStatusToCalendar(widget.workflowPath, 'PAUSED');
-          // Refresh UI to reflect PAUSED state
+          await statusService.assignStatusToCalendar(widget.workflowPath, 'STOPPED');
+          // Refresh UI to reflect STOPPED state
+          ref.invalidate(projectProvider(widget.workflowPath));
+        },
+      ));
+    } else if (status == 'STOPPED') {
+      buttons.add(FilledButton.icon(
+        icon: const Icon(Icons.play_arrow_rounded),
+        label: const Text('Resume workflow'),
+        onPressed: () async {
+          final statusService = ref.read(statusServiceProvider);
+          await statusService.assignStatusToCalendar(widget.workflowPath, 'ONGOING');
           ref.invalidate(projectProvider(widget.workflowPath));
         },
       ));
@@ -187,6 +198,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
         onTabSelected: (index) => setState(() => _selectedTabIndex = index),
         items: const [
           StyledTabItem(label: 'List', icon: Icons.checklist_rounded),
+          StyledTabItem(label: 'Bottleneck', icon: Icons.timeline),
           StyledTabItem(label: 'Steps', icon: Icons.stairs_outlined),
         ],
       ),
@@ -202,6 +214,16 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
           onTasksRefresh: () {},
         );
       case 1:
+        return tasksAsync.when(
+          data: (tasks) => ProjectBottleneckView(
+            projectPath: widget.workflowPath,
+            tasks: tasks,
+            onTasksRefresh: () {},
+          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => Center(child: Text('Error loading tasks: $error')),
+        );
+      case 2:
         return ProjectTaskStepView(
           projectPath: widget.workflowPath,
           tasksAsync: tasksAsync,
