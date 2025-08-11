@@ -64,6 +64,11 @@ class VTODOParser {
     vtodo.writeln('X-FLOWIT-VALIDATOR:${_escapeCalendarText(task.flowitValidator)}');
     vtodo.writeln('X-FLOWIT-REQUIREMENT:${task.flowitRequirement}');
     
+    // Step reference (single step per task)
+    if (task.stepId != null && task.stepId!.isNotEmpty) {
+      vtodo.writeln('X-FLOWIT-STEP:${_escapeCalendarText(task.stepId!)}');
+    }
+    
     if (task.flowitTemplate != null) {
       vtodo.writeln('X-FLOWIT-TEMPLATE:${task.flowitTemplate}');
     }
@@ -103,6 +108,8 @@ class VTODOParser {
       List<Map<String, dynamic>> attachments = [];
       List<Map<String, dynamic>> mediaAttachments = [];
       String? flowitValidator;
+      String? flowitRequirement;
+      String? flowitStep;
       int percentComplete = 0;
       
       for (final line in lines) {
@@ -126,6 +133,10 @@ class VTODOParser {
           percentComplete = int.tryParse(line.substring(17)) ?? 0;
         } else if (line.startsWith('X-FLOWIT-VALIDATOR:')) {
           flowitValidator = _unescapeCalendarText(line.substring(19));
+        } else if (line.startsWith('X-FLOWIT-STEP:')) {
+          flowitStep = _unescapeCalendarText(line.substring(14));
+        } else if (line.startsWith('X-FLOWIT-REQUIREMENT:')) {
+          flowitRequirement = line.substring('X-FLOWIT-REQUIREMENT:'.length);
         } else if (line.startsWith('ORGANIZER:')) {
           // Parse organizer (remove mailto: prefix if present)
           organizer = line.substring(10);
@@ -191,8 +202,10 @@ class VTODOParser {
           attendees: attendees,
           percentComplete: percentComplete,
           flowitValidator: flowitValidator ?? '{"type":"default"}',
+          flowitRequirement: flowitRequirement ?? '[]',
           attachments: _serializeAttachments(attachments),
           mediaAttachments: _serializeAttachments(mediaAttachments),
+          stepId: flowitStep,
         );
       }
     } catch (e) {

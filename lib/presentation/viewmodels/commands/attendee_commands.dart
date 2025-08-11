@@ -65,7 +65,7 @@ class AddAttendeeCommand extends ParameterizedCommand<Task, AddAttendeeParams> {
   Future<void> _queueUpdateOperation(Task task) async {
     try {
       final updateData = <String, dynamic>{
-        'calendarUid': task.projectPath!,
+        'calendarPath': task.projectPath!,
         'taskUid': task.uid,
       };
       
@@ -138,7 +138,7 @@ class RemoveAttendeeCommand extends ParameterizedCommand<Task, RemoveAttendeePar
   Future<void> _queueUpdateOperation(Task task) async {
     try {
       final updateData = <String, dynamic>{
-        'calendarUid': task.projectPath!,
+        'calendarPath': task.projectPath!,
         'taskUid': task.uid,
       };
       
@@ -212,7 +212,7 @@ class UpdateAttendeeCommand extends ParameterizedCommand<Task, UpdateAttendeePar
   Future<void> _queueUpdateOperation(Task task) async {
     try {
       final updateData = <String, dynamic>{
-        'calendarUid': task.projectPath!,
+        'calendarPath': task.projectPath!,
         'taskUid': task.uid,
       };
       
@@ -289,7 +289,7 @@ class UpdateAttendeeStatusCommand extends ParameterizedCommand<Task, UpdateAtten
   Future<void> _queueUpdateOperation(Task task) async {
     try {
       final updateData = <String, dynamic>{
-        'calendarUid': task.projectPath!,
+        'calendarPath': task.projectPath!,
         'taskUid': task.uid,
       };
       

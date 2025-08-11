@@ -177,8 +177,8 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     AppLogger.info('CalDAVManagement: Starting calendar discovery for ${account.serverUrl}');
     
     try {
-      final caldavService = CalDAVService(account: account);
-      final capabilitiesResult = await caldavService.discoverCapabilities();
+      final ICalDAVService caldavService = CalDAVService(account: account);
+      final capabilitiesResult = await caldavService.testConnection();
       
       await capabilitiesResult.when(
         success: (capabilities) async {

@@ -1,19 +1,25 @@
-// Desktop table widget for projects list
-// Displays projects in a Material Design DataTable with clickable rows
+// Projects list adaptive table
+// Replaces DataTable with custom adaptive widgets for better layout control and touch UX
 // Adapts columns to available space with priority order: project, status, progress, duedate, started, actions (actions stays right)
-// Supports column sorting with clickable headers
+// Supports column sorting with clickable headers and fully-clickable rows
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../viewmodels/project_list_viewmodel.dart';
 import '../navbar/project_popup_menu.dart';
+import '../addaptative_table/addaptative_table_container.dart';
+import '../addaptative_table/addaptative_table_head.dart';
+import '../addaptative_table/addaptative_table_row.dart';
 
 class ProjectsTable extends ConsumerStatefulWidget {
   final ProjectListState state;
   final Function(TaskCalendar) onProjectTap;
   final Function(String, ProjectWithStats) onProjectAction;
   final Function(ProjectSort) onSortChanged;
+  final List<PopupMenuEntry<String>> Function(BuildContext, WidgetRef, TaskCalendar)? menuBuilder;
+  final Widget? header;
+  final List<ProjectWithStats>? projectsOverride;
 
   const ProjectsTable({
     super.key,
@@ -21,6 +27,9 @@ class ProjectsTable extends ConsumerStatefulWidget {
     required this.onProjectTap,
     required this.onProjectAction,
     required this.onSortChanged,
+    this.menuBuilder,
+    this.header,
+    this.projectsOverride,
   });
 
   @override
@@ -47,10 +56,17 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Card(
-        child: LayoutBuilder(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isMobile) ...[
+            _buildMobileList(context, ref),
+          ] else ...[
+            LayoutBuilder(
           builder: (context, constraints) {
             final availableWidth = constraints.maxWidth;
             
@@ -62,24 +78,67 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
               });
             }
             
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: _ClickableDataTable(
-                columns: _buildColumns(_visibleColumns),
-                rows: widget.state.filteredProjects.map((projectWithStats) {
-                  return DataRow(
-                    cells: _buildCells(context, ref, projectWithStats, _visibleColumns),
-                  );
-                }).toList(),
-                onRowTap: (index) {
-                  final projectWithStats = widget.state.filteredProjects[index];
-                  widget.onProjectTap(projectWithStats.project);
-                },
+            final rows = (widget.projectsOverride ?? widget.state.filteredProjects);
+
+            final header = _buildHeader(context);
+            final rowWidgets = rows.asMap().entries.map((entry) {
+              final projectWithStats = entry.value;
+              return AddaptativeTableRow(
+                onTap: () => widget.onProjectTap(projectWithStats.project),
+                cells: _buildRowCells(context, ref, projectWithStats, _visibleColumns),
+              );
+            }).toList();
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+              child: AddaptativeTableContainer(
+                header: header,
+                rows: rowWidgets,
               ),
             );
           },
-        ),
+          ),
+          ],
+          if (widget.header != null) ...[
+            const SizedBox(height: 12),
+            widget.header!,
+          ],
+        ],
       ),
+    );
+  }
+
+  Widget _buildMobileList(BuildContext context, WidgetRef ref) {
+    final rows = widget.projectsOverride ?? widget.state.filteredProjects;
+    final textStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500);
+    return Column(
+      children: [
+        for (final projectWithStats in rows)
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => widget.onProjectTap(projectWithStats.project),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        projectWithStats.project.displayName,
+                        overflow: TextOverflow.ellipsis,
+                        style: textStyle,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -139,54 +198,79 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
     return totalWidth;
   }
 
-  List<DataColumn> _buildColumns(List<ColumnType> visibleColumns) {
-    return visibleColumns.map((columnType) {
+  Widget _buildHeader(BuildContext context) {
+    List<AddaptativeTableHeadCell> headCells = [];
+
+    for (final columnType in _visibleColumns) {
       switch (columnType) {
         case ColumnType.project:
-          return _buildSortableColumn(
-            '',
-            ProjectSort.name,
-            Icons.sort_by_alpha,
-          );
+          headCells.add(_buildSortableHeadCell(
+            context,
+            label: 'Project',
+            sortType: ProjectSort.name,
+            icon: Icons.sort_by_alpha,
+            flex: _flexFor(columnType),
+          ));
+          break;
         case ColumnType.actions:
-          return const DataColumn(label: Text(''));
+          headCells.add(const AddaptativeTableHeadCell(label: '', flex: 1));
+          break;
         case ColumnType.status:
-          return _buildSortableColumn(
-            'Status',
-            ProjectSort.name, // Status sorting uses name as proxy
-            Icons.sort,
-          );
+          headCells.add(_buildSortableHeadCell(
+            context,
+            label: 'Status',
+            sortType: ProjectSort.name,
+            icon: Icons.sort,
+            flex: _flexFor(columnType),
+          ));
+          break;
         case ColumnType.progress:
-          return _buildSortableColumn(
-            'Progress',
-            ProjectSort.progress,
-            Icons.trending_up,
-          );
+          headCells.add(_buildSortableHeadCell(
+            context,
+            label: 'Progress',
+            sortType: ProjectSort.progress,
+            icon: Icons.trending_up,
+            flex: _flexFor(columnType),
+          ));
+          break;
         case ColumnType.duedate:
-          return _buildSortableColumn(
-            'Due Date',
-            ProjectSort.lastModified, // Use lastModified as proxy for due date
-            Icons.schedule,
-          );
+          headCells.add(_buildSortableHeadCell(
+            context,
+            label: 'Due Date',
+            sortType: ProjectSort.lastModified,
+            icon: Icons.schedule,
+            flex: _flexFor(columnType),
+          ));
+          break;
         case ColumnType.started:
-          return _buildSortableColumn(
-            'Started',
-            ProjectSort.created,
-            Icons.calendar_today,
-          );
+          headCells.add(_buildSortableHeadCell(
+            context,
+            label: 'Started',
+            sortType: ProjectSort.created,
+            icon: Icons.calendar_today,
+            flex: _flexFor(columnType),
+          ));
+          break;
       }
-    }).toList();
+    }
+
+    return AddaptativeTableHead(cells: headCells);
   }
 
-  DataColumn _buildSortableColumn(String label, ProjectSort sortType, IconData icon) {
+  AddaptativeTableHeadCell _buildSortableHeadCell(
+    BuildContext context, {
+    required String label,
+    required ProjectSort sortType,
+    required IconData icon,
+    required int flex,
+  }) {
     final isCurrentlySorted = widget.state.sortBy == sortType;
     final sortDirection = widget.state.sortDirection;
-    
+
     IconData sortIcon;
     Color iconColor;
-    
+
     if (isCurrentlySorted && sortDirection != SortDirection.none) {
-      // Show direction-specific icon
       switch (sortDirection) {
         case SortDirection.ascending:
           sortIcon = Icons.keyboard_arrow_up;
@@ -202,93 +286,70 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
           break;
       }
     } else {
-      // Show default icon
       sortIcon = icon;
-      iconColor = isCurrentlySorted 
-        ? Theme.of(context).colorScheme.primary 
-        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
+      iconColor = isCurrentlySorted
+          ? Theme.of(context).colorScheme.primary
+          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
     }
-    
-    return DataColumn(
-      label: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: InkWell(
-          onTap: () => widget.onSortChanged(sortType),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(label),
-              const SizedBox(width: 4),
-              Icon(
-                sortIcon,
-                size: 16,
-                color: iconColor,
-              ),
-            ],
-          ),
-        ),
-      ),
+
+    return AddaptativeTableHeadCell(
+      label: label,
+      trailing: Icon(sortIcon, size: 16, color: iconColor),
+      flex: flex,
+      onTap: () => widget.onSortChanged(sortType),
     );
   }
 
-  List<DataCell> _buildCells(BuildContext context, WidgetRef ref, ProjectWithStats projectWithStats, List<ColumnType> visibleColumns) {
+  List<AddaptativeTableRowCell> _buildRowCells(
+    BuildContext context,
+    WidgetRef ref,
+    ProjectWithStats projectWithStats,
+    List<ColumnType> visibleColumns,
+  ) {
     return visibleColumns.map((columnType) {
       switch (columnType) {
         case ColumnType.project:
-          return _buildClickableCell(
-            Text(projectWithStats.project.displayName, 
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
-            () => widget.onProjectTap(projectWithStats.project),
+          return AddaptativeTableRowCell(
+            Text(
+              projectWithStats.project.displayName,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+            ),
+            flex: _flexFor(columnType),
           );
         case ColumnType.actions:
-          return DataCell(
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () {}, // Prevent row click
-                child: Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  alignment: Alignment.center,
-                  child: _buildActionMenu(context, ref, projectWithStats),
-                ),
-              ),
+          return AddaptativeTableRowCell(
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _buildActionMenu(context, ref, projectWithStats),
             ),
+            flex: _flexFor(columnType),
           );
         case ColumnType.status:
-          return _buildClickableCell(
+          return AddaptativeTableRowCell(
             _buildStatusChip(context, projectWithStats.project.statusDisplayName),
-            () => widget.onProjectTap(projectWithStats.project),
+            flex: _flexFor(columnType),
           );
         case ColumnType.progress:
-          return _buildClickableCell(
+          return AddaptativeTableRowCell(
             _buildProgressIndicator(context, projectWithStats.stats),
-            () => widget.onProjectTap(projectWithStats.project),
+            flex: _flexFor(columnType),
           );
         case ColumnType.duedate:
-          return _buildClickableCell(
+          return AddaptativeTableRowCell(
             _buildDueDateText(context, projectWithStats),
-            () => widget.onProjectTap(projectWithStats.project),
+            flex: _flexFor(columnType),
           );
         case ColumnType.started:
-          return _buildClickableCell(
-            Text('${projectWithStats.project.created.day}/${projectWithStats.project.created.month}/${projectWithStats.project.created.year}', 
-                style: Theme.of(context).textTheme.bodySmall),
-            () => widget.onProjectTap(projectWithStats.project),
+          return AddaptativeTableRowCell(
+            Text(
+              '${projectWithStats.project.created.day}/${projectWithStats.project.created.month}/${projectWithStats.project.created.year}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            flex: _flexFor(columnType),
           );
       }
     }).toList();
-  }
-
-  DataCell _buildClickableCell(Widget child, VoidCallback onTap) {
-    return DataCell(
-      Container(
-        width: double.infinity,
-        height: double.infinity,
-        alignment: Alignment.center,
-        child: child,
-      ),
-    );
   }
 
   Widget _buildStatusChip(BuildContext context, String status) {
@@ -385,54 +446,36 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
   }
 
   Widget _buildActionMenu(BuildContext context, WidgetRef ref, ProjectWithStats projectWithStats) {
+    if (widget.menuBuilder != null) {
+      return PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert_rounded),
+        tooltip: 'Options',
+        onSelected: (value) => widget.onProjectAction(value, projectWithStats),
+        itemBuilder: (context) => widget.menuBuilder!(context, ref, projectWithStats.project),
+      );
+    }
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert_rounded),
-      tooltip: 'Project actions',
+      tooltip: 'Options',
       onSelected: (value) => widget.onProjectAction(value, projectWithStats),
       itemBuilder: (context) => ProjectPopupMenu.getMenuItems(context, ref, project: projectWithStats.project),
     );
   }
-}
-
-class _ClickableDataTable extends StatelessWidget {
-  final List<DataColumn> columns;
-  final List<DataRow> rows;
-  final Function(int) onRowTap;
-
-  const _ClickableDataTable({
-    required this.columns,
-    required this.rows,
-    required this.onRowTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return DataTable(
-      columns: columns,
-      rows: rows.asMap().entries.map((entry) {
-        final index = entry.key;
-        final row = entry.value;
-        
-        return DataRow(
-          cells: row.cells.map((cell) {
-            // Wrap each cell in a GestureDetector to handle row clicks
-            return DataCell(
-              MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  onTap: () => onRowTap(index),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: double.infinity,
-                    child: cell.child,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        );
-      }).toList(),
-    );
+  int _flexFor(ColumnType type) {
+    switch (type) {
+      case ColumnType.project:
+        return 4;
+      case ColumnType.status:
+        return 2;
+      case ColumnType.progress:
+        return 3;
+      case ColumnType.duedate:
+        return 2;
+      case ColumnType.started:
+        return 2;
+      case ColumnType.actions:
+        return 1;
+    }
   }
 }
 

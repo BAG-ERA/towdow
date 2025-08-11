@@ -303,6 +303,7 @@ class CapabilityDiscoveryService {
     <FLOWIT:template/>
     <FLOWIT:status/>
     <FLOWIT:kanban/>
+    <FLOWIT:steps/>
     <FLOWIT:sharedWith/>
   </D:prop>
 </D:propfind>''';
@@ -403,9 +404,9 @@ class CapabilityDiscoveryService {
         final href = hrefMatch.group(1)!.trim();
         if (href == calendarHome || href == '$calendarHome/') continue; // Skip home itself
         
-        // Check if it's a calendar collection
-        final isCalendar = responseContent.contains('<C:calendar/>') || 
-                          responseContent.contains('<calendar/>');
+        // Check if it's a calendar collection (tolerate spacing and prefixes)
+        final isCalendar = RegExp(r'<(?:C:)?calendar\s*/?>', caseSensitive: false)
+            .hasMatch(responseContent);
         if (!isCalendar) continue;
         
         // Extract display name
@@ -425,6 +426,7 @@ class CapabilityDiscoveryService {
         final description = descriptionMatch?.group(1)?.trim();
         
         // Extract FlowIt properties using global namespace prefixes
+        //TODO: may not need to extract all properties here, as they are parsed where needed via calendar refresh.
         AppLogger.debug('CapabilityDiscovery: Extracting FlowIt properties from response content for $href');
         AppLogger.debug('CapabilityDiscovery: Response content snippet: ${responseContent.substring(0, responseContent.length > 500 ? 500 : responseContent.length)}...');
         final domain = _extractFlowItPropertyWithPrefixes(responseContent, 'domain', globalFlowItPrefixes);
@@ -436,6 +438,7 @@ class CapabilityDiscoveryService {
         final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
         final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
         final flowitKanban = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
+        // Steps are parsed where needed via calendar refresh; discovery retains main props only.
         final flowitSharedWith = _extractFlowItPropertyWithPrefixes(responseContent, 'sharedWith', globalFlowItPrefixes);
         AppLogger.debug('CapabilityDiscovery: Status extraction result: $flowitStatus');
         AppLogger.debug('CapabilityDiscovery: Kanban extraction result: $flowitKanban');

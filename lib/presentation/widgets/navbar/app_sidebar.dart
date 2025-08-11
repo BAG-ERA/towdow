@@ -4,8 +4,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'main_navigation.dart';
-import 'projects_section.dart';
 import 'toolbar_widget.dart';
+import 'user_account_badge.dart';
 
 import '../adaptive_app_layout.dart';
 
@@ -37,18 +37,21 @@ class AppSidebar extends ConsumerWidget {
         children: [
           // Add top padding on mobile for status bar
           if (!isDesktop) const SizedBox(height: 8),
+          // Top: user account badge
+          const UserAccountBadge(),
           
-          // Main navigation
-          MainNavigation(
-            currentDestination: currentDestination,
-            isDesktop: isDesktop,
-          ),
-          
-          const Divider(height: 24, color: Colors.transparent),
-          
-          // Projects section
+          // Center navigation section vertically between badge and toolbar
           Expanded(
-            child: ProjectsSection(isDesktop: isDesktop),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                MainNavigation(
+                  currentDestination: currentDestination,
+                  isDesktop: isDesktop,
+                ),
+                const Divider(height: 24, color: Colors.transparent),
+              ],
+            ),
           ),
           
           // Bottom toolbar with Create, Archive, and Settings

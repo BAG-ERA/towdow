@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'task.dart';
 import 'attendee.dart';
 import 'category.dart';
+  import 'requirement.dart';
+import 'step.dart';
 import '../providers/providers.dart';
 
 part 'task_calendar.freezed.dart';
@@ -44,6 +46,8 @@ class TaskCalendar with _$TaskCalendar {
     @HiveField(19) @Default(1) int calendarOrder, // CALENDAR-ORDER
     @HiveField(21) @Default([]) List<Attendee> attendees, // ATTENDEE
     @HiveField(22) @Default('[]') String projectCategories, // JSON array of Category objects for project-level categories
+     @HiveField(31) @Default('[]') String projectRequirements, // JSON array of Requirement objects for project-level requirements
+    @HiveField(23) @Default('[]') String projectSteps, // JSON array of Step objects for project-level steps
     @HiveField(24) String? flowitDomain, // X-FLOWIT-DOMAIN - domain for grouping projects
     @HiveField(25) String? flowitStatus, // X-FLOWIT-STATUS - project status (DRAFT, CANCELED, ONGOING, STOPPED, ARCHIVE, COMPLETED, NEEDACTION, FAILED)
     @HiveField(26) @Default('[]') String sharedWith, // JSON array of SharedProjectMember objects for project sharing
@@ -409,6 +413,59 @@ extension TaskCalendarStatus on TaskCalendar {
     }
   }
   
+  /// Get parsed project requirements from JSON string
+  List<Requirement> get projectRequirementsList {
+    try {
+      if (projectRequirements.isEmpty || projectRequirements == '[]') {
+        return [];
+      }
+      final List<dynamic> jsonList = json.decode(projectRequirements);
+      return jsonList.map((json) => Requirement.fromJson(json as Map<String, dynamic>)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+  
+  /// Update project requirements with a list of Requirement objects
+  TaskCalendar withProjectRequirements(List<Requirement> requirements) {
+    final jsonString = json.encode(requirements.map((r) => r.toJson()).toList());
+    return copyWith(
+      projectRequirements: jsonString,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Add or update a requirement in the project
+  TaskCalendar addOrUpdateRequirement(Requirement requirement) {
+    final current = projectRequirementsList;
+    final index = current.indexWhere((r) => r.id == requirement.id);
+    if (index != -1) {
+      current[index] = requirement;
+    } else {
+      current.add(requirement);
+    }
+    return withProjectRequirements(current);
+  }
+  
+  /// Remove a requirement by id
+  TaskCalendar removeRequirement(String requirementId) {
+    final current = projectRequirementsList;
+    current.removeWhere((r) => r.id == requirementId);
+    return withProjectRequirements(current);
+  }
+  
+  /// Check if project has a requirement id
+  bool hasRequirement(String requirementId) => projectRequirementsList.any((r) => r.id == requirementId);
+  
+  /// Get a requirement by id
+  Requirement? getRequirementById(String requirementId) {
+    try {
+      return projectRequirementsList.firstWhere((r) => r.id == requirementId);
+    } catch (_) {
+      return null;
+    }
+  }
+  
   /// Update project categories with a list of Category objects
   TaskCalendar withProjectCategories(List<Category> categories) {
     final jsonString = json.encode(categories.map((cat) => cat.toJson()).toList());
@@ -467,6 +524,120 @@ extension TaskCalendarStatus on TaskCalendar {
       return null;
     }
   }
+
+  /// Get parsed project steps from JSON string
+  List<ProjectStep> get projectStepsList {
+    try {
+      if (projectSteps.isEmpty || projectSteps == '[]') {
+        return [];
+      }
+      final List<dynamic> jsonList = json.decode(projectSteps);
+      final List<ProjectStep> steps = [];
+      for (final item in jsonList) {
+        if (item is Map<String, dynamic>) {
+          final normalized = <String, dynamic>{...item};
+          // Normalize common alternate keys to expected names
+          if (!normalized.containsKey('id') && normalized.containsKey('stepId')) {
+            normalized['id'] = normalized['stepId'];
+          }
+          if (!normalized.containsKey('name') && normalized.containsKey('title')) {
+            normalized['name'] = normalized['title'];
+          }
+          if (normalized.containsKey('depends_on') && !normalized.containsKey('dependsOn')) {
+            final depends = normalized['depends_on'];
+            if (depends is List) {
+              normalized['dependsOn'] = depends.cast<String>();
+            }
+          }
+          if (normalized.containsKey('end_workflow') && !normalized.containsKey('endWorkflow')) {
+            normalized['endWorkflow'] = normalized['end_workflow'];
+          }
+          if (normalized.containsKey('available_date') && !normalized.containsKey('availableDate')) {
+            normalized['availableDate'] = normalized['available_date'];
+          }
+          if (normalized.containsKey('completion_date') && !normalized.containsKey('completionDate')) {
+            normalized['completionDate'] = normalized['completion_date'];
+          }
+          if (normalized.containsKey('order') && normalized['order'] is String) {
+            final str = normalized['order'] as String;
+            final parsed = int.tryParse(str);
+            if (parsed != null) normalized['order'] = parsed;
+          }
+          // Default status if missing
+          normalized['status'] = normalized['status'] ?? 'WAITING';
+          try {
+            steps.add(ProjectStep.fromJson(normalized));
+          } catch (_) {
+            // Skip invalid step entries silently to keep UI resilient
+          }
+        }
+      }
+      steps.sort((a, b) => a.order.compareTo(b.order));
+      return steps;
+    } catch (e) {
+      return [];
+    }
+  }
+  
+  /// Update project steps with a list of Step objects
+  TaskCalendar withProjectSteps(List<ProjectStep> steps) {
+    final jsonString = json.encode(steps.map((s) => s.toJson()).toList());
+    return copyWith(
+      projectSteps: jsonString,
+      lastModified: DateTime.now(),
+    );
+  }
+  
+  /// Add or update a step in the project
+  TaskCalendar addOrUpdateStep(ProjectStep step) {
+    final current = projectStepsList;
+    final index = current.indexWhere((s) => s.id == step.id);
+    if (index != -1) {
+      current[index] = step;
+    } else {
+      current.add(step);
+    }
+    return withProjectSteps(current);
+  }
+  
+  /// Remove a step from the project by id
+  TaskCalendar removeStep(String stepId) {
+    final current = projectStepsList;
+    current.removeWhere((s) => s.id == stepId);
+    return withProjectSteps(current);
+  }
+  
+  /// Reorder steps using provided ordered list of ids
+  TaskCalendar reorderSteps(List<String> orderedIds) {
+    final current = projectStepsList;
+    final byId = {for (final s in current) s.id: s};
+    final reordered = <ProjectStep>[];
+    for (int i = 0; i < orderedIds.length; i++) {
+      final id = orderedIds[i];
+      final step = byId[id];
+      if (step != null) {
+        reordered.add(step.withOrder(i));
+      }
+    }
+    // append any missing ones at the end preserving relative order
+    for (final s in current) {
+      if (!orderedIds.contains(s.id)) {
+        reordered.add(s);
+      }
+    }
+    return withProjectSteps(reordered);
+  }
+  
+  /// Lookup helpers
+  ProjectStep? getStepById(String stepId) {
+    try {
+      return projectStepsList.firstWhere((s) => s.id == stepId);
+    } catch (_) {
+      return null;
+    }
+  }
+  
+  bool hasStep(String stepId) => projectStepsList.any((s) => s.id == stepId);
 } 
 
 // Extension for project management operations

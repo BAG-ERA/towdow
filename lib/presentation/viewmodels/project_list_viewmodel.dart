@@ -316,8 +316,11 @@ enum ProjectFilter {
 class ProjectListViewModel extends StateNotifier<ProjectListState> {
   final CalendarRepository _calendarRepository;
   final TaskRepository _taskRepository;
-  final AccountRepository _accountRepository;
+  final AccountRepository _accountRepository; 
   final UserRepository _userRepository;
+  // When true, this view model will list only workflows (flow calendars)
+  // When false, it will list only standard projects (non-workflow calendars)
+  final bool workflowsMode;
   
   // Stream subscription for repository changes
   StreamSubscription? _calendarSubscription;
@@ -328,6 +331,7 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     this._taskRepository,
     this._accountRepository,
     this._userRepository,
+    {this.workflowsMode = false}
   ) : super(const ProjectListState()) {
     // Listen to calendar repository changes and update state automatically
     _startListeningToRepositoryChanges();
@@ -406,10 +410,16 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         success: (calendars) async {
           // AppLogger.info('ProjectListViewModel: Found ${calendars.length} projects');
           
-          // Load tasks for each project and calculate statistics
+          // Filter calendars based on mode
+          final filteredCalendars = calendars.where((c) {
+            final isWorkflow = c.flowitAsFlow == true || (c.flowitType.toUpperCase() == 'WORKFLOW');
+            return workflowsMode ? isWorkflow : !isWorkflow;
+          }).toList();
+
+          // Load tasks for each project/workflow and calculate statistics
           final projectsWithStats = <ProjectWithStats>[];
           
-          for (final calendar in calendars) {
+          for (final calendar in filteredCalendars) {
             // Check if still mounted before each async operation
             if (!mounted) return;
             
@@ -713,6 +723,140 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     }
   }
 
+  /// Convert a calendar to workflow
+  Future<void> convertProjectToWorkflow(String projectPath) async {
+    if (!mounted) return;
+    try {
+      state = state.copyWith(error: null);
+      final calendarResult = await _calendarRepository.getByPath(projectPath);
+      await calendarResult.when(
+        success: (calendar) async {
+          if (calendar == null) return;
+          final updated = calendar.copyWith(
+            flowitAsFlow: true,
+            flowitType: 'WORKFLOW',
+            lastModified: DateTime.now(),
+          );
+          final updateResult = await _calendarRepository.updateCalendarProperties(updated);
+          await updateResult.when(
+            success: (_) async {
+              await loadProjects();
+            },
+            failure: (f) async {
+              if (mounted) state = state.copyWith(error: f.message);
+            },
+          );
+        },
+        failure: (f) async {
+          if (mounted) state = state.copyWith(error: f.message);
+        },
+      );
+    } catch (e, st) {
+      AppLogger.error('ProjectListViewModel: convertProjectToWorkflow failed', e, st);
+      if (mounted) state = state.copyWith(error: e.toString());
+    }
+  }
+
+  /// Convert a calendar to project
+  Future<void> convertWorkflowToProject(String projectPath) async {
+    if (!mounted) return;
+    try {
+      state = state.copyWith(error: null);
+      final calendarResult = await _calendarRepository.getByPath(projectPath);
+      await calendarResult.when(
+        success: (calendar) async {
+          if (calendar == null) return;
+          final updated = calendar.copyWith(
+            flowitAsFlow: false,
+            flowitType: 'PROJECT',
+            lastModified: DateTime.now(),
+          );
+          final updateResult = await _calendarRepository.updateCalendarProperties(updated);
+          await updateResult.when(
+            success: (_) async {
+              await loadProjects();
+            },
+            failure: (f) async {
+              if (mounted) state = state.copyWith(error: f.message);
+            },
+          );
+        },
+        failure: (f) async {
+          if (mounted) state = state.copyWith(error: f.message);
+        },
+      );
+    } catch (e, st) {
+      AppLogger.error('ProjectListViewModel: convertWorkflowToProject failed', e, st);
+      if (mounted) state = state.copyWith(error: e.toString());
+    }
+  }
+
+  /// Archive a calendar
+  Future<void> archiveProject(String projectPath) async {
+    if (!mounted) return;
+    try {
+      state = state.copyWith(error: null);
+      final calendarResult = await _calendarRepository.getByPath(projectPath);
+      await calendarResult.when(
+        success: (calendar) async {
+          if (calendar == null) return;
+          final updated = calendar.copyWith(
+            flowitStatus: 'ARCHIVE',
+            lastModified: DateTime.now(),
+          );
+          final updateResult = await _calendarRepository.updateCalendarProperties(updated);
+          await updateResult.when(
+            success: (_) async {
+              await loadProjects();
+            },
+            failure: (f) async {
+              if (mounted) state = state.copyWith(error: f.message);
+            },
+          );
+        },
+        failure: (f) async {
+          if (mounted) state = state.copyWith(error: f.message);
+        },
+      );
+    } catch (e, st) {
+      AppLogger.error('ProjectListViewModel: archiveProject failed', e, st);
+      if (mounted) state = state.copyWith(error: e.toString());
+    }
+  }
+
+  /// Unarchive a calendar
+  Future<void> unarchiveProject(String projectPath) async {
+    if (!mounted) return;
+    try {
+      state = state.copyWith(error: null);
+      final calendarResult = await _calendarRepository.getByPath(projectPath);
+      await calendarResult.when(
+        success: (calendar) async {
+          if (calendar == null) return;
+          final updated = calendar.copyWith(
+            flowitStatus: 'ONGOING',
+            lastModified: DateTime.now(),
+          );
+          final updateResult = await _calendarRepository.updateCalendarProperties(updated);
+          await updateResult.when(
+            success: (_) async {
+              await loadProjects();
+            },
+            failure: (f) async {
+              if (mounted) state = state.copyWith(error: f.message);
+            },
+          );
+        },
+        failure: (f) async {
+          if (mounted) state = state.copyWith(error: f.message);
+        },
+      );
+    } catch (e, st) {
+      AppLogger.error('ProjectListViewModel: unarchiveProject failed', e, st);
+      if (mounted) state = state.copyWith(error: e.toString());
+    }
+  }
+
   /// Clear any errors
   void clearError() {
     // Check if still mounted before updating state
@@ -798,7 +942,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
 
   /// Get domain expansion state
   bool isDomainExpanded(String domain) {
-    return state.domainExpandedState[domain] ?? false;
+    // Default to expanded when no explicit state is stored
+    return state.domainExpandedState[domain] ?? true;
   }
 
   /// Assign domain to project

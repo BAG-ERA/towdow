@@ -335,7 +335,7 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
       );
 
       // Test the CalDAV connection
-      final caldavService = CalDAVService(account: account);
+      final ICalDAVService caldavService = CalDAVService(account: account);
       final testResult = await caldavService.testConnection();
       
       await testResult.when(

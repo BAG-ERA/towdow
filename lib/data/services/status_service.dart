@@ -101,10 +101,10 @@ class StatusService {
   }
 
   /// Assign a status to a calendar
-  Future<Result<void>> assignStatusToCalendar(String calendarUid, String? status) async {
-    AppLogger.info('StatusService: Assigning status "$status" to calendar $calendarUid');
+  Future<Result<void>> assignStatusToCalendar(String calendarPath, String? status) async {
+    AppLogger.info('StatusService: Assigning status "$status" to calendar $calendarPath');
     
-    final calendarResult = await _calendarRepository.getById(calendarUid);
+    final calendarResult = await _calendarRepository.getById(calendarPath);
     return calendarResult.when(
       success: (calendar) async {
         if (calendar == null) {
@@ -130,10 +130,10 @@ class StatusService {
   }
 
   /// Remove status from a calendar
-  Future<Result<void>> removeStatusFromCalendar(String calendarUid) async {
-    AppLogger.info('StatusService: Removing status from calendar $calendarUid');
+  Future<Result<void>> removeStatusFromCalendar(String calendarPath) async {
+    AppLogger.info('StatusService: Removing status from calendar $calendarPath');
     
-    final calendarResult = await _calendarRepository.getById(calendarUid);
+    final calendarResult = await _calendarRepository.getById(calendarPath);
     return calendarResult.when(
       success: (calendar) async {
         if (calendar == null) {
@@ -159,15 +159,15 @@ class StatusService {
   }
 
   /// Archive a calendar (set status to ARCHIVE)
-  Future<Result<void>> archiveCalendar(String calendarUid) async {
-    AppLogger.info('StatusService: Archiving calendar $calendarUid');
-    return await assignStatusToCalendar(calendarUid, 'ARCHIVE');
+  Future<Result<void>> archiveCalendar(String calendarPath) async {
+    AppLogger.info('StatusService: Archiving calendar $calendarPath');
+    return await assignStatusToCalendar(calendarPath, 'ARCHIVE');
   }
 
   /// Unarchive a calendar (set status to ONGOING)
-  Future<Result<void>> unarchiveCalendar(String calendarUid) async {
-    AppLogger.info('StatusService: Unarchiving calendar $calendarUid');
-    return await assignStatusToCalendar(calendarUid, 'ONGOING');
+  Future<Result<void>> unarchiveCalendar(String calendarPath) async {
+    AppLogger.info('StatusService: Unarchiving calendar $calendarPath');
+    return await assignStatusToCalendar(calendarPath, 'ONGOING');
   }
 
   /// Sync status to CalDAV server using queue for offline resilience
@@ -237,13 +237,13 @@ class StatusService {
   }
 
   /// Bulk assign status to multiple calendars
-  Future<Result<void>> bulkAssignStatus(List<String> calendarUids, String? status) async {
-    AppLogger.info('StatusService: Bulk assigning status "$status" to ${calendarUids.length} calendars');
+  Future<Result<void>> bulkAssignStatus(List<String> calendarPaths, String? status) async {
+    AppLogger.info('StatusService: Bulk assigning status "$status" to ${calendarPaths.length} calendars');
     
-    for (final uid in calendarUids) {
-      final result = await assignStatusToCalendar(uid, status);
+    for (final path in calendarPaths) {
+      final result = await assignStatusToCalendar(path, status);
       if (result is Error<void>) {
-        AppLogger.error('StatusService: Failed to assign status to calendar $uid: ${result.failure.message}');
+        AppLogger.error('StatusService: Failed to assign status to calendar $path: ${result.failure.message}');
         return result;
       }
     }

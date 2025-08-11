@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/providers/providers.dart';
 import '../utils/buttons/create_project_or_domain_button.dart';
-import '../adaptive_app_layout.dart';
 
 class ToolbarWidget extends ConsumerWidget {
   const ToolbarWidget({super.key});
@@ -27,8 +26,6 @@ class ToolbarWidget extends ConsumerWidget {
 
   Widget _buildToolbarContent(BuildContext context, String currentLocation, WidgetRef ref) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
     
     return Container(
       height: 56,
@@ -44,39 +41,10 @@ class ToolbarWidget extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          // Create button (left side)
           Expanded(
             child: CreateProjectOrDomainButton.compact(
               isFullWidth: true,
             ),
-          ),
-          
-          const SizedBox(width: 8),
-          
-          // Archive button (right side)
-          _buildIconButton(
-            context: context,
-            icon: Icons.archive_rounded,
-            tooltip: 'Archived Projects',
-            isSelected: isDesktop && currentLocation == '/archived',
-            onPressed: () {
-              context.go('/archived');
-              _closeDrawerIfMobile(context, ref);
-            },
-          ),
-          
-          const SizedBox(width: 8),
-          
-          // Settings button (right side)
-          _buildIconButton(
-            context: context,
-            icon: Icons.settings_rounded,
-            tooltip: 'Settings',
-            isSelected: isDesktop && currentLocation == '/settings',
-            onPressed: () {
-              context.go('/settings');
-              _closeDrawerIfMobile(context, ref);
-            },
           ),
         ],
       ),
@@ -85,49 +53,9 @@ class ToolbarWidget extends ConsumerWidget {
 
 
 
-  Widget _buildIconButton({
-    required BuildContext context,
-    required IconData icon,
-    required String tooltip,
-    required bool isSelected,
-    required VoidCallback onPressed,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: isSelected 
-            ? colorScheme.secondaryContainer
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            child: Icon(
-              icon,
-              color: isSelected
-                  ? colorScheme.onSecondaryContainer
-                  : colorScheme.onSurfaceVariant,
-              size: 20,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // No additional buttons for now
 
 
 
-  void _closeDrawerIfMobile(BuildContext context, WidgetRef ref) {
-    // More reliable drawer closing - only on mobile screens
-    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
-    if (!isDesktop) {
-      final closeDrawer = ref.read(drawerControllerProvider);
-      closeDrawer?.call();
-    }
-  }
+  // No-op helpers for future use
 } 

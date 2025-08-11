@@ -46,6 +46,11 @@ enum AppDestination {
     label: 'Projects',
     icon: Icons.folder_rounded,
     route: '/projects',
+  ),
+  workflows(
+    label: 'Workflows',
+    icon: Icons.route_rounded,
+    route: '/workflows',
   );
 
   const AppDestination({
@@ -202,12 +207,9 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     // Determine title for mobile based on route
     String title = 'FlowIt';
     bool isDetailScreen = false;
-      final location = GoRouterState.of(context).uri.path;
-    
-      if (location.startsWith('/archived')) {
-        title = 'Archived Projects';
-      isDetailScreen = true;
-    } else if (location.startsWith('/settings')) {
+    final location = GoRouterState.of(context).uri.path;
+
+    if (location.startsWith('/settings')) {
       title = 'Settings';
       isDetailScreen = true;
     } else if (location.startsWith('/project/')) {
@@ -216,11 +218,17 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     } else if (location == '/projects') {
       title = 'All Projects';
       isDetailScreen = true;
-    } else if (location == '/' || location.startsWith('/today') || location.startsWith('/soon') || 
-               location.startsWith('/next-week') || location.startsWith('/later') || location.startsWith('/anytime')) {
+    } else if (location.startsWith('/workflow/')) {
+      title = ref.watch(mobileTitleProvider) ?? 'Workflow Details';
+      isDetailScreen = true;
+    } else if (location == '/workflows') {
+      title = 'All Workflows';
+      isDetailScreen = true;
+    } else if (location == '/' || location.startsWith('/today') || location.startsWith('/soon') ||
+        location.startsWith('/next-week') || location.startsWith('/later') || location.startsWith('/anytime')) {
       title = 'My Tasks';
       isDetailScreen = true;
-    }    
+    }
     return Scaffold(
       key: _scaffoldKey,
       appBar: isDetailScreen ? AppBar(
@@ -235,8 +243,22 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-            tooltip: 'Back to navigation',
+            onPressed: () {
+              // On mobile detail pages, navigate back to the corresponding list
+              if (location.startsWith('/project/')) {
+                context.go('/projects');
+              } else if (location.startsWith('/workflow/')) {
+                context.go('/workflows');
+              } else {
+                // Fallback: open navigation drawer
+                Scaffold.of(context).openDrawer();
+              }
+            },
+            tooltip: location.startsWith('/project/')
+                ? 'Back to projects'
+                : location.startsWith('/workflow/')
+                    ? 'Back to workflows'
+                    : 'Back to navigation',
           ),
         ),
         actions: location.startsWith('/project/') 
@@ -350,23 +372,6 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
       );
     } catch (e) {
       AppLogger.error('Failed to archive project: $e');
-    }
-  }
-
-  void _handleUnarchiveProject(BuildContext context, WidgetRef ref, TaskCalendar project) async {
-    try {
-      final statusService = ref.read(statusServiceProvider);
-      final result = await statusService.unarchiveCalendar(project.path);
-      
-      result.when(
-        success: (_) {
-        },
-        failure: (failure) {
-          AppLogger.error('Failed to unarchive project: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('Failed to unarchive project: $e');
     }
   }
 

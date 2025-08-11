@@ -114,10 +114,10 @@ class DomainService {
   }
 
   /// Assign a domain to a calendar
-  Future<Result<void>> assignDomainToCalendar(String calendarUid, String? domain) async {
-    AppLogger.info('DomainService: Assigning domain "$domain" to calendar $calendarUid');
+  Future<Result<void>> assignDomainToCalendar(String calendarPath, String? domain) async {
+    AppLogger.info('DomainService: Assigning domain "$domain" to calendar $calendarPath');
     
-    final calendarResult = await _calendarRepository.getById(calendarUid);
+    final calendarResult = await _calendarRepository.getById(calendarPath);
     return calendarResult.when(
       success: (calendar) async {
         if (calendar == null) {
@@ -143,10 +143,10 @@ class DomainService {
   }
 
   /// Remove domain from a calendar
-  Future<Result<void>> removeDomainFromCalendar(String calendarUid) async {
-    AppLogger.info('DomainService: Removing domain from calendar $calendarUid');
+  Future<Result<void>> removeDomainFromCalendar(String calendarPath) async {
+    AppLogger.info('DomainService: Removing domain from calendar $calendarPath');
     
-    final calendarResult = await _calendarRepository.getById(calendarUid);
+    final calendarResult = await _calendarRepository.getById(calendarPath);
     return calendarResult.when(
       success: (calendar) async {
         if (calendar == null) {
@@ -279,13 +279,13 @@ class DomainService {
   }
 
   /// Bulk assign domain to multiple calendars
-  Future<Result<void>> bulkAssignDomain(List<String> calendarUids, String? domain) async {
-    AppLogger.info('DomainService: Bulk assigning domain "$domain" to ${calendarUids.length} calendars');
+  Future<Result<void>> bulkAssignDomain(List<String> calendarPaths, String? domain) async {
+    AppLogger.info('DomainService: Bulk assigning domain "$domain" to ${calendarPaths.length} calendars');
     
-    for (final uid in calendarUids) {
-      final result = await assignDomainToCalendar(uid, domain);
+    for (final path in calendarPaths) {
+      final result = await assignDomainToCalendar(path, domain);
       if (result is Error<void>) {
-        AppLogger.error('DomainService: Failed to assign domain to calendar $uid: ${result.failure.message}');
+        AppLogger.error('DomainService: Failed to assign domain to calendar $path: ${result.failure.message}');
         return result;
       }
     }

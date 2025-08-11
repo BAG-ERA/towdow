@@ -83,8 +83,17 @@ class SyncResult {
   });
 }
 
+/// SyncService orchestrates offline-first synchronization with a CalDAV server.
+///
+/// Notes on CalDAV dependency injection:
+/// - This class consumes `ICalDAVService` (see `caldav_service.dart`).
+/// - In production, `caldavFactory` builds a concrete `CalDAVService`.
+/// - In tests, override `SyncService.caldavFactory = (_) => mock;` to fully
+///   control server interactions (create/update/delete/report) without network.
 class SyncService {
   static SyncService? _instance;
+  static ICalDAVService Function(CaldavAccount) caldavFactory =
+      (account) => CalDAVService(account: account);
   
   final TaskRepository _taskRepository;
   final AccountRepository _accountRepository;
@@ -92,6 +101,8 @@ class SyncService {
   final CategoryRepository _categoryRepository;
   final UserRepository _userRepository;
   final LocalStorageService _localStorage;
+  // Note: _shareService is currently unused here; sharing updates handled elsewhere
+  // ignore: unused_field
   final ShareService? _shareService;
 
   // Private constructor
@@ -251,7 +262,7 @@ class SyncService {
 
   /// Perform the actual sync operation with a CalDAV account
   Future<Result<SyncResult>> _performSync(CaldavAccount account) async {
-    final caldavService = CalDAVService(account: account);
+    final ICalDAVService caldavService = SyncService.caldavFactory(account);
     final errors = <String>[];
     int syncedItems = 0;
     int failedItems = 0;
@@ -337,6 +348,10 @@ class SyncService {
         }
       }
 
+      // Also process queue items for calendars not included in this sync pass (e.g., excluded by prefs)
+      final includedPaths = calendarsToSync.map((c) => c.path).toSet();
+      await _processRemainingQueueItems(caldavService, includedPaths, errors);
+
       // Process queue items for calendars that no longer exist locally
       await _processOrphanedQueueItems(caldavService, errors);
 
@@ -369,7 +384,16 @@ class SyncService {
 
   /// Sync a single calendar with the server
   /// Returns true if sync was successful, false if it failed
-  Future<bool> _syncCalendar(CalDAVService caldavService, TaskCalendar calendar, List<String> errors) async {
+  Future<bool> _syncCalendar(ICalDAVService caldavService, TaskCalendar calendar, List<String> errors) async {
+    // Push queued operations first for this calendar to avoid UI re-adding stale server state
+    try {
+      final hasQueuedOpsEarly = await _hasQueuedOperationsForCalendar(calendar.path);
+      if (hasQueuedOpsEarly) {
+        await _processSyncQueueForCalendar(caldavService, calendar.path, errors);
+      }
+    } catch (_) {
+      // ignore push-first failures; pull will still proceed
+    }
     // Étape 1: Obtenir le sync-token actuel du serveur
     final serverSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
     
@@ -377,7 +401,7 @@ class SyncService {
       success: (serverSyncToken) async {
         final localSyncToken = calendar.syncToken;
         
-        AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: ${localSyncToken ?? "(null)"}, Server: ${serverSyncToken ?? "(null)"}');
+        AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: ${localSyncToken}, Server: ${serverSyncToken}');
         
         if (localSyncToken != serverSyncToken) {
           // Case 1: Sync token changed - get actual changes and apply them
@@ -408,6 +432,8 @@ class SyncService {
                 flowitStatus: serverCalendar.flowitStatus,
                 flowitKanban: serverCalendar.flowitKanban,
                 projectCategories: serverCalendar.projectCategories,
+                projectRequirements: serverCalendar.projectRequirements,
+                projectSteps: serverCalendar.projectSteps,
                 sharedWith: serverCalendar.sharedWith,
                 lastModified: serverCalendar.lastModified,
                 // Keep attendees from server if they exist, otherwise keep local ones
@@ -442,9 +468,9 @@ class SyncService {
           final newServerSyncTokenResult = await _getServerSyncToken(caldavService, calendar);
           await newServerSyncTokenResult.when(
             success: (newServerSyncToken) async {
-              AppLogger.debug('🔄 SyncService: Server sync token after queue processing: ${newServerSyncToken ?? "(null)"}');
+            AppLogger.debug('🔄 SyncService: Server sync token after queue processing: ${newServerSyncToken}');
               if (newServerSyncToken != serverSyncToken) {
-                AppLogger.debug('🔄 SyncService: Server sync-token updated after push: ${newServerSyncToken ?? "(null)"}');
+                AppLogger.debug('🔄 SyncService: Server sync-token updated after push: ${newServerSyncToken}');
                 
                 // Get current calendar properties to update ETag as well
                 final serverPropertiesResult = await caldavService.getCalendarProperties(calendar);
@@ -459,7 +485,7 @@ class SyncService {
                     final saveResult = await _calendarRepository.save(updatedCalendar);
                     await saveResult.when(
                       success: (_) async {
-                        AppLogger.info('🔄 SyncService: Calendar ${calendar.path} sync token and ETag updated after queue processing');
+                    AppLogger.info('🔄 SyncService: Calendar ${calendar.path} sync token and ETag updated after queue processing');
                       },
                       failure: (failure) async {
                         AppLogger.error('🔄 SyncService: Failed to save calendar ${calendar.path}: ${failure.message}');
@@ -496,7 +522,7 @@ class SyncService {
         }
         
         // Si aucun des deux tests n'est vrai, rien à faire
-        if (localSyncToken == serverSyncToken && !hasQueuedOperations) {
+        if (localSyncToken == serverSyncToken) {
           //AppLogger.debug('🔄 SyncService: No changes needed for ${calendar.path}');
         }
         
@@ -518,52 +544,35 @@ class SyncService {
 
   /// Public method to sync a single calendar (for use by monitor/services)
   Future<bool> syncCalendar(CaldavAccount account, TaskCalendar calendar, List<String> errors) async {
-    final caldavService = CalDAVService(account: account);
+    final ICalDAVService caldavService = SyncService.caldavFactory(account);
     return _syncCalendar(caldavService, calendar, errors);
   }
 
   /// Process a single sync queue item
-  Future<void> _processSyncQueueItem(SyncQueueItem item, CalDAVService caldavService) async {
+  Future<void> _processSyncQueueItem(SyncQueueItem item, ICalDAVService caldavService) async {
     switch (item.operation) {
       case SyncOperation.create:
-        // Get the complete task from repository using taskUid (same pattern as UPDATE/DELETE)
         final taskUid = item.data['taskUid'] as String?;
         final calendarPath = item.data['calendarPath'] as String?;
-        
+
         if (taskUid == null || calendarPath == null) {
           AppLogger.warning('SyncService: Missing taskUid or calendarPath for create');
           throw Exception('Missing required data for task creation');
         }
-        
-        // Get the complete task from repository
+
         final taskResult = await _taskRepository.getById(taskUid);
         await taskResult.when(
           success: (task) async {
             if (task == null) {
               throw Exception('Task not found in repository: $taskUid');
             }
-            
-            // Get calendar path from repository for proper CalDAV path
-            final calendarResult = await _calendarRepository.getById(calendarPath);
-            await calendarResult.when(
-              success: (calendar) async {
-                if (calendar != null) {
-                  final result = await caldavService.createTask(task, calendar.path);
-                  await result.when(
-                    success: (_) async {
-                      //AppLogger.debug('SyncService: Created task ${task.uid} on server in calendar ${calendar.path}');
-                    },
-                    failure: (failure) async {
-                      throw Exception('Failed to create task: ${failure.message}');
-                    },
-                  );
-                } else {
-                  throw Exception('Calendar not found: $calendarPath');
-                }
-              },
+
+            // Use queued calendarPath directly to support orphaned items
+            final result = await caldavService.createTask(task, calendarPath);
+            await result.when(
+              success: (_) async {},
               failure: (failure) async {
-                AppLogger.warning('SyncService: Could not find calendar $calendarPath for task creation');
-                throw Exception('Calendar not found for task creation: ${failure.message}');
+                throw Exception('Failed to create task: ${failure.message}');
               },
             );
           },
@@ -575,47 +584,28 @@ class SyncService {
         break;
 
       case SyncOperation.update:
-        // Get the complete task from repository using taskUid
         final taskUid = item.data['taskUid'] as String?;
         final calendarPath = item.data['calendarPath'] as String?;
-        
+
         if (taskUid == null || calendarPath == null) {
           AppLogger.warning('SyncService: Missing taskUid or calendarPath for update');
           throw Exception('Missing required data for task update');
         }
-        
-        // Get the complete task from repository
+
         final taskResult = await _taskRepository.getById(taskUid);
         await taskResult.when(
           success: (task) async {
             if (task == null) {
               throw Exception('Task not found in repository: $taskUid');
             }
-            
-            // Get calendar path from repository
-            final calendarResult = await _calendarRepository.getById(calendarPath);
-            await calendarResult.when(
-              success: (calendar) async {
-                if (calendar != null) {
-                  // Construct task URL: calendar.path + taskUid + .ics
-                  final taskUrl = '${calendar.path}${taskUid}.ics';
-                  
-                  final result = await caldavService.updateTask(task, taskUrl);
-                  await result.when(
-                    success: (_) async {
-                      // AppLogger.debug('SyncService: Updated task ${task.uid} on server at $taskUrl');
-                    },
-                    failure: (failure) async {
-                      throw Exception('Failed to update task: ${failure.message}');
-                    },
-                  );
-                } else {
-                  throw Exception('Calendar not found: $calendarPath');
-                }
-              },
+
+            // Construct task URL directly from queued calendar path
+            final taskUrl = '${calendarPath}${taskUid}.ics';
+            final result = await caldavService.updateTask(task, taskUrl);
+            await result.when(
+              success: (_) async {},
               failure: (failure) async {
-                AppLogger.warning('SyncService: Could not find calendar $calendarPath for task update');
-                throw Exception('Calendar not found for task update: ${failure.message}');
+                throw Exception('Failed to update task: ${failure.message}');
               },
             );
           },
@@ -627,42 +617,22 @@ class SyncService {
         break;
 
       case SyncOperation.delete:
-        // Construct task URL from calendar UID and task UID
         final calendarPath = item.data['calendarPath'] as String?;
         final taskUid = item.data['taskUid'] as String?;
-        
-        if (calendarPath != null && taskUid != null) {
-          // Get calendar path from repository
-          final calendarResult = await _calendarRepository.getById(calendarPath);
-          await calendarResult.when(
-            success: (calendar) async {
-              if (calendar != null) {
-                // Construct task URL: calendar.path + taskUid + .ics
-                final taskUrl = '${calendar.path}${taskUid}.ics';
-                // AppLogger.debug('SyncService: Constructed delete URL: $taskUrl');
-                
-                final result = await caldavService.deleteTask(taskUrl);
-                await result.when(
-                  success: (_) async {
-                    // AppLogger.info('SyncService: Deleted task ${item.itemId} from server at $taskUrl');
-                  },
-                  failure: (failure) async {
-                    throw Exception('Failed to delete task: ${failure.message}');
-                  },
-                );
-              } else {
-                throw Exception('Calendar not found: $calendarPath');
-              }
-            },
-            failure: (failure) async {
-              AppLogger.warning('SyncService: Could not find calendar $calendarPath for task deletion');
-              throw Exception('Calendar not found for task deletion: ${failure.message}');
-            },
-          );
-        } else {
+
+        if (calendarPath == null || taskUid == null) {
           AppLogger.warning('SyncService: Missing calendarPath or taskUid for deletion');
           throw Exception('Missing required data for task deletion');
         }
+
+        final taskUrl = '${calendarPath}${taskUid}.ics';
+        final result = await caldavService.deleteTask(taskUrl);
+        await result.when(
+          success: (_) async {},
+          failure: (failure) async {
+            throw Exception('Failed to delete task: ${failure.message}');
+          },
+        );
         break;
 
       case SyncOperation.updateCalendar:
@@ -731,7 +701,6 @@ class SyncService {
             final result = await caldavService.createCalendar(
               displayName: calendar.displayName,
               description: calendar.description,
-              uid: calendar.uid,
               domain: calendar.flowitDomain,
               kanban: calendar.flowitKanban,
               author: calendar.flowitAuthor,
@@ -764,41 +733,20 @@ class SyncService {
         break;
 
       case SyncOperation.deleteCalendar:
-        // Get the calendar from repository using calendarPath
+        // Use queued path directly; calendar may already be removed locally
         final calendarPath = item.data['calendarPath'] as String?;
-        
         AppLogger.debug('SyncService: Processing calendar deletion for: $calendarPath');
-        
         if (calendarPath == null) {
           AppLogger.warning('SyncService: Missing calendarPath for calendar deletion');
           throw Exception('Missing required data for calendar deletion');
         }
-        
-        // Get the complete calendar from repository
-        final calendarResult = await _calendarRepository.getById(calendarPath);
-        await calendarResult.when(
-          success: (calendar) async {
-            if (calendar == null) {
-              AppLogger.warning('SyncService: Calendar not found in repository: $calendarPath');
-              throw Exception('Calendar not found in repository: $calendarPath');
-            }
-            
-            AppLogger.debug('SyncService: Found calendar ${calendar.displayName}, calling CalDAV delete');
-            
-            // Delete calendar from server
-            final result = await caldavService.deleteCalendar(calendar.path);
-            await result.when(
-              success: (_) async {
-                AppLogger.info('SyncService: Deleted calendar ${calendar.displayName} from server');
-              },
-              failure: (failure) async {
-                throw Exception('Failed to delete calendar: ${failure.message}');
-              },
-            );
+        final result = await caldavService.deleteCalendar(calendarPath);
+        await result.when(
+          success: (_) async {
+            AppLogger.info('SyncService: Deleted calendar at $calendarPath from server');
           },
           failure: (failure) async {
-            AppLogger.warning('SyncService: Could not find calendar $calendarPath for deletion');
-            throw Exception('Calendar not found for deletion: ${failure.message}');
+            throw Exception('Failed to delete calendar: ${failure.message}');
           },
         );
         break;
@@ -943,7 +891,7 @@ class SyncService {
   ) async {
     try {
       final queueItem = SyncQueueItem(
-        id: 'sync_${DateTime.now().millisecondsSinceEpoch}_$itemId',
+        id: 'sync_${DateTime.now().microsecondsSinceEpoch}_${operation.name}_$itemId',
         operation: operation,
         itemId: itemId,
         data: data,
@@ -1076,8 +1024,13 @@ class SyncService {
     }
   }
 
+  /// Public check for pending calendar deletions (used by monitor/discovery)
+  Future<bool> hasPendingDeletionForCalendar(String calendarPath) async {
+    return _hasPendingDeletionForCalendar(calendarPath);
+  }
+
   /// Get current sync token from server for a calendar
-  Future<Result<String>> _getServerSyncToken(CalDAVService caldavService, TaskCalendar calendar) async {
+  Future<Result<String>> _getServerSyncToken(ICalDAVService caldavService, TaskCalendar calendar) async {
     try {
       // Use CalDAVService to get both sync token and ETag
       final propertiesResult = await caldavService.getCalendarProperties(calendar);
@@ -1105,7 +1058,7 @@ class SyncService {
   }
 
   /// Sync changes from server using sync-collection REPORT
-  Future<void> _syncFromServer(CalDAVService caldavService, TaskCalendar calendar, String newSyncToken, List<String> errors) async {
+  Future<void> _syncFromServer(ICalDAVService caldavService, TaskCalendar calendar, String newSyncToken, List<String> errors) async {
     try {
       //AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
       
@@ -1192,6 +1145,8 @@ class SyncService {
             flowitStatus: serverCalendar.flowitStatus,
             flowitKanban: serverCalendar.flowitKanban,
             projectCategories: serverCalendar.projectCategories,
+            projectRequirements: serverCalendar.projectRequirements,
+            projectSteps: serverCalendar.projectSteps,
             sharedWith: serverCalendar.sharedWith,
             lastModified: serverCalendar.lastModified,
             attendees: serverCalendar.attendees,
@@ -1263,7 +1218,7 @@ class SyncService {
   }
 
   /// Process sync queue operations for a specific calendar
-  Future<void> _processSyncQueueForCalendar(CalDAVService caldavService, String calendarPath, List<String> errors) async {
+  Future<void> _processSyncQueueForCalendar(ICalDAVService caldavService, String calendarPath, List<String> errors) async {
     try {
       AppLogger.debug('🔄 SyncService: Processing queue for calendar $calendarPath');
       
@@ -1276,6 +1231,9 @@ class SyncService {
               .cast<SyncQueueItem>()
               .where((item) => item.data['calendarPath'] == calendarPath)
               .toList();
+
+          // Process in chronological order (create → update → delete) to preserve user intent
+          queueItems.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
           //AppLogger.debug('🔄 SyncService: Found ${queueItems.length} queued operations for calendar $calendarPath');
 
@@ -1312,7 +1270,7 @@ class SyncService {
   }
 
   /// Process queue items for calendars that no longer exist locally
-  Future<void> _processOrphanedQueueItems(CalDAVService caldavService, List<String> errors) async {
+  Future<void> _processOrphanedQueueItems(ICalDAVService caldavService, List<String> errors) async {
     try {
       AppLogger.debug('🔄 SyncService: Processing orphaned queue items');
       
@@ -1366,6 +1324,53 @@ class SyncService {
       );
     } catch (e) {
       AppLogger.error('SyncService: Error processing orphaned queue items', e, StackTrace.current);
+    }
+  }
+
+  /// Process queue items for calendars that were not in the current sync set (e.g. excluded by prefs)
+  Future<void> _processRemainingQueueItems(ICalDAVService caldavService, Set<String> includedCalendarPaths, List<String> errors) async {
+    try {
+      final queueResult = await _localStorage.getAll<Map<String, dynamic>>(syncQueueBoxName);
+      await queueResult.when(
+        success: (queueData) async {
+          final queueItems = queueData
+              .map((data) => _mapToSyncQueueItem(data))
+              .where((item) => item != null)
+              .cast<SyncQueueItem>()
+              .toList();
+
+          for (final item in queueItems) {
+            final calendarPath = item.data['calendarPath'] as String?;
+            if (calendarPath == null) continue;
+            if (includedCalendarPaths.contains(calendarPath)) continue; // already processed in regular loop
+
+            // Ensure the calendar exists locally; if it does, process its queue now
+            final calendarResult = await _calendarRepository.getById(calendarPath);
+            await calendarResult.when(
+              success: (calendar) async {
+                if (calendar != null) {
+                  try {
+                    await _processSyncQueueItem(item, caldavService);
+                    await _localStorage.delete(syncQueueBoxName, item.id);
+                  } catch (e) {
+                    if (item.retryCount >= maxRetryCount) {
+                      errors.add('Max retries reached for item ${item.id}: $e');
+                      await _localStorage.delete(syncQueueBoxName, item.id);
+                    } else {
+                      final updatedItem = item.copyWith(retryCount: item.retryCount + 1);
+                      await _localStorage.put(syncQueueBoxName, item.id, _mapFromSyncQueueItem(updatedItem));
+                    }
+                  }
+                }
+              },
+              failure: (_) async {},
+            );
+          }
+        },
+        failure: (_) async {},
+      );
+    } catch (_) {
+      // swallow
     }
   }
 
@@ -1798,7 +1803,7 @@ class SyncService {
           }
 
           // Process queue for each calendar
-          final caldavService = CalDAVService(account: account);
+          final ICalDAVService caldavService = SyncService.caldavFactory(account);
           final errors = <String>[];
           
           for (final calendar in selectedCalendars) {
@@ -1857,7 +1862,7 @@ class SyncService {
       AppLogger.info('SyncService: Creating calendar on server: ${calendar.displayName}');
       
       // Use CalDAV service to create the calendar
-      final caldavService = CalDAVService(account: account);
+      final ICalDAVService caldavService = SyncService.caldavFactory(account);
       final createResult = await caldavService.createCalendar(
         displayName: calendar.displayName,
         description: calendar.description,

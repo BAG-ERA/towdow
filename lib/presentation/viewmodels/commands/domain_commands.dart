@@ -11,19 +11,19 @@ import '../../../data/models/task_calendar.dart';
 /// Command to assign a domain to a single calendar
 class AssignDomainToCalendarCommand extends VoidCommand {
   final DomainService _domainService;
-  final String calendarUid;
+  final String calendarPath;
   final String? domain;
 
   AssignDomainToCalendarCommand(
     this._domainService,
-    this.calendarUid,
+    this.calendarPath,
     this.domain,
   );
 
   @override
   Future<void> run() async {
-    AppLogger.info('AssignDomainToCalendarCommand: Assigning domain "$domain" to calendar $calendarUid');
-    final result = await _domainService.assignDomainToCalendar(calendarUid, domain);
+    AppLogger.info('AssignDomainToCalendarCommand: Assigning domain "$domain" to calendar $calendarPath');
+    final result = await _domainService.assignDomainToCalendar(calendarPath, domain);
     
     result.when(
       success: (_) => null,
@@ -35,17 +35,17 @@ class AssignDomainToCalendarCommand extends VoidCommand {
 /// Command to remove domain from a calendar
 class RemoveDomainFromCalendarCommand extends VoidCommand {
   final DomainService _domainService;
-  final String calendarUid;
+  final String calendarPath;
 
   RemoveDomainFromCalendarCommand(
     this._domainService,
-    this.calendarUid,
+    this.calendarPath,
   );
 
   @override
   Future<void> run() async {
-    AppLogger.info('RemoveDomainFromCalendarCommand: Removing domain from calendar $calendarUid');
-    final result = await _domainService.removeDomainFromCalendar(calendarUid);
+    AppLogger.info('RemoveDomainFromCalendarCommand: Removing domain from calendar $calendarPath');
+    final result = await _domainService.removeDomainFromCalendar(calendarPath);
     
     result.when(
       success: (_) => null,
@@ -57,19 +57,19 @@ class RemoveDomainFromCalendarCommand extends VoidCommand {
 /// Command to bulk assign domain to multiple calendars
 class BulkAssignDomainCommand extends VoidCommand {
   final DomainService _domainService;
-  final List<String> calendarUids;
+  final List<String> calendarPaths;
   final String? domain;
 
   BulkAssignDomainCommand(
     this._domainService,
-    this.calendarUids,
+    this.calendarPaths,
     this.domain,
   );
 
   @override
   Future<void> run() async {
-    AppLogger.info('BulkAssignDomainCommand: Bulk assigning domain "$domain" to ${calendarUids.length} calendars');
-    final result = await _domainService.bulkAssignDomain(calendarUids, domain);
+    AppLogger.info('BulkAssignDomainCommand: Bulk assigning domain "$domain" to ${calendarPaths.length} calendars');
+    final result = await _domainService.bulkAssignDomain(calendarPaths, domain);
     
     result.when(
       success: (_) => null,
@@ -244,18 +244,18 @@ class DomainCommandFactory {
   DomainCommandFactory(this._domainService);
 
   /// Create command to assign domain to calendar
-  AssignDomainToCalendarCommand assignDomainToCalendar(String calendarUid, String? domain) {
-    return AssignDomainToCalendarCommand(_domainService, calendarUid, domain);
+  AssignDomainToCalendarCommand assignDomainToCalendar(String calendarPath, String? domain) {
+    return AssignDomainToCalendarCommand(_domainService, calendarPath, domain);
   }
 
   /// Create command to remove domain from calendar
-  RemoveDomainFromCalendarCommand removeDomainFromCalendar(String calendarUid) {
-    return RemoveDomainFromCalendarCommand(_domainService, calendarUid);
+  RemoveDomainFromCalendarCommand removeDomainFromCalendar(String calendarPath) {
+    return RemoveDomainFromCalendarCommand(_domainService, calendarPath);
   }
 
   /// Create command to bulk assign domain
-  BulkAssignDomainCommand bulkAssignDomain(List<String> calendarUids, String? domain) {
-    return BulkAssignDomainCommand(_domainService, calendarUids, domain);
+  BulkAssignDomainCommand bulkAssignDomain(List<String> calendarPaths, String? domain) {
+    return BulkAssignDomainCommand(_domainService, calendarPaths, domain);
   }
 
   /// Create command to rename domain

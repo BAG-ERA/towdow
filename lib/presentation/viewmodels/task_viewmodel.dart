@@ -49,6 +49,8 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
     List<String> categories = const [],
     List<Attendee> attendees = const [],
     String? projectPath,
+    String? flowitRequirement,
+    String? stepId,
   }) async {
     AppLogger.debug('🔄 TaskViewModel: Creating task with summary: $summary');
     
@@ -75,7 +77,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
       // Encode project path to match storage format (especially for @ characters)
       final encodedProjectPath = projectPath?.replaceAll('@', '%40');
       
-      final task = TaskFactory.createNew(
+      final baseTask = TaskFactory.createNew(
         summary: summary,
         description: description,
         due: due,
@@ -83,7 +85,9 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
         attendees: attendees,
         projectPath: encodedProjectPath,
         organizer: organizer,
+        flowitRequirement: flowitRequirement ?? '{}',
       );
+      final task = stepId != null ? baseTask.copyWith(stepId: stepId) : baseTask;
 
       final result = await _taskRepository.save(task);
       

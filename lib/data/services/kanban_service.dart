@@ -98,7 +98,7 @@ class KanbanService {
           }
 
           // Use CalDAV service to refresh calendar info from server
-          final caldavService = CalDAVService(account: account);
+          final ICalDAVService caldavService = CalDAVService(account: account);
           
           // Create a minimal calendar object to get properties
           final tempCalendar = TaskCalendarFactory.fromCalDAVDiscovery(

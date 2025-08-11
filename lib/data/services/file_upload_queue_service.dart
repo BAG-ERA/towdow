@@ -529,7 +529,7 @@ class FileUploadQueueService {
                 offlineFile.taskUid,
                 {
                   'taskUid': offlineFile.taskUid,
-                  'calendarUid': task.projectPath,
+                  'calendarPath': task.projectPath,
                 },
               );
               

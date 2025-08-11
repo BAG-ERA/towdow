@@ -12,6 +12,7 @@ import '../../widgets/utils/buttons/archive_project_button.dart';
 import '../../widgets/utils/buttons/exit_share_button.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/step.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../viewmodels/commands/attendee_commands.dart';
@@ -21,6 +22,7 @@ import '../../widgets/adaptive_app_layout.dart';
 import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/project_detail/project_kanban_view.dart';
 import '../../widgets/project_detail/project_infos_widget.dart';
+import '../../widgets/project_detail/project_warnings_banner.dart';
 
 // Provider for a specific project/calendar that watches only this specific calendar
 final projectProvider = StreamProvider.family<TaskCalendar?, String>((ref, projectPath) {
@@ -119,8 +121,12 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             width: 320,
             child: Column(
               children: [
-                // Project title and full project info
-                _buildDesktopHeader(context, projectAsync, tasksAsync),
+                // Project title and full project info (scrollable to avoid overflow)
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: _buildDesktopHeader(context, projectAsync, tasksAsync),
+                  ),
+                ),
               ],
             ),
           ),
@@ -225,13 +231,66 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Project Details Widget (replacing ProjectInfoCard)
+                  // Warnings banner on mobile (if any)
                   projectAsync.when(
-                    data: (project) => project != null 
-                        ? ProjectInfosWidget(
-                            project: project,
-                            tasksAsync: tasksAsync,
-                            onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                    data: (project) => project != null
+                        ? ProjectWarningsBanner(project: project, tasksAsync: tasksAsync)
+                        : const SizedBox.shrink(),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+                  // Project Details - collapsible on mobile
+                  projectAsync.when(
+                    data: (project) => project != null
+                        ? Column(
+                            children: [
+                              // Collapsible header with tasks count
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: ExpansionTile(
+                                  initiallyExpanded: false,
+                                  backgroundColor: Colors.transparent,
+                                  collapsedBackgroundColor: Colors.transparent,
+                                  tilePadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                                  title: tasksAsync.when(
+                                    data: (tasks) {
+                                      final completed = tasks.where((t) => t.status == 'COMPLETED').length;
+                                      final total = tasks.length;
+                                      return Text(
+                                        'Tasks $completed/$total',
+                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                                      );
+                                    },
+                                    loading: () => Text(
+                                      'Tasks ...',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                                    ),
+                                    error: (_, __) => Text(
+                                      'Tasks 0/0',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: ProjectInfosWidget(
+                                        project: project,
+                                        tasksAsync: tasksAsync,
+                                        onProjectUpdated: (updatedProject) => _updateProject(updatedProject),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Separator under the header
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Divider(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                                  height: 1,
+                                ),
+                              ),
+                            ],
                           )
                         : Container(
                             margin: const EdgeInsets.all(16),
@@ -251,8 +310,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                   child: Text(
                                     'Project not found: ${widget.projectPath}',
                                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Theme.of(context).colorScheme.onErrorContainer,
-                                    ),
+                                          color: Theme.of(context).colorScheme.onErrorContainer,
+                                        ),
                                   ),
                                 ),
                               ],
@@ -291,8 +350,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                             child: Text(
                               'Failed to load project: $error',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.onErrorContainer,
-                              ),
+                                    color: Theme.of(context).colorScheme.onErrorContainer,
+                                  ),
                             ),
                           ),
                         ],
@@ -539,6 +598,25 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         // Navigate to task detail
       },
       onTaskToggle: (task) async {
+        // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
+        final project = ref.read(projectProvider(widget.projectPath)).asData?.value;
+        final stepRepo = ref.read(stepRepositoryProvider);
+        ProjectStep? step;
+        if (task.stepId != null && task.stepId!.isNotEmpty) {
+          final stepRes = await stepRepo.getStepById(task.stepId!);
+          step = stepRes.when(success: (s) => s, failure: (_) => null);
+        }
+        final isFlow = project?.flowitAsFlow == true;
+        final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
+        final stepIsAvailable = step?.status == StepStatus.available;
+
+        if (isFlow && status == 'ONGOING' && !stepIsAvailable) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This task belongs to a waiting step and cannot be completed yet.')),
+          );
+          return;
+        }
+
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
         await taskViewModel.toggleTaskCompletion(task);
         
@@ -885,6 +963,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     // Refresh the project tasks list
     ref.invalidate(projectTasksProvider(widget.projectPath));
   }
+
+  
 
   Future<void> _updateProject(TaskCalendar updatedProject) async {
     try {

@@ -161,6 +161,7 @@ class XMLResponseParser {
         final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
         final flowitKanban = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
         final flowitCategories = _extractFlowItPropertyWithPrefixes(responseContent, 'categories', globalFlowItPrefixes);
+        final flowitRequirements = _extractFlowItPropertyWithPrefixes(responseContent, 'requirements', globalFlowItPrefixes);
         final flowitSharedWith = _extractFlowItPropertyWithPrefixes(responseContent, 'sharedWith', globalFlowItPrefixes);
         
         if (isCalendar && supportsTodos) {
@@ -179,12 +180,15 @@ class XMLResponseParser {
             sharedWith: flowitSharedWith,
           );
           
-          // Update project categories if found
+          // Update project categories/requirements if found
+          TaskCalendar withCollections = calendar;
           if (flowitCategories != null && flowitCategories.isNotEmpty) {
-            calendars.add(calendar.copyWith(projectCategories: flowitCategories));
-          } else {
-            calendars.add(calendar);
+            withCollections = withCollections.copyWith(projectCategories: flowitCategories);
           }
+          if (flowitRequirements != null && flowitRequirements.isNotEmpty) {
+            withCollections = withCollections.copyWith(projectRequirements: flowitRequirements);
+          }
+          calendars.add(withCollections);
         }
       }
       
@@ -370,6 +374,8 @@ class XMLResponseParser {
         responseData['flowit-status'] = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
         responseData['flowit-kanban'] = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
         responseData['flowit-categories'] = _extractFlowItPropertyWithPrefixes(responseContent, 'categories', globalFlowItPrefixes);
+        responseData['flowit-requirements'] = _extractFlowItPropertyWithPrefixes(responseContent, 'requirements', globalFlowItPrefixes);
+        responseData['flowit-steps'] = _extractFlowItPropertyWithPrefixes(responseContent, 'steps', globalFlowItPrefixes);
         responseData['flowit-type'] = _extractFlowItPropertyWithPrefixes(responseContent, 'type', globalFlowItPrefixes);
         responseData['flowit-asflow'] = _extractFlowItPropertyWithPrefixes(responseContent, 'asflow', globalFlowItPrefixes);
         responseData['flowit-owner'] = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);

@@ -28,7 +28,7 @@ class AutomatedTask with _$AutomatedTask {
     @HiveField(12) String? flowitTemplate, // UID of template
     @HiveField(13) String? flowitReversalTask, // UID of reversal task
     @HiveField(14) @Default('{"type":"default"}') String flowitValidator, // JSON string
-    @HiveField(15) @Default('{}') String flowitRequirement, // JSON string
+    @HiveField(15) @Default('[]') String flowitRequirement, // JSON array string of requirement IDs
     @HiveField(16) @Default('{}') String flowitAutomate, // JSON string
     @HiveField(17) @Default('{}') String flowitContext, // JSON string
   }) = _AutomatedTask;

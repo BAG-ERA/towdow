@@ -2,23 +2,63 @@
 // Provides high-level CalDAV operations for VTODO synchronization
 
 import 'dart:math' as math;
+import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
-import 'package:xml/xml.dart';
+ 
 
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/caldav_account.dart';
 import '../models/task.dart';
 import '../models/task_calendar.dart';
+import '../models/step.dart';
 
 import 'webdav_client.dart';
 import 'capability_discovery_service.dart';
 import 'parsers/vtodo_parser.dart';
 import 'parsers/xml_response_parser.dart';
 import 'share_service.dart';
+/// Interface for CalDAV operations used across the app.
+///
+/// Why this exists
+/// - Testability: Allows mocking CalDAV calls (create/update/delete/report)
+///   without performing real network I/O. Queue-processing tests depend on this.
+/// - Decoupling: UI/ViewModels/Services can depend on an interface instead of
+///   the concrete `CalDAVService`, making it easier to evolve/replace.
+/// - DI compatibility: Combined with `SyncService.caldavFactory` and the
+///   `caldavServiceProvider`, this enables dependency injection.
+///
+/// How to use
+/// - Production: Use the provider returning `ICalDAVService` or the default
+///   factory in `SyncService` which constructs `CalDAVService`.
+/// - Tests: Override `SyncService.caldavFactory` to return a mock
+///   (e.g., Mockito) or override the provider to inject a fake.
+/// - Prefer typing against `ICalDAVService` everywhere. Only the DI composition
+///   code should reference `CalDAVService` directly.
+abstract class ICalDAVService {
+  CaldavAccount get account;
+  Future<Result<CalDAVCapabilities>> testConnection();
+  Future<Result<String>> createTask(Task task, String calendarPath);
+  Future<Result<void>> updateTask(Task task, String taskUrl, {String? etag});
+  Future<Result<void>> deleteTask(String taskUrl, {String? etag});
+  Future<Result<List<Task>>> fetchTasks({required String calendarPath});
+  Future<Result<void>> deleteCalendar(String calendarPath);
+  Future<Result<TaskCalendar>> getCalendarProperties(TaskCalendar calendar);
+  Future<Result<TaskCalendar>> createCalendar({
+    required String displayName,
+    String? description,
+    String? domain,
+    String? kanban,
+    String? categ,
+    String? author,
+    String? owner,
+    bool asWorkflow = false,
+  });
+  Future<Result<void>> updateCalendarProperties(TaskCalendar calendar);
+}
 
-class CalDAVService {
+class CalDAVService implements ICalDAVService {
   final CaldavAccount account;
   late final WebDAVClient _client;
 
@@ -115,7 +155,7 @@ class CalDAVService {
       final putResult = await _client.put(taskUrl, vtodoContent, etag: etag);
       return await putResult.when(
         success: (response) async {
-          if (response.statusCode == 204 || response.statusCode == 200) {
+          if (response.statusCode == 204 || response.statusCode == 200 || response.statusCode == 201) {
             // AppLogger.info('CalDAVService: Task updated successfully');
             return Result.success(null);
           } else {
@@ -178,12 +218,10 @@ class CalDAVService {
   }
 
   /// Fetch all tasks from a calendar using REPORT query
-  Future<Result<List<Task>>> fetchTasks({String? calendarPath}) async {
+  Future<Result<List<Task>>> fetchTasks({required String calendarPath}) async {
     try {
       // AppLogger.debug('CalDAVService: Fetching tasks from calendar');
-      
-      calendarPath ??= '/calendars/${account.username}/tasks/';
-      
+            
       // CalDAV REPORT query to fetch all VTODOs
       final reportQuery = '''<?xml version="1.0" encoding="utf-8" ?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -393,6 +431,8 @@ class CalDAVService {
     <FLOWIT:template/>
     <FLOWIT:status/>
     <FLOWIT:categories/>
+    <FLOWIT:requirements/>
+    <FLOWIT:steps/>
     <FLOWIT:sharedWith/>
   </D:prop>
 </D:propfind>''';
@@ -501,7 +541,7 @@ class CalDAVService {
       AppLogger.debug('CalDAVService: Resyncing calendar info for ${calendar.displayName}');
       
       // Get ALL calendar properties from server (including custom namespaces)
-      final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
+    final propfindBody = '''<?xml version="1.0" encoding="utf-8" ?>
 <D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:FLOWIT="https://flowit.app/ns/">
   <D:prop>
     <D:displayname />
@@ -517,6 +557,8 @@ class CalDAVService {
     <FLOWIT:status />
     <FLOWIT:kanban />
     <FLOWIT:categories />
+    <FLOWIT:requirements />
+    <FLOWIT:steps />
     <FLOWIT:sharedWith />
     <FLOWIT:author />
     <FLOWIT:manager />
@@ -546,6 +588,8 @@ class CalDAVService {
                 flowitStatus: responseData['flowit-status'],
                 flowitKanban: responseData['flowit-kanban'] ?? calendar.flowitKanban,
                 projectCategories: responseData['flowit-categories'] ?? calendar.projectCategories,
+                projectRequirements: responseData['flowit-requirements'] ?? calendar.projectRequirements,
+                projectSteps: responseData['flowit-steps'] ?? calendar.projectSteps,
                 sharedWith: responseData['flowit-sharedWith'] ?? calendar.sharedWith,
                 flowitAuthor: responseData['flowit-author'] ?? calendar.flowitAuthor,
                 flowitOwner: responseData['flowit-owner'] ?? calendar.flowitOwner,
@@ -592,24 +636,23 @@ class CalDAVService {
   Future<Result<TaskCalendar>> createCalendar({
     required String displayName,
     String? description,
-    String? uid,
     String? domain,
     String? kanban,
     String? categ,
     String? author,
     String? owner,
+    bool asWorkflow = false,
   }) async {
     try {
       // First discover the proper calendar home for this account
-      final capabilitiesResult = await discoverCapabilities();
+      final capabilitiesResult = await testConnection();
       return await capabilitiesResult.when(
         success: (capabilities) async {
-          // Generate UUID for unique calendar path
+          // Generate a new calendar collection path under the discovered home
           final calendarUuid = const Uuid().v4();
           final calendarHome = capabilities.calendarHome;
-          final calendarPath = '$calendarHome$calendarUuid/';
-          final normalizedPath = calendarPath.endsWith('/') ? calendarPath : '$calendarPath/';
-          AppLogger.info('CalDAVService: Creating calendar $displayName at $normalizedPath using calendar home: $calendarHome');
+          final normalizedPath = '$calendarHome$calendarUuid/';
+          AppLogger.info('CalDAVService: Creating calendar $displayName at $normalizedPath');
           
           return await _performCalendarCreation(
             normalizedPath, 
@@ -620,6 +663,7 @@ class CalDAVService {
             categ: categ,
             author: author,
             owner: owner,
+            asWorkflow: asWorkflow,
           );
         },
         failure: (failure) async {
@@ -642,9 +686,16 @@ class CalDAVService {
     String normalizedPath,
     String displayName,
     String? description,
-    {String? domain, String? kanban, String? categ, String? author, String? owner}
+    {String? domain, String? kanban, String? categ, String? author, String? owner, bool asWorkflow = false}
   ) async {
     try {
+      // Default steps for workflow calendars
+      // For workflows, seed with a single default step using model + toJson
+      final stepsJson = asWorkflow
+          ? jsonEncode([
+              ProjectStep.create(name: 'Step 1', order: 0).toJson(),
+            ])
+          : null;
       
       // Build MKCALENDAR request body (RFC 4791 Section 5.3.1)
       final mkCalendarBody = '''<?xml version="1.0" encoding="utf-8"?>
@@ -661,11 +712,13 @@ class CalDAVService {
         <C:comp name="VEVENT"/>
       </C:supported-calendar-component-set>
       <C:calendar-description><![CDATA[${description ?? 'Created by FlowIt'}]]></C:calendar-description>
-      <FLOWIT:type>PROJECT</FLOWIT:type>
-      <FLOWIT:status>ONGOING</FLOWIT:status>
+      <FLOWIT:type>${asWorkflow ? 'WORKFLOW' : 'PROJECT'}</FLOWIT:type>
+      <FLOWIT:asflow>${asWorkflow ? 'true' : 'false'}</FLOWIT:asflow>
+      <FLOWIT:status>${asWorkflow ? 'DRAFT' : 'ONGOING'}</FLOWIT:status>
       ${domain != null && domain.isNotEmpty ? '<FLOWIT:domain>$domain</FLOWIT:domain>' : ''}
       ${kanban != null && kanban.isNotEmpty ? '<FLOWIT:kanban>$kanban</FLOWIT:kanban>' : ''}
       ${categ != null && categ.isNotEmpty ? '<FLOWIT:categories>$categ</FLOWIT:categories>' : ''}
+      ${stepsJson != null ? '<FLOWIT:steps><![CDATA[' + stepsJson + ']]></FLOWIT:steps>' : ''}
       ${author != null && author.isNotEmpty ? '<FLOWIT:author>$author</FLOWIT:author>' : ''}
       ${owner != null && owner.isNotEmpty ? '<FLOWIT:owner>$owner</FLOWIT:owner>' : ''}
     </D:prop>
@@ -695,6 +748,9 @@ class CalDAVService {
                flowitAuthor: author,
                flowitOwner: owner,
                flowitStartedAt: DateTime.now(),
+               flowitType: asWorkflow ? 'WORKFLOW' : 'PROJECT',
+               flowitAsFlow: asWorkflow,
+               flowitStatus: asWorkflow ? 'DRAFT' : 'ONGOING',
              ));
                      } else if (webDavResponse.statusCode == 409) {
              // 409 Conflict - calendar already exists
@@ -892,6 +948,14 @@ class CalDAVService {
     if (calendar.projectCategories.isNotEmpty && calendar.projectCategories != '[]') {
       xml.writeln('      <FLOWIT:categories><![CDATA[${calendar.projectCategories}]]></FLOWIT:categories>');
     }
+    // Set project requirements as JSON
+    if (calendar.projectRequirements.isNotEmpty && calendar.projectRequirements != '[]') {
+      xml.writeln('      <FLOWIT:requirements><![CDATA[${calendar.projectRequirements}]]></FLOWIT:requirements>');
+    }
+    // Set project steps as JSON
+    if (calendar.projectSteps.isNotEmpty && calendar.projectSteps != '[]') {
+      xml.writeln('      <FLOWIT:steps><![CDATA[${calendar.projectSteps}]]></FLOWIT:steps>');
+    }
     
     // Set shared project members as JSON
     if (calendar.sharedWith.isNotEmpty && calendar.sharedWith != '[]') {
@@ -906,6 +970,7 @@ class CalDAVService {
         (calendar.flowitStatus == null || calendar.flowitStatus!.isEmpty) ||
         (calendar.flowitKanban.isEmpty || calendar.flowitKanban == '[]') ||
         (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') ||
+        (calendar.projectRequirements.isEmpty || calendar.projectRequirements == '[]') ||
         (calendar.sharedWith.isEmpty || calendar.sharedWith == '[]')) {
       xml.writeln('  <D:remove>');
       xml.writeln('    <D:prop>');
@@ -924,6 +989,12 @@ class CalDAVService {
       
       if (calendar.projectCategories.isEmpty || calendar.projectCategories == '[]') {
         xml.writeln('      <FLOWIT:categories/>');
+      }
+      if (calendar.projectRequirements.isEmpty || calendar.projectRequirements == '[]') {
+        xml.writeln('      <FLOWIT:requirements/>');
+      }
+      if (calendar.projectSteps.isEmpty || calendar.projectSteps == '[]') {
+        xml.writeln('      <FLOWIT:steps/>');
       }
       
       if (calendar.sharedWith.isEmpty || calendar.sharedWith == '[]') {
@@ -948,149 +1019,6 @@ class CalDAVService {
         .replaceAll("'", '&apos;');
   }
 
-  /// Serialize calendar properties to VCALENDAR format
-  String _serializeCalendarProperties(TaskCalendar calendar) {
-    final vcalendar = StringBuffer();
-    
-    // Start VCALENDAR
-    vcalendar.writeln('BEGIN:VCALENDAR');
-    vcalendar.writeln('VERSION:2.0');
-    vcalendar.writeln('PRODID:-//FlowIt//FlowIt v1.0//EN');
-    
-    // Standard calendar properties
-    vcalendar.writeln('UID:${calendar.path}');
-    vcalendar.writeln('DTSTAMP:${_formatDateTime(calendar.dtstamp)}');
-    vcalendar.writeln('CREATED:${_formatDateTime(calendar.created)}');
-    vcalendar.writeln('LAST-MODIFIED:${_formatDateTime(calendar.lastModified)}');
-    vcalendar.writeln('SUMMARY:${_escapeCalendarText(calendar.displayName)}');
-    vcalendar.writeln('STATUS:${calendar.status}');
-    vcalendar.writeln('PERCENT-COMPLETE:${calendar.percentComplete}');
-    
-    if (calendar.description.isNotEmpty) {
-      vcalendar.writeln('DESCRIPTION:${_escapeCalendarText(calendar.description)}');
-    }
-    
-    // FlowIt-specific properties
-    vcalendar.writeln('X-FLOWIT-TYPE:${calendar.flowitType}');
-    vcalendar.writeln('X-FLOWIT-ASFLOW:${calendar.flowitAsFlow.toString().toUpperCase()}');
-    
-    if (calendar.flowitDomain != null && calendar.flowitDomain!.isNotEmpty) {
-      vcalendar.writeln('X-FLOWIT-DOMAIN:${_escapeCalendarText(calendar.flowitDomain!)}');
-    }
-    
-    if (calendar.flowitStatus != null && calendar.flowitStatus!.isNotEmpty) {
-      vcalendar.writeln('X-FLOWIT-STATUS:${_escapeCalendarText(calendar.flowitStatus!)}');
-    }
-    
-    if (calendar.flowitKanban.isNotEmpty && calendar.flowitKanban != '[]') {
-      vcalendar.writeln('X-FLOWIT-KANBAN:${_escapeCalendarText(calendar.flowitKanban)}');
-    }
-    
-    if (calendar.flowitOwner != null) {
-      vcalendar.writeln('X-FLOWIT-OWNER:${_escapeCalendarText(calendar.flowitOwner!)}');
-    }
-    
-    if (calendar.flowitTemplate != null) {
-      vcalendar.writeln('X-FLOWIT-TEMPLATE:${calendar.flowitTemplate}');
-    }
-    
-    if (calendar.flowitAuthor != null && calendar.flowitAuthor!.isNotEmpty) {
-      vcalendar.writeln('X-FLOWIT-AUTHOR:${_escapeCalendarText(calendar.flowitAuthor!)}');
-    }
-    
-    if (calendar.flowitOwner != null && calendar.flowitOwner!.isNotEmpty) {
-      vcalendar.writeln('X-FLOWIT-OWNER:${_escapeCalendarText(calendar.flowitOwner!)}');
-    }
-    
-    if (calendar.flowitStartedAt != null) {
-      vcalendar.writeln('X-FLOWIT-STARTED-AT:${calendar.flowitStartedAt!.toIso8601String()}');
-    }
-    
-    if (calendar.flowitEndedAt != null) {
-      vcalendar.writeln('X-FLOWIT-ENDED-AT:${calendar.flowitEndedAt!.toIso8601String()}');
-    }
-    
-    vcalendar.writeln('CALENDAR-ORDER:${calendar.calendarOrder}');
-    
-    // Categories
-    if (calendar.projectCategories.isNotEmpty && calendar.projectCategories != '[]') {
-      vcalendar.writeln('CATEGORIES:${calendar.projectCategories}');
-    }
-    
-    // End VCALENDAR
-    vcalendar.writeln('END:VCALENDAR');
-    
-    return vcalendar.toString();
-  }
-
-  /// Parse calendar properties from VCALENDAR response probably not needed anymore
-  TaskCalendar? _parseCalendarProperties(String vcalendarContent, String path, String displayName) {
-    try {
-      final lines = vcalendarContent.split('\n').map((line) => line.trim()).toList();
-      final properties = <String, String>{};
-      
-      for (final line in lines) {
-        if (line.contains(':') && !line.startsWith('BEGIN:') && !line.startsWith('END:')) {
-          final colonIndex = line.indexOf(':');
-          final key = line.substring(0, colonIndex).trim();
-          final value = line.substring(colonIndex + 1).trim();
-          properties[key] = _unescapeCalendarText(value);
-        }
-      }
-      
-      // Extract standard properties
-      final uid = properties['UID'] ?? 'generated-${DateTime.now().millisecondsSinceEpoch}';
-      final dtstamp = _parseDateTime(properties['DTSTAMP']) ?? DateTime.now();
-      final created = _parseDateTime(properties['CREATED']) ?? DateTime.now();
-      final lastModified = _parseDateTime(properties['LAST-MODIFIED']) ?? DateTime.now();
-      final summary = properties['SUMMARY'] ?? displayName;
-      final status = properties['STATUS'] ?? 'NEEDS-ACTION';
-      final percentComplete = int.tryParse(properties['PERCENT-COMPLETE'] ?? '0') ?? 0;
-      final description = properties['DESCRIPTION'] ?? '';
-      
-      // Extract FlowIt-specific properties
-      final flowitType = properties['X-FLOWIT-TYPE'] ?? 'PROJECT';
-      final flowitAsFlow = properties['X-FLOWIT-ASFLOW']?.toLowerCase() == 'true';
-      final flowitDomain = properties['X-FLOWIT-DOMAIN'];
-      final flowitStatus = properties['X-FLOWIT-STATUS'];
-      final flowitKanban = properties['X-FLOWIT-KANBAN'] ?? '[]';
-      final flowitOwner = properties['X-FLOWIT-OWNER'];
-      final flowitTemplate = properties['X-FLOWIT-TEMPLATE'];
-      final flowitAuthor = properties['X-FLOWIT-AUTHOR'];
-      final flowitStartedAt = _parseDateTime(properties['X-FLOWIT-STARTED-AT']);
-      final flowitEndedAt = _parseDateTime(properties['X-FLOWIT-ENDED-AT']);
-      final calendarOrder = int.tryParse(properties['CALENDAR-ORDER'] ?? '1') ?? 1;
-      
-      // Project categories are handled via X-FLOWIT-CATEGORIES field, not CATEGORIES
-      // CATEGORIES field is no longer used in TaskCalendar
-      
-      return TaskCalendar(
-        path: path,
-        displayName: displayName,
-        description: description,
-        dtstamp: dtstamp,
-        created: created,
-        lastModified: lastModified,
-        status: status,
-        percentComplete: percentComplete,
-        flowitType: flowitType,
-        flowitAsFlow: flowitAsFlow,
-        flowitDomain: flowitDomain,
-        flowitStatus: flowitStatus,
-        flowitKanban: flowitKanban,
-        flowitOwner: flowitOwner,
-        flowitTemplate: flowitTemplate,
-        flowitAuthor: flowitAuthor,
-        flowitStartedAt: flowitStartedAt,
-        flowitEndedAt: flowitEndedAt,
-        calendarOrder: calendarOrder,
-        // projectCategories will be set by the caller via X-FLOWIT-CATEGORIES
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('CalDAVService: Failed to parse calendar properties', e, stackTrace);
-      return null;
-    }
-  }
 
   /// Helper method to format DateTime for iCalendar
   String _formatDateTime(DateTime dateTime) {

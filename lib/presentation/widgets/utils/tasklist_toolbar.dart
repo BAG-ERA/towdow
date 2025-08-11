@@ -11,11 +11,13 @@ import 'buttons/create_task_button.dart';
 class TaskListToolbar extends ConsumerStatefulWidget {
   final String projectPath;
   final String? projectName;
+  final bool workflowVariant;
   
   const TaskListToolbar({
     super.key,
     required this.projectPath,
     this.projectName,
+    this.workflowVariant = false,
   });
 
   @override
@@ -130,6 +132,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
         // Create task button
         CreateTaskButton.compact(
           projectCalendarUid: widget.projectPath,
+          workflowVariant: widget.workflowVariant,
         ),
       ],
     );
@@ -199,6 +202,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
         // Create task button
         CreateTaskButton.compact(
           projectCalendarUid: widget.projectPath,
+          workflowVariant: widget.workflowVariant,
         ),
       ],
     );

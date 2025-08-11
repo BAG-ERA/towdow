@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/chart_theme.dart';
 import '../popup/domain_creation_dialog.dart';
 import '../popup/project_creation_dialog.dart';
+import '../popup/workflow_creation_dialog.dart';
 
 class CreateProjectOrDomainButton extends StatelessWidget {
   /// Custom button color (defaults to theme primary color)
@@ -169,6 +170,15 @@ class CreateProjectOrDomainButton extends StatelessWidget {
                 _showCreateProjectDialog(context);
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.route_rounded),
+              title: const Text('Workflow'),
+              subtitle: const Text('Create a new workflow'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _showCreateWorkflowDialog(context);
+              },
+            ),
           ],
         ),
       ),
@@ -191,6 +201,13 @@ class CreateProjectOrDomainButton extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => const ProjectCreationDialog(),
+    );
+  }
+
+  void _showCreateWorkflowDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const WorkflowCreationDialog(),
     );
   }
 }

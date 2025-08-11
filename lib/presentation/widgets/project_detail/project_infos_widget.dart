@@ -61,8 +61,8 @@ class ProjectInfosWidget extends ConsumerWidget {
                 const SizedBox(height: 8),
               ],
               
-              // Warning for attendees without project access
-              _buildAttendeeAccessWarning(context, ref),
+              // Warning for attendees without project access (desktop only)
+              if (isDesktop) _buildAttendeeAccessWarning(context, ref),
               
               // Author email or Shared with me by
               sharedByAsync.when(

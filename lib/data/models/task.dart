@@ -30,10 +30,13 @@ class Task with _$Task {
     @HiveField(13) String? flowitTemplate, // UID of template
     @HiveField(14) String? flowitReversalTask, // UID of reversal task
     @HiveField(15) @Default('{"type":"default"}') String flowitValidator, // JSON string
-    @HiveField(16) @Default('{}') String flowitRequirement, // JSON string
+    @HiveField(16) @Default('[]') String flowitRequirement, // JSON array string of requirement IDs
     @HiveField(17) @Default('[]') String flowitKanbanColumn, // JSON array
     @HiveField(18) @Default('[]') String attachments, // JSON array of ATTACH field data with x-flowit-* parameters
     @HiveField(19) @Default('[]') String mediaAttachments, // JSON array of media attachments with image preview support
+
+    // Steps
+    @HiveField(20) String? stepId, // Reference to project step id
   }) = _Task;
 
   factory Task.fromJson(Map<String, dynamic> json) => _$TaskFromJson(json);

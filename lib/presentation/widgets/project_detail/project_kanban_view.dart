@@ -10,6 +10,8 @@ import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../widgets/kanban_board.dart';
 import '../utils/popup/task_creation_dialog.dart';
+import '../../../data/models/step.dart';
+import '../../screens/project_detail/project_detail_screen.dart' show projectProvider;
 
 class ProjectKanbanView extends ConsumerWidget {
   final String projectPath;
@@ -165,6 +167,25 @@ class ProjectKanbanView extends ConsumerWidget {
         // Navigate to task detail
       },
       onTaskToggle: (task) async {
+        // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
+        final project = ref.read(projectProvider(projectPath)).asData?.value;
+        final stepRepo = ref.read(stepRepositoryProvider);
+        ProjectStep? step;
+        if (task.stepId != null && task.stepId!.isNotEmpty) {
+          final stepRes = await stepRepo.getStepById(task.stepId!);
+          step = stepRes.when(success: (s) => s, failure: (_) => null);
+        }
+        final isFlow = project?.flowitAsFlow == true;
+        final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
+        final stepIsAvailable = step?.status == StepStatus.available;
+
+        if (isFlow && status == 'ONGOING' && !stepIsAvailable) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This task belongs to a waiting step and cannot be completed yet.')),
+          );
+          return;
+        }
+
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
         await taskViewModel.toggleTaskCompletion(task);
         

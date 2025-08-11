@@ -7,8 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/connection/connection_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
-import 'presentation/screens/archived_projects/archived_projects_screen.dart';
 import 'presentation/screens/projects_list/projects_list_screen.dart';
+import 'presentation/screens/workflows_list/workflow_list_screen.dart';
+import 'presentation/screens/workflow_detail/workflow_detail_screen.dart';
 
 import 'presentation/screens/project_detail/project_detail_screen.dart';
 import 'presentation/widgets/adaptive_app_layout.dart';
@@ -93,8 +94,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           
           if (location.startsWith('/settings')) {
             currentDestination = null; // Settings handled by toolbar
-          } else if (location.startsWith('/archived')) {
-            currentDestination = null; // Archived projects have no main navigation active
           } else if (location.startsWith('/project/')) {
             currentDestination = null; // Project details have no main navigation active
           } else if (location == '/today' || location == '/') {
@@ -105,6 +104,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             currentDestination = AppDestination.anytime;
           } else if (location == '/projects') {
             currentDestination = AppDestination.projects;
+          } else if (location == '/workflows') {
+            currentDestination = AppDestination.workflows;
           } else if (location == '/next-week' || location == '/later') {
             // Next week and later tabs exist but are not shown in sidebar
             currentDestination = null;
@@ -153,14 +154,21 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
           ),
-          GoRoute(
-            path: '/archived',
-            builder: (context, state) => const ArchivedProjectsScreen(),
-          ),
+          
           GoRoute(
             path: '/projects',
             builder: (context, state) => const ProjectsListScreen(),
           ),
+           GoRoute(
+             path: '/workflows',
+             builder: (context, state) => const WorkflowListScreen(),
+           ),
+           GoRoute(
+             path: '/workflow/:path',
+             builder: (context, state) => WorkflowDetailScreen(
+               workflowPath: Uri.decodeComponent(state.pathParameters['path']!),
+             ),
+           ),
         ],
       ),
       
@@ -185,7 +193,7 @@ class FlowItApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'FlowIt',
+      title: 'TowDow',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: FlowItColors.primary,
