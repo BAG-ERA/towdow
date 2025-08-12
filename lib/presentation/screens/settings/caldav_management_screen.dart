@@ -54,7 +54,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
         
         return Scaffold(
           appBar: AppBar(
-            title: Text('CalDAV Calendar Management'),
+            title: Text(AppLocalizations.of(context)!.caldavManagementTitle),
             actions: [
               if (state.capabilities != null && !state.isLoading)
                 IconButton(
@@ -93,7 +93,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'CalDAV Account',
+                            AppLocalizations.of(context)!.caldavAccount,
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -101,11 +101,11 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text('Server: ${state.currentAccount!.serverUrl}'),
-                      Text('User: ${state.currentAccount!.username}'),
+                       Text('${AppLocalizations.of(context)!.server}: ${state.currentAccount!.serverUrl}'),
+                       Text('${AppLocalizations.of(context)!.username}: ${state.currentAccount!.username}'),
                       if (state.capabilities != null) ...[
                         const SizedBox(height: 4),
-                        Text('Capabilities: ${state.capabilities!.serverInfo}'),
+                         Text('${AppLocalizations.of(context)!.capabilities}: ${state.capabilities!.serverInfo}'),
                       ],
                     ],
                   ),

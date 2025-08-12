@@ -259,15 +259,15 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
       builder: (ctx) {
         final controller = TextEditingController(text: '${project.displayName} (copy)');
         return AlertDialog(
-          title: const Text('Duplicate workflow'),
+          title: Text(AppLocalizations.of(context)!.duplicateWorkflow),
           content: TextField(
             controller: controller,
             autofocus: true,
-            decoration: const InputDecoration(labelText: 'New workflow name'),
+            decoration: InputDecoration(labelText: AppLocalizations.of(context)!.newWorkflowName),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('Create')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(AppLocalizations.of(context)!.cancel)),
+            FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: Text(AppLocalizations.of(context)!.create)),
           ],
         );
       },

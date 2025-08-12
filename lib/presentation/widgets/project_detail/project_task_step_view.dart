@@ -179,16 +179,16 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                           final confirmed = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
-                              title: const Text('Delete step?'),
+                              title: Text(AppLocalizations.of(context)!.areYouSureDelete(steps[idx].name)),
                               content: Text('Are you sure you want to delete "${steps[idx].name}"? Tasks assigned to this step will become unassigned.'),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.of(context).pop(false),
-                                  child: const Text('Cancel'),
+                                  child: Text(AppLocalizations.of(context)!.cancel),
                                 ),
                                 FilledButton(
                                   onPressed: () => Navigator.of(context).pop(true),
-                                  child: const Text('Delete'),
+                                  child: Text(AppLocalizations.of(context)!.delete),
                                 ),
                               ],
                             ),
@@ -257,13 +257,13 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
           ],
         );
       },
-      loading: () => const Center(
+      loading: () => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading tasks...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(AppLocalizations.of(context)!.discoveringCalendars),
           ],
         ),
       ),
@@ -529,7 +529,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
 
     if (isFlow && status == 'ONGOING' && !stepIsAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This task belongs to a waiting step and cannot be completed yet.')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.waitingStepCannotComplete)),
       );
       return;
     }

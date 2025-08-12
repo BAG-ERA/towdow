@@ -179,11 +179,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Loading project...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text(AppLocalizations.of(context)!.loadingProject),
                 ],
               ),
             ),
@@ -320,11 +320,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                         color: Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          CircularProgressIndicator(),
-                          SizedBox(width: 16),
-                          Text('Loading project...'),
+                          const CircularProgressIndicator(),
+                          const SizedBox(width: 16),
+                          Text(AppLocalizations.of(context)!.loadingProject),
                         ],
                       ),
                     ),
@@ -493,7 +493,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     return tasksAsync.when(
       data: (tasks) => _buildTimingKanban(context, ref, tasks),
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('Error loading tasks: $error')),
+      error: (error, _) => Center(child: Text('${AppLocalizations.of(context)!.failedToLoad}: $error')),
     );
   }
 
@@ -604,7 +604,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
         if (isFlow && status == 'ONGOING' && !stepIsAvailable) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('This task belongs to a waiting step and cannot be completed yet.')),
+            SnackBar(content: Text(AppLocalizations.of(context)!.waitingStepCannotComplete)),
           );
           return;
         }
@@ -650,7 +650,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Add Task for ${_formatAttendeeEmail(attendee)}'),
+        title: Text(AppLocalizations.of(context)!.addTaskFor(_formatAttendeeEmail(attendee))),
         content: TextField(
           controller: textController,
           decoration: const InputDecoration(
@@ -661,11 +661,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(textController.text.trim()),
-            child: const Text('Add'),
+            child: Text(AppLocalizations.of(context)!.addTask),
           ),
         ],
       ),
@@ -691,17 +691,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     return projectAsync.when(
       data: (project) {
         if (project == null) {
-          return const Center(child: Text('Project not found'));
+          return Center(child: Text(AppLocalizations.of(context)!.projectNotFound));
         }
 
         return tasksAsync.when(
           data: (tasks) => _buildAttendeeKanban(context, ref, project, tasks),
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(child: Text('Error loading tasks: $error')),
+          error: (error, _) => Center(child: Text('${AppLocalizations.of(context)!.failedToLoad}: $error')),
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('Error loading project: $error')),
+      error: (error, _) => Center(child: Text('${AppLocalizations.of(context)!.failedToLoad}: $error')),
     );
   }
 
@@ -819,7 +819,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add Unassigned Task'),
+        title: Text(AppLocalizations.of(context)!.addUnassignedTask),
         content: TextField(
           controller: textController,
           decoration: const InputDecoration(
@@ -830,11 +830,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(textController.text.trim()),
-            child: const Text('Add'),
+            child: Text(AppLocalizations.of(context)!.addTask),
           ),
         ],
       ),
@@ -921,7 +921,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         },
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('Error loading tasks: $error')),
+      error: (error, _) => Center(child: Text('${AppLocalizations.of(context)!.failedToLoad}: $error')),
     );
   }
 

@@ -31,7 +31,7 @@ class ProjectKanbanView extends ConsumerWidget {
     return tasksAsync.when(
       data: (tasks) => _buildKanbanWithViewModel(context, ref, tasks),
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('Error loading tasks: $error')),
+      error: (error, _) => Center(child: Text('${AppLocalizations.of(context)!.failedToLoad}: $error')),
     );
   }
 
@@ -45,7 +45,7 @@ class ProjectKanbanView extends ConsumerWidget {
     }
     
     if (kanbanViewModelState.error != null) {
-      return Center(child: Text('Error loading kanban: ${kanbanViewModelState.error}'));
+      return Center(child: Text('${AppLocalizations.of(context)!.failedToLoad}: ${kanbanViewModelState.error}'));
     }
     
     // For now, fall back to the original category-based kanban
@@ -63,7 +63,7 @@ class ProjectKanbanView extends ConsumerWidget {
     }
     
     if (categoryViewModelState.error != null) {
-      return Center(child: Text('Error loading categories: ${categoryViewModelState.error}'));
+      return Center(child: Text('${AppLocalizations.of(context)!.failedToLoad}: ${categoryViewModelState.error}'));
     }
     
     final projectCategories = categoryViewModelState.projectCategories;
@@ -192,7 +192,7 @@ class ProjectKanbanView extends ConsumerWidget {
 
         if (isFlow && status == 'ONGOING' && !stepIsAvailable) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('This task belongs to a waiting step and cannot be completed yet.')),
+            SnackBar(content: Text(AppLocalizations.of(context)!.waitingStepCannotComplete)),
           );
           return;
         }
@@ -291,7 +291,7 @@ class ProjectKanbanView extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error moving task: $error'),
+            content: Text('${AppLocalizations.of(context)!.failedToLoad}: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -317,7 +317,7 @@ class ProjectKanbanView extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error hiding column: $error'),
+            content: Text('${AppLocalizations.of(context)!.failedToLoad}: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -367,7 +367,7 @@ class ProjectKanbanView extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error showing column: $error'),
+            content: Text('${AppLocalizations.of(context)!.failedToLoad}: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -427,7 +427,7 @@ class ProjectKanbanView extends ConsumerWidget {
                         Navigator.of(context).pop();
                         await _handleColumnShow(context, ref, category.id);
                       },
-                      child: const Text('Show'),
+                      child: Text(AppLocalizations.of(context)!.show),
                     ),
                   ],
                 ),
@@ -438,7 +438,7 @@ class ProjectKanbanView extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: Text(AppLocalizations.of(context)!.close),
           ),
         ],
       ),

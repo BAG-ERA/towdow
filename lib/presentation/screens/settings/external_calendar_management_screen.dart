@@ -10,6 +10,7 @@ import '../../../data/models/external_caldav_account.dart';
 import '../../../data/models/external_calendar.dart';
 import '../../../data/providers/providers.dart';
 import '../../widgets/utils/popup/external_calendar_setup_dialog.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 class ExternalCalendarManagementScreen extends ConsumerStatefulWidget {
   const ExternalCalendarManagementScreen({super.key});
@@ -27,7 +28,7 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('External Calendars'),
+        title: Text(AppLocalizations.of(context)!.externalCalendars),
         scrolledUnderElevation: 0,
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -37,7 +38,7 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddCalendarDialog,
         icon: const Icon(Icons.add),
-        label: const Text('Add Calendar'),
+        label: Text(AppLocalizations.of(context)!.addCalendar),
       ),
     );
   }
@@ -58,7 +59,7 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
                 const Icon(Icons.error_outline, size: 48, color: Colors.red),
                 const SizedBox(height: 16),
                 Text(
-                  'Error loading external calendars',
+                  AppLocalizations.of(context)!.errorLoadingExternalCalendars,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
@@ -70,7 +71,7 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () => setState(() {}),
-                  child: const Text('Retry'),
+                  child: Text(AppLocalizations.of(context)!.retry),
                 ),
               ],
             ),
@@ -121,12 +122,12 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
           ),
           const SizedBox(height: 16),
           Text(
-            'No External Calendars',
+            AppLocalizations.of(context)!.noExternalCalendars,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
           Text(
-            'Add external CalDAV calendars to sync your events',
+            AppLocalizations.of(context)!.externalCalendarsExplainer,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.outline,
             ),
@@ -136,7 +137,7 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
           ElevatedButton.icon(
             onPressed: _showAddCalendarDialog,
             icon: const Icon(Icons.add),
-            label: const Text('Add Calendar'),
+            label: Text(AppLocalizations.of(context)!.addCalendar),
           ),
         ],
       ),
@@ -177,29 +178,29 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
                 children: [
                   Icon(account.isActive ? Icons.pause : Icons.play_arrow),
                   const SizedBox(width: 8),
-                  Text(account.isActive ? 'Disable' : 'Enable'),
+                  Text(account.isActive ? AppLocalizations.of(context)!.disable : AppLocalizations.of(context)!.enable),
                 ],
               ),
             ),
 
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'sync',
               child: Row(
                 children: [
                   Icon(Icons.sync),
                   SizedBox(width: 8),
-                  Text('Sync Now'),
+                  Text(AppLocalizations.of(context)!.syncNow),
                 ],
               ),
             ),
             const PopupMenuDivider(),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'delete',
               child: Row(
                 children: [
                   Icon(Icons.delete, color: Colors.red),
                   SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: Colors.red)),
+                  Text(AppLocalizations.of(context)!.delete, style: TextStyle(color: Colors.red)),
                 ],
               ),
             ),
@@ -218,15 +219,15 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDetailRow('Server', account.serverUrl),
-          _buildDetailRow('Username', account.username),
-          _buildDetailRow('Auth Type', account.authType.name),
+          _buildDetailRow(AppLocalizations.of(context)!.server, account.serverUrl),
+          _buildDetailRow(AppLocalizations.of(context)!.username, account.username),
+          _buildDetailRow(AppLocalizations.of(context)!.authType, account.authType.name),
           if (account.lastSyncAt != null)
-            _buildDetailRow('Last Sync', _formatDateTime(account.lastSyncAt!)),
+            _buildDetailRow(AppLocalizations.of(context)!.lastSync, _formatDateTime(account.lastSyncAt!)),
           if (account.lastSuccessfulSync != null)
-            _buildDetailRow('Last Success', _formatDateTime(account.lastSuccessfulSync!)),
-          _buildDetailRow('Total Calendars', account.totalCalendars.toString()),
-          _buildDetailRow('Total Events', account.totalEvents.toString()),
+            _buildDetailRow(AppLocalizations.of(context)!.lastSuccess, _formatDateTime(account.lastSuccessfulSync!)),
+          _buildDetailRow(AppLocalizations.of(context)!.totalCalendars, account.totalCalendars.toString()),
+          _buildDetailRow(AppLocalizations.of(context)!.totalEvents, account.totalEvents.toString()),
           const SizedBox(height: 16),
           _buildCalendarsList(account),
         ],
@@ -271,14 +272,14 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
         final calendars = snapshot.data!;
         
         if (calendars.isEmpty) {
-          return const Text('No calendars found');
+          return Text(AppLocalizations.of(context)!.noCalendarsFound);
         }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Calendars:',
+              '${AppLocalizations.of(context)!.calendars}:',
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
@@ -312,14 +313,14 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
               : null,
         ),
         title: Text(calendar.displayName),
-        subtitle: Text(calendar.color != null ? 'Color: ${calendar.color}' : 'No color set'),
+        subtitle: Text(calendar.color != null ? '${AppLocalizations.of(context)!.color}: ${calendar.color}' : AppLocalizations.of(context)!.noColorSet),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
               icon: const Icon(Icons.color_lens, size: 20),
               onPressed: () => _showColorPicker(calendar),
-              tooltip: 'Change color',
+              tooltip: AppLocalizations.of(context)!.changeColor,
             ),
             Switch(
               value: calendar.isEnabled,
@@ -400,15 +401,12 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete External Calendar'),
-        content: Text(
-          'Are you sure you want to delete "${account.displayName}"?\n\n'
-          'This will remove all associated calendars and events.',
-        ),
+        title: Text(AppLocalizations.of(context)!.deleteExternalCalendar),
+        content: Text(AppLocalizations.of(context)!.areYouSureDeleteExternalCalendar(account.displayName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -416,7 +414,7 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
               backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
-            child: const Text('Delete'),
+            child: Text(AppLocalizations.of(context)!.delete),
           ),
         ],
       ),
@@ -480,7 +478,7 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
     final selectedColor = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Choose color for "${calendar.displayName}"'),
+        title: Text(AppLocalizations.of(context)!.chooseColorFor(calendar.displayName)),
         content: SizedBox(
           width: 300,
           child: GridView.builder(
@@ -517,12 +515,12 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           if (calendar.color != null)
             TextButton(
               onPressed: () => Navigator.of(context).pop('remove'),
-              child: const Text('Remove Color'),
+              child: Text(AppLocalizations.of(context)!.removeColor),
             ),
         ],
       ),

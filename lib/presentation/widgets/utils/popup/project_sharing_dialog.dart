@@ -218,11 +218,12 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                   style: TextStyle(color: Colors.grey),
                 ),
               )
-            : ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: state.editedMembers.length,
-                itemBuilder: (context, index) {
+            : SizedBox(
+                height: 240,
+                child: ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: state.editedMembers.length,
+                  itemBuilder: (context, index) {
                   final member = state.editedMembers[index];
                   final isNew = !state.members.any((m) => m.targetUserEmail == member.targetUserEmail);
                   
@@ -336,14 +337,14 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
         const SizedBox(height: 16),
         
         // Error display
-        if (state.error != null) ...[
-          Container(
+        (state.error != null)
+          ? Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.errorContainer,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Row(
+          child: Row(
               children: [
                 Icon(
                   Icons.error_outline,
@@ -366,63 +367,66 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
+          )
+          : const SizedBox.shrink(),
+        SizedBox(height: state.error != null ? 16 : 0),
         
         // Suggested members section
-        if (widget.suggestedMembers != null && widget.suggestedMembers!.isNotEmpty) ...[
-          const SizedBox(height: 44),
-          Row(
-            children: [
-              Text(
-                'Suggested Members:',
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: widget.suggestedMembers!.map((email) {
-              final isAlreadyAdded = state.editedMembers.any((m) => m.targetUserEmail == email);
-              return ActionChip(
-                avatar: Icon(
-                  isAlreadyAdded ? Icons.check : Icons.person_add,
-                  size: 16,
-                  color: isAlreadyAdded 
-                      ? Theme.of(context).colorScheme.onSecondary 
-                      : Theme.of(context).colorScheme.onPrimary,
-                ),
-                label: Text(
-                  email,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isAlreadyAdded 
-                        ? Theme.of(context).colorScheme.onSecondary 
-                        : Theme.of(context).colorScheme.onPrimary,
+        (widget.suggestedMembers != null && widget.suggestedMembers!.isNotEmpty)
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 44),
+                  Row(
+                    children: [
+                      const Text(
+                        'Suggested Members:',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ],
                   ),
-                ),
-                backgroundColor: isAlreadyAdded 
-                    ? Theme.of(context).colorScheme.secondary 
-                    : Theme.of(context).colorScheme.primary,
-                onPressed: isAlreadyAdded || state.isSaving 
-                    ? null 
-                    : () {
-                        setState(() {
-                          _isInputActive = true;
-                        });
-                        _emailController.text = email;
-                        _addMember(notifier);
-                      },
-                tooltip: isAlreadyAdded 
-                    ? 'Already added' 
-                    : 'Click to add this member',
-              );
-            }).toList(),
-          ),
-        ],
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: widget.suggestedMembers!.map((email) {
+                      final isAlreadyAdded = state.editedMembers.any((m) => m.targetUserEmail == email);
+                      return ActionChip(
+                        avatar: Icon(
+                          isAlreadyAdded ? Icons.check : Icons.person_add,
+                          size: 16,
+                          color: isAlreadyAdded
+                              ? Theme.of(context).colorScheme.onSecondary
+                              : Theme.of(context).colorScheme.onPrimary,
+                        ),
+                        label: Text(
+                          email,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isAlreadyAdded
+                                ? Theme.of(context).colorScheme.onSecondary
+                                : Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        ),
+                        backgroundColor: isAlreadyAdded
+                            ? Theme.of(context).colorScheme.secondary
+                            : Theme.of(context).colorScheme.primary,
+                        onPressed: isAlreadyAdded || state.isSaving
+                            ? null
+                            : () {
+                                setState(() {
+                                  _isInputActive = true;
+                                });
+                                _emailController.text = email;
+                                _addMember(notifier);
+                              },
+                        tooltip: isAlreadyAdded ? 'Already added' : 'Click to add this member',
+                      );
+                    }).toList(),
+                  ),
+                ],
+              )
+            : const SizedBox.shrink(),
       ],
     );
   }
