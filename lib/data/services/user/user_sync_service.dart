@@ -5,19 +5,19 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import '../../core/result.dart';
-import '../../core/logger.dart';
-import '../models/user_preferences.dart';
-import '../models/shared_with_me_project.dart';
-import '../models/external_caldav_account.dart';
-import '../repositories/user_repository.dart';
-import '../repositories/external_account_repository.dart';
-import '../repositories/external_calendar_repository.dart';
-import '../repositories/account_repository.dart';
+import '../../../core/result.dart';
+import '../../../core/logger.dart';
+import '../../models/user_preferences.dart';
+import '../../models/shared_with_me_project.dart';
+import '../../models/external_caldav_account.dart';
+import '../../repositories/user_repository.dart';
+import '../../repositories/external_account_repository.dart';
+import '../../repositories/external_calendar_repository.dart';
+import '../../repositories/account_repository.dart';
 
-import '../models/external_calendar.dart';
-import 's3_storage_service.dart';
-import 'share_service.dart';
+import '../../models/external_calendar.dart';
+import '../storage/s3_storage_service.dart';
+import '../share/share_service.dart';
 
 /// Service for synchronizing user preferences and external credentials to S3
 class UserSyncService {

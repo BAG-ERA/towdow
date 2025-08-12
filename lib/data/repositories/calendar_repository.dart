@@ -5,8 +5,8 @@
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/task_calendar.dart';
-import '../services/local_storage_service.dart';
-import '../services/sync_service.dart';
+import '../services/storage/local_storage_service.dart';
+import '../services/sync/sync_service.dart';
 // import '../services/share_service.dart';
 import 'account_repository.dart';
 import 'user_repository.dart';

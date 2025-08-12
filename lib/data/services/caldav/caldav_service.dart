@@ -7,18 +7,18 @@ import 'dart:convert';
 import 'package:uuid/uuid.dart';
  
 
-import '../../core/result.dart';
-import '../../core/logger.dart';
-import '../models/caldav_account.dart';
-import '../models/task.dart';
-import '../models/task_calendar.dart';
-import '../models/step.dart';
+import '../../../core/result.dart';
+import '../../../core/logger.dart';
+import '../../models/caldav_account.dart';
+import '../../models/task.dart';
+import '../../models/task_calendar.dart';
+import '../../models/step.dart';
 
-import 'webdav_client.dart';
+import '../webdav_client.dart';
 import 'capability_discovery_service.dart';
-import 'parsers/vtodo_parser.dart';
-import 'parsers/xml_response_parser.dart';
-import 'share_service.dart';
+import '../parsers/vtodo_parser.dart';
+import '../parsers/xml_response_parser.dart';
+import '../share/sharing_sync_service.dart';
 /// Interface for CalDAV operations used across the app.
 ///
 /// Why this exists
@@ -59,14 +59,18 @@ abstract class ICalDAVService {
 }
 
 class CalDAVService implements ICalDAVService {
+  @override
   final CaldavAccount account;
   late final WebDAVClient _client;
+  late final SharingSyncService _sharingSyncService;
 
-  CalDAVService({required this.account, WebDAVClient? client}) {
+  CalDAVService({required this.account, WebDAVClient? client, SharingSyncService? sharingSyncService}) {
     _client = client ?? WebDAVClient.fromAccount(account);
+    _sharingSyncService = sharingSyncService ?? const SharingSyncService();
   }
 
   /// Test connection to CalDAV server
+  @override
   Future<Result<CalDAVCapabilities>> testConnection() async {
     try {
       // AppLogger.debug('CalDAVService: Testing connection to ${account.serverUrl}');
@@ -104,6 +108,7 @@ class CalDAVService implements ICalDAVService {
   }
 
   /// Create a task (VTODO) on the server - RFC 4791 Section 5.3.2
+  @override
   Future<Result<String>> createTask(Task task, String calendarPath) async {
     try {
       // AppLogger.debug('CalDAVService: Creating task ${task.summary}');
@@ -146,6 +151,7 @@ class CalDAVService implements ICalDAVService {
   }
 
   /// Update a task on the server
+  @override
   Future<Result<void>> updateTask(Task task, String taskUrl, {String? etag}) async {
     try {
       // AppLogger.debug('CalDAVService: Updating task ${task.summary}');
@@ -183,6 +189,7 @@ class CalDAVService implements ICalDAVService {
   }
 
   /// Delete a task from the server
+  @override
   Future<Result<void>> deleteTask(String taskUrl, {String? etag}) async {
     try {
       // AppLogger.debug('CalDAVService: Deleting task at $taskUrl');
@@ -218,6 +225,7 @@ class CalDAVService implements ICalDAVService {
   }
 
   /// Fetch all tasks from a calendar using REPORT query
+  @override
   Future<Result<List<Task>>> fetchTasks({required String calendarPath}) async {
     try {
       // AppLogger.debug('CalDAVService: Fetching tasks from calendar');
@@ -459,6 +467,7 @@ class CalDAVService implements ICalDAVService {
   }
 
   /// Delete a calendar collection from the server using DELETE
+  @override
   Future<Result<void>> deleteCalendar(String calendarPath) async {
     try {
       // Normalize calendar path to ensure it ends with /
@@ -536,6 +545,7 @@ class CalDAVService implements ICalDAVService {
     }
   }
 
+  @override
   Future<Result<TaskCalendar>> getCalendarProperties(TaskCalendar calendar) async {
     try {
       AppLogger.debug('CalDAVService: Resyncing calendar info for ${calendar.displayName}');
@@ -633,6 +643,7 @@ class CalDAVService implements ICalDAVService {
   }
 
   /// Create a new calendar on the server using MKCALENDAR
+  @override
   Future<Result<TaskCalendar>> createCalendar({
     required String displayName,
     String? description,
@@ -718,7 +729,7 @@ class CalDAVService implements ICalDAVService {
       ${domain != null && domain.isNotEmpty ? '<FLOWIT:domain>$domain</FLOWIT:domain>' : ''}
       ${kanban != null && kanban.isNotEmpty ? '<FLOWIT:kanban>$kanban</FLOWIT:kanban>' : ''}
       ${categ != null && categ.isNotEmpty ? '<FLOWIT:categories>$categ</FLOWIT:categories>' : ''}
-      ${stepsJson != null ? '<FLOWIT:steps><![CDATA[' + stepsJson + ']]></FLOWIT:steps>' : ''}
+      ${stepsJson != null ? '<FLOWIT:steps><![CDATA[$stepsJson]]></FLOWIT:steps>' : ''}
       ${author != null && author.isNotEmpty ? '<FLOWIT:author>$author</FLOWIT:author>' : ''}
       ${owner != null && owner.isNotEmpty ? '<FLOWIT:owner>$owner</FLOWIT:owner>' : ''}
     </D:prop>
@@ -791,12 +802,13 @@ class CalDAVService implements ICalDAVService {
   }
 
   /// Update calendar properties (standard + FlowIt properties) on server using PROPPATCH
+  @override
   Future<Result<void>> updateCalendarProperties(TaskCalendar calendar) async {
     try {
       AppLogger.info('CalDAVService: Starting calendar properties PROPPATCH for ${calendar.displayName}');
       AppLogger.info('CalDAVService: Calendar path: ${calendar.path}');
       AppLogger.info('CalDAVService: Calendar UID: ${calendar.path}');
-      AppLogger.info('CalDAVService: Description: ${calendar.description.isNotEmpty ? calendar.description.substring(0, math.min(50, calendar.description.length)) + "..." : "(empty)"}');
+      AppLogger.info('CalDAVService: Description: ${calendar.description.isNotEmpty ? "${calendar.description.substring(0, math.min(50, calendar.description.length))}..." : "(empty)"}');
       AppLogger.info('CalDAVService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
       AppLogger.info('CalDAVService: Status value: ${calendar.flowitStatus ?? "(null)"}');
       
@@ -823,12 +835,19 @@ class CalDAVService implements ICalDAVService {
           
           if (response.statusCode == 207 || response.statusCode == 200) {
             AppLogger.info('CalDAVService: Calendar WebDAV properties updated successfully');
-            
-            // SHARING SYNC INTEGRATION: 
-            // Update sharing information on TowDow API if this calendar has sharing data
-            // TODO: Remove this if we implement sharing as CalDAV properties instead
-            // @see https://gitlab.com/towdow/towdow-infra/-/issues/1 - extend caldav protocol with sharedwith field
-            await _syncSharingToTowDowAPI(calendar);
+            // Delegate sharing synchronization to SharingSyncService (best-effort)
+            final sharingResult = await _sharingSyncService.syncCalendarSharing(
+              calendar: calendar,
+              account: account,
+            );
+            sharingResult.when(
+              success: (_) {
+                // no-op
+              },
+              failure: (f) {
+                AppLogger.warning('CalDAVService: Sharing sync failed but PROPPATCH succeeded: ${f.message}');
+              },
+            );
             
             return Result.success(null);
           } else {
@@ -851,63 +870,6 @@ class CalDAVService implements ICalDAVService {
         message: 'Exception during calendar update: $e',
         code: 'EXCEPTION',
       ));
-    }
-  }
-
-  /// Sync sharing information to TowDow sharing API
-  /// This integrates sharing updates with the PROPPATCH flow
-  Future<void> _syncSharingToTowDowAPI(TaskCalendar calendar) async {
-    try {
-      // Only sync sharing for TowDow accounts that support sharing
-      if (account.providerType != 'towdow_cloud' && account.providerType != 'towdow_selfhosted') {
-        AppLogger.debug('CalDAVService: Skipping sharing sync - account type ${account.providerType} does not support sharing');
-        return;
-      }
-
-      // Check if calendar has sharing data to sync
-      if (calendar.sharedWithMembers.isEmpty) {
-        AppLogger.debug('CalDAVService: No sharing data to sync for calendar ${calendar.path}');
-        return;
-      }
-
-      AppLogger.info('CalDAVService: Syncing sharing data to TowDow API for calendar ${calendar.path}');
-      
-      // Create sharing service instance
-      final sharingService = ShareService(account: account);
-      
-      // Extract project path (UUID) from calendar path
-      final projectPath = calendar.uid;
-      
-      if (projectPath.isEmpty) {
-        AppLogger.warning('CalDAVService: Could not extract project path from ${calendar.path}');
-        return;
-      }
-      
-      AppLogger.debug('CalDAVService: Extracted project path: $projectPath');
-      
-      // Get member emails for the API from SharedProjectMember objects
-      final memberEmails = calendar.sharedWithMembers.map((member) => member['targetUserEmail'] as String).toList();
-      
-      // Call setProjectMembers to sync the current sharing state
-      final result = await sharingService.setProjectMembers(
-        projectPath: projectPath,
-        memberEmails: memberEmails,
-      );
-
-      await result.when(
-        success: (_) async {
-          AppLogger.info('CalDAVService: Successfully synced sharing data to TowDow API for calendar ${calendar.path}');
-        },
-        failure: (failure) async {
-          // Don't fail the entire PROPPATCH operation if sharing sync fails
-          // This ensures calendar properties are still updated even if sharing API is down
-          AppLogger.error('CalDAVService: Failed to sync sharing data to TowDow API: ${failure.message}');
-          AppLogger.error('CalDAVService: Sharing sync will be retried during next sync operation');
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('CalDAVService: Exception during sharing sync to TowDow API', e, stackTrace);
-      // Don't propagate the exception - sharing sync is secondary to PROPPATCH
     }
   }
 
@@ -1020,61 +982,7 @@ class CalDAVService implements ICalDAVService {
   }
 
 
-  /// Helper method to format DateTime for iCalendar
-  String _formatDateTime(DateTime dateTime) {
-    return dateTime.toUtc().toIso8601String().replaceAll(RegExp(r'[:\-]'), '').replaceAll('.000Z', 'Z');
-  }
-  
-  /// Helper method to parse DateTime from iCalendar format
-  DateTime? _parseDateTime(String? dateTimeStr) {
-    if (dateTimeStr == null) return null;
-    try {
-      // Handle iCalendar format: 20250101T090000Z
-      if (dateTimeStr.endsWith('Z')) {
-        final cleaned = dateTimeStr.substring(0, dateTimeStr.length - 1);
-        final year = int.parse(cleaned.substring(0, 4));
-        final month = int.parse(cleaned.substring(4, 6));
-        final day = int.parse(cleaned.substring(6, 8));
-        final hour = int.parse(cleaned.substring(9, 11));
-        final minute = int.parse(cleaned.substring(11, 13));
-        final second = int.parse(cleaned.substring(13, 15));
-        return DateTime.utc(year, month, day, hour, minute, second);
-      }
-    } catch (e) {
-      AppLogger.warning('CalDAVService: Failed to parse datetime: $dateTimeStr');
-    }
-    return null;
-  }
-  
-  /// Helper method to escape calendar text
-  String _escapeCalendarText(String text) {
-    return text
-        .replaceAll('\\', '\\\\')
-        .replaceAll('\n', '\\n')
-        .replaceAll('\r', '\\r')
-        .replaceAll(',', '\\,')
-        .replaceAll(';', '\\;');
-  }
-  
-  /// Helper method to unescape calendar text and decode HTML entities
-  String _unescapeCalendarText(String text) {
-    return text
-        // First handle HTML entities (common in CalDAV responses)
-        .replaceAll('&#13;', '') // Remove carriage return entities
-        .replaceAll('&#10;', '\n') // Line feed entity to newline
-        .replaceAll('&#9;', '\t') // Tab entity
-        .replaceAll('&lt;', '<') // Less than entity
-        .replaceAll('&gt;', '>') // Greater than entity
-        .replaceAll('&amp;', '&') // Ampersand entity (must be last)
-        .replaceAll('&quot;', '"') // Quote entity
-        .replaceAll('&apos;', "'") // Apostrophe entity
-        // Then handle standard iCalendar escaping (RFC 5545)
-        .replaceAll('\\n', '\n')
-        .replaceAll('\\r', '\r')
-        .replaceAll('\\,', ',')
-        .replaceAll('\\;', ';')
-        .replaceAll('\\\\', '\\');
-  }
+  // Unused helpers removed; keep class minimal and focused on CalDAV ops.
 }
 
 /// CalDAV server capabilities information

@@ -6,21 +6,18 @@ import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
-import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
-import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
 import 'package:towdow_app/data/repositories/external_account_repository.dart';
 import 'package:towdow_app/data/repositories/external_calendar_repository.dart';
-import 'package:towdow_app/data/services/caldav_monitor.dart';
-import 'package:towdow_app/data/services/connection_monitor_service.dart';
-import 'package:towdow_app/data/services/sync_service.dart';
-import 'package:towdow_app/data/services/user_sync_service.dart';
-import 'package:towdow_app/data/services/user_preferences_queue_service.dart';
+import 'package:towdow_app/data/services/sync/sync_orchestrator_service.dart';
+import 'package:towdow_app/data/services/sync/sync_service.dart';
+import 'package:towdow_app/data/services/sync/connection_monitor_service.dart';
+import 'package:towdow_app/data/services/user/user_sync_service.dart';
+import 'package:towdow_app/data/services/user/user_preferences_queue_service.dart';
 import 'package:towdow_app/data/services/webdav_client.dart';
-import 'package:towdow_app/core/logger.dart';
 
 import 'caldav_monitor_test.mocks.dart';
 
@@ -45,7 +42,7 @@ void main() {
     late MockCategoryRepository mockCategoryRepository;
     late MockUserRepository mockUserRepository;
     late MockExternalAccountRepository mockExternalAccountRepository;
-    late MockExternalCalendarRepository mockExternalCalendarRepository;
+    // Intentionally omitted: MockExternalCalendarRepository isn't required by CalDAVMonitor constructor
     late MockConnectionMonitorService mockConnectionMonitorService;
     late MockSyncService mockSyncService;
     late MockUserSyncService mockUserSyncService;
@@ -57,7 +54,7 @@ void main() {
       mockCategoryRepository = MockCategoryRepository();
       mockUserRepository = MockUserRepository();
       mockExternalAccountRepository = MockExternalAccountRepository();
-      mockExternalCalendarRepository = MockExternalCalendarRepository();
+      // No need to initialize MockExternalCalendarRepository for these tests
       mockConnectionMonitorService = MockConnectionMonitorService();
       mockSyncService = MockSyncService();
       mockUserSyncService = MockUserSyncService();
@@ -74,6 +71,18 @@ void main() {
         userSyncService: mockUserSyncService,
         userPreferencesQueueService: mockUserPreferencesQueueService,
       );
+
+      // Default stubs to avoid hitting real services during monitor loops
+      when(mockUserPreferencesQueueService.processQueue())
+          .thenAnswer((_) async => const Result.success(null));
+      when(mockUserRepository.getEtag())
+          .thenAnswer((_) async => const Result.success(null));
+      when(mockExternalAccountRepository.getCredentialsFileEtag())
+          .thenAnswer((_) async => const Result.success(null));
+      when(mockUserSyncService.downloadUserData())
+          .thenAnswer((_) async => const Result.success(false));
+      when(mockUserSyncService.uploadUserData())
+          .thenAnswer((_) async => const Result.success(null));
     });
 
     tearDown(() {

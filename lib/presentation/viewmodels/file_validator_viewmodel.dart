@@ -7,10 +7,10 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
-import '../../data/services/s3_storage_service.dart';
+import '../../data/services/storage/s3_storage_service.dart';
 import '../../data/services/validator_service.dart';
-import '../../data/services/offline_file_service.dart';
-import '../../data/services/file_upload_queue_service.dart';
+import '../../data/services/storage/offline_file_service.dart';
+import '../../data/services/storage/file_upload_queue_service.dart';
 import '../../data/providers/providers.dart';
 import '../../core/logger.dart';
 

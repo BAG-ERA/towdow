@@ -9,10 +9,10 @@ import 'package:crypto/crypto.dart';
 
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
-import '../../data/services/s3_storage_service.dart';
+import '../../data/services/storage/s3_storage_service.dart';
 
-import '../../data/services/offline_file_service.dart';
-import '../../data/services/file_upload_queue_service.dart';
+import '../../data/services/storage/offline_file_service.dart';
+import '../../data/services/storage/file_upload_queue_service.dart';
 import '../../core/logger.dart';
 
 /// State for task file attachment operations

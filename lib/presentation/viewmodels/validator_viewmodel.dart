@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
-import '../../data/services/sync_service.dart';
 import '../../data/services/validator_service.dart';
 import '../../core/logger.dart';
 import './commands/validator_commands.dart';

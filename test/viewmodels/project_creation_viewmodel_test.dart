@@ -5,14 +5,14 @@ import 'package:mockito/annotations.dart';
 
 import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
-import 'package:towdow_app/data/services/caldav_service.dart';
+import 'package:towdow_app/data/services/caldav/caldav_service.dart';
 import 'package:towdow_app/data/services/domain_service.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/providers/providers.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:towdow_app/presentation/viewmodels/project_creation_viewmodel.dart';
-import 'package:towdow_app/data/services/local_storage_service.dart';
+import 'package:towdow_app/data/services/storage/local_storage_service.dart';
 
 // Import the generated mocks
 import 'project_creation_viewmodel_test.mocks.dart';

@@ -1,27 +1,31 @@
-// CalDAV Monitor for detecting changes in calendars
-// Monitors sync tokens and ETags to detect changes that need synchronization
-// Delegates actual sync operations to SyncService
+// SyncOrchestratorService: orchestrates connection monitoring, CalDAV change
+// detection (sync tokens/ETags), sharing state refresh, and delegates actual
+// sync operations to SyncService. This unit centralizes orchestration across
+// CalDAV, TowDow APIs, and external storage providers.
 
 import 'dart:async';
-import '../../core/result.dart';
-import '../../core/logger.dart';
-import '../models/caldav_account.dart';
+import '../../../core/result.dart';
+import '../../../core/logger.dart';
+import '../../models/caldav_account.dart';
 
-import '../models/shared_with_me_project.dart';
+import '../../models/shared_with_me_project.dart';
 
-import '../repositories/account_repository.dart';
-import '../repositories/calendar_repository.dart';
-import '../repositories/category_repository.dart';
-import '../repositories/user_repository.dart';
-import '../repositories/external_account_repository.dart';
+import '../../repositories/account_repository.dart';
+import '../../repositories/calendar_repository.dart';
+import '../../repositories/category_repository.dart';
+import '../../repositories/user_repository.dart';
+import '../../repositories/external_account_repository.dart';
 
 import 'connection_monitor_service.dart';
 import 'sync_service.dart';
-import 'caldav_service.dart';
-import 's3_storage_service.dart';
-import 'user_sync_service.dart';
-import 'user_preferences_queue_service.dart';
-import 'share_service.dart';
+import '../caldav/caldav_discovery_service.dart';
+import '../storage/s3_storage_service.dart';
+import '../../providers/providers.dart';
+import '../../models/task_calendar.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../user/user_sync_service.dart';
+import '../user/user_preferences_queue_service.dart';
+import '../share/share_service.dart';
 
 class CalDAVMonitor {
   // Dependencies - focused on calendar monitoring
@@ -34,6 +38,8 @@ class CalDAVMonitor {
   final SyncService _syncService;
   final UserSyncService _userSyncService;
   final UserPreferencesQueueService _userPreferencesQueueService;
+  // Optional Ref for DI families
+  final Ref? _ref;
 
   // Dynamic interval configuration
   static const Duration _minInterval = Duration(seconds: 2);
@@ -49,6 +55,7 @@ class CalDAVMonitor {
   Duration _currentInterval = _initialInterval;
 
   CalDAVMonitor({
+    Ref? ref,
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
     required CategoryRepository categoryRepository,
@@ -58,7 +65,8 @@ class CalDAVMonitor {
     required SyncService syncService,
     required UserSyncService userSyncService,
     required UserPreferencesQueueService userPreferencesQueueService,
-  })  : _accountRepository = accountRepository,
+  })  : _ref = ref,
+        _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
         _userRepository = userRepository,
         _externalAccountRepository = externalAccountRepository,
@@ -277,7 +285,9 @@ class CalDAVMonitor {
       AppLogger.debug('CalDAVMonitor: Retrieved local ETag: $localEtag');
 
       // Create S3 service and get remote etag
-      final s3Service = S3StorageService(account: account);
+      final s3Service = _ref != null
+          ? _ref.read(s3StorageServiceProvider(account))
+          : S3StorageService(account: account);
       final userPrefix = s3Service.getUserPrefix();
       final key = '${userPrefix}preferences.json';
       
@@ -377,7 +387,9 @@ class CalDAVMonitor {
         failure: (_) => null,
       );
       
-      final s3Service = S3StorageService(account: account);
+      final s3Service = _ref != null
+          ? _ref.read(s3StorageServiceProvider(account))
+          : S3StorageService(account: account);
       final userPrefix = s3Service.getUserPrefix();
       
       // Check external credentials file
@@ -443,74 +455,29 @@ class CalDAVMonitor {
     try {
       AppLogger.info('CalDAVMonitor: Discovering all available calendars from server');
       
-      // Use CalDAV service to discover all available calendars
-      final ICalDAVService caldavService = CalDAVService(account: account);
-      final capabilitiesResult = await caldavService.testConnection();
+      // Use DI CalDAV service if available to test connection and list calendars
+      if (_ref != null) {
+        final caldav = _ref.read(caldavServiceProvider(account));
+        final capabilitiesResult = await caldav.testConnection();
+        return await capabilitiesResult.when(
+          success: (capabilities) async {
+            final availableCalendars = capabilities.taskCalendars;
+            AppLogger.info('CalDAVMonitor: Server has ${availableCalendars.length} available calendars');
+            return await _ensureCalendarsExist(availableCalendars);
+          },
+          failure: (f) async {
+            AppLogger.error('CalDAVMonitor: Failed to discover calendars: ${f.message}');
+            return false;
+          },
+        );
+      }
+      // Fallback to discovery service
+      final discovery = CalDavDiscoveryService(account: account);
+      final capabilitiesResult = await discovery.testConnection();
       
       return await capabilitiesResult.when(
         success: (capabilities) async {
-          final availableCalendars = capabilities.taskCalendars;
-          AppLogger.info('CalDAVMonitor: Server has ${availableCalendars.length} available calendars');
-          
-          // Ensure all discovered calendars exist in local repository
-          int addedCount = 0;
-          int existingCount = 0;
-          
-          for (final serverCalendar in availableCalendars) {
-            // Skip calendars with pending deletion in sync queue to avoid UI re-introducing them
-            final pendingDeletion = await _syncService.hasPendingDeletionForCalendar(serverCalendar.path);
-            if (pendingDeletion) {
-              AppLogger.info('CalDAVMonitor: Skipping discovered calendar pending deletion: ${serverCalendar.path}');
-              continue;
-            }
-            final existingCalendarResult = await _calendarRepository.getByPath(serverCalendar.path);
-            await existingCalendarResult.when(
-              success: (existingCalendar) async {
-                if (existingCalendar == null) {
-                  // Calendar doesn't exist locally, add it
-                  final saveResult = await _calendarRepository.save(serverCalendar);
-                  saveResult.when(
-                    success: (_) {
-                      addedCount++;
-                      AppLogger.info('CalDAVMonitor: Added discovered calendar: ${serverCalendar.displayName}');
-                    },
-                    failure: (failure) {
-                      AppLogger.warning('CalDAVMonitor: Failed to save discovered calendar ${serverCalendar.displayName}: ${failure.message}');
-                    },
-                  );
-                } else {
-                  existingCount++;
-                  // Calendar exists, optionally update it with server data
-                  if (existingCalendar.etag != serverCalendar.etag) {
-                    final updatedCalendar = existingCalendar.copyWith(
-                      displayName: serverCalendar.displayName,
-                      description: serverCalendar.description,
-                      etag: serverCalendar.etag,
-                      lastModified: DateTime.now(),
-                    );
-                    await _calendarRepository.save(updatedCalendar);
-                    AppLogger.debug('CalDAVMonitor: Updated existing calendar: ${serverCalendar.displayName}');
-                  }
-                }
-              },
-              failure: (_) async {
-                // Error checking existing calendar, try to add it
-                final saveResult = await _calendarRepository.save(serverCalendar);
-                saveResult.when(
-                  success: (_) {
-                    addedCount++;
-                    AppLogger.info('CalDAVMonitor: Added discovered calendar (after lookup error): ${serverCalendar.displayName}');
-                  },
-                  failure: (failure) {
-                    AppLogger.warning('CalDAVMonitor: Failed to save discovered calendar ${serverCalendar.displayName}: ${failure.message}');
-                  },
-                );
-              },
-            );
-          }
-          
-          AppLogger.info('CalDAVMonitor: Calendar discovery complete - ${addedCount} added, ${existingCount} already existed');
-          return addedCount > 0; // Return true if any calendars were added
+          return _ensureCalendarsExist(capabilities.taskCalendars);
         },
         failure: (failure) async {
           AppLogger.error('CalDAVMonitor: Failed to discover calendars: ${failure.message}');
@@ -521,6 +488,62 @@ class CalDAVMonitor {
       AppLogger.error('CalDAVMonitor: Exception during calendar discovery', e, stackTrace);
       return false;
     }
+  }
+
+  Future<bool> _ensureCalendarsExist(List<TaskCalendar> availableCalendars) async {
+    // Ensure all discovered calendars exist in local repository
+    int addedCount = 0;
+    int existingCount = 0;
+    for (final serverCalendar in availableCalendars) {
+      final pendingDeletion = await _syncService.hasPendingDeletionForCalendar(serverCalendar.path);
+      if (pendingDeletion) {
+        AppLogger.info('CalDAVMonitor: Skipping discovered calendar pending deletion: ${serverCalendar.path}');
+        continue;
+      }
+      final existingCalendarResult = await _calendarRepository.getByPath(serverCalendar.path);
+      await existingCalendarResult.when(
+        success: (existingCalendar) async {
+          if (existingCalendar == null) {
+            final saveResult = await _calendarRepository.save(serverCalendar);
+            saveResult.when(
+              success: (_) {
+                addedCount++;
+                AppLogger.info('CalDAVMonitor: Added discovered calendar: ${serverCalendar.displayName}');
+              },
+              failure: (failure) {
+                AppLogger.warning('CalDAVMonitor: Failed to save discovered calendar ${serverCalendar.displayName}: ${failure.message}');
+              },
+            );
+          } else {
+            existingCount++;
+            if (existingCalendar.etag != serverCalendar.etag) {
+              final updatedCalendar = existingCalendar.copyWith(
+                displayName: serverCalendar.displayName,
+                description: serverCalendar.description,
+                etag: serverCalendar.etag,
+                lastModified: DateTime.now(),
+              );
+              await _calendarRepository.save(updatedCalendar);
+              AppLogger.debug('CalDAVMonitor: Updated existing calendar: ${serverCalendar.displayName}');
+            }
+          }
+        },
+        failure: (_) async {
+          final saveResult = await _calendarRepository.save(serverCalendar);
+          saveResult.when(
+            success: (_) {
+              addedCount++;
+              AppLogger.info('CalDAVMonitor: Added discovered calendar (after lookup error): ${serverCalendar.displayName}');
+            },
+            failure: (failure) {
+              AppLogger.warning('CalDAVMonitor: Failed to save discovered calendar ${serverCalendar.displayName}: ${failure.message}');
+            },
+          );
+        },
+      );
+    }
+    AppLogger.info('CalDAVMonitor: Calendar discovery complete - $addedCount added, $existingCount already existed');
+    return addedCount > 0;
   }
 
   /// Check and update shared projects from server

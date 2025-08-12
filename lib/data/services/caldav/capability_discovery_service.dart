@@ -1,11 +1,11 @@
 ﻿// Capability discovery service for CalDAV servers
 // Implements RFC 4791 discovery flow to identify server capabilities
 
-import '../../core/result.dart';
-import '../../core/logger.dart';
-import '../models/caldav_account.dart';
-import '../models/task_calendar.dart';
-import 'webdav_client.dart';
+import '../../../core/result.dart';
+import '../../../core/logger.dart';
+import '../../models/caldav_account.dart';
+import '../../models/task_calendar.dart';
+import '../webdav_client.dart';
 
 /// Server capabilities discovered during CalDAV discovery process
 class ServerCapabilities {

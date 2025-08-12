@@ -2,7 +2,7 @@
 // Verifies that all storage boxes are properly cleared including offline files and file upload queue
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:towdow_app/data/services/local_storage_service.dart';
+import 'package:towdow_app/data/services/storage/local_storage_service.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:io';

@@ -3,11 +3,11 @@
 
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../../core/result.dart';
-import '../../core/logger.dart';
-import '../models/caldav_account.dart';
-import '../models/shared_project_member.dart';
-import 'webdav_client.dart';
+import '../../../core/result.dart';
+import '../../../core/logger.dart';
+import '../../models/caldav_account.dart';
+import '../../models/shared_project_member.dart';
+import '../webdav_client.dart';
 
 /// Service for managing project sharing through TowDow API
 class ShareService {

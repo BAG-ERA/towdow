@@ -8,7 +8,7 @@ library;
 import '../../core/logger.dart';
 import '../../core/result.dart';
 import '../models/attendee.dart';
-import 'local_storage_service.dart';
+import 'storage/local_storage_service.dart';
 
 class MigrationService {
   final LocalStorageService _storageService;

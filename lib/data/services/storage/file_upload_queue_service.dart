@@ -3,18 +3,18 @@
 
 import 'dart:async';
 import 'package:uuid/uuid.dart';
-import '../../core/result.dart';
-import '../../core/logger.dart';
-import '../models/offline_file.dart';
-import '../models/task.dart';
-import '../repositories/account_repository.dart';
-import '../repositories/task_repository.dart';
+import '../../../core/result.dart';
+import '../../../core/logger.dart';
+import '../../models/offline_file.dart';
+import '../../models/task.dart';
+import '../../repositories/account_repository.dart';
+import '../../repositories/task_repository.dart';
 import 'local_storage_service.dart';
 import 'offline_file_service.dart';
 import 's3_storage_service.dart';
-import 'connection_monitor_service.dart';
-import 'sync_service.dart';
-import 'validator_service.dart';
+import '../sync/connection_monitor_service.dart';
+import '../sync/sync_service.dart';
+import '../validator_service.dart';
 
 /// Upload status types
 enum UploadStatusType {

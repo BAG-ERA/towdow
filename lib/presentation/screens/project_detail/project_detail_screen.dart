@@ -15,7 +15,8 @@ import '../../../data/models/task.dart';
 import '../../../data/models/step.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
-import '../../viewmodels/commands/attendee_commands.dart';
+// commands now handled in ViewModel
+import '../../viewmodels/project_detail_viewmodel.dart';
 
 import '../../../core/theme/chart_theme.dart';
 import '../../widgets/adaptive_app_layout.dart';
@@ -24,34 +25,26 @@ import '../../widgets/project_detail/project_kanban_view.dart';
 import '../../widgets/project_detail/project_infos_widget.dart';
 import '../../widgets/project_detail/project_warnings_banner.dart';
 
-// Provider for a specific project/calendar that watches only this specific calendar
-final projectProvider = StreamProvider.family<TaskCalendar?, String>((ref, projectPath) {
+// ViewModel provider for a specific project
+final projectDetailViewModelProvider = StateNotifierProvider.family<ProjectDetailViewModel, ProjectDetailState, String>((ref, projectPath) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
-  
-  // Encode special characters in the project path to match storage format
-  final encodedProjectPath = projectPath.replaceAll('@', '%40');
-  
-  // Watch all calendars and filter for just this one
-  return calendarRepository.watchCalendars().asyncMap((calendars) async {
-    // Find the specific calendar by path
-    try {
-      final calendar = calendars.cast<TaskCalendar?>().firstWhere(
-        (cal) => cal?.path == encodedProjectPath,
-        orElse: () => null,
-      );
-      
-      if (calendar != null) {
-        AppLogger.debug('ProjectDetailScreen: Found project for path $projectPath: ${calendar.displayName}');
-      } else {
-        AppLogger.debug('ProjectDetailScreen: Project not found for path $projectPath (encoded: $encodedProjectPath)');
-      }
-      
-      return calendar;
-    } catch (e) {
-      AppLogger.error('ProjectDetailScreen: Error finding project $projectPath: $e');
-      return null;
-    }
-  });
+  final userRepository = ref.watch(userRepositoryProvider);
+  final stepRepository = ref.watch(stepRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final syncService = ref.watch(syncServiceProvider);
+
+  final vm = ProjectDetailViewModel(
+    ref,
+    projectPath,
+    calendarRepository,
+    userRepository,
+    stepRepository,
+    taskRepository,
+    syncService,
+  );
+  // Fire and forget init
+  vm.initialize();
+  return vm;
 });
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
@@ -79,7 +72,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   @override
   Widget build(BuildContext context) {
     // AppLogger.info('ProjectDetailScreen: Building screen for project path: ${widget.projectPath}');
-    final projectAsync = ref.watch(projectProvider(widget.projectPath));
+    final vmState = ref.watch(projectDetailViewModelProvider(widget.projectPath));
+    final projectAsync = vmState.project;
     final tasksAsync = ref.watch(projectTasksProvider(widget.projectPath));
 
     // Check if we're on desktop (same breakpoint as AdaptiveAppLayout)
@@ -97,7 +91,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           }
           
           // Auto-acknowledge shared project when viewing project detail
-          _acknowledgeSharedProjectIfNeeded(project);
+          ref.read(projectDetailViewModelProvider(widget.projectPath).notifier)
+              .acknowledgeSharedProjectIfNeeded(project);
         });
       }
     });
@@ -124,7 +119,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 // Project title and full project info (scrollable to avoid overflow)
                 Expanded(
                   child: SingleChildScrollView(
-                    child: _buildDesktopHeader(context, projectAsync, tasksAsync),
+                   child: _buildDesktopHeader(context, ref.watch(projectDetailViewModelProvider(widget.projectPath)), tasksAsync),
                   ),
                 ),
               ],
@@ -162,14 +157,14 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
   }
 
-  Widget _buildDesktopHeader(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
+  Widget _buildDesktopHeader(BuildContext context, ProjectDetailState vmState, AsyncValue<List<Task>> tasksAsync) {
     return Container(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Project details layout
-          projectAsync.when(
+           vmState.project.when(
             data: (project) => project != null 
                 ? ProjectInfosWidget(
                     project: project,
@@ -592,23 +587,19 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       ),
     ];
 
-    return KanbanBoard(
+      return KanbanBoard(
       columns: columns,
       onTaskTap: (task) {
         // Navigate to task detail
       },
       onTaskToggle: (task) async {
         // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
-        final project = ref.read(projectProvider(widget.projectPath)).asData?.value;
-        final stepRepo = ref.read(stepRepositoryProvider);
-        ProjectStep? step;
-        if (task.stepId != null && task.stepId!.isNotEmpty) {
-          final stepRes = await stepRepo.getStepById(task.stepId!);
-          step = stepRes.when(success: (s) => s, failure: (_) => null);
-        }
+          final project = ref.read(projectDetailViewModelProvider(widget.projectPath)).project.asData?.value;
+          final stepStatusRes = await ref.read(projectDetailViewModelProvider(widget.projectPath).notifier).getStepStatusForTask(task);
+          final step = stepStatusRes.when(success: (s) => s, failure: (_) => null);
         final isFlow = project?.flowitAsFlow == true;
         final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
-        final stepIsAvailable = step?.status == StepStatus.available;
+          final stepIsAvailable = step == StepStatus.available;
 
         if (isFlow && status == 'ONGOING' && !stepIsAvailable) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -694,7 +685,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   // Attendee View - Kanban organized by attendees
   Widget _buildAttendeeView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
-    final projectAsync = ref.watch(projectProvider(widget.projectPath));
+    final projectAsync = ref.watch(projectDetailViewModelProvider(widget.projectPath)).project;
     
     return projectAsync.when(
       data: (project) {
@@ -774,7 +765,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       );
     }
 
-    return KanbanBoard(
+      return KanbanBoard(
       columns: columns,
       onTaskTap: (task) {
         // Navigate to task detail
@@ -790,7 +781,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         await ref.read(taskViewModelProvider.notifier).updateTask(task);
         _refreshProjectTasks(ref);
       },
-      onTaskMoved: (task, columnId) => _handleAttendeeTaskMove(context, ref, task, columnId),
+        onTaskMoved: (task, columnId) async {
+          final res = await ref.read(projectDetailViewModelProvider(widget.projectPath).notifier)
+              .handleAttendeeTaskMove(task, columnId);
+          res.when(success: (_) => _refreshProjectTasks(ref), failure: (_) {});
+        },
     );
   }
 
@@ -855,37 +850,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     }
   }
 
-  Future<void> _handleAttendeeTaskMove(BuildContext context, WidgetRef ref, Task task, String columnId) async {
-    try {
-      if (columnId == '__no_attendees__') {
-        // Remove all attendees from task
-        final command = UnassignAllAttendeesCommand(
-          ref.read(taskRepositoryProvider),
-          ref.read(syncServiceProvider),
-        );
-        final params = UnassignAllAttendeesParams(task: task);
-        await command.executeWith(params);
-        
-        // Refresh the UI
-        ref.invalidate(projectTasksProvider(widget.projectPath));
-      } else {
-        // Assign attendee to task
-        final command = AssignAttendeeToTaskCommand(
-          ref.read(taskRepositoryProvider),
-          ref.read(syncServiceProvider),
-        );
-        final params = AssignAttendeeToTaskParams(task: task, attendeeEmail: columnId);
-        await command.executeWith(params);
-        
-        // Refresh the UI
-        ref.invalidate(projectTasksProvider(widget.projectPath));
-      }
-    } catch (error) {
-      if (context.mounted) {
-        AppLogger.error('Error moving task: $error');
-      }
-    }
-  }
+  // moved to ViewModel
 
   // Kanban View - Organized by categories
   Widget _buildKanbanView(BuildContext context, WidgetRef ref, AsyncValue<List<Task>> tasksAsync) {
@@ -967,102 +932,18 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   
 
   Future<void> _updateProject(TaskCalendar updatedProject) async {
-    try {
-      AppLogger.info('ProjectDetail: _updateProject called for project: ${updatedProject.displayName}');
-      
-      final calendarRepository = ref.read(calendarRepositoryProvider);
-      
-      // Save locally first
-      AppLogger.info('ProjectDetail: Saving project locally...');
-      final result = await calendarRepository.save(updatedProject);
-      
-      await result.when(
-        success: (data) async {
-          // Refresh the project data immediately
-          ref.invalidate(projectProvider(widget.projectPath));
-          
-          // Also invalidate the project list provider so navbar updates
-          ref.invalidate(projectListProvider);
-          
-          // Sync changes to CalDAV server (don't wait for this)
-          AppLogger.info('ProjectDetail: About to call _syncProjectToServer...');
-          _syncProjectToServer(updatedProject);
-          AppLogger.info('ProjectDetail: _syncProjectToServer call initiated (running in background)');
-        },
-        failure: (failure) async {
-          if (mounted) {
-            AppLogger.error('Failed to update project: ${failure.message}');
-          }
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        AppLogger.error('Error updating project: $e');
-      }
-    }
+    final res = await ref.read(projectDetailViewModelProvider(widget.projectPath).notifier)
+        .updateProject(updatedProject);
+    res.when(success: (_) {
+      ref.invalidate(projectTasksProvider(widget.projectPath));
+    }, failure: (f) {
+      AppLogger.error('ProjectDetail: Failed to update project: ${f.message}', f.exception, f.stackTrace);
+    });
   }
 
   /// Sync project metadata changes to server via repository
-  Future<void> _syncProjectToServer(TaskCalendar project) async {
-    AppLogger.info('ProjectDetail: _syncProjectToServer method entered for project: ${project.displayName}');
-    
-    try {
-      AppLogger.info('ProjectDetail: Starting server sync for project: ${project.displayName}');
-      
-      // Use repository for proper MVVM architecture - it handles account management internally
-      final calendarRepository = ref.read(calendarRepositoryProvider);
-      AppLogger.info('ProjectDetail: Calling repository updateCalendarProperties...');
-      final syncResult = await calendarRepository.updateCalendarProperties(project);
-      
-      await syncResult.when(
-        success: (_) {
-          AppLogger.info('ProjectDetail: Successfully synced project metadata to server');
-        },
-        failure: (failure) {
-          AppLogger.error('ProjectDetail: Failed to sync project metadata to server: ${failure.message}');
-          if (mounted) {
-          }
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('ProjectDetail: Exception during server sync', e, stackTrace);
-      if (mounted) {
-        // Sync error - no user notification needed
-      }
-    }
-  }
+  // Sync moved to ViewModel
 
   /// Auto-acknowledge shared project when user views project detail
-  Future<void> _acknowledgeSharedProjectIfNeeded(TaskCalendar project) async {
-    try {
-      final userRepository = ref.read(userRepositoryProvider);
-      final preferencesResult = await userRepository.getUserPreferences();
-      
-      await preferencesResult.when(
-        success: (preferences) async {
-          final sharedProject = preferences.getSharedProject(project.uid);
-          
-          // Only acknowledge if project is shared with me and not yet acknowledged
-          if (sharedProject != null && !sharedProject.ack) {
-            AppLogger.info('ProjectDetailScreen: Auto-acknowledging shared project ${project.displayName}');
-            
-            final acknowledgeResult = await userRepository.acknowledgeSharedProject(project.uid);
-            await acknowledgeResult.when(
-              success: (_) {
-                AppLogger.info('ProjectDetailScreen: Successfully acknowledged shared project ${project.displayName}');
-              },
-              failure: (failure) {
-                AppLogger.warning('ProjectDetailScreen: Failed to acknowledge shared project ${project.displayName}: ${failure.message}');
-              },
-            );
-          }
-        },
-        failure: (failure) async {
-          AppLogger.warning('ProjectDetailScreen: Failed to get user preferences for acknowledgment: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('ProjectDetailScreen: Exception during shared project acknowledgment: $e');
-    }
-  }
+  // Acknowledgment moved to ViewModel
 } 

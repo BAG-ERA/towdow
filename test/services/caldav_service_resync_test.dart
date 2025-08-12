@@ -7,7 +7,7 @@ import 'package:mockito/annotations.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
-import 'package:towdow_app/data/services/caldav_service.dart';
+import 'package:towdow_app/data/services/caldav/caldav_service.dart';
 import 'package:towdow_app/data/services/webdav_client.dart';
 import 'package:towdow_app/core/logger.dart';
 

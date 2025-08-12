@@ -15,10 +15,9 @@ import '../../core/logger.dart';
 import '../../data/models/caldav_account.dart';
 import '../../data/models/task_calendar.dart';
 
-import '../../data/services/caldav_service.dart';
+import '../../data/services/caldav/caldav_discovery_service.dart';
 import '../../data/services/status_service.dart';
-import '../../data/services/local_storage_service.dart';
-import '../../data/services/user_sync_service.dart';
+import '../../data/services/storage/local_storage_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/user_repository.dart';
@@ -69,19 +68,16 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
   final UserRepository _userRepository;
-  final UserSyncService _userSyncService;
   final void Function()? _onInvalidateProjectList;
 
   CalDAVManagementViewModel({
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
     required UserRepository userRepository,
-    required UserSyncService userSyncService,
     void Function()? onInvalidateProjectList,
   })  : _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
         _userRepository = userRepository,
-        _userSyncService = userSyncService,
         _onInvalidateProjectList = onInvalidateProjectList,
         super(const CalDAVManagementState());
 
@@ -177,8 +173,8 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     AppLogger.info('CalDAVManagement: Starting calendar discovery for ${account.serverUrl}');
     
     try {
-      final ICalDAVService caldavService = CalDAVService(account: account);
-      final capabilitiesResult = await caldavService.testConnection();
+      final discovery = CalDavDiscoveryService(account: account);
+      final capabilitiesResult = await discovery.testConnection();
       
       await capabilitiesResult.when(
         success: (capabilities) async {
@@ -517,7 +513,6 @@ final caldavManagementViewModelProvider = StateNotifierProvider.autoDispose<CalD
     accountRepository: ref.read(accountRepositoryProvider),
     calendarRepository: ref.read(calendarRepositoryProvider),
     userRepository: ref.read(userRepositoryProvider),
-    userSyncService: ref.read(userSyncServiceProvider),
     onInvalidateProjectList: () => ref.invalidate(projectListProvider),
   ),
 ); 

@@ -7,8 +7,8 @@ import '../../core/logger.dart';
 import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
-import 'local_storage_service.dart';
-import 'sync_service.dart';
+import 'storage/local_storage_service.dart';
+import 'sync/sync_service.dart';
 
 /// Service for managing project domains and domain-related operations
 class DomainService {

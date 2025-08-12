@@ -9,8 +9,9 @@ import '../models/kanban.dart';
 import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
-import '../services/caldav_service.dart';
-import '../services/sync_service.dart';
+import 'caldav/caldav_properties_service.dart';
+import 'webdav_client.dart';
+import 'sync/sync_service.dart';
 
 class KanbanService {
   final CalendarRepository _calendarRepository;
@@ -97,8 +98,8 @@ class KanbanService {
             return [];
           }
 
-          // Use CalDAV service to refresh calendar info from server
-          final ICalDAVService caldavService = CalDAVService(account: account);
+          // Use CalDAV properties service to refresh calendar info from server
+          final caldavProps = CalDavPropertiesService(client: WebDAVClient.fromAccount(account));
           
           // Create a minimal calendar object to get properties
           final tempCalendar = TaskCalendarFactory.fromCalDAVDiscovery(
@@ -106,12 +107,11 @@ class KanbanService {
             displayName: 'Temp',
           );
           
-          final refreshResult = await caldavService.getCalendarProperties(tempCalendar);
+          final refreshResult = await caldavProps.getCalendarProperties(tempCalendar);
           
           return await refreshResult.when(
             success: (updatedCalendar) async {
-              if (updatedCalendar != null && 
-                  updatedCalendar.flowitKanban.isNotEmpty && 
+              if (updatedCalendar.flowitKanban.isNotEmpty && 
                   updatedCalendar.flowitKanban != '[]') {
                 try {
                   final kanbanData = jsonDecode(updatedCalendar.flowitKanban);

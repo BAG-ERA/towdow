@@ -6,8 +6,8 @@ import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/user_preferences.dart';
 import '../models/shared_with_me_project.dart';
-import '../services/local_storage_service.dart';
-import '../services/user_preferences_queue_service.dart';
+import '../services/storage/local_storage_service.dart';
+import '../services/user/user_preferences_queue_service.dart';
 
 // Abstract repository interface
 abstract class UserRepository {

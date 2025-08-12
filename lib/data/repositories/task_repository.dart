@@ -4,8 +4,8 @@
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/task.dart';
-import '../services/local_storage_service.dart';
-import '../services/sync_service.dart';
+import '../services/storage/local_storage_service.dart';
+import '../services/sync/sync_service.dart';
 
 // Abstract repository interface
 abstract class TaskRepository {
@@ -18,6 +18,7 @@ abstract class TaskRepository {
   Future<Result<void>> save(Task task);
   Future<Result<void>> delete(String uid);
   Stream<List<Task>> watchTasks();
+    Stream<List<Task>> watchTasksByProject(String projectPath);
   
   // Internal methods for sync operations (don't trigger sync)
   Future<Result<void>> saveFromSync(Task task);
@@ -189,6 +190,19 @@ class LocalTaskRepository implements TaskRepository {
             failure: (_) => <Task>[],
           );
         });
+  }
+
+  @override
+  Stream<List<Task>> watchTasksByProject(String projectPath) async* {
+    final encoded = projectPath.replaceAll('@', '%40');
+    // Emit initial
+    final init = await getByProject(encoded);
+    yield init.when(success: (tasks) => tasks, failure: (_) => <Task>[]);
+    // Then listen for changes and filter
+    yield* _storageService.getStream(LocalStorageService.tasksBoxName).asyncMap((_) async {
+      final res = await getByProject(encoded);
+      return res.when(success: (tasks) => tasks, failure: (_) => <Task>[]);
+    });
   }
 
   @override

@@ -5,7 +5,7 @@ import 'dart:convert';
 import '../models/requirement.dart';
 import '../models/task_calendar.dart';
 import 'calendar_repository.dart';
-import '../services/sync_service.dart';
+import '../services/sync/sync_service.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
 

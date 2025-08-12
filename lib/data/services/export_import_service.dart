@@ -11,8 +11,10 @@ import '../models/task.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/task_repository.dart';
 import '../repositories/account_repository.dart';
-import 'local_storage_service.dart';
-import '../services/caldav_service.dart';
+import 'storage/local_storage_service.dart';
+import 'caldav/caldav_task_service.dart';
+import 'caldav/caldav_calendar_service.dart';
+import 'caldav/caldav_discovery_service.dart';
 
 /// Result of an import operation
 class ImportResult {
@@ -504,10 +506,17 @@ class ExportImportService {
       if (account == null) {
         return Result.failure(Failure(message: 'No active account found'));
       }
-      final ICalDAVService caldavService = CalDAVService(account: account);
+      final caldavCalendar = CalDavCalendarService(account: account);
+      final discovery = CalDavDiscoveryService(account: account);
+      final caps = await discovery.testConnection();
+      final calendarHome = await caps.when(
+        success: (c) async => c.calendarHome,
+        failure: (f) async => throw Exception('Discovery failed: ${f.message}'),
+      );
       
-      // Create the calendar using CalDAV MKCOL method
-      final result = await caldavService.createCalendar(
+      // Create the calendar using CalDAV MKCALENDAR method
+      final result = await caldavCalendar.createCalendar(
+        calendarHome: calendarHome,
         displayName: calendar.displayName,
         description: calendar.description,
         author: account.email?.isNotEmpty == true ? account.email : account.username,
@@ -542,10 +551,9 @@ class ExportImportService {
       if (account == null) {
         return Result.failure(Failure(message: 'No active account found'));
       }
-      final ICalDAVService caldavService = CalDAVService(account: account);
-      
+      final caldavTasks = CalDavTaskService(account: account);
       // Create the task using CalDAV PUT method
-      final result = await caldavService.createTask(task, calendarPath);
+      final result = await caldavTasks.createTask(task, calendarPath);
       
       return result.when(
         success: (_) {

@@ -7,8 +7,8 @@ import 'package:crypto/crypto.dart';
 import 'package:pointycastle/export.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
-import '../../core/result.dart';
-import '../../core/logger.dart';
+import '../../../core/result.dart';
+import '../../../core/logger.dart';
 
 /// Parameters for encryption operation in isolate
 class _EncryptionParams {

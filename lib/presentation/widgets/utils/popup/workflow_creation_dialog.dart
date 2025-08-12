@@ -6,6 +6,8 @@ import '../../../../core/logger.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../data/models/task_calendar.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../data/services/caldav/caldav_calendar_service.dart';
+import '../../../../data/services/caldav/caldav_discovery_service.dart';
 
 class WorkflowCreationDialog extends ConsumerStatefulWidget {
   const WorkflowCreationDialog({super.key});
@@ -112,9 +114,16 @@ class _WorkflowCreationDialogState extends ConsumerState<WorkflowCreationDialog>
         await syncService.queueCalendarCreation(workflowCal.path);
         createdPath = workflowCal.path;
       } else {
-        // Try immediate server creation; on failure fallback to local + queue
-        final caldavService = ref.read(caldavServiceProvider(account));
-        final createResult = await caldavService.createCalendar(
+        // Try immediate server creation via split services; on failure fallback to local + queue
+        final discovery = CalDavDiscoveryService(account: account);
+        final caps = await discovery.testConnection();
+        final calendarHome = await caps.when(
+          success: (c) async => c.calendarHome,
+          failure: (f) async => throw Exception('Discovery failed: ${f.message}'),
+        );
+        final caldavCalendar = CalDavCalendarService(account: account);
+        final createResult = await caldavCalendar.createCalendar(
+          calendarHome: calendarHome,
           displayName: name,
           description: description.isEmpty ? 'Workflow created by FlowIt' : description,
           author: currentUser,

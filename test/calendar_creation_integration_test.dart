@@ -4,7 +4,7 @@
  */
 
 import 'package:test/test.dart';
-import '../lib/data/services/caldav_service.dart';
+import 'package:towdow_app/data/services/caldav/caldav_service.dart';
 import '../lib/data/models/caldav_account.dart';
 import '../lib/core/result.dart';
 

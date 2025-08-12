@@ -19,8 +19,8 @@ import 'package:uuid/uuid.dart';
 import '../../core/logger.dart';
 
 import '../../data/models/caldav_account.dart';
-import '../../data/services/external_sync_service.dart';
-import '../../data/services/s3_storage_service.dart';
+import '../../data/services/integration/external_caldav_calendar/external_sync_service.dart';
+import '../../data/services/storage/s3_storage_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/providers/providers.dart';
 

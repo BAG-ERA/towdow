@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../data/models/caldav_account.dart';
-import '../../../../data/services/caldav_service.dart';
+import '../../../../data/services/caldav/caldav_discovery_service.dart';
 import '../../../../data/providers/providers.dart';
 import 'package:uuid/uuid.dart';
 import '../../../widgets/utils/enhanced_text_field.dart';
@@ -335,8 +335,8 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
       );
 
       // Test the CalDAV connection
-      final ICalDAVService caldavService = CalDAVService(account: account);
-      final testResult = await caldavService.testConnection();
+      final discovery = CalDavDiscoveryService(account: account);
+      final testResult = await discovery.testConnection();
       
       await testResult.when(
         success: (capabilities) async {

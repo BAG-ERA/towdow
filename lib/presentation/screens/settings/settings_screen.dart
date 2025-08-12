@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../../core/logger.dart';
-import '../../../data/services/local_storage_service.dart';
+import '../../../data/services/storage/local_storage_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
 import 'caldav_management_screen.dart';
@@ -13,8 +13,8 @@ import 'connection_info_screen.dart';
 import 'external_calendar_management_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
-import '../../../data/services/web_storage.dart';
-import '../../../data/services/sync_service.dart';
+import '../../../data/services/web/web_storage.dart';
+import '../../../data/services/sync/sync_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../viewmodels/appearance_settings_viewmodel.dart';
 
@@ -264,50 +264,8 @@ class SettingsScreen extends ConsumerWidget {
 
   // Helper method to clear web-specific storage and cache
   Future<void> _clearWebStorageAndCache() async {
-    if (kIsWeb) {
-      try {
-        // Use dart:html's window.localStorage to clear browser storage
-        // This needs to be done using JS interop in a web-safe way
-        await _clearLocalStorageUsingJsInterop();
-
-        // Clear Hive's IndexedDB storage more aggressively using known box names
-        final boxNames = [
-          LocalStorageService.tasksBoxName,
-          LocalStorageService.projectsBoxName,
-          LocalStorageService.calendarsBoxName,
-          LocalStorageService.automatedTasksBoxName,
-          LocalStorageService.accountsBoxName,
-          LocalStorageService.syncQueueBoxName,
-          LocalStorageService.domainsBoxName,
-          LocalStorageService.statusesBoxName,
-          LocalStorageService.userPreferencesBoxName,
-          LocalStorageService.externalAccountsBoxName,
-          LocalStorageService.externalCalendarsBoxName,
-          LocalStorageService.externalEventsBoxName,
-          LocalStorageService.offlineFilesBoxName,
-          LocalStorageService.fileUploadQueueBoxName,
-        ];
-
-        for (final boxName in boxNames) {
-          if (Hive.isBoxOpen(boxName)) {
-            try {
-              await Hive.box(boxName).clear();
-              await Hive.box(boxName).close();
-              await Hive.deleteBoxFromDisk(boxName);
-            } catch (e) {
-              AppLogger.warning('Failed to clear box $boxName: $e');
-            }
-          }
-        }
-
-        // Force page refresh to ensure clean state (only in production)
-        if (!const bool.fromEnvironment('dart.vm.product')) {
-          await _reloadPageUsingJsInterop();
-        }
-      } catch (e) {
-        AppLogger.error('Failed to clear web storage', e);
-      }
-    }
+    final storage = ref.read(localStorageServiceProvider);
+    await storage.clearAllBoxesWebSafe();
   }
 
   // Clear localStorage using JS interop
@@ -323,17 +281,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   // Reload the page using JS interop
-  Future<void> _reloadPageUsingJsInterop() async {
-    if (kIsWeb) {
-      try {
-        // In a real implementation with conditional imports:
-        // js.context.callMethod('eval', ['window.location.reload();']);
-        AppLogger.info('Web platform: page would be reloaded here');
-      } catch (e) {
-        AppLogger.error('Failed to reload page', e);
-      }
-    }
-  }
+  Future<void> _reloadPageUsingJsInterop() async {}
 
   Future<void> _openExternalUrl(String url) async {
     try {

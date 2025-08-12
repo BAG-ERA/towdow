@@ -2,10 +2,11 @@
 // Provides a singleton instance with CRUD operations following repository pattern
 
 import 'dart:convert';
+import 'dart:async';
 import '../models/category.dart';
 import '../models/task_calendar.dart';
 import 'calendar_repository.dart';
-import '../services/sync_service.dart';
+import '../services/sync/sync_service.dart';
 import 'account_repository.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
@@ -19,6 +20,7 @@ class CategoryRepository {
   // Category cache and project mapping
   final Map<String, Category> _categoryCache = {};
   final Map<String, Set<String>> _projectCategoriesMap = {};
+  final Map<String, StreamController<List<Category>>> _projectStreams = {};
   
   CategoryRepository(this._calendarRepository, this._accountRepository);
   
@@ -42,6 +44,7 @@ class CategoryRepository {
           }
           
           _projectCategoriesMap[calendar.path] = categoryIds;
+          _emitProjectStream(calendar.path);
         }
         
         AppLogger.info('CategoryRepository: Loaded ${_categoryCache.length} categories from ${calendars.length} projects');
@@ -80,6 +83,14 @@ class CategoryRepository {
     
     AppLogger.debug('CategoryRepository: Retrieved ${categories.length} categories for project $projectPath');
     return Result.success(categories);
+  }
+
+  /// Watch categories for a specific project as a stream
+  Stream<List<Category>> watchProjectCategories(String projectPath) {
+    _projectStreams.putIfAbsent(projectPath, () => StreamController<List<Category>>.broadcast());
+    // Emit current snapshot
+    _emitProjectStream(projectPath);
+    return _projectStreams[projectPath]!.stream;
   }
   
   /// Get a category by ID
@@ -129,6 +140,7 @@ class CategoryRepository {
             _categoryCache[categoryId] = category;
             _projectCategoriesMap[projectPath] ??= <String>{};
             _projectCategoriesMap[projectPath]!.add(categoryId);
+            _emitProjectStream(projectPath);
             
             AppLogger.info('CategoryRepository: Successfully created category $categoryId');
             
@@ -176,6 +188,7 @@ class CategoryRepository {
           if (calendar != null) {
             final updatedCalendar = calendar.updateCategory(updatedCategory);
             await _calendarRepository.save(updatedCalendar);
+            _emitProjectStream(projectPath);
             
             // Sync category changes to CalDAV server
             await _syncCategoryToServer(updatedCalendar);
@@ -220,6 +233,7 @@ class CategoryRepository {
           if (calendar != null) {
             final updatedCalendar = calendar.removeCategory(categoryId);
             await _calendarRepository.save(updatedCalendar);
+            _emitProjectStream(projectPath);
             
             // Sync category deletion to CalDAV server
             await _syncCategoryToServer(updatedCalendar);
@@ -322,6 +336,7 @@ class CategoryRepository {
           success: (_) async {
             // Update cache
             _projectCategoriesMap[projectPath]?.remove(categoryId);
+            _emitProjectStream(projectPath);
             
             AppLogger.info('CategoryRepository: Successfully removed category $categoryId from project $projectPath');
             return Result.success(null);
@@ -343,6 +358,10 @@ class CategoryRepository {
   void clearCache() {
     _categoryCache.clear();
     _projectCategoriesMap.clear();
+    for (final c in _projectStreams.values) {
+      c.close();
+    }
+    _projectStreams.clear();
     AppLogger.debug('CategoryRepository: Cache cleared');
   }
 
@@ -371,6 +390,7 @@ class CategoryRepository {
             _categoryCache[category.id] = category;
             _projectCategoriesMap[calendar.path] ??= <String>{};
             _projectCategoriesMap[calendar.path]!.add(category.id);
+            _emitProjectStream(calendar.path);
             
             AppLogger.debug('CategoryRepository: Loaded category ${category.name} (${category.id}) from calendar');
           } catch (e) {
@@ -435,3 +455,16 @@ class CategoryRepository {
     }
   }
 } 
+
+extension on CategoryRepository {
+  void _emitProjectStream(String projectPath) {
+    final controller = _projectStreams[projectPath];
+    if (controller == null || controller.isClosed) return;
+    final ids = _projectCategoriesMap[projectPath] ?? <String>{};
+    final categories = ids
+        .map((id) => _categoryCache[id])
+        .whereType<Category>()
+        .toList();
+    controller.add(categories);
+  }
+}

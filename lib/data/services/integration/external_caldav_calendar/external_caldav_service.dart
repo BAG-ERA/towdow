@@ -1,15 +1,15 @@
-// External CalDAV service for external calendar operations
+// Integration: External CalDAV service for external calendar operations
 // Provides read-only CalDAV operations for VEVENT synchronization
 // Based on RFC 4791 for CalDAV and RFC 5545 for iCalendar
 
-import '../../core/result.dart';
-import '../../core/logger.dart';
-import '../models/external_caldav_account.dart';
-import '../models/external_calendar.dart';
-import '../models/calendar_event.dart';
-import 'webdav_client.dart';
-import 'parsers/vevent_parser.dart';
-import 'parsers/xml_response_parser.dart';
+import '../../../../core/result.dart';
+import '../../../../core/logger.dart';
+import '../../../models/external_caldav_account.dart';
+import '../../../models/external_calendar.dart';
+import '../../../models/calendar_event.dart';
+import '../../webdav_client.dart';
+import '../../parsers/vevent_parser.dart';
+import '../../parsers/xml_response_parser.dart';
 
 class ExternalCalDAVService {
   final ExternalCaldavAccount account;
@@ -172,7 +172,7 @@ class ExternalCalDAVService {
         final description = response['calendar-description'] as String? ?? '';
         final color = response['calendar-color'] as String?;
         final etag = response['getetag'] as String? ?? '';
-        final ctag = response['getctag'] as String? ?? '';
+        // getctag may be present depending on server; not used directly here
         
         // Extract supported components
         final supportedComponents = <String>[];
@@ -250,7 +250,7 @@ class ExternalCalDAVService {
       String calendarDataElement = '<C:calendar-data />';
       if (timeMin != null && timeMax != null) {
         // Expand recurring events when time range is specified
-        calendarDataElement = '''<C:calendar-data>\n  <C:expand start=\"${_formatDateTime(timeMin)}\" end=\"${_formatDateTime(timeMax)}\" />\n</C:calendar-data>''';
+        calendarDataElement = '''<C:calendar-data>\n  <C:expand start="${_formatDateTime(timeMin)}" end="${_formatDateTime(timeMax)}" />\n</C:calendar-data>''';
         AppLogger.debug('ExternalCalDAVService: Using recurring event expansion from ${_formatDateTime(timeMin)} to ${_formatDateTime(timeMax)}');
       }
       
@@ -448,7 +448,7 @@ class ExternalCalDAVService {
     final minute = utc.minute.toString().padLeft(2, '0');
     final second = utc.second.toString().padLeft(2, '0');
     
-    return '${year}${month}${day}T${hour}${minute}${second}Z';
+    return '$year$month${day}T$hour$minute${second}Z';
   }
 }
 

@@ -7,10 +7,10 @@ import 'dart:typed_data';
 import 'package:aws_s3_api/s3-2006-03-01.dart';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
-import '../models/caldav_account.dart';
-import '../../core/result.dart';
-import '../../core/logger.dart';
-import 'webdav_client.dart';
+import '../../models/caldav_account.dart';
+import '../../../core/result.dart';
+import '../../../core/logger.dart';
+import '../webdav_client.dart';
 import 'encryption_service.dart';
 
 /// S3 credentials obtained from JWT token
@@ -386,7 +386,7 @@ class S3StorageService {
       success: (_) async {
         // Check file size limit
         if (data.length > _maxFileSize) {
-          return Result.failure(Failure(message: 'File size ${data.length} exceeds limit ${_maxFileSize}'));
+          return Result.failure(Failure(message: 'File size ${data.length} exceeds limit $_maxFileSize'));
         }
 
         final bucket = isPrivate ? _bucketPrivate : _bucketShared;

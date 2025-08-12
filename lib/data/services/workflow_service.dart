@@ -12,7 +12,7 @@ import '../repositories/step_repository.dart';
 import '../models/step.dart';
 import '../models/requirement.dart';
 // No direct use here; step creation is delegated to repository
-import 'sync_service.dart';
+import 'sync/sync_service.dart';
 import 'dart:convert';
 
 class WorkflowService {

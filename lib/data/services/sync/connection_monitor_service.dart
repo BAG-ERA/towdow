@@ -3,7 +3,7 @@
 
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import '../../core/logger.dart';
+import '../../../core/logger.dart';
 
 /// Connection status
 enum ConnectionStatus {

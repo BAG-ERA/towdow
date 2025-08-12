@@ -5,6 +5,8 @@ import '../../data/models/caldav_account.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/providers/providers.dart';
 import 'package:uuid/uuid.dart';
+import '../../data/services/caldav/caldav_calendar_service.dart';
+import '../../data/services/caldav/caldav_discovery_service.dart';
 
 // ----- STATE -----
 class ProjectCreationState {
@@ -83,9 +85,16 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
         final syncService = _ref.read(syncServiceProvider);
         await syncService.queueCalendarCreation(createdCalendar.path);
       } else {
-        // Online path: attempt immediate remote creation
-        final caldavService = _ref.read(caldavServiceProvider(account!));
-        final createResult = await caldavService.createCalendar(
+        // Online path: attempt immediate remote creation using split services
+        final discovery = CalDavDiscoveryService(account: account!);
+        final caps = await discovery.testConnection();
+        final calendarHome = await caps.when(
+          success: (c) async => c.calendarHome,
+          failure: (f) async => throw Exception('Discovery failed: ${f.message}'),
+        );
+        final caldavCalendar = CalDavCalendarService(account: account!);
+        final createResult = await caldavCalendar.createCalendar(
+          calendarHome: calendarHome,
           displayName: name,
           description: description,
           domain: domain,

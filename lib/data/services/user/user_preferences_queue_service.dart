@@ -3,14 +3,14 @@
 
 import 'dart:async';
 import 'package:hive/hive.dart';
-import '../../core/result.dart';
-import '../../core/logger.dart';
-import '../models/user_preferences.dart';
-import '../repositories/user_repository.dart';
-import '../services/local_storage_service.dart';
+import '../../../core/result.dart';
+import '../../../core/logger.dart';
+import '../../models/user_preferences.dart';
+import '../../repositories/user_repository.dart';
+import '../storage/local_storage_service.dart';
 import 'user_sync_service.dart';
 
-part 'user_preferences_queue_service.g.dart';
+part '../user/user_preferences_queue_service.g.dart';
 
 @HiveType(typeId: 40)
 enum UserPreferencesOperation {

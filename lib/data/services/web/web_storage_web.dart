@@ -10,3 +10,4 @@ external void _clearLocalStorage();
 Future<void> clearLocalStorage() async {
   _clearLocalStorage();
 }
+

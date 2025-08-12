@@ -4,7 +4,7 @@
 import 'package:test/test.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
-import 'package:towdow_app/data/services/caldav_service.dart';
+import 'package:towdow_app/data/services/caldav/caldav_service.dart';
 
 void main() {
   group('Validator Serialization Integration Tests', () {

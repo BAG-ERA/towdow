@@ -4,10 +4,9 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../../core/result.dart';
-import '../../core/logger.dart';
-import '../models/caldav_account.dart';
-import '../models/task_calendar.dart';
+import '../../../core/result.dart';
+import '../../../core/logger.dart';
+import '../../models/caldav_account.dart';
 
 class LocalStorageService {
   static const String tasksBoxName = 'tasks';
@@ -175,6 +174,46 @@ class LocalStorageService {
   // Helper method to get a generic path message for a Hive box file
   String _getBoxPathMessage(String boxName) {
     return 'fichiers Hive locaux ($boxName.hive dans le dossier Documents)';
+  }
+
+  /// Clear all boxes safely on web and optionally refresh page via platform channel
+  Future<Result<void>> clearAllBoxesWebSafe() async {
+    try {
+      final boxNames = [
+        tasksBoxName,
+        projectsBoxName,
+        calendarsBoxName,
+        automatedTasksBoxName,
+        accountsBoxName,
+        syncQueueBoxName,
+        domainsBoxName,
+        statusesBoxName,
+        userPreferencesBoxName,
+        externalAccountsBoxName,
+        externalCalendarsBoxName,
+        externalEventsBoxName,
+        offlineFilesBoxName,
+        fileUploadQueueBoxName,
+        userPreferencesQueueBoxName,
+      ];
+
+      for (final boxName in boxNames) {
+        if (Hive.isBoxOpen(boxName)) {
+          try {
+            await Hive.box(boxName).clear();
+            await Hive.box(boxName).close();
+            await Hive.deleteBoxFromDisk(boxName);
+          } catch (e) {
+            AppLogger.warning('LocalStorageService: Failed to clear box $boxName: $e');
+          }
+        }
+      }
+
+      return const Result.success(null);
+    } catch (e, st) {
+      AppLogger.error('LocalStorageService: clearAllBoxesWebSafe failed', e, st);
+      return Result.failure(Failure(message: e.toString(), exception: e is Exception ? e : Exception('$e'), stackTrace: st));
+    }
   }
 
   // Generic get all items from a box

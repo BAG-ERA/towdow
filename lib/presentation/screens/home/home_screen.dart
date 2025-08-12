@@ -11,7 +11,7 @@ import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/calendar_event.dart';
-import '../../../data/services/sync_service.dart';
+import '../../../data/services/sync/sync_service.dart';
 import '../../providers/home_providers.dart';
 import '../../../core/theme/chart_theme_usage.dart';
 

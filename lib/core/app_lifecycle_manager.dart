@@ -4,12 +4,12 @@
 
 import 'dart:async';
 import 'package:flutter/widgets.dart';
-import '../data/services/sync_service.dart';
-import '../data/services/caldav_monitor.dart';
-import '../data/services/external_sync_service.dart';
-import '../data/services/file_upload_queue_service.dart';
-import '../data/services/connection_monitor_service.dart';
-import '../data/services/user_sync_service.dart';
+import '../data/services/sync/sync_service.dart';
+import '../data/services/sync/sync_orchestrator_service.dart';
+import '../data/services/integration/external_caldav_calendar/external_sync_service.dart';
+import '../data/services/storage/file_upload_queue_service.dart';
+import '../data/services/sync/connection_monitor_service.dart';
+import '../data/services/user/user_sync_service.dart';
 import '../data/repositories/account_repository.dart';
 import 'logger.dart';
 import 'result.dart';
