@@ -295,7 +295,8 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   }
 
   void _copyWorkflowPath(TaskCalendar project) {
-    Clipboard.setData(ClipboardData(text: project.path));
+    final displayPath = Uri.decodeFull(project.path);
+    Clipboard.setData(ClipboardData(text: displayPath));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(AppLocalizations.of(context)!.workflowPathCopied), duration: const Duration(seconds: 2)),
     );
