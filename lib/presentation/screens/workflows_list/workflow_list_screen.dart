@@ -178,6 +178,10 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
                 ],
               ),
             ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: _WorkflowsExplanationHeader(),
+          ),
           const SizedBox(height: 96),
         ],
       ),
@@ -297,6 +301,30 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   }
 }
 
-// Removed unused _WorkflowsExplanationHeader after domain grouping refactor
-
+class _WorkflowsExplanationHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Workflows define steps to move tasks through. \n'
+            'Use them to standardize progress across tasks and teams. \n'
+            'This table lets you browse, sort, and manage your workflows at a glance.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 

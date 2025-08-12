@@ -316,8 +316,8 @@ class _ProjectsExplanationHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Projects are conventional containers that group related tasks. '
-            'Use them to organize work like app development, event planning, or any multi-step initiative. '
+            'Projects are conventional containers that group related tasks. \n'
+            'Use them to organize work like app development, event planning, or any multi-step initiative. \n'
             'This table lets you browse, sort, and manage your projects at a glance.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
