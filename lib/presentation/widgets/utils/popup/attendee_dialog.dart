@@ -2,6 +2,7 @@
 // Provides a clean interface for adding attendees by email address
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/task.dart';
@@ -74,11 +75,11 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
         }
       },
       child: AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.person_add_rounded),
             SizedBox(width: 12),
-            Text('Add Attendee'),
+            Text(AppLocalizations.of(context)!.addAttendee),
           ],
         ),
         content: SizedBox(
@@ -88,7 +89,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Task: ${widget.task.summary}',
+                '${AppLocalizations.of(context)!.taskLabel}: ${widget.task.summary}',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontStyle: FontStyle.italic,
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
@@ -99,7 +100,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
               // Current attendees list
               if (widget.task.attendees.isNotEmpty) ...[
                 Text(
-                  'Current attendees:',
+                  AppLocalizations.of(context)!.currentAttendees,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -112,7 +113,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
               // Suggested attendees
               if (widget.suggestedAttendees != null && widget.suggestedAttendees!.isNotEmpty) ...[
                 Text(
-                  'Suggested attendees:',
+                  AppLocalizations.of(context)!.suggestedAttendees,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -130,7 +131,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
         actions: [
           TextButton(
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
         ],
       ),

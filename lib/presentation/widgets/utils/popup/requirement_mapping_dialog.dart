@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../../data/models/requirement.dart';
 import '../../../../data/providers/providers.dart';
 
@@ -42,11 +43,11 @@ class _RequirementMappingDialogState extends ConsumerState<RequirementMappingDia
         }
       },
       child: AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.groups_rounded),
             SizedBox(width: 12),
-            Text('Assign Attendees to Requirements'),
+            Text(AppLocalizations.of(context)!.assignAttendeesToRequirements),
           ],
         ),
         content: SizedBox(
@@ -54,7 +55,7 @@ class _RequirementMappingDialogState extends ConsumerState<RequirementMappingDia
           child: requirementsAsync.when(
             data: (requirements) {
               if (requirements.isEmpty) {
-                return const Text('No requirements defined for this workflow.');
+                return Text(AppLocalizations.of(context)!.noRequirementsDefined);
               }
 
               // Initialize controllers and local state once
@@ -69,7 +70,7 @@ class _RequirementMappingDialogState extends ConsumerState<RequirementMappingDia
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Before starting the workflow, add at least one email per requirement. These contacts will be used during validations.',
+                      AppLocalizations.of(context)!.requirementsIntro,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 12),
@@ -79,20 +80,20 @@ class _RequirementMappingDialogState extends ConsumerState<RequirementMappingDia
               );
             },
             loading: () => const SizedBox(height: 120, child: Center(child: CircularProgressIndicator())),
-            error: (e, _) => Text('Failed to load requirements: $e'),
+            error: (e, _) => Text('${AppLocalizations.of(context)!.failedToLoad}: $e'),
           ),
         ),
         actions: [
           TextButton(
             onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton.icon(
             onPressed: _isSubmitting ? null : _onSubmit,
             icon: _isSubmitting
                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.play_circle_fill_rounded),
-            label: Text(_isSubmitting ? 'Starting…' : 'Start Workflow'),
+            label: Text(_isSubmitting ? AppLocalizations.of(context)!.startingWorkflow : AppLocalizations.of(context)!.startWorkflow),
           ),
         ],
       ),
@@ -130,9 +131,9 @@ class _RequirementMappingDialogState extends ConsumerState<RequirementMappingDia
                 width: 260,
                 child: TextField(
                   controller: controller,
-                  decoration: const InputDecoration(
-                    labelText: 'Add email',
-                    prefixIcon: Icon(Icons.email_rounded),
+                  decoration: InputDecoration(
+                    labelText: AppLocalizations.of(context)!.addEmail,
+                    prefixIcon: const Icon(Icons.email_rounded),
                   ),
                   onSubmitted: (_) => _onAddEmail(requirement.id),
                 ),
@@ -140,7 +141,7 @@ class _RequirementMappingDialogState extends ConsumerState<RequirementMappingDia
               FilledButton.tonalIcon(
                 onPressed: () => _onAddEmail(requirement.id),
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('Add'),
+                label: Text(AppLocalizations.of(context)!.add),
               )
             ],
           ),
@@ -148,7 +149,7 @@ class _RequirementMappingDialogState extends ConsumerState<RequirementMappingDia
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'At least one email is required',
+                AppLocalizations.of(context)!.atLeastOneEmailRequired,
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
@@ -167,7 +168,7 @@ class _RequirementMappingDialogState extends ConsumerState<RequirementMappingDia
     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
     if (!emailRegex.hasMatch(text)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invalid email: $text')),
+        SnackBar(content: Text('${AppLocalizations.of(context)!.failedToLoad}: $text')),
       );
       return;
     }
@@ -187,7 +188,7 @@ class _RequirementMappingDialogState extends ConsumerState<RequirementMappingDia
     for (final entry in _emailsByRequirement.entries) {
       if (entry.value.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please add at least one email for each requirement.')),
+          SnackBar(content: Text(AppLocalizations.of(context)!.noneFound('email'))),
         );
         return;
       }
@@ -217,7 +218,7 @@ class _RequirementMappingDialogState extends ConsumerState<RequirementMappingDia
       AppLogger.error('RequirementMappingDialog: Failed to persist mappings', e, st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save mappings: $e')),
+          SnackBar(content: Text('${AppLocalizations.of(context)!.failedToLoad}: $e')),
         );
       }
     } finally {

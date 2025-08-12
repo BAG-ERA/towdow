@@ -46,7 +46,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add External Calendar'),
+      title: Text(AppLocalizations.of(context)!.addExternalCalendar),
       content: SizedBox(
         width: double.maxFinite,
         height: 600,
@@ -67,7 +67,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(AppLocalizations.of(context)!.cancel),
         ),
         if (_discoveredCalendars.isEmpty) ...[
           ElevatedButton(
@@ -83,7 +83,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
         ] else ...[
           ElevatedButton(
             onPressed: _selectedCalendars.isEmpty ? null : _saveCalendars,
-            child: const Text('Add Selected'),
+            child: Text(AppLocalizations.of(context)!.add),
           ),
         ],
       ],
@@ -97,7 +97,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Enter your CalDAV server details',
+              AppLocalizations.of(context)!.enterCaldavDetails,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -105,10 +105,10 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
             // Server URL
             TextFormField(
               controller: _serverUrlController,
-              decoration: const InputDecoration(
-                labelText: 'Server URL',
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(context)!.serverUrlLabel,
                 hintText: 'https://caldav.example.com',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
@@ -137,11 +137,11 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
             // Calendar path
             TextFormField(
               controller: _calendarPathController,
-              decoration: const InputDecoration(
-                labelText: 'Calendar Path',
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(context)!.calendarPath,
                 hintText: '/dav/calendars/username/ (leave empty for auto-discovery)',
-                border: OutlineInputBorder(),
-                helperText: 'Path to your calendar collection (e.g., /dav/calendars/user/, /remote.php/dav/calendars/user/)',
+                border: const OutlineInputBorder(),
+                helperText: AppLocalizations.of(context)!.calendarPathHelper,
               ),
             ),
             const SizedBox(height: 16),
@@ -149,10 +149,10 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
             // Display name
             TextFormField(
               controller: _displayNameController,
-              decoration: const InputDecoration(
-                labelText: 'Display Name',
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(context)!.displayName,
                 hintText: 'My Calendar',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
@@ -166,9 +166,9 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
             // Authentication type selector (always visible)
             DropdownButtonFormField<ExternalCalendarAuthType>(
               value: _authType,
-              decoration: const InputDecoration(
-                labelText: 'Authentication Type',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(context)!.authenticationType,
+                border: const OutlineInputBorder(),
               ),
               items: ExternalCalendarAuthType.values.map((type) {
                 return DropdownMenuItem(
@@ -190,9 +190,9 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
               // Username
               TextFormField(
                 controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Username',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.username,
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if ((_authType == ExternalCalendarAuthType.basic || _authType == ExternalCalendarAuthType.oauth) && (value == null || value.trim().isEmpty)) {
@@ -206,9 +206,9 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
               // Password
               TextFormField(
                 controller: _passwordController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Password',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 obscureText: true,
                 validator: (value) {
@@ -231,12 +231,12 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Select calendars to sync',
+            AppLocalizations.of(context)!.selectCalendarsToSync,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Found ${_discoveredCalendars.length} calendars',
+            AppLocalizations.of(context)!.foundCalendars(_discoveredCalendars.length),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 16),
@@ -277,7 +277,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                       Expanded(child: Text(calendar.displayName)),
                     ],
                   ),
-                  subtitle: Text(calendar.description ?? 'No description'),
+                  subtitle: Text(calendar.description ?? AppLocalizations.of(context)!.noDescription),
                   value: _selectedCalendars.contains(calendar.id),
                   onChanged: (selected) {
                     setState(() {
@@ -305,7 +305,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                     _selectedCalendars.clear();
                   });
                 },
-                child: const Text('Back'),
+                child: Text(AppLocalizations.of(context)!.back),
               ),
               const Spacer(),
               TextButton(
@@ -316,7 +316,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                     );
                   });
                 },
-                child: const Text('Select All'),
+                child: Text(AppLocalizations.of(context)!.selectAll),
               ),
               const SizedBox(width: 8),
               TextButton(
@@ -325,7 +325,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                     _selectedCalendars.clear();
                   });
                 },
-                child: const Text('Select None'),
+                child: Text(AppLocalizations.of(context)!.selectNone),
               ),
             ],
           ),
@@ -363,7 +363,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
           final controller = TextEditingController();
           String? errorText;
           return AlertDialog(
-            title: const Text('Choose Calendar Color'),
+            title: Text(AppLocalizations.of(context)!.chooseCalendarColor),
             content: SizedBox(
               width: 300,
               height: 420,
@@ -414,13 +414,13 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                       final result = await showDialog<String>(
                         context: context,
                         builder: (context) => AlertDialog(
-                          title: const Text('Enter Custom Color'),
+                          title: Text(AppLocalizations.of(context)!.enterCustomColor),
                           content: TextField(
                             controller: controller,
-                            decoration: InputDecoration(
-                              labelText: 'Hex Color (e.g. #FF8800 or 0088FF)',
-                              errorText: errorText,
-                            ),
+                              decoration: InputDecoration(
+                                labelText: 'Hex Color (e.g. #FF8800 or 0088FF)',
+                                errorText: errorText,
+                              ),
                           ),
                           actions: [
                             TextButton(
@@ -436,17 +436,13 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                                     final color = Color(int.parse(hex.length == 6 ? 'FF$hex' : hex, radix: 16));
                                     Navigator.of(context).pop('#${hex.toUpperCase()}');
                                   } catch (_) {
-                                    setState(() {
-                                      errorText = 'Invalid hex color';
-                                    });
+                                    setState(() { errorText = AppLocalizations.of(context)!.invalidHexColor; });
                                   }
                                 } else {
-                                  setState(() {
-                                    errorText = 'Enter 6 or 8 hex digits';
-                                  });
+                                  setState(() { errorText = AppLocalizations.of(context)!.enter6or8HexDigits; });
                                 }
                               },
-                              child: const Text('OK'),
+                              child: Text(AppLocalizations.of(context)!.ok),
                             ),
                           ],
                         ),
@@ -464,11 +460,11 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text(AppLocalizations.of(context)!.cancel),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(pickedColor),
-                child: const Text('OK'),
+                child: Text(AppLocalizations.of(context)!.ok),
               ),
             ],
           );

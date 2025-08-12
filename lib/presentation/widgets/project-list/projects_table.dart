@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../viewmodels/project_list_viewmodel.dart';
 import '../navbar/project_popup_menu.dart';
@@ -449,14 +450,14 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
     if (widget.menuBuilder != null) {
       return PopupMenuButton<String>(
         icon: const Icon(Icons.more_vert_rounded),
-        tooltip: 'Options',
+        tooltip: AppLocalizations.of(context)!.show,
         onSelected: (value) => widget.onProjectAction(value, projectWithStats),
         itemBuilder: (context) => widget.menuBuilder!(context, ref, projectWithStats.project),
       );
     }
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert_rounded),
-      tooltip: 'Options',
+      tooltip: AppLocalizations.of(context)!.show,
       onSelected: (value) => widget.onProjectAction(value, projectWithStats),
       itemBuilder: (context) => ProjectPopupMenu.getMenuItems(context, ref, project: projectWithStats.project),
     );

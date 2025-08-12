@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../viewmodels/file_validator_viewmodel.dart';
 import '../../../../core/logger.dart';
@@ -210,7 +211,7 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.download, size: 16),
-            tooltip: 'Download',
+            tooltip: AppLocalizations.of(context)!.download,
             style: IconButton.styleFrom(
               minimumSize: const Size(32, 32),
               padding: EdgeInsets.zero,
@@ -222,7 +223,7 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
             IconButton(
               onPressed: () => _removeFile(validatorId, fileId),
               icon: const Icon(Icons.delete_outline, size: 16),
-              tooltip: 'Remove',
+              tooltip: AppLocalizations.of(context)!.remove,
               style: IconButton.styleFrom(
                 minimumSize: const Size(32, 32),
                 padding: EdgeInsets.zero,

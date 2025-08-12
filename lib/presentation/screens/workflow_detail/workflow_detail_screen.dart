@@ -260,7 +260,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
           failure: (f) async {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to duplicate: ${f.message}')),
+                SnackBar(content: Text('${AppLocalizations.of(context)!.failedToLoad}: ${f.message}')),
               );
             }
           },

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../core/logger.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/models/task.dart';
 import 'chips/attendee_chip.dart';
 import 'chips/category_chip.dart';
@@ -126,7 +127,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
             focusNode: _focusNode,
             maxLines: null,
             readOnly: !_isEditing,
-            hintText: hasDescription ? null : 'No description provided • Click to add one or attach files',
+            hintText: hasDescription ? null : AppLocalizations.of(context)!.noDescriptionHint,
             style: TextStyle(
               fontSize: 13,
               color: hasDescription 
@@ -149,7 +150,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
                   IconButton(
                     onPressed: _triggerFileAttachment,
                     icon: const Icon(Icons.attach_file, size: 16),
-                    tooltip: 'Attach file',
+                    tooltip: AppLocalizations.of(context)!.attachFile,
                     style: IconButton.styleFrom(
                       minimumSize: const Size(32, 32),
                       padding: EdgeInsets.zero,
@@ -160,7 +161,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
                   IconButton(
                     onPressed: _triggerMediaAttachment,
                     icon: const Icon(Icons.perm_media, size: 16),
-                    tooltip: 'Attach media',
+                    tooltip: AppLocalizations.of(context)!.attachMedia,
                     style: IconButton.styleFrom(
                       minimumSize: const Size(32, 32),
                       padding: EdgeInsets.zero,
@@ -172,12 +173,12 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
                 // Cancel and Save buttons
                 TextButton(
                   onPressed: _cancelEdit,
-                  child: const Text('Cancel'),
+                  child: Text(AppLocalizations.of(context)!.cancel),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: _saveDescription,
-                  child: const Text('Save'),
+                  child: Text(AppLocalizations.of(context)!.save),
                 ),
               ],
             ),

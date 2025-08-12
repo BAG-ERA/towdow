@@ -2,6 +2,7 @@
 // Provides an interface for managing task categorization with search and improved UX
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/task.dart';
@@ -69,7 +70,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         }
       },
       child: AlertDialog(
-        title: const Text('Manage Categories'),
+        title: Text(AppLocalizations.of(context)!.manageCategories),
         content: SizedBox(
           width: 400,
           child: Column(
@@ -77,7 +78,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Task: ${widget.task.summary}',
+                '${AppLocalizations.of(context)!.taskLabel}: ${widget.task.summary}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
@@ -88,7 +89,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Search categories...',
+                  hintText: AppLocalizations.of(context)!.searchCategoriesHint,
                   prefixIcon: const Icon(Icons.search),
                   border: const OutlineInputBorder(),
                   isDense: true,
@@ -118,7 +119,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         actions: [
           TextButton(
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton(
             onPressed: _isLoading ? null : _saveCategories,
@@ -128,7 +129,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Save'),
+                : Text(AppLocalizations.of(context)!.save),
           ),
         ],
       ),
@@ -137,8 +138,8 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
 
   Widget _buildCategoriesList() {
     if (widget.projectPath == null) {
-      return const Center(
-        child: Text('No project path provided'),
+      return Center(
+        child: Text(AppLocalizations.of(context)!.failedToLoad),
       );
     }
 
@@ -172,8 +173,9 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         );
         final showCreateButton = _searchQuery.isNotEmpty && !exactMatch;
 
-        return ListView(
-          shrinkWrap: true,
+        return SizedBox(
+          height: 300,
+          child: ListView(
           children: [
             // Show create button if search doesn't match existing categories
             if (showCreateButton) ...[
@@ -183,7 +185,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             
             // Selected categories section
             if (selectedCategories.isNotEmpty) ...[
-              _buildSectionHeader('Selected Categories', selectedCategories.length),
+              _buildSectionHeader(AppLocalizations.of(context)!.selectedCategories, selectedCategories.length),
               const SizedBox(height: 4),
               ...selectedCategories.map((category) => _buildCategoryItem(category, isSelected: true)),
               const SizedBox(height: 16),
@@ -191,7 +193,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             
             // Available categories section
             if (availableCategoriesFiltered.isNotEmpty) ...[
-              _buildSectionHeader('Available Categories', availableCategoriesFiltered.length),
+              _buildSectionHeader(AppLocalizations.of(context)!.availableCategories, availableCategoriesFiltered.length),
               const SizedBox(height: 4),
               ...availableCategoriesFiltered.map((category) => _buildCategoryItem(category, isSelected: false)),
             ],
@@ -209,14 +211,14 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'No categories found',
+                      AppLocalizations.of(context)!.noCalendarsFound,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Try adjusting your search or create a new category',
+                      AppLocalizations.of(context)!.tryAdjustingSearch,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
@@ -226,7 +228,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
               ),
             ],
           ],
-        );
+        ));
       },
     );
   }
@@ -271,14 +273,14 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         size: 20,
       ),
       title: Text(
-        'Create "$_searchQuery"',
+        AppLocalizations.of(context)!.createNamed(_searchQuery),
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
           color: Theme.of(context).colorScheme.primary,
           fontWeight: FontWeight.w500,
         ),
       ),
       subtitle: Text(
-        'Create new category',
+        AppLocalizations.of(context)!.createNewCategory,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
         ),
@@ -294,7 +296,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         projectPath: widget.projectPath,
       ),
       title: Text(
-        isSelected ? 'Click to remove' : 'Click to add',
+        isSelected ? AppLocalizations.of(context)!.clickToRemove : AppLocalizations.of(context)!.clickToAdd,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
         ),
@@ -307,7 +309,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             value: 'remove_from_project',
             child: ListTile(
               leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
-              title: const Text('Remove from project'),
+              title: Text(AppLocalizations.of(context)!.removeFromProject),
               contentPadding: EdgeInsets.zero,
             ),
           ),
@@ -315,7 +317,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             value: 'edit_name',
             child: ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('Change name'),
+              title: Text(AppLocalizations.of(context)!.changeName),
               contentPadding: EdgeInsets.zero,
             ),
           ),
@@ -323,7 +325,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             value: 'edit_color',
             child: ListTile(
               leading: const Icon(Icons.palette),
-              title: const Text('Change color'),
+              title: Text(AppLocalizations.of(context)!.changeColor),
               contentPadding: EdgeInsets.zero,
             ),
           ),
@@ -362,15 +364,12 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove Category'),
-        content: Text(
-          'Remove "${category.name}" from this project?\n\n'
-          'This will also remove it from all tasks in this project.',
-        ),
+        title: Text(AppLocalizations.of(context)!.removeCategory),
+        content: Text(AppLocalizations.of(context)!.removeCategoryFromProjectConfirm(category.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -381,7 +380,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
               backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
-            child: const Text('Remove'),
+            child: Text(AppLocalizations.of(context)!.remove),
           ),
         ],
       ),
@@ -414,7 +413,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit Category Name'),
+        title: Text(AppLocalizations.of(context)!.editCategoryName),
         content: SizedBox(
           width: 400,
           child: Column(
@@ -422,7 +421,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Update the name for "${category.name}".',
+                AppLocalizations.of(context)!.updateNameFor(category.name),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
@@ -430,10 +429,10 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
               const SizedBox(height: 16),
               TextField(
                 controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'Category name *',
-                  hintText: 'Enter new category name',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.categoryName ?? 'Category name *',
+                  hintText: AppLocalizations.of(context)!.enterNewCategoryName ?? 'Enter new category name',
+                  border: const OutlineInputBorder(),
                 ),
                 autofocus: true,
               ),
@@ -443,7 +442,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton(
             onPressed: () async {
@@ -453,7 +452,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                 await _updateCategoryName(category, newName);
               }
             },
-            child: const Text('Save'),
+            child: Text(AppLocalizations.of(context)!.save),
           ),
         ],
       ),
@@ -482,7 +481,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Edit Category Color'),
+          title: Text(AppLocalizations.of(context)!.editCategoryColor),
           content: SizedBox(
             width: 400,
             child: Column(
@@ -490,7 +489,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Choose a color for "${category.name}".',
+                  AppLocalizations.of(context)!.chooseColorFor(category.name),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
@@ -533,14 +532,14 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
             ),
             FilledButton(
               onPressed: () async {
                 Navigator.of(context).pop();
                 await _updateCategoryColor(category, selectedColor);
               },
-              child: const Text('Save'),
+            child: Text(AppLocalizations.of(context)!.save),
             ),
           ],
         ),
@@ -608,7 +607,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Custom Color'),
+        title: Text(AppLocalizations.of(context)!.customColor),
         content: SizedBox(
           width: 400,
           child: Column(
@@ -616,7 +615,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Enter a hex color code for your custom color.',
+                AppLocalizations.of(context)!.enterHexColorExplainer,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
@@ -624,10 +623,10 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
               const SizedBox(height: 16),
               TextField(
                 controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'Hex color *',
-                  hintText: 'e.g., FF5733',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.hexColorLabel,
+                  hintText: AppLocalizations.of(context)!.hexColorExample,
+                  border: const OutlineInputBorder(),
                   prefixText: '#',
                 ),
                 onChanged: (value) {
@@ -646,7 +645,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -661,7 +660,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                 }
               }
             },
-            child: const Text('Apply'),
+            child: Text(AppLocalizations.of(context)!.apply),
           ),
         ],
       ),
@@ -691,7 +690,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Create New Category'),
+          title: Text(AppLocalizations.of(context)!.createNewCategoryTitle),
           content: SizedBox(
             width: 400,
             child: Column(
@@ -699,7 +698,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Create a new category for organizing tasks.',
+                  AppLocalizations.of(context)!.createNewCategorySubtitle,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
@@ -707,16 +706,16 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Category name *',
-                    hintText: 'e.g., Urgent, In Progress, Review',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: AppLocalizations.of(context)!.categoryName ?? 'Category name *',
+                    hintText: AppLocalizations.of(context)!.categoryName ?? 'e.g., Urgent, In Progress, Review',
+                    border: const OutlineInputBorder(),
                   ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Color:',
+                  AppLocalizations.of(context)!.colorLabel,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 8),
@@ -731,7 +730,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
             ),
             FilledButton(
               onPressed: () async {
@@ -741,7 +740,7 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                   await _createCategory(name, selectedColor);
                 }
               },
-              child: const Text('Create'),
+            child: Text(AppLocalizations.of(context)!.create),
             ),
           ],
         ),
