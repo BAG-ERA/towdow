@@ -74,7 +74,13 @@ class TaskItemPopup extends StatelessWidget {
               TaskItemToolbar(
                 task: task,
                 onTaskUpdated: onTaskUpdated,
-                onTaskDeleted: onTaskDeleted,
+                onTaskDeleted: () {
+                  if (onTaskDeleted != null) {
+                    onTaskDeleted!();
+                  }
+                  // Close the popup after deletion
+                  Navigator.of(context).maybePop();
+                },
               ),
             ],
           ),
@@ -370,7 +376,12 @@ class _AnchoredPopupScaffoldState extends State<_AnchoredPopupScaffold> {
         child: TaskItemToolbar(
           task: widget.task,
           onTaskUpdated: widget.onTaskUpdated,
-          onTaskDeleted: widget.onTaskDeleted,
+          onTaskDeleted: () {
+            if (widget.onTaskDeleted != null) {
+              widget.onTaskDeleted!();
+            }
+            Navigator.of(context).maybePop();
+          },
           vertical: true,
           alignRight: true,
         ),
@@ -416,7 +427,12 @@ class _AnchoredPopupScaffoldState extends State<_AnchoredPopupScaffold> {
             child: TaskItemToolbar(
               task: widget.task,
               onTaskUpdated: widget.onTaskUpdated,
-              onTaskDeleted: widget.onTaskDeleted,
+              onTaskDeleted: () {
+                if (widget.onTaskDeleted != null) {
+                  widget.onTaskDeleted!();
+                }
+                Navigator.of(context).maybePop();
+              },
               vertical: true,
               alignRight: false,
             ),
