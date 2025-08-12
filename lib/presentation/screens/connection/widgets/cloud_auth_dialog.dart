@@ -2,6 +2,7 @@
 // Shared functionality between TowDow Cloud and Self-Hosted dialogs
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -343,7 +344,7 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
                 width: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : const Text('Connect'),
+            : Text(AppLocalizations.of(context)!.connect),
       ),
     );
   }

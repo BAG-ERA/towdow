@@ -1,3 +1,7 @@
+# Generated localization code (keep ARB files tracked)
+/lib/l10n/app_localizations.dart
+/lib/l10n/app_localizations_*.dart
+
 appdir_towdow
 
 # Miscellaneous

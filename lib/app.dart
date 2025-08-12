@@ -18,6 +18,8 @@ import 'presentation/widgets/adaptive_app_layout.dart';
 import 'presentation/providers/home_providers.dart';
 import 'data/providers/providers.dart';
 import 'core/theme/chart_theme.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
 
 // ChangeNotifier wrapper for AsyncValue to make GoRouter reactive
 class AsyncValueNotifier<T> extends ChangeNotifier {
@@ -202,7 +204,7 @@ class FlowItApp extends ConsumerWidget {
       final themeMode = ref.watch(themeModeProvider);
 
       return MaterialApp.router(
-      title: 'TowDow',
+      title: AppLocalizations.of(context)?.appTitle ?? 'TowDow',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: FlowItColors.primary,
@@ -270,6 +272,17 @@ class FlowItApp extends ConsumerWidget {
         ],
       ),
       themeMode: themeMode,
+      locale: ref.watch(localeProvider),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('fr'),
+      ],
       routerConfig: router,
       builder: (context, child) {
         final media = MediaQuery.of(context);

@@ -3,6 +3,7 @@
 // Projects are represented by TaskCalendar objects (CalDAV calendars)
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/kanban_board.dart';
@@ -440,25 +441,25 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             _selectedTabIndex = index;
           });
         },
-        items: const [
+        items: [
           StyledTabItem(
-            label: 'List',
+            label: AppLocalizations.of(context)!.listTab,
             icon: Icons.checklist_rounded,
           ),
           StyledTabItem(
-            label: 'Timing',
+            label: AppLocalizations.of(context)!.timingTab,
             icon: Icons.schedule_rounded,
           ),
           StyledTabItem(
-            label: 'Attendee',
+            label: AppLocalizations.of(context)!.attendeeTab,
             icon: Icons.groups,
           ),
           StyledTabItem(
-            label: 'Kanban',
+            label: AppLocalizations.of(context)!.kanbanTab,
             icon: Icons.view_kanban_rounded,
           ),
           StyledTabItem(
-            label: 'Agenda',
+            label: AppLocalizations.of(context)!.agendaTab,
             icon: Icons.calendar_month_rounded,
           ),
         ],
@@ -547,7 +548,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       ),
       KanbanColumn(
         id: 'today',
-        title: 'Today',
+        title: AppLocalizations.of(context)!.today,
         subtitle: _formatDate(today),
         tasks: todayTasks,
                  color: context.chartTheme.colors.success,
@@ -555,7 +556,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       ),
       KanbanColumn(
         id: 'soon',
-        title: 'Soon',
+        title: AppLocalizations.of(context)!.soon,
         subtitle: 'Next 2 days',
         tasks: soonTasks,
                  color: context.chartTheme.colors.warning,
@@ -571,7 +572,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       ),
       KanbanColumn(
         id: 'later',
-        title: 'Later',
+        title: AppLocalizations.of(context)!.later,
         subtitle: '${laterTasks.length} tasks',
         tasks: laterTasks,
                  color: context.chartTheme.colors.tertiary,
@@ -579,7 +580,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       ),
       KanbanColumn(
         id: 'anytime',
-        title: 'Anytime',
+        title: AppLocalizations.of(context)!.anytime,
         subtitle: '${anytimeTasks.length} tasks',
         tasks: anytimeTasks,
         color: Colors.grey,

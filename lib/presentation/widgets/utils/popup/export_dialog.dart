@@ -3,10 +3,10 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
-import '../../../../data/services/export_import_service.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../core/logger.dart';
 
@@ -35,11 +35,11 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
         }
       },
       child: AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.download_rounded),
-            SizedBox(width: 8),
-            Text('Export Calendars'),
+            const Icon(Icons.download_rounded),
+            const SizedBox(width: 8),
+            Text(AppLocalizations.of(context)!.exportCalendars),
           ],
         ),
         content: SizedBox(
@@ -47,21 +47,21 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Export all your calendars and tasks to a zip file. This will include all VTODO items from your projects.',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+              Text(
+                AppLocalizations.of(context)!.exportCalendarsDescription,
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 24),
               
               if (_isExporting) ...[
                 const CircularProgressIndicator(),
                 const SizedBox(height: 16),
-                const Text('Exporting calendars...'),
+                Text(AppLocalizations.of(context)!.exportingCalendars),
               ] else if (_exportPath != null) ...[
                 const Icon(Icons.check_circle, color: Colors.green, size: 48),
                 const SizedBox(height: 16),
                 Text(
-                  'Export completed!',
+                  AppLocalizations.of(context)!.exportCompleted,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,
@@ -69,7 +69,7 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'File saved to:',
+                  AppLocalizations.of(context)!.fileSavedTo,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 4),
@@ -90,7 +90,7 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
                 const Icon(Icons.error_outline, color: Colors.red, size: 48),
                 const SizedBox(height: 16),
                 Text(
-                  'Export failed',
+                  AppLocalizations.of(context)!.exportFailed,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Colors.red,
                     fontWeight: FontWeight.bold,
@@ -107,7 +107,7 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
               ] else ...[
                 const Icon(Icons.folder_open_rounded, size: 48, color: Colors.grey),
                 const SizedBox(height: 16),
-                const Text('Click "Export" to choose where to save the file'),
+                Text(AppLocalizations.of(context)!.clickExportToChoose),
               ],
             ],
           ),
@@ -115,12 +115,12 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
         actions: [
           TextButton(
             onPressed: _isExporting ? null : () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           if (!_isExporting && _exportPath == null)
             ElevatedButton(
               onPressed: _startExport,
-              child: const Text('Export'),
+              child: Text(AppLocalizations.of(context)!.export),
             ),
           if (_exportPath != null)
             ElevatedButton(
@@ -128,7 +128,7 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
                 Navigator.of(context).pop();
                 _showSuccessMessage();
               },
-              child: const Text('Done'),
+              child: Text(AppLocalizations.of(context)!.done),
             ),
         ],
       ),

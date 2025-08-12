@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../viewmodels/project_list_viewmodel.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../../data/models/task_calendar.dart';
@@ -59,7 +60,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     
     return Scaffold(
       appBar: isDesktop ? AppBar(
-        title: const Text('All Projects'),
+        title: Text(AppLocalizations.of(context)!.allProjects),
         scrolledUnderElevation: 0,
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -67,10 +68,10 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
           bottom: PreferredSize(
           preferredSize: const Size.fromHeight(80),
           child: StyledTabBar(
-            items: const [
-              StyledTabItem(label: 'Ongoing'),
-              StyledTabItem(label: 'Archived'),
-              StyledTabItem(label: 'All'),
+            items: [
+              StyledTabItem(label: AppLocalizations.of(context)!.ongoing),
+              StyledTabItem(label: AppLocalizations.of(context)!.archived),
+              StyledTabItem(label: AppLocalizations.of(context)!.all),
             ],
             selectedIndex: _selectedTabIndex,
             onTabSelected: (index) {
@@ -112,13 +113,13 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
           children: [
             Icon(Icons.error_outline_rounded, size: 64, color: Theme.of(context).colorScheme.error),
             const SizedBox(height: 16),
-            Text('Failed to load projects', style: Theme.of(context).textTheme.headlineSmall),
+            Text('${AppLocalizations.of(context)!.failedToLoad} ${AppLocalizations.of(context)!.projects.toLowerCase()}', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(state.error!, style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => ref.read(projectListViewModelProvider.notifier).loadProjects(),
-              child: const Text('Retry'),
+              child: Text(AppLocalizations.of(context)!.retry),
             ),
           ],
         ),
@@ -132,10 +133,10 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
           children: [
             Icon(Icons.folder_open_rounded, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
-            Text('No projects found', style: Theme.of(context).textTheme.headlineSmall),
+            Text(AppLocalizations.of(context)!.noneFound(AppLocalizations.of(context)!.projects.toLowerCase()), style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(
-              'Projects group tasks and help you keep them organized. Click on CREATE NEW PROJECT to get started.',
+              AppLocalizations.of(context)!.projectsExplainer,
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -250,14 +251,14 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Delete Project'),
+        title: Text(AppLocalizations.of(context)!.deleteProject),
         content: Text(
-          'Are you sure you want to delete "${project.displayName}"? This action cannot be undone.',
+          AppLocalizations.of(context)!.areYouSureDelete(project.displayName),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -268,7 +269,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
               backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
-            child: const Text('Delete'),
+            child: Text(AppLocalizations.of(context)!.delete),
           ),
         ],
       ),
@@ -290,7 +291,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     // Show a brief snackbar to confirm the copy action
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Project path copied to clipboard'),
+        content: Text(AppLocalizations.of(context)!.projectPathCopied),
         duration: const Duration(seconds: 2),
       ),
     );

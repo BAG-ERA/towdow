@@ -3,6 +3,7 @@
 // Supports both category-based and custom kanban configurations
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/task.dart';
 import '../../../data/models/category.dart';
@@ -139,8 +140,8 @@ class ProjectKanbanView extends ConsumerWidget {
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      '${hiddenCategories.length} hidden',
+                     Text(
+                      AppLocalizations.of(context)!.hiddenCount(hiddenCategories.length),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
@@ -149,7 +150,7 @@ class ProjectKanbanView extends ConsumerWidget {
                     OutlinedButton.icon(
                       onPressed: () => _showHiddenColumnsDialog(context, ref, hiddenCategories),
                       icon: const Icon(Icons.visibility_rounded, size: 16),
-                      label: const Text('Show'),
+                      label: Text(AppLocalizations.of(context)!.show),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Theme.of(context).colorScheme.primary,
                         side: BorderSide(
@@ -379,14 +380,14 @@ class ProjectKanbanView extends ConsumerWidget {
     return showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
+            title: Row(
           children: [
             Icon(
               Icons.visibility_off_rounded,
               color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 8),
-            Text('Hidden Columns'),
+                Text(AppLocalizations.of(context)!.hiddenColumns),
           ],
         ),
         content: SizedBox(
@@ -396,7 +397,7 @@ class ProjectKanbanView extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'The following columns are hidden by the kanban filter:',
+                AppLocalizations.of(context)!.hiddenColumnsExplainer,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),

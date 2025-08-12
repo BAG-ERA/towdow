@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../adaptive_app_layout.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 class MainNavigation extends ConsumerWidget {
   const MainNavigation({
@@ -18,21 +19,22 @@ class MainNavigation extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final List<_NavItem> items = [
       _NavItem(
-        label: 'My task',
+        label: l10n.myTasks,
         icon: Icons.task_alt_rounded,
         route: '/today',
         isSelected: (d) => isDesktop && (d == AppDestination.today || d == AppDestination.soon || d == AppDestination.anytime),
       ),
       _NavItem(
-        label: 'My workflow',
+        label: l10n.myWorkflows,
         icon: Icons.route_rounded,
         route: '/workflows',
         isSelected: (d) => isDesktop && d == AppDestination.workflows,
       ),
       _NavItem(
-        label: 'My Projects',
+        label: l10n.myProjects,
         icon: Icons.folder_rounded,
         route: '/projects',
         isSelected: (d) => isDesktop && d == AppDestination.projects,

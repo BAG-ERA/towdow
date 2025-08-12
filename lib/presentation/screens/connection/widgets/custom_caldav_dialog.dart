@@ -2,6 +2,7 @@
 // Allows users to configure their own CalDAV server connection
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../data/models/caldav_account.dart';
@@ -302,7 +303,7 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Connect'),
+              : Text(AppLocalizations.of(context)!.connect),
         ),
       ],
     );

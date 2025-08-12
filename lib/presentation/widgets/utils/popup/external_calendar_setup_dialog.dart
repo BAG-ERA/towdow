@@ -3,6 +3,7 @@
 // Performs discovery and calendar selection
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
 import '../../../../data/models/external_caldav_account.dart';
@@ -77,7 +78,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Connect'),
+                : Text(AppLocalizations.of(context)!.connect),
           ),
         ] else ...[
           ElevatedButton(
@@ -408,7 +409,7 @@ class _ExternalCalendarSetupDialogState extends ConsumerState<ExternalCalendarSe
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.edit),
-                    label: const Text('Custom Color'),
+                    label: Text(AppLocalizations.of(context)!.customColor),
                     onPressed: () async {
                       final result = await showDialog<String>(
                         context: context,

@@ -10,7 +10,7 @@ import '../../repositories/user_repository.dart';
 import '../storage/local_storage_service.dart';
 import 'user_sync_service.dart';
 
-part '../user/user_preferences_queue_service.g.dart';
+part 'user_preferences_queue_service.g.dart';
 
 @HiveType(typeId: 40)
 enum UserPreferencesOperation {

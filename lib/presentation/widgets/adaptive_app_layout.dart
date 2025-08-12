@@ -3,6 +3,7 @@
 // Mobile: drawer navigation + full-screen content
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/logger.dart';
@@ -210,23 +211,23 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     final location = GoRouterState.of(context).uri.path;
 
     if (location.startsWith('/settings')) {
-      title = 'Settings';
+      title = AppLocalizations.of(context)!.settings;
       isDetailScreen = true;
     } else if (location.startsWith('/project/')) {
-      title = ref.watch(mobileTitleProvider) ?? 'Project Details';
+      title = ref.watch(mobileTitleProvider) ?? AppLocalizations.of(context)!.projectDetails;
       isDetailScreen = true;
     } else if (location == '/projects') {
-      title = 'All Projects';
+      title = AppLocalizations.of(context)!.allProjects;
       isDetailScreen = true;
     } else if (location.startsWith('/workflow/')) {
-      title = ref.watch(mobileTitleProvider) ?? 'Workflow Details';
+      title = ref.watch(mobileTitleProvider) ?? AppLocalizations.of(context)!.workflowDetails;
       isDetailScreen = true;
     } else if (location == '/workflows') {
-      title = 'All Workflows';
+      title = AppLocalizations.of(context)!.allWorkflows;
       isDetailScreen = true;
     } else if (location == '/' || location.startsWith('/today') || location.startsWith('/soon') ||
         location.startsWith('/next-week') || location.startsWith('/later') || location.startsWith('/anytime')) {
-      title = 'My Tasks';
+      title = AppLocalizations.of(context)!.myTasks;
       isDetailScreen = true;
     }
     return Scaffold(
@@ -255,10 +256,10 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
               }
             },
             tooltip: location.startsWith('/project/')
-                ? 'Back to projects'
+                ? AppLocalizations.of(context)!.backToProjects
                 : location.startsWith('/workflow/')
-                    ? 'Back to workflows'
-                    : 'Back to navigation',
+                    ? AppLocalizations.of(context)!.backToWorkflows
+                    : AppLocalizations.of(context)!.backToNavigation,
           ),
         ),
         actions: location.startsWith('/project/') 
@@ -306,7 +307,7 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     }
     
     // Fallback to regular title
-    final title = ref.watch(mobileTitleProvider) ?? 'Project Details';
+    final title = ref.watch(mobileTitleProvider) ?? AppLocalizations.of(context)!.projectDetails;
     return Text(title);
   }
 

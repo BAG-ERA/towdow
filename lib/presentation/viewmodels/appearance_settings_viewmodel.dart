@@ -11,16 +11,18 @@ import '../../data/repositories/user_repository.dart';
 class AppearanceSettingsState {
   final ThemeMode themeMode;
   final double fontScale;
+  final Locale? locale;
 
   const AppearanceSettingsState({
     required this.themeMode,
     required this.fontScale,
+    required this.locale,
   });
 }
 
 class AppearanceSettingsViewModel extends StateNotifier<AppearanceSettingsState> {
   AppearanceSettingsViewModel(this._userRepository)
-      : super(const AppearanceSettingsState(themeMode: ThemeMode.system, fontScale: 1.0));
+      : super(const AppearanceSettingsState(themeMode: ThemeMode.system, fontScale: 1.0, locale: null));
 
   final UserRepository _userRepository;
 
@@ -31,6 +33,7 @@ class AppearanceSettingsViewModel extends StateNotifier<AppearanceSettingsState>
         state = AppearanceSettingsState(
           themeMode: _mapPreferredThemeToThemeMode(prefs.preferredTheme),
           fontScale: _mapFontScaleToFactor(prefs.fontScale),
+          locale: _extractLocaleFromCustomSettings(prefs.customSettings),
         );
       },
       failure: (failure) {
@@ -46,7 +49,7 @@ class AppearanceSettingsViewModel extends StateNotifier<AppearanceSettingsState>
         final updated = prefs.copyWith(preferredTheme: _mapThemeModeToPreferredTheme(mode));
         final res = await _userRepository.saveUserPreferences(updated);
         res.when(
-          success: (_) => state = AppearanceSettingsState(themeMode: mode, fontScale: state.fontScale),
+          success: (_) => state = AppearanceSettingsState(themeMode: mode, fontScale: state.fontScale, locale: state.locale),
           failure: (f) => AppLogger.error('AppearanceSettingsViewModel: Failed to save theme mode: ${f.message}'),
         );
       },
@@ -62,8 +65,30 @@ class AppearanceSettingsViewModel extends StateNotifier<AppearanceSettingsState>
         final updated = prefs.copyWith(fontScale: scaleKey);
         final res = await _userRepository.saveUserPreferences(updated);
         res.when(
-          success: (_) => state = AppearanceSettingsState(themeMode: state.themeMode, fontScale: factor),
+          success: (_) => state = AppearanceSettingsState(themeMode: state.themeMode, fontScale: factor, locale: state.locale),
           failure: (f) => AppLogger.error('AppearanceSettingsViewModel: Failed to save font scale: ${f.message}'),
+        );
+      },
+      failure: (f) async => AppLogger.error('AppearanceSettingsViewModel: Failed to load prefs: ${f.message}'),
+    );
+  }
+
+  Future<void> setLocale(String? localeCode) async {
+    final prefsResult = await _userRepository.getUserPreferences();
+    await prefsResult.when(
+      success: (prefs) async {
+        final normalized = _normalizeLocaleCode(localeCode);
+        final current = Map<String, dynamic>.from(prefs.customSettings ?? {});
+        current['localeCode'] = normalized;
+        final updated = prefs.copyWith(customSettings: current);
+        final res = await _userRepository.saveUserPreferences(updated);
+        res.when(
+          success: (_) => state = AppearanceSettingsState(
+            themeMode: state.themeMode,
+            fontScale: state.fontScale,
+            locale: _mapLocaleCodeToLocale(normalized),
+          ),
+          failure: (f) => AppLogger.error('AppearanceSettingsViewModel: Failed to save locale: ${f.message}'),
         );
       },
       failure: (f) async => AppLogger.error('AppearanceSettingsViewModel: Failed to load prefs: ${f.message}'),
@@ -104,6 +129,23 @@ class AppearanceSettingsViewModel extends StateNotifier<AppearanceSettingsState>
         return 1.0;
     }
   }
+
+  static String _normalizeLocaleCode(String? code) {
+    if (code == null || code.isEmpty || code == 'system') return 'system';
+    return code;
+  }
+
+  static Locale? _mapLocaleCodeToLocale(String? code) {
+    if (code == null || code == 'system') return null;
+    final parts = code.split('-');
+    if (parts.length == 1) return Locale(parts[0]);
+    return Locale(parts[0], parts[1]);
+  }
+
+  static Locale? _extractLocaleFromCustomSettings(Map<String, dynamic>? customSettings) {
+    final code = (customSettings ?? const {})['localeCode'] as String?;
+    return _mapLocaleCodeToLocale(code);
+  }
 }
 
 final appearanceSettingsViewModelProvider =
@@ -122,6 +164,10 @@ final themeModeProvider = Provider<ThemeMode>((ref) {
 
 final fontScaleProvider = Provider<double>((ref) {
   return ref.watch(appearanceSettingsViewModelProvider).fontScale;
+});
+
+final localeProvider = Provider<Locale?>((ref) {
+  return ref.watch(appearanceSettingsViewModelProvider).locale;
 });
 
 

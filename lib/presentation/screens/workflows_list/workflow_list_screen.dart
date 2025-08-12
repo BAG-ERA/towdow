@@ -11,6 +11,7 @@ import '../../../data/providers/providers.dart';
 import '../../viewmodels/project_list_viewmodel.dart';
 import '../../widgets/project-list/projects_table.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../widgets/utils/buttons/create_workflow_button.dart';
 import '../../widgets/navbar/workflow_popup_menu.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
@@ -57,7 +58,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
     return Scaffold(
       appBar: isDesktop
           ? AppBar(
-              title: const Text('All Workflows'),
+              title: Text(AppLocalizations.of(context)!.allWorkflows),
               scrolledUnderElevation: 0,
               elevation: 0,
               backgroundColor: Theme.of(context).colorScheme.surface,
@@ -65,10 +66,10 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(80),
                 child: StyledTabBar(
-                  items: const [
-                    StyledTabItem(label: 'Ongoing'),
-                    StyledTabItem(label: 'Archived'),
-                    StyledTabItem(label: 'All'),
+                  items: [
+                    StyledTabItem(label: AppLocalizations.of(context)!.ongoing),
+                    StyledTabItem(label: AppLocalizations.of(context)!.archived),
+                    StyledTabItem(label: AppLocalizations.of(context)!.all),
                   ],
                   selectedIndex: _selectedTabIndex,
                   onTabSelected: (index) {
@@ -111,10 +112,10 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
           children: [
             Icon(Icons.route_rounded, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
-            Text('No workflows found', style: Theme.of(context).textTheme.headlineSmall),
+             Text(AppLocalizations.of(context)!.noneFound(AppLocalizations.of(context)!.workflows.toLowerCase()), style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(
-              'Workflows define steps to move tasks through. Click on CREATE NEW WORKFLOW to get started.',
+              AppLocalizations.of(context)!.workflowsExplainer,
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -286,7 +287,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
       failure: (f) async {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to duplicate: ${f.message}')),
+           SnackBar(content: Text('${AppLocalizations.of(context)!.failedToLoad}: ${f.message}')),
           );
         }
       },
@@ -296,7 +297,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   void _copyWorkflowPath(TaskCalendar project) {
     Clipboard.setData(ClipboardData(text: project.path));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Workflow path copied to clipboard'), duration: Duration(seconds: 2)),
+      SnackBar(content: Text(AppLocalizations.of(context)!.workflowPathCopied), duration: const Duration(seconds: 2)),
     );
   }
 }

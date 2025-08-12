@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 import '../../../core/logger.dart';
 import '../../../core/theme/chart_theme.dart';
@@ -106,7 +107,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                             ? TextButton.icon(
                                 onPressed: () => _addTaskInStep(context, ref, null),
                                 icon: const Icon(Icons.add_rounded, size: 18),
-                                label: const Text('Add task'),
+                                label: Text(AppLocalizations.of(context)!.addTask),
                               )
                             : null,
                         isEmpty: false,
@@ -149,7 +150,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                             ? TextButton.icon(
                                 onPressed: () => _addTaskInStep(context, ref, steps[idx].id),
                                 icon: const Icon(Icons.add_rounded, size: 18),
-                                label: const Text('Add task'),
+                                label: Text(AppLocalizations.of(context)!.addTask),
                               )
                             : null,
                         canMoveUp: (isStoppedFlow ? steps[idx].status != StepStatus.completed : !isOngoingFlow) && idx > 0,
@@ -292,7 +293,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
             ElevatedButton.icon(
               onPressed: widget.onTasksRefresh,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
+              label: Text(AppLocalizations.of(context)!.retry),
             ),
           ],
         ),
@@ -328,7 +329,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
           }
         },
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Add step'),
+        label: Text(AppLocalizations.of(context)!.addStep),
       ),
     );
   }
