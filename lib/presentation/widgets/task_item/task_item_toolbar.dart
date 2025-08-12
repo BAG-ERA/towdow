@@ -11,6 +11,7 @@ import '../utils/popup/category_dialog.dart';
 import '../utils/popup/due_date_dialog.dart';
 import '../utils/popup/move_task_dialog.dart';
 import '../utils/popup/validator_type_picker_dialog.dart';
+import '../../viewmodels/attendee_suggestions_viewmodel.dart';
 
 class TaskItemToolbar extends ConsumerStatefulWidget {
   final Task task;
@@ -184,7 +185,18 @@ class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
   }
 
   // Dialog methods
-  void _showAttendeeDialog(BuildContext context) {
+  Future<void> _showAttendeeDialog(BuildContext context) async {
+    // Prepare suggestions via ViewModel (MVVM) just like in task creation
+    List<String>? suggestedEmails;
+    final projectPath = widget.task.projectPath;
+    if (projectPath != null && projectPath.isNotEmpty) {
+      await ref.read(attendeeSuggestionsProvider(projectPath).notifier).load();
+      final state = ref.read(attendeeSuggestionsProvider(projectPath));
+      suggestedEmails = state.suggestions.isEmpty ? null : state.suggestions;
+    }
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
       builder: (context) => AttendeeDialog(
@@ -194,6 +206,7 @@ class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
             widget.onTaskUpdated!(updatedTask);
           }
         },
+        suggestedAttendees: suggestedEmails,
       ),
     );
   }

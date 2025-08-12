@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
+// import '../../../../data/models/task_calendar.dart';
+import '../../../viewmodels/attendee_suggestions_viewmodel.dart';
 import '../../../../data/models/task.dart';
 import '../../../../data/models/attendee.dart';
 import '../../../../data/providers/providers.dart';
@@ -337,6 +339,15 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
       projectPath: widget.projectPath,
     );
 
+    // Build suggested attendees via ViewModel (MVVM) - force load before showing dialog
+    List<String>? suggestedEmails;
+    if (widget.projectPath != null && widget.projectPath!.isNotEmpty) {
+      // Always load to ensure suggestions are available immediately
+      await ref.read(attendeeSuggestionsProvider(widget.projectPath!).notifier).load();
+      final refreshed = ref.read(attendeeSuggestionsProvider(widget.projectPath!));
+      suggestedEmails = refreshed.suggestions.isEmpty ? null : refreshed.suggestions;
+    }
+
     final result = await showDialog<Task>(
       context: context,
       builder: (context) => AttendeeDialog(
@@ -346,12 +357,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
             selectedAttendees = updatedTask.attendees;
           });
         },
-        // Example: Add some suggested attendees based on project context
-        suggestedAttendees: [
-          'john.doe@example.com',
-          'jane.smith@example.com',
-          'team@example.com',
-        ],
+        suggestedAttendees: suggestedEmails,
       ),
     );
 
