@@ -2,6 +2,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_lifecycle_manager.dart';
+import '../../core/logger.dart';
 import 'providers_services_core.dart';
 // caldav services are used indirectly via providers_services_core
 import 'providers_repositories.dart';
@@ -20,6 +21,8 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
   final accountRepository = ref.watch(accountRepositoryProvider);
   final stepRepository = ref.watch(stepRepositoryProvider);
   final requirementRepository = ref.watch(requirementRepositoryProvider);
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
 
   ref.watch(userPreferencesQueueSetupProvider);
 
@@ -27,6 +30,24 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
 
   await stepRepository.initialize();
   await requirementRepository.initialize();
+
+  // Cleanup orphan tasks on startup (local-only): tasks whose projectPath doesn't match existing calendars
+  try {
+    final calendarsResult = await calendarRepository.getAll();
+    await calendarsResult.when(
+      success: (calendars) async {
+        final validPaths = calendars.map((c) => c.path).toSet();
+        final cleanupResult = await taskRepository.deleteOrphanedTasksLocalOnly(validPaths);
+        cleanupResult.when(
+          success: (_) {},
+          failure: (f) => AppLogger.warning('AppLifecycle: Orphan task cleanup failed: ${f.message}'),
+        );
+      },
+      failure: (f) async {
+        AppLogger.warning('AppLifecycle: Could not load calendars for orphan cleanup: ${f.message}');
+      },
+    );
+  } catch (_) {}
 
   final result = await lifecycleManager.initialize(
     syncService: syncService,
