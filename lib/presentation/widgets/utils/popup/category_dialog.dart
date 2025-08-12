@@ -760,8 +760,28 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
         color: color,
         projectPath: widget.projectPath,
       );
-      
-      // Clear search to show the new category
+      // After creation completes (and viewmodel reloads categories), auto-select the new category
+      final categoryState = ref.read(projectCategoryViewModelProvider(widget.projectPath!));
+      final newlyCreated = categoryState.projectCategories.firstWhere(
+        (c) => c.name.toLowerCase() == name.toLowerCase(),
+        orElse: () => categoryState.projectCategories.isNotEmpty
+            ? categoryState.projectCategories.last
+            : throw Exception('Category creation did not reflect in state'),
+      );
+
+      // Add to selected list if not already there
+      if (!_selectedCategoryIds.contains(newlyCreated.id)) {
+        _selectedCategoryIds.add(newlyCreated.id);
+      }
+
+      // Optimistically update the task immediately
+      final updatedTask = widget.task.copyWith(
+        categoryIds: List<String>.from(_selectedCategoryIds),
+        lastModified: DateTime.now(),
+      );
+      widget.onTaskUpdated(updatedTask);
+
+      // Clear search to reveal full list including the new selection
       _searchController.clear();
       setState(() {
         _searchQuery = '';
