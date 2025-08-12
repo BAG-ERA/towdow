@@ -169,15 +169,22 @@ class AddValidatorFromTemplateCommand extends ParameterizedCommand<Task, AddVali
 
     // Get current user email to check permissions
     String? currentUserEmail;
+    String? providerType;
     final accountResult = await _accountRepository.getActiveAccount();
     await accountResult.when(
       success: (account) async {
         currentUserEmail = account?.email ?? account?.username;
+        providerType = account?.providerType;
       },
       failure: (_) async {
         // Continue without user email - permission check will fail gracefully
       },
     );
+
+    // Gate file/media validators for custom CalDAV accounts
+    if (providerType == 'custom' && (params.templateType == 'file' || params.templateType == 'media')) {
+      throw Exception('File and media completion requirements are disabled for this account type');
+    }
 
     // Get current task
     final taskResult = await _taskRepository.getById(params.taskUid);

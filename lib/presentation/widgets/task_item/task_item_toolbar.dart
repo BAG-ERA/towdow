@@ -119,6 +119,7 @@ class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
   }
 
   Widget _buildVerticalValidatorAction(BuildContext context, WidgetRef ref) {
+    final fileFeaturesEnabled = ref.watch(fileFeaturesEnabledProvider);
     return PopupMenuButton<String>(
       offset: const Offset(0, 36),
       tooltip: '',
@@ -151,24 +152,26 @@ class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
             contentPadding: EdgeInsets.zero,
           ),
         ),
-        const PopupMenuItem(
-          value: 'file',
-          child: ListTile(
-            leading: Icon(Icons.attach_file),
-            title: Text('File'),
-            subtitle: Text('File attachments'),
-            contentPadding: EdgeInsets.zero,
+        if (fileFeaturesEnabled)
+          const PopupMenuItem(
+            value: 'file',
+            child: ListTile(
+              leading: Icon(Icons.attach_file),
+              title: Text('File'),
+              subtitle: Text('File attachments'),
+              contentPadding: EdgeInsets.zero,
+            ),
           ),
-        ),
-        const PopupMenuItem(
-          value: 'media',
-          child: ListTile(
-            leading: Icon(Icons.perm_media),
-            title: Text('Media'),
-            subtitle: Text('Photos and videos'),
-            contentPadding: EdgeInsets.zero,
+        if (fileFeaturesEnabled)
+          const PopupMenuItem(
+            value: 'media',
+            child: ListTile(
+              leading: Icon(Icons.perm_media),
+              title: Text('Media'),
+              subtitle: Text('Photos and videos'),
+              contentPadding: EdgeInsets.zero,
+            ),
           ),
-        ),
       ],
       child: const _ToolbarTile(icon: Icons.fact_check, label: 'Completion requirement'),
     );

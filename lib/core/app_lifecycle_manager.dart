@@ -162,35 +162,62 @@ class AppLifecycleManager {
         );
       }
 
-      // Start file upload queue service
-      if (_fileUploadQueueService != null) {
-        AppLogger.debug('AppLifecycleManager: Starting FileUploadQueueService');
-        _fileUploadQueueService!.startQueueProcessing();
-        AppLogger.info('AppLifecycleManager: FileUploadQueueService started successfully');
+      // Start file upload queue service only if file features are enabled for current account
+      if (_fileUploadQueueService != null && _accountRepository != null) {
+        final accRes = await _accountRepository!.getActiveAccount();
+        await accRes.when(
+          success: (acc) async {
+            final fileFeaturesEnabled = acc != null && acc.providerType != 'custom';
+            if (fileFeaturesEnabled) {
+              AppLogger.debug('AppLifecycleManager: Starting FileUploadQueueService');
+              _fileUploadQueueService!.startQueueProcessing();
+              AppLogger.info('AppLifecycleManager: FileUploadQueueService started successfully');
+            } else {
+              AppLogger.info('AppLifecycleManager: File features disabled (custom provider) - not starting FileUploadQueueService');
+            }
+          },
+          failure: (_) async {
+            // Default to not starting when account unknown
+            AppLogger.info('AppLifecycleManager: No active account - file upload queue not started');
+          },
+        );
       }
 
-      // Start user sync service (for cloud/self-hosted users)
-      if (_userSyncService != null) {
-        AppLogger.debug('AppLifecycleManager: Starting UserSyncService periodic sync');
-        _userSyncService!.startPeriodicSync(interval: const Duration(hours: 2)); // Check every 2 hours for user data updates
-        
-        // Fetch shared projects on startup
-        AppLogger.debug('AppLifecycleManager: Fetching shared projects on startup');
-        try {
-          final sharedProjectsResult = await _userSyncService!.updateSharedProjects();
-          sharedProjectsResult.when(
-            success: (_) {
-              AppLogger.info('AppLifecycleManager: Shared projects fetched successfully on startup');
-            },
-            failure: (failure) {
-              AppLogger.warning('AppLifecycleManager: Failed to fetch shared projects on startup: ${failure.message}');
-            },
-          );
-        } catch (e) {
-          AppLogger.warning('AppLifecycleManager: Error fetching shared projects on startup: $e');
-        }
-        
-        AppLogger.info('AppLifecycleManager: UserSyncService started successfully');
+      // Start user sync service (cloud only)
+      if (_userSyncService != null && _accountRepository != null) {
+        final accRes = await _accountRepository!.getActiveAccount();
+        await accRes.when(
+          success: (acc) async {
+            final enableUserSync = acc != null && acc.providerType == 'towdow_cloud';
+            if (enableUserSync) {
+              AppLogger.debug('AppLifecycleManager: Starting UserSyncService periodic sync');
+              _userSyncService!.startPeriodicSync(interval: const Duration(hours: 2)); // Check every 2 hours for user data updates
+
+              // Fetch shared projects on startup
+              AppLogger.debug('AppLifecycleManager: Fetching shared projects on startup');
+              try {
+                final sharedProjectsResult = await _userSyncService!.updateSharedProjects();
+                sharedProjectsResult.when(
+                  success: (_) {
+                    AppLogger.info('AppLifecycleManager: Shared projects fetched successfully on startup');
+                  },
+                  failure: (failure) {
+                    AppLogger.warning('AppLifecycleManager: Failed to fetch shared projects on startup: ${failure.message}');
+                  },
+                );
+              } catch (e) {
+                AppLogger.warning('AppLifecycleManager: Error fetching shared projects on startup: $e');
+              }
+
+              AppLogger.info('AppLifecycleManager: UserSyncService started successfully');
+            } else {
+              AppLogger.info('AppLifecycleManager: UserSyncService disabled for providerType ${acc?.providerType ?? 'unknown'}');
+            }
+          },
+          failure: (_) async {
+            AppLogger.info('AppLifecycleManager: No active account - UserSyncService not started');
+          },
+        );
       }
 
       // Start connection monitoring service

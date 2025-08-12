@@ -272,6 +272,11 @@ class CalDAVMonitor {
   /// Check for changes in user preferences by comparing S3 etags
   Future<bool> _checkUserPreferencesChanges(CaldavAccount account) async {
     try {
+      // Skip S3 checks for custom provider accounts (no S3 features)
+      if (account.providerType == 'custom') {
+        AppLogger.debug('CalDAVMonitor: Skipping user preferences S3 checks for custom provider');
+        return false;
+      }
       // First, check and update shared projects from server
       await _checkAndUpdateSharedProjects(account);
 
@@ -378,6 +383,11 @@ class CalDAVMonitor {
   /// Check for changes in external accounts by comparing S3 etags
   Future<bool> _checkExternalAccountChanges(CaldavAccount account) async {
     try {
+      // Skip S3 checks for custom provider accounts (no S3 features)
+      if (account.providerType == 'custom') {
+        AppLogger.debug('CalDAVMonitor: Skipping external account S3 checks for custom provider');
+        return false;
+      }
       bool anyChanges = false;
       
       // Get the global credentials file etag (similar to user preferences)

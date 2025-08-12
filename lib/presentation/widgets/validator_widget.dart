@@ -188,13 +188,16 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
 
   Widget _buildValidatorContent(Map<String, dynamic> validator, ValidatorViewModelState validatorState) {
     final type = validator['type'] as String;
+    final fileFeaturesEnabled = ref.watch(fileFeaturesEnabledProvider);
     
     switch (type) {
       case 'checklist':
         return _buildChecklistValidator(validator, validatorState);
       case 'file':
+        if (!fileFeaturesEnabled) return const SizedBox.shrink();
         return _buildFileValidator(validator, validatorState);
       case 'media':
+        if (!fileFeaturesEnabled) return const SizedBox.shrink();
         return _buildMediaValidator(validator, validatorState);
       case 'single_select':
         return _buildSingleSelectValidator(validator, validatorState);
