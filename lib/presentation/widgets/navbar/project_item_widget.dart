@@ -427,11 +427,10 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
   }
 
   void _copyProjectPath(BuildContext context) {
-    final displayPath = Uri.decodeFull(widget.project.path);
-    Clipboard.setData(ClipboardData(text: displayPath));
+    Clipboard.setData(ClipboardData(text: widget.project.path));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Project path copied: ${Uri.decodeFull(widget.project.path)}'),
+        content: Text('Project path copied: ${widget.project.path}'),
         backgroundColor: Colors.orange,
         duration: const Duration(seconds: 2),
       ),

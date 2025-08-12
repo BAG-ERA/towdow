@@ -720,6 +720,7 @@ class SyncService implements SyncCommander {
               failure: (f) async => throw Exception('Discovery failed: ${f.message}'),
             );
             final caldavCalendar = SyncService.calendarServiceFactory(caldavTask.account);
+            final asWorkflow = (calendar.flowitAsFlow == true) || ((calendar.flowitType.toUpperCase()) == 'WORKFLOW');
             final result = await caldavCalendar.createCalendar(
               calendarHome: calendarHome,
               displayName: calendar.displayName,
@@ -728,6 +729,7 @@ class SyncService implements SyncCommander {
               kanban: calendar.flowitKanban,
               author: calendar.flowitAuthor,
               owner: calendar.flowitOwner,
+              asWorkflow: asWorkflow,
             );
             await result.when(
               success: (createdCalendar) async {
@@ -742,6 +744,50 @@ class SyncService implements SyncCommander {
                     AppLogger.warning('SyncService: Failed to update local calendar after creation: ${failure.message}');
                   },
                 );
+
+                try {
+                  // Migrate any locally cloned tasks pointing to the placeholder path to the new server path
+                  final placeholderPath = calendarPath;
+                  final serverPath = createdCalendar.path;
+
+                  // 1) Rewrite queued operations that reference the placeholder calendarPath
+                  final queueResult = await _localStorage.getAll<Map<String, dynamic>>(syncQueueBoxName);
+                  await queueResult.when(
+                    success: (queueData) async {
+                      for (final data in queueData) {
+                        final item = _mapToSyncQueueItem(data);
+                        if (item == null) continue;
+                        final itemCalPath = item.data['calendarPath'] as String?;
+                        if (itemCalPath == placeholderPath) {
+                          final updatedItemMap = Map<String, dynamic>.from(_mapFromSyncQueueItem(item));
+                          final updatedData = Map<String, dynamic>.from(updatedItemMap['data'] as Map<String, dynamic>);
+                          updatedData['calendarPath'] = serverPath;
+                          updatedItemMap['data'] = updatedData;
+                          await _localStorage.put(syncQueueBoxName, item.id, updatedItemMap);
+                        }
+                      }
+                    },
+                    failure: (_) async {},
+                  );
+
+                  // 2) Migrate existing local tasks to point to the new server path
+                  final tasksRes = await _taskRepository.getByProject(placeholderPath);
+                  await tasksRes.when(
+                    success: (tasks) async {
+                      for (final t in tasks) {
+                        final moved = t.copyWith(projectPath: serverPath);
+                        await _taskRepository.save(moved);
+                      }
+                    },
+                    failure: (_) async {},
+                  );
+
+                  // 3) Remove the placeholder calendar locally without queuing a server deletion
+                  await _calendarRepository.unsyncCalendar(placeholderPath);
+                } catch (e, st) {
+                  AppLogger.warning('SyncService: Post-creation migration encountered an issue for ${calendar.displayName}: $e');
+                  AppLogger.debug('SyncService: Stack: $st');
+                }
               },
               failure: (failure) async {
                 throw Exception('Failed to create calendar: ${failure.message}');
