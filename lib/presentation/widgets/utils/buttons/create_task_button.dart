@@ -99,18 +99,17 @@ class CreateTaskButton extends StatelessWidget {
     final effectiveTextColor = textColor ?? chartTheme.typography.primaryButton.color;
     
     final buttonPadding = _getPadding(chartTheme);
-    final fontSize = _getFontSize();
+    final scale = (chartTheme.typography.primaryButton.fontSize ?? 14) / 14.0;
     
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       child: ElevatedButton.icon(
         onPressed: () => _showCreateTaskDialog(context),
-        icon: icon != null ? Icon(icon, size: _getIconSize()) : const SizedBox.shrink(),
+        icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
         label: Text(
           text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
           style: chartTheme.typography.primaryButton.copyWith(
             color: effectiveTextColor,
-            fontSize: fontSize,
           ),
         ),
         style: ElevatedButton.styleFrom(
@@ -143,17 +142,6 @@ class CreateTaskButton extends StatelessWidget {
           horizontal: chartTheme.dimensions.paddingLarge * 1.5,
           vertical: chartTheme.dimensions.paddingMedium * 1.2,
         );
-    }
-  }
-
-  double _getFontSize() {
-    switch (size) {
-      case CreateTaskButtonSize.small:
-        return 12;
-      case CreateTaskButtonSize.medium:
-        return 14;
-      case CreateTaskButtonSize.large:
-        return 16;
     }
   }
 

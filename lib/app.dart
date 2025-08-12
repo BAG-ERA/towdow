@@ -12,6 +12,7 @@ import 'presentation/screens/workflows_list/workflow_list_screen.dart';
 import 'presentation/screens/workflow_detail/workflow_detail_screen.dart';
 
 import 'presentation/screens/project_detail/project_detail_screen.dart';
+import 'presentation/viewmodels/appearance_settings_viewmodel.dart';
 import 'presentation/widgets/adaptive_app_layout.dart';
 import 'presentation/providers/home_providers.dart';
 import 'data/providers/providers.dart';
@@ -50,7 +51,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final accountNotifier = ref.watch(accountStatusNotifierProvider);
   final sessionEpoch = ref.watch(sessionEpochProvider);
 
-  return GoRouter(
+      return GoRouter(
     navigatorKey: globalNavigatorKey,
     initialLocation: '/projects',
     refreshListenable: Listenable.merge([accountNotifier, ValueNotifier(sessionEpoch)]),
@@ -192,7 +193,10 @@ class FlowItApp extends ConsumerWidget {
     // Get the reactive router
     final router = ref.watch(routerProvider);
 
-    return MaterialApp.router(
+      final fontScale = ref.watch(fontScaleProvider);
+      final themeMode = ref.watch(themeModeProvider);
+
+      return MaterialApp.router(
       title: 'TowDow',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -215,11 +219,11 @@ class FlowItApp extends ConsumerWidget {
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
         ),
-        extensions: <ThemeExtension<dynamic>>[
-          ChartTheme.light(ColorScheme.fromSeed(
+          extensions: <ThemeExtension<dynamic>>[
+            ChartTheme.light(ColorScheme.fromSeed(
             seedColor: FlowItColors.primary,
             brightness: Brightness.light,
-          )),
+            ), scale: fontScale),
         ],
       ),
       darkTheme: ThemeData(
@@ -243,15 +247,22 @@ class FlowItApp extends ConsumerWidget {
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
         ),
-        extensions: <ThemeExtension<dynamic>>[
-          ChartTheme.dark(ColorScheme.fromSeed(
+          extensions: <ThemeExtension<dynamic>>[
+            ChartTheme.dark(ColorScheme.fromSeed(
             seedColor: FlowItColors.primary,
             brightness: Brightness.dark,
-          )),
+            ), scale: fontScale),
         ],
       ),
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       routerConfig: router,
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(textScaler: TextScaler.linear(fontScale)),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

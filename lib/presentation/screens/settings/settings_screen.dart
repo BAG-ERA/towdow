@@ -16,6 +16,7 @@ import '../../widgets/utils/popup/import_dialog.dart';
 import '../../../data/services/web_storage.dart';
 import '../../../data/services/sync_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../viewmodels/appearance_settings_viewmodel.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -39,6 +40,27 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
+          _SettingsSection(
+            title: 'Appearance',
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Theme', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    _ThemeModeSelector(),
+                    const SizedBox(height: 16),
+                    Text('Font size', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    _FontScaleSelector(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
           _SettingsSection(
             title: 'Account',
             children: [
@@ -391,6 +413,58 @@ class _SettingsItem extends StatelessWidget {
           () {
             // Feature coming soon - no action needed
           },
+    );
+  }
+}
+
+class _ThemeModeSelector extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(themeModeProvider);
+    final vm = ref.read(appearanceSettingsViewModelProvider.notifier);
+    return SegmentedButton<ThemeMode>(
+      segments: const [
+        ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.phone_android), label: Text('System')),
+        ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_rounded), label: Text('Light')),
+        ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_rounded), label: Text('Dark')),
+      ],
+      selected: {current},
+      onSelectionChanged: (set) {
+        if (set.isNotEmpty) {
+          vm.setThemeMode(set.first);
+        }
+      },
+    );
+  }
+}
+
+class _FontScaleSelector extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentScale = ref.watch(fontScaleProvider);
+    final vm = ref.read(appearanceSettingsViewModelProvider.notifier);
+
+    String currentKey;
+    if (currentScale <= 0.95) {
+      currentKey = 'small';
+    } else if (currentScale >= 1.1) {
+      currentKey = 'large';
+    } else {
+      currentKey = 'medium';
+    }
+
+    return SegmentedButton<String>(
+      segments: const [
+        ButtonSegment(value: 'small', label: Text('Small')),
+        ButtonSegment(value: 'medium', label: Text('Medium')),
+        ButtonSegment(value: 'large', label: Text('Large')),
+      ],
+      selected: {currentKey},
+      onSelectionChanged: (set) {
+        if (set.isNotEmpty) {
+          vm.setFontScale(set.first);
+        }
+      },
     );
   }
 }

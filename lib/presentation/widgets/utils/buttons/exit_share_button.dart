@@ -102,18 +102,17 @@ class ExitShareButton extends ConsumerWidget {
     final effectiveBackgroundColor = backgroundColor ?? chartTheme.colors.primary;
     
     final buttonPadding = _getPadding(chartTheme);
-    final fontSize = _getFontSize();
+    final scale = (chartTheme.typography.primaryButton.fontSize ?? 14) / 14.0;
     
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       child: OutlinedButton.icon(
         onPressed: () => _handleExitShare(context, ref),
-        icon: icon != null ? Icon(icon, size: _getIconSize()) : const SizedBox.shrink(),
+        icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
         label: Text(
           text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
           style: chartTheme.typography.primaryButton.copyWith(
             color: effectiveBackgroundColor,
-            fontSize: fontSize,
           ),
         ),
         style: OutlinedButton.styleFrom(
@@ -145,17 +144,6 @@ class ExitShareButton extends ConsumerWidget {
           horizontal: chartTheme.dimensions.paddingLarge * 1.5,
           vertical: chartTheme.dimensions.paddingMedium * 1.2,
         );
-    }
-  }
-
-  double _getFontSize() {
-    switch (size) {
-      case ExitShareButtonSize.small:
-        return 12;
-      case ExitShareButtonSize.medium:
-        return 14;
-      case ExitShareButtonSize.large:
-        return 16;
     }
   }
 

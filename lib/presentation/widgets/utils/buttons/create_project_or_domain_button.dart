@@ -28,6 +28,10 @@ class CreateProjectOrDomainButton extends StatelessWidget {
   /// Whether the button should expand to fill available width
   final bool isFullWidth;
   
+  /// When true, shows a right-side vertical separator and a down arrow to hint a submenu
+  /// This is a visual-only affordance; behaviour remains identical (single onPressed)
+  final bool showDropdownAffordance;
+  
   /// Optional callback when project is created
   final Function(String projectName)? onProjectCreated;
   
@@ -42,6 +46,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
     this.icon = Icons.add_rounded,
     this.size = CreateProjectOrDomainButtonSize.medium,
     this.isFullWidth = false,
+    this.showDropdownAffordance = false,
     this.onProjectCreated,
     this.onDomainCreated,
   });
@@ -52,6 +57,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
     Color? backgroundColor,
     Color? textColor,
     bool isFullWidth = false,
+    bool showDropdownAffordance = false,
     Function(String)? onProjectCreated,
     Function(String)? onDomainCreated,
   }) {
@@ -63,6 +69,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
       icon: Icons.add,
       size: CreateProjectOrDomainButtonSize.small,
       isFullWidth: isFullWidth,
+      showDropdownAffordance: showDropdownAffordance,
       onProjectCreated: onProjectCreated,
       onDomainCreated: onDomainCreated,
     );
@@ -73,30 +80,100 @@ class CreateProjectOrDomainButton extends StatelessWidget {
     final chartTheme = context.chartTheme;
     final effectiveBackgroundColor = backgroundColor ?? chartTheme.colors.primary;
     final effectiveTextColor = textColor ?? chartTheme.typography.primaryButton.color;
+    final onPrimaryColor = Theme.of(context).colorScheme.onPrimary;
     
     final buttonPadding = _getPadding(chartTheme);
-    final fontSize = _getFontSize();
+    final scale = (chartTheme.typography.primaryButton.fontSize ?? 14) / 14.0;
     
-    return SizedBox(
-      width: isFullWidth ? double.infinity : null,
-      child: ElevatedButton.icon(
-        onPressed: () => _showCreateDialog(context),
-        icon: icon != null ? Icon(icon, size: _getIconSize()) : const SizedBox.shrink(),
-        label: Text(
-          text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
-          style: chartTheme.typography.primaryButton.copyWith(
-            color: effectiveTextColor,
-            fontSize: fontSize,
+    final baseButtonStyle = ElevatedButton.styleFrom(
+      backgroundColor: effectiveBackgroundColor,
+      foregroundColor: effectiveTextColor,
+      padding: buttonPadding,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(chartTheme.dimensions.cornerRadius),
+      ),
+      elevation: size == CreateProjectOrDomainButtonSize.large ? 2 : 1,
+    );
+
+    if (!showDropdownAffordance) {
+      return SizedBox(
+        width: isFullWidth ? double.infinity : null,
+        child: ElevatedButton.icon(
+          onPressed: () => _showCreateDialog(context),
+          icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
+          label: Text(
+            text.toUpperCase(),
+            style: chartTheme.typography.primaryButton.copyWith(
+              color: effectiveTextColor,
+            ),
           ),
+          style: baseButtonStyle,
         ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: effectiveBackgroundColor,
-          foregroundColor: effectiveTextColor,
-          padding: buttonPadding,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(chartTheme.dimensions.cornerRadius),
+      );
+    }
+
+    // With dropdown affordance: build a simple custom Material button for full control
+    // This guarantees the arrow can be exactly flush to the right border
+    final double iconSize = _getIconSize() * scale;
+    return Material(
+      color: effectiveBackgroundColor,
+      elevation: size == CreateProjectOrDomainButtonSize.large ? 2 : 1,
+      borderRadius: BorderRadius.circular(chartTheme.dimensions.cornerRadius),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(chartTheme.dimensions.cornerRadius),
+        onTap: () => _showCreateDialog(context),
+        child: Container(
+          width: isFullWidth ? double.infinity : null,
+          padding: EdgeInsets.symmetric(
+            vertical: _getPadding(chartTheme).vertical/4,
+            horizontal: _getPadding(chartTheme).horizontal/8,
           ),
-          elevation: size == CreateProjectOrDomainButtonSize.large ? 2 : 1,
+          child: IntrinsicHeight(
+            child: Row(
+            children: [
+              // Left content with classic padding
+              Padding(
+                padding: EdgeInsets.only(
+                  left: chartTheme.dimensions.paddingMedium,
+                  right: chartTheme.dimensions.paddingSmall,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (icon != null) ...[
+                      Icon(icon, size: iconSize, color: effectiveTextColor ?? onPrimaryColor),
+                      SizedBox(width: chartTheme.dimensions.paddingSmall),
+                    ],
+                    Text(
+                      text.toUpperCase(),
+                      style: chartTheme.typography.primaryButton.copyWith(
+                        color: effectiveTextColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Spacer takes remaining width
+              Expanded(child: SizedBox.shrink()),
+              VerticalDivider(
+                width: 8,
+                thickness: 1,
+                color: (effectiveTextColor ?? onPrimaryColor).withOpacity(0.24),
+              ),
+              SizedBox(
+                width: iconSize, // tight area: icon width only
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: iconSize,
+                    color: effectiveTextColor ?? onPrimaryColor,
+                  ),
+                ),
+              ),
+            ],
+            ),
+          ),
         ),
       ),
     );
@@ -122,17 +199,6 @@ class CreateProjectOrDomainButton extends StatelessWidget {
     }
   }
 
-  double _getFontSize() {
-    switch (size) {
-      case CreateProjectOrDomainButtonSize.small:
-        return 12;
-      case CreateProjectOrDomainButtonSize.medium:
-        return 14;
-      case CreateProjectOrDomainButtonSize.large:
-        return 16;
-    }
-  }
-
   double _getIconSize() {
     switch (size) {
       case CreateProjectOrDomainButtonSize.small:
@@ -143,6 +209,8 @@ class CreateProjectOrDomainButton extends StatelessWidget {
         return 24;
     }
   }
+
+  // Removed _getSeparatorHeight; using full height container in affordance variant
 
   void _showCreateDialog(BuildContext context) {
     showDialog(

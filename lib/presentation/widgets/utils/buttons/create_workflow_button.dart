@@ -67,16 +67,16 @@ class CreateWorkflowButton extends StatelessWidget {
     final effectiveBackgroundColor = backgroundColor ?? chartTheme.colors.primary;
     final effectiveTextColor = textColor ?? chartTheme.typography.primaryButton.color;
 
+    final scale = (chartTheme.typography.primaryButton.fontSize ?? 14) / 14.0;
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       child: ElevatedButton.icon(
         onPressed: () => _showCreateWorkflowDialog(context),
-        icon: icon != null ? Icon(icon, size: _getIconSize()) : const SizedBox.shrink(),
+        icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
         label: Text(
           text.toUpperCase(),
           style: chartTheme.typography.primaryButton.copyWith(
             color: effectiveTextColor,
-            fontSize: _getFontSize(),
           ),
         ),
         style: ElevatedButton.styleFrom(
@@ -109,17 +109,6 @@ class CreateWorkflowButton extends StatelessWidget {
           horizontal: chartTheme.dimensions.paddingLarge * 1.5,
           vertical: chartTheme.dimensions.paddingMedium * 1.2,
         );
-    }
-  }
-
-  double _getFontSize() {
-    switch (size) {
-      case CreateWorkflowButtonSize.small:
-        return 12;
-      case CreateWorkflowButtonSize.medium:
-        return 14;
-      case CreateWorkflowButtonSize.large:
-        return 16;
     }
   }
 

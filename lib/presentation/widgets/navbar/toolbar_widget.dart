@@ -27,9 +27,13 @@ class ToolbarWidget extends ConsumerWidget {
   Widget _buildToolbarContent(BuildContext context, String currentLocation, WidgetRef ref) {
     final theme = Theme.of(context);
     
+    // Scale toolbar height and padding with global text scale so the compact button grows
+    final textScale = MediaQuery.of(context).textScaler.scale(1.0);
+    final baseHPad = 16.0;
+    final baseVPad = 8.0;
+
     return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: baseHPad * textScale, vertical: baseVPad * textScale),
       decoration: BoxDecoration(
         color: Colors.transparent,
         border: Border(
@@ -42,8 +46,10 @@ class ToolbarWidget extends ConsumerWidget {
       child: Row(
         children: [
           Expanded(
-            child: CreateProjectOrDomainButton.compact(
+            child: CreateProjectOrDomainButton(
               isFullWidth: true,
+              size: CreateProjectOrDomainButtonSize.large,
+              showDropdownAffordance: true,
             ),
           ),
         ],

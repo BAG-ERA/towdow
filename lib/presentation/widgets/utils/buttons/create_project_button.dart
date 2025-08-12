@@ -84,18 +84,17 @@ class CreateProjectButton extends StatelessWidget {
     final effectiveTextColor = textColor ?? chartTheme.typography.primaryButton.color;
     
     final buttonPadding = _getPadding(chartTheme);
-    final fontSize = _getFontSize();
+    final scale = (chartTheme.typography.primaryButton.fontSize ?? 14) / 14.0;
     
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       child: ElevatedButton.icon(
         onPressed: () => _showCreateProjectDialog(context),
-        icon: icon != null ? Icon(icon, size: _getIconSize()) : const SizedBox.shrink(),
+        icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
         label: Text(
           text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
           style: chartTheme.typography.primaryButton.copyWith(
             color: effectiveTextColor,
-            fontSize: fontSize,
           ),
         ),
         style: ElevatedButton.styleFrom(
@@ -131,18 +130,8 @@ class CreateProjectButton extends StatelessWidget {
     }
   }
 
-  double _getFontSize() {
-    switch (size) {
-      case CreateProjectButtonSize.small:
-        return 12;
-      case CreateProjectButtonSize.medium:
-        return 14;
-      case CreateProjectButtonSize.large:
-        return 16;
-    }
-  }
-
   double _getIconSize() {
+    // Scale icon sizes using dimensions scale by referencing paddingMedium baseline
     switch (size) {
       case CreateProjectButtonSize.small:
         return 16;
