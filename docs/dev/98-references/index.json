@@ -1,0 +1,11 @@
+{
+  "topics": {
+    "architecture": ["../10-architecture/OVERVIEW.md"],
+    "adaptive_navigation": ["../40-ui/ADAPTIVE_NAVIGATION.md", "../50-routing/ROUTES_REFERENCE.md", "../50-routing/routes.json"],
+    "lifecycle": ["../30-sync/LIFECYCLE_MANAGER.md"],
+    "domains": ["../60-features/DOMAINS_WEBDAV.md"],
+    "validators": ["VALIDATOR_SCHEMA.json"],
+    "vcalendar": ["VCALENDAR_SCHEMA.json"],
+    "testing": ["../80-testing/STRATEGY.md"]
+  }
+}
