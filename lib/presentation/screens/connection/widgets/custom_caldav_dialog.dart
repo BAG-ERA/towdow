@@ -358,6 +358,8 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
             
             // Invalidate the account status provider to ensure router recognizes the account
             ref.invalidate(hasActiveAccountProvider);
+            // Also invalidate active account details so the navbar badge updates immediately
+            ref.invalidate(activeAccountProvider);
             
             // Navigate to projects screen on first connection (delay to avoid router race)
             Future.delayed(const Duration(milliseconds: 100), () {

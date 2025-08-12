@@ -123,6 +123,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
 
       if (!mounted) return;
       ref.invalidate(hasActiveAccountProvider);
+      // Ensure navbar user badge updates immediately
+      ref.invalidate(activeAccountProvider);
       GoRouter.of(context).go('/projects');
     }
   }

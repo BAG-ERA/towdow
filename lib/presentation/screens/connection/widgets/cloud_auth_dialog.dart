@@ -112,6 +112,8 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
       if (mounted) {
         // Invalidate the account status provider to ensure router recognizes the account
         ref.invalidate(hasActiveAccountProvider);
+        // Also invalidate active account details so the navbar badge updates immediately
+        ref.invalidate(activeAccountProvider);
 
         Navigator.of(context).pop(); // Close dialog
         // Navigate based on returning/new detection; default to projects when custom/offline/new
