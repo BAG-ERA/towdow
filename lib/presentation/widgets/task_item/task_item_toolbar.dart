@@ -3,12 +3,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../utils/popup/attendee_dialog.dart';
 import '../utils/popup/category_dialog.dart';
 import '../utils/popup/due_date_dialog.dart';
 import '../utils/popup/move_task_dialog.dart';
+import '../utils/popup/validator_type_picker_dialog.dart';
 
 class TaskItemToolbar extends ConsumerStatefulWidget {
   final Task task;
@@ -49,18 +51,24 @@ class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
           _buildVerticalAction(
             context: context,
             icon: Icons.calendar_today_rounded,
-            label: 'Due date',
+            label: AppLocalizations.of(context)!.dueDateTitle,
             onPressed: () => DueDateDialog.show(
               context,
               task: widget.task,
               onTaskUpdated: widget.onTaskUpdated,
             ),
           ),
-          if (_isOrganizer()) _buildVerticalValidatorAction(context, ref),
+          if (_isOrganizer())
+            _buildVerticalAction(
+              context: context,
+              icon: Icons.fact_check,
+              label: AppLocalizations.of(context)!.completionRequirement,
+              onPressed: () => _openValidatorTypePicker(context, ref),
+            ),
           _buildVerticalAction(
             context: context,
             icon: Icons.person_add_rounded,
-            label: 'Attendee',
+            label: AppLocalizations.of(context)!.attendee,
             onPressed: () => _showAttendeeDialog(context),
           ),
           _buildVerticalMenu(context),
@@ -81,28 +89,28 @@ class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
       children: [
         _ToolbarTile(
           icon: _showMore ? Icons.expand_less_rounded : Icons.more_vert_rounded,
-          label: _showMore ? 'Less' : 'More',
+          label: _showMore ? AppLocalizations.of(context)!.less : AppLocalizations.of(context)!.more,
           onTap: () => setState(() => _showMore = !_showMore),
         ),
         if (_showMore) const SizedBox(height: 8),
         if (_showMore)
           _ToolbarTile(
             icon: Icons.label_rounded,
-            label: 'Add Category',
+            label: AppLocalizations.of(context)!.addCategory,
             onTap: () => _showCategoryDialog(context),
           ),
         if (_showMore) const SizedBox(height: 8),
         if (_showMore)
           _ToolbarTile(
             icon: Icons.drive_file_move_rounded,
-            label: 'Move Task',
+            label: AppLocalizations.of(context)!.moveTask,
             onTap: () => _showMoveDialog(context),
           ),
         if (_showMore) const SizedBox(height: 8),
         if (_showMore)
           _ToolbarTile(
             icon: Icons.delete_rounded,
-            label: 'Delete Task',
+            label: AppLocalizations.of(context)!.deleteTask,
             onTap: () => _showDeleteDialog(context),
           ),
       ],
@@ -118,66 +126,13 @@ class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
     return _ToolbarTile(icon: icon, label: label, onTap: onPressed);
   }
 
-  Widget _buildVerticalValidatorAction(BuildContext context, WidgetRef ref) {
-    final fileFeaturesEnabled = ref.watch(fileFeaturesEnabledProvider);
-    return PopupMenuButton<String>(
-      offset: const Offset(0, 36),
-      tooltip: '',
-      onSelected: (validatorType) => _addValidator(context, ref, validatorType),
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'checklist',
-          child: ListTile(
-            leading: Icon(Icons.checklist),
-            title: Text('Checklist'),
-            subtitle: Text('Multiple checkable items'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'single_select',
-          child: ListTile(
-            leading: Icon(Icons.radio_button_checked),
-            title: Text('Single Select'),
-            subtitle: Text('Choose one option'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'free_field',
-          child: ListTile(
-            leading: Icon(Icons.text_fields),
-            title: Text('Free Field'),
-            subtitle: Text('Text input'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        if (fileFeaturesEnabled)
-          const PopupMenuItem(
-            value: 'file',
-            child: ListTile(
-              leading: Icon(Icons.attach_file),
-              title: Text('File'),
-              subtitle: Text('File attachments'),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        if (fileFeaturesEnabled)
-          const PopupMenuItem(
-            value: 'media',
-            child: ListTile(
-              leading: Icon(Icons.perm_media),
-              title: Text('Media'),
-              subtitle: Text('Photos and videos'),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-      ],
-      child: const _ToolbarTile(icon: Icons.fact_check, label: 'Completion requirement'),
-    );
+  Future<void> _openValidatorTypePicker(BuildContext context, WidgetRef ref) async {
+    final picked = await ValidatorTypePickerDialog.show(context);
+    if (picked == null || picked.isEmpty) return;
+    _addValidator(context, ref, picked);
   }
   
-  // (removed old horizontal validator trigger)
+  // (validator menu replaced by dialog)
 
   bool _isOrganizer() {
     // TODO: Implement organizer check based on current user and task.organizer
@@ -197,23 +152,23 @@ class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
     switch (validatorType) {
       case 'checklist':
         defaultOptions = ['Item 1', 'Item 2', 'Item 3'];
-        title = 'Checklist';
+        title = AppLocalizations.of(context)!.checklist;
         break;
       case 'single_select':
         defaultOptions = ['Option 1', 'Option 2', 'Option 3'];
-        title = 'Choose an option';
+        title = AppLocalizations.of(context)!.chooseAnOption;
         break;
       case 'free_field':
         defaultOptions = [];
-        title = 'Text field';
+        title = AppLocalizations.of(context)!.textField;
         break;
       case 'file':
         defaultOptions = [];
-        title = 'File attachment';
+        title = AppLocalizations.of(context)!.fileAttachment;
         break;
       case 'media':
         defaultOptions = [];
-        title = 'Media attachment';
+        title = AppLocalizations.of(context)!.mediaAttachment;
         break;
       default:
          return;
