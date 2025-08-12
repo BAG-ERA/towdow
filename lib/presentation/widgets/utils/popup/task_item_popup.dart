@@ -91,7 +91,7 @@ class TaskItemPopup extends StatelessWidget {
     if (validators.isNotEmpty && !ValidatorService.areValidatorsCompleted(validators)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please complete all required validators before marking the task as done'),
+          content: const Text('Please complete all required completion requirements before marking the task as done'),
           backgroundColor: Theme.of(context).colorScheme.error,
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
@@ -573,7 +573,7 @@ class _AnchoredTaskCardState extends State<_AnchoredTaskCard>
     if (validators.isNotEmpty && !ValidatorService.areValidatorsCompleted(validators)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please complete all required validators before marking the task as done'),
+          content: const Text('Please complete all required completion requirements before marking the task as done'),
           backgroundColor: Theme.of(context).colorScheme.error,
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,

@@ -188,9 +188,9 @@ class AddValidatorFromTemplateCommand extends ParameterizedCommand<Task, AddVali
           throw Exception('Task not found: ${params.taskUid}');
         }
 
-        // Check permissions - only organizer can add validators
+        // Check permissions - only organizer can add completion requirements
         if (!ValidatorService.canEditValidators(task.organizer, currentUserEmail)) {
-          throw Exception('You do not have permission to add validators to this task');
+          throw Exception('You do not have permission to add completion requirements to this task');
         }
 
         // Create validator based on template type
@@ -326,9 +326,9 @@ class RemoveValidatorCommand extends ParameterizedCommand<Task, UpdateValidatorS
           throw Exception('Task not found: ${params.taskUid}');
         }
 
-        // Check permissions - only organizer can remove validators
+        // Check permissions - only organizer can remove completion requirements
         if (!ValidatorService.canEditValidators(task.organizer, currentUserEmail)) {
-          throw Exception('You do not have permission to remove validators from this task');
+          throw Exception('You do not have permission to remove completion requirements from this task');
         }
 
         // Parse current validators and remove the specified one
@@ -405,9 +405,9 @@ class CompleteTaskWithValidatorsCommand extends ParameterizedCommand<Task, Compl
     // Parse validators and check completion
     final validatorLists = ValidatorService.parseValidators(params.task.flowitValidator);
     
-    // Check if all required validators are completed
+    // Check if all required completion requirements are completed
     if (!ValidatorService.areValidatorsCompleted(validatorLists)) {
-      throw Exception('All required validators must be completed before marking the task as done');
+      throw Exception('All required completion requirements must be completed before marking the task as done');
     }
 
     // Create completed task

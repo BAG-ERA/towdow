@@ -91,8 +91,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
   Widget _buildValidatorCard(Map<String, dynamic> validator, ValidatorViewModelState validatorState) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final type = validator['type'] as String;
-    final title = validator['title'] as String? ?? 'Validator';
+    final title = validator['title'] as String? ?? 'Completion requirement';
     final required = validator['required'] as bool? ?? true;
     final validatorId = validator['id'] as String;
 
@@ -202,7 +201,7 @@ class _ValidatorWidgetState extends ConsumerState<ValidatorWidget> {
       case 'free_field':
         return _buildFreeFieldValidator(validator, validatorState);
       default:
-        return Text('Unknown validator type: $type');
+        return Text('Unknown completion requirement type: $type');
     }
   }
 

@@ -2,6 +2,7 @@
 // Configures Material theme, routing, and global app setup
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'presentation/screens/home/home_screen.dart';
@@ -122,52 +123,56 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/',
-            builder: (context, state) => const _AppShell(),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _AppShell()),
           ),
           GoRoute(
             path: '/today',
-            builder: (context, state) => const _TaskViewShell(initialTab: 0),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 0)),
           ),
           GoRoute(
             path: '/soon',
-            builder: (context, state) => const _TaskViewShell(initialTab: 1),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 1)),
           ),
           GoRoute(
             path: '/next-week',
-            builder: (context, state) => const _TaskViewShell(initialTab: 2),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 2)),
           ),
           GoRoute(
             path: '/later',
-            builder: (context, state) => const _TaskViewShell(initialTab: 3),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 3)),
           ),
           GoRoute(
             path: '/anytime',
-            builder: (context, state) => const _TaskViewShell(initialTab: 4),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 4)),
           ),
 
           GoRoute(
             path: '/project/:path',
-            builder: (context, state) => ProjectDetailScreen(
-              projectPath: Uri.decodeComponent(state.pathParameters['path']!),
+            pageBuilder: (context, state) => _buildPageForDesktop(
+              child: ProjectDetailScreen(
+                projectPath: Uri.decodeComponent(state.pathParameters['path']!),
+              ),
             ),
           ),
           GoRoute(
             path: '/settings',
-            builder: (context, state) => const SettingsScreen(),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const SettingsScreen()),
           ),
           
           GoRoute(
             path: '/projects',
-            builder: (context, state) => const ProjectsListScreen(),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const ProjectsListScreen()),
           ),
            GoRoute(
              path: '/workflows',
-             builder: (context, state) => const WorkflowListScreen(),
+             pageBuilder: (context, state) => _buildPageForDesktop(child: const WorkflowListScreen()),
            ),
            GoRoute(
              path: '/workflow/:path',
-             builder: (context, state) => WorkflowDetailScreen(
-               workflowPath: Uri.decodeComponent(state.pathParameters['path']!),
+             pageBuilder: (context, state) => _buildPageForDesktop(
+               child: WorkflowDetailScreen(
+                 workflowPath: Uri.decodeComponent(state.pathParameters['path']!),
+               ),
              ),
            ),
         ],
@@ -176,7 +181,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Routes outside the main shell
       GoRoute(
         path: '/connect',
-        builder: (context, state) => const ConnectionScreen(),
+        pageBuilder: (context, state) => _buildPageForDesktop(child: const ConnectionScreen()),
       ),
     ],
   );
@@ -329,3 +334,16 @@ class _TaskViewShell extends ConsumerWidget {
     return const HomeScreen();
   }
 } 
+
+// Returns a page without transitions on desktop platforms, default transitions elsewhere
+Page<dynamic> _buildPageForDesktop({required Widget child}) {
+  final isDesktop = !kIsWeb && (
+    defaultTargetPlatform == TargetPlatform.windows ||
+    defaultTargetPlatform == TargetPlatform.linux ||
+    defaultTargetPlatform == TargetPlatform.macOS
+  );
+  if (isDesktop) {
+    return NoTransitionPage(child: child);
+  }
+  return MaterialPage(child: child);
+}
