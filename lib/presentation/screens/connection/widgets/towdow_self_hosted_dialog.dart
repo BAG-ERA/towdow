@@ -2,7 +2,6 @@
 // Implementation of BaseAuthDialog for Self-Hosted TowDow servers
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../viewmodels/login_viewmodel.dart';
 import 'cloud_auth_dialog.dart';

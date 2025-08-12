@@ -98,7 +98,7 @@ class LocalUserRepository implements UserRepository {
           await _queueCallback!(preferences);
           AppLogger.debug('LocalUserRepository: User preferences saved locally and queued for upload via callback');
         } else if (_userPreferencesQueueService != null) {
-          await _userPreferencesQueueService!.queueUserPreferencesUpdate(preferences);
+          await _userPreferencesQueueService.queueUserPreferencesUpdate(preferences);
           AppLogger.debug('LocalUserRepository: User preferences saved locally and queued for upload via service');
         } else {
           AppLogger.debug('LocalUserRepository: User preferences saved locally only (no queue available)');
@@ -113,7 +113,6 @@ class LocalUserRepository implements UserRepository {
     return result;
   }
 
-  @override
   Future<Result<void>> updateProjectOrder(List<String> projectOrder) async {
     final preferencesResult = await getUserPreferences();
     return await preferencesResult.when(

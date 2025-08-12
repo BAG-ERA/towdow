@@ -14,7 +14,6 @@ import '../../../data/providers/providers.dart';
 import '../../viewmodels/caldav_management_viewmodel.dart';
 import '../../../data/services/webdav_client.dart';
 import '../../../data/models/task_calendar.dart';
-import '../../../core/logger.dart';
 
 class CalDAVManagementScreen extends ConsumerStatefulWidget {
   const CalDAVManagementScreen({super.key});

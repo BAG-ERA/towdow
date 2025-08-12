@@ -262,7 +262,7 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
         return;
       }
 
-      final oldCalendarUid = task.projectPath;
+      final oldCalendarUid = task.projectPath; // TODO: it may be the caus of not being able to delete the task in source calendar
       
       // Create updated task with new source calendar
       final movedTask = task.copyWith(

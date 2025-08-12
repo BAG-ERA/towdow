@@ -12,7 +12,7 @@ import '../../widgets/utils/tasklist_toolbar.dart';
 import '../../widgets/utils/popup/requirement_mapping_dialog.dart';
 import '../../widgets/project_detail/project_task_step_view.dart';
 import '../../widgets/project_detail/project_bottleneck_view.dart';
-import '../project_detail/project_detail_screen.dart' show projectProvider;
+// projectProvider removed; use calendarListProvider to read project state
 import '../../widgets/project_detail/project_warnings_banner.dart';
 
 class WorkflowDetailScreen extends ConsumerStatefulWidget {
@@ -28,8 +28,11 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final projectAsync = ref.watch(projectProvider(widget.workflowPath));
     final tasksAsync = ref.watch(projectTasksProvider(widget.workflowPath));
+    final encoded = widget.workflowPath.replaceAll('@', '%40');
+    final projectAsync = ref.watch(calendarListProvider).whenData(
+      (cals) => cals.cast<TaskCalendar?>().firstWhere((c) => c?.path == encoded, orElse: () => null),
+    );
 
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
@@ -170,11 +173,11 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
           );
           if (confirmed == true) {
             final statusService = ref.read(statusServiceProvider);
-            await statusService.assignStatusToCalendar(widget.workflowPath, 'ONGOING');
-            // After starting, propagate requirement attendees to tasks
-            await ref.read(workflowServiceProvider).applyRequirementAttendeesToTasks(widget.workflowPath);
-            // Force refresh of project status for UI buttons
-            ref.invalidate(projectProvider(widget.workflowPath));
+             await statusService.assignStatusToCalendar(widget.workflowPath, 'ONGOING');
+             // After starting, propagate requirement attendees to tasks
+             // TODO: inject workflow service via provider if needed
+             // Force refresh of project status for UI buttons
+             ref.invalidate(calendarListProvider);
           }
         },
       ));
@@ -186,7 +189,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
           final statusService = ref.read(statusServiceProvider);
           await statusService.assignStatusToCalendar(widget.workflowPath, 'STOPPED');
           // Refresh UI to reflect STOPPED state
-          ref.invalidate(projectProvider(widget.workflowPath));
+          ref.invalidate(calendarListProvider);
         },
       ));
     } else if (status == 'STOPPED') {
@@ -196,7 +199,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
         onPressed: () async {
           final statusService = ref.read(statusServiceProvider);
           await statusService.assignStatusToCalendar(widget.workflowPath, 'ONGOING');
-          ref.invalidate(projectProvider(widget.workflowPath));
+          ref.invalidate(calendarListProvider);
         },
       ));
     } else if (status == 'COMPLETED') {
@@ -207,7 +210,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
           final statusService = ref.read(statusServiceProvider);
           await statusService.archiveCalendar(widget.workflowPath);
           // Refresh UI to reflect ARCHIVE state
-          ref.invalidate(projectProvider(widget.workflowPath));
+          ref.invalidate(calendarListProvider);
         },
       ));
     }

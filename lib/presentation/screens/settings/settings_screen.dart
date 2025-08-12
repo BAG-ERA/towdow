@@ -3,9 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:hive_flutter/hive_flutter.dart';
 import '../../../core/logger.dart';
-import '../../../data/services/storage/local_storage_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
 import 'caldav_management_screen.dart';
@@ -13,7 +11,6 @@ import 'connection_info_screen.dart';
 import 'external_calendar_management_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
-import '../../../data/services/web/web_storage.dart';
 import '../../../data/services/sync/sync_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../viewmodels/appearance_settings_viewmodel.dart';
@@ -188,7 +185,7 @@ class SettingsScreen extends ConsumerWidget {
       // Special handling for web platform
       if (kIsWeb) {
         // For web browsers, we need to clear the browser's localStorage as well
-        await _clearWebStorageAndCache();
+        await _clearWebStorageAndCache(ref);
       }
 
       // Perform full on-disk wipe to ensure nothing lingers
@@ -263,25 +260,12 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   // Helper method to clear web-specific storage and cache
-  Future<void> _clearWebStorageAndCache() async {
+  Future<void> _clearWebStorageAndCache(WidgetRef ref) async {
     final storage = ref.read(localStorageServiceProvider);
     await storage.clearAllBoxesWebSafe();
   }
 
-  // Clear localStorage using JS interop
-  Future<void> _clearLocalStorageUsingJsInterop() async {
-    if (kIsWeb) {
-      try {
-        await clearLocalStorage();
-        AppLogger.info('localStorage cleared successfully via JS interop');
-      } catch (e, stacktrace) {
-        AppLogger.error('Failed to clear localStorage', e, stacktrace);
-      }
-    }
-  }
-
-  // Reload the page using JS interop
-  Future<void> _reloadPageUsingJsInterop() async {}
+  // JS interop helpers removed; handled by LocalStorageService
 
   Future<void> _openExternalUrl(String url) async {
     try {

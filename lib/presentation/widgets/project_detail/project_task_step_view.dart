@@ -15,7 +15,7 @@ import '../step_item/step_container.dart';
 import '../step_item/step_tasklist.dart';
 import '../utils/popup/step_dialog.dart';
 import '../utils/popup/task_creation_dialog.dart';
-import '../../screens/project_detail/project_detail_screen.dart' show projectProvider;
+// projectProvider removed
 
 class ProjectTaskStepView extends ConsumerStatefulWidget {
   final String projectPath;
@@ -68,7 +68,17 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
         _initializeControllers('unassigned', tasksByStep['unassigned'] ?? const <Task>[]);
 
         // Determine flow state for gating edits
-        final project = ref.watch(projectProvider(widget.projectPath)).asData?.value;
+        final encoded = widget.projectPath.replaceAll('@', '%40');
+        final project = ref.watch(calendarListProvider).maybeWhen(
+          data: (cals) {
+            try {
+              return cals.firstWhere((c) => c.path == encoded);
+            } catch (_) {
+              return null;
+            }
+          },
+          orElse: () => null,
+        );
         final isFlow = project?.flowitAsFlow == true;
         final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
         final isOngoingFlow = isFlow && status == 'ONGOING';
@@ -494,7 +504,17 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
 
   Future<void> _toggleTaskComplete(BuildContext context, WidgetRef ref, Task task) async {
     // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
-    final project = ref.read(projectProvider(widget.projectPath)).asData?.value;
+    final encoded = widget.projectPath.replaceAll('@', '%40');
+    final project = ref.read(calendarListProvider).maybeWhen(
+      data: (cals) {
+        try {
+          return cals.firstWhere((c) => c.path == encoded);
+        } catch (_) {
+          return null;
+        }
+      },
+      orElse: () => null,
+    );
     final stepRepo = ref.read(stepRepositoryProvider);
     ProjectStep? step;
     if (task.stepId != null && task.stepId!.isNotEmpty) {

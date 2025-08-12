@@ -306,9 +306,6 @@ class ValidatorService {
   }
   
   /// Private helper methods
-  
-
-  
   static Map<String, dynamic> _migrateFormQuestion(Map<String, dynamic> question) {
     final type = question['questiontype'] as String?;
     final id = question['questionid'] as String? ?? const Uuid().v4();

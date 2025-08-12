@@ -29,7 +29,7 @@ class ExternalEventCard extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     
     // Determine if event is all-day
-    final isAllDay = event.isAllDay ?? false;
+    final isAllDay = event.isAllDay;
     
     // Format time display using timezone-aware utilities
     String timeDisplay = '';
@@ -204,7 +204,7 @@ class ExternalEventCard extends ConsumerWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
+                              event.summary.isNotEmpty == true ? event.summary : 'Untitled Event',
                               style: textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w500,
                               ),
@@ -300,7 +300,7 @@ class ExternalEventCard extends ConsumerWidget {
               // Event content
               Expanded(
                 child: Text(
-                  event.summary?.isNotEmpty == true ? event.summary! : 'Untitled Event',
+                  event.summary.isNotEmpty == true ? event.summary : 'Untitled Event',
                   style: textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w500,
                     fontSize: 13,

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../services/export_import_service.dart';
 import '../services/kanban_service.dart';
+import '../services/workflow_service.dart';
 import '../services/status_service.dart';
 import '../services/storage/file_upload_queue_service.dart';
 import '../services/storage/offline_file_service.dart';
@@ -25,6 +26,7 @@ import '../models/user_preferences.dart';
 import '../models/external_calendar.dart';
 import '../models/calendar_event.dart';
 import 'providers_repositories.dart';
+import 'providers_project.dart';
 import '../services/integration/external_caldav_calendar/external_sync_service.dart';
 import 'providers_storage.dart';
 // caldav service family is defined in providers_services_caldav
@@ -84,6 +86,19 @@ final kanbanServiceProvider = Provider<KanbanService>((ref) {
   );
 });
 
+final workflowServiceProvider = Provider<WorkflowService>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final service = WorkflowService(calendarRepository);
+  // Optionally wire repositories if needed by the service
+  try {
+    // ignore: avoid_dynamic_calls
+    service.setStepRepository(ref.watch(stepRepositoryProvider));
+    // ignore: avoid_dynamic_calls
+    service.setTaskRepository(ref.watch(taskRepositoryProvider));
+  } catch (_) {}
+  return service;
+});
+
 final exportImportServiceProvider = Provider<ExportImportService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final taskRepository = ref.watch(taskRepositoryProvider);
@@ -113,6 +128,25 @@ final statusServiceProvider = Provider<StatusService>((ref) {
 final userPreferencesProvider = StreamProvider<UserPreferences>((ref) {
   final userRepository = ref.watch(userRepositoryProvider);
   return userRepository.watchUserPreferences();
+});
+
+// Account status providers
+final hasActiveAccountProvider = FutureProvider<bool>((ref) async {
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final result = await accountRepository.hasActiveAccount();
+  return result.when(
+    success: (has) => has,
+    failure: (_) => false,
+  );
+});
+
+final activeAccountProvider = FutureProvider<CaldavAccount?>((ref) async {
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final result = await accountRepository.getActiveAccount();
+  return result.when(
+    success: (acc) => acc,
+    failure: (_) => null,
+  );
 });
 
 final userSyncServiceProvider = Provider<UserSyncService>((ref) {
@@ -232,6 +266,53 @@ final enabledExternalEventListProvider = Provider<AsyncValue<List<CalendarEvent>
     return AsyncValue.data(filteredEvents);
   }
   return const AsyncValue.loading();
+});
+
+// Sync status providers
+final syncStatusStreamProvider = StreamProvider<SyncStatus>((ref) {
+  final syncService = ref.watch(syncServiceProvider);
+  return syncService.statusStream;
+});
+
+final currentSyncStatusProvider = Provider<SyncStatus>((ref) {
+  final syncService = ref.watch(syncServiceProvider);
+  return syncService.status;
+});
+
+// Available domains provider - reacts to calendar list
+final availableDomainsProvider = FutureProvider<List<String>>((ref) async {
+  final domainService = ref.watch(domainServiceProvider);
+  // Recompute when calendars change
+  ref.watch(calendarListProvider);
+  final result = await domainService.getAvailableDomains();
+  return result.when(success: (d) => d, failure: (_) => <String>[]);
+});
+
+// Project sharing notification providers
+final projectSharedNotificationProvider = Provider.family<AsyncValue<bool>, String>((ref, projectId) {
+  final userPreferencesAsync = ref.watch(userPreferencesProvider);
+  return userPreferencesAsync.when(
+    data: (prefs) {
+      final sharedProject = prefs.getSharedProject(projectId);
+      final hasNotification = sharedProject != null && !sharedProject.ack;
+      return AsyncValue.data(hasNotification);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (err, st) => AsyncValue.error(err, st),
+  );
+});
+
+final projectSharedByProvider = Provider.family<AsyncValue<String>, String>((ref, projectId) {
+  final userPreferencesAsync = ref.watch(userPreferencesProvider);
+  return userPreferencesAsync.when(
+    data: (prefs) {
+      final sharedProject = prefs.getSharedProject(projectId);
+      final sourceEmail = sharedProject?.sourceUserEmail ?? '';
+      return AsyncValue.data(sourceEmail);
+    },
+    loading: () => const AsyncValue.loading(),
+    error: (err, st) => AsyncValue.error(err, st),
+  );
 });
 
 // CalDAV Monitor provider with DI

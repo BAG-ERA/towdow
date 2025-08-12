@@ -11,7 +11,7 @@ import '../../../core/logger.dart';
 import '../../widgets/kanban_board.dart';
 import '../utils/popup/task_creation_dialog.dart';
 import '../../../data/models/step.dart';
-import '../../screens/project_detail/project_detail_screen.dart' show projectProvider;
+// projectProvider removed; use calendarListProvider to read project state
 
 class ProjectKanbanView extends ConsumerWidget {
   final String projectPath;
@@ -168,7 +168,17 @@ class ProjectKanbanView extends ConsumerWidget {
       },
       onTaskToggle: (task) async {
         // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
-        final project = ref.read(projectProvider(projectPath)).asData?.value;
+        final encoded = projectPath.replaceAll('@', '%40');
+        final project = ref.read(calendarListProvider).maybeWhen(
+          data: (cals) {
+            try {
+              return cals.firstWhere((c) => c.path == encoded);
+            } catch (_) {
+              return null;
+            }
+          },
+          orElse: () => null,
+        );
         final stepRepo = ref.read(stepRepositoryProvider);
         ProjectStep? step;
         if (task.stepId != null && task.stepId!.isNotEmpty) {

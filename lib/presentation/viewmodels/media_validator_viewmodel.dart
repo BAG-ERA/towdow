@@ -554,13 +554,11 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
       // Download image bytes from S3
       final downloadResult = await _downloadFromS3(s3Key, validatorId);
       
-      if (downloadResult != null) {
-        // Cache the downloaded image locally
-        _imageCache[fileId] = downloadResult; // Cache the data
-        return downloadResult;
-      }
+ 
+      // Cache the downloaded image locally
+      _imageCache[fileId] = downloadResult; // Cache the data
+      return downloadResult;
       
-      return null;
     } catch (e) {
       AppLogger.debug('MediaValidatorViewModel: Failed to download and cache image: $e');
       return null;
