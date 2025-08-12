@@ -12,16 +12,20 @@ import '../repositories/account_repository.dart';
 import 'caldav/caldav_properties_service.dart';
 import 'webdav_client.dart';
 import 'sync/sync_service.dart';
+import '../repositories/calendar_repository.dart' show SyncCommander;
 
 class KanbanService {
   final CalendarRepository _calendarRepository;
   final AccountRepository _accountRepository;
+  final SyncCommander? _sync;
 
   KanbanService({
     required CalendarRepository calendarRepository,
     required AccountRepository accountRepository,
+    SyncCommander? sync,
   })  : _calendarRepository = calendarRepository,
-        _accountRepository = accountRepository;
+        _accountRepository = accountRepository,
+        _sync = sync;
 
   /// Load kanbans for a project, creating default if none exist
   Future<Result<List<Kanban>>> loadKanbansForProject(String projectPath) async {
@@ -227,7 +231,7 @@ class KanbanService {
                 AppLogger.info('KanbanService: Saved kanban locally for project $projectPath');
                 
                 // Always use sync queue for offline resilience
-                final syncService = SyncService.instance;
+                final syncService = _sync ?? SyncService.instance;
                 if (syncService != null) {
                   AppLogger.debug('KanbanService: Queuing calendar update for kanban sync');
                   final queueResult = await syncService.queueCalendarUpdate(updatedCalendar.path);
@@ -242,7 +246,7 @@ class KanbanService {
                     },
                   );
                 } else {
-                  AppLogger.error('KanbanService: SyncService singleton not initialized - kanban sync skipped');
+                  AppLogger.error('KanbanService: SyncService commander not available - kanban sync skipped');
                 }
               },
               failure: (failure) async {

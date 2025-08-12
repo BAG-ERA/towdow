@@ -33,6 +33,17 @@ import 'providers_storage.dart';
 import '../services/domain_service.dart' as caldav_domain;
 // import '../../core/app_lifecycle_manager.dart';
 import '../../core/logger.dart';
+import '../services/sync/sync_commander_provider.dart';
+
+/// Feature flag: whether file features (S3, file/media validators, attachments)
+/// are enabled for the current active account. Disabled for `providerType == 'custom'`.
+final fileFeaturesEnabledProvider = Provider<bool>((ref) {
+  final activeAccount = ref.watch(activeAccountProvider);
+  return activeAccount.maybeWhen(
+    data: (acc) => acc != null && acc.providerType != 'custom',
+    orElse: () => false,
+  );
+});
 
 final offlineFileServiceProvider = Provider<OfflineFileService>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
@@ -88,7 +99,8 @@ final kanbanServiceProvider = Provider<KanbanService>((ref) {
 
 final workflowServiceProvider = Provider<WorkflowService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
-  final service = WorkflowService(calendarRepository);
+  final commander = ref.watch(syncCommanderProvider);
+  final service = WorkflowService(calendarRepository, sync: commander);
   // Optionally wire repositories if needed by the service
   try {
     // ignore: avoid_dynamic_calls
@@ -121,7 +133,8 @@ final domainServiceProvider = Provider<caldav_domain.DomainService>((ref) {
 final statusServiceProvider = Provider<StatusService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final localStorageService = ref.watch(localStorageServiceProvider);
-  return StatusService(calendarRepository, localStorageService);
+  final commander = ref.watch(syncCommanderProvider);
+  return StatusService(calendarRepository, localStorageService, sync: commander);
 });
 
 // User preferences stream (from UserRepository)

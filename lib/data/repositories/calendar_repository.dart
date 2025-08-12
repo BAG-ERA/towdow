@@ -14,6 +14,7 @@ abstract class SyncCommander {
   Future<Result<void>> queueCalendarUpdate(String calendarPath);
   Future<Result<void>> queueCalendarDeletion(String calendarPath);
   Future<Result<void>> queueExitShare(String calendarPath);
+  Future<Result<void>> queueCalendarCreation(String calendarPath);
 }
 // import '../services/share_service.dart';
 

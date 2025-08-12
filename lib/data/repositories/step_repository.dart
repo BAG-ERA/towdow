@@ -7,18 +7,20 @@ import '../models/task_calendar.dart';
 import 'calendar_repository.dart';
 import 'task_repository.dart';
 import '../services/sync/sync_service.dart';
+import 'calendar_repository.dart' show SyncCommander;
 import '../../core/result.dart';
 import '../../core/logger.dart';
 
 class StepRepository {
   final CalendarRepository _calendarRepository;
   final TaskRepository _taskRepository;
+  final SyncCommander? _sync;
 
   final Map<String, ProjectStep> _stepCache = {};
   final Map<String, Set<String>> _projectStepsMap = {};
   String? _lastSignature;
 
-  StepRepository(this._calendarRepository, this._taskRepository);
+  StepRepository(this._calendarRepository, this._taskRepository, {SyncCommander? sync}) : _sync = sync;
 
   Future<Result<void>> initialize() async {
     AppLogger.info('StepRepository: Initializing step cache');
@@ -445,7 +447,7 @@ class StepRepository {
   }
 
   Future<void> _queueCalendarUpdate(String path) async {
-    final sync = SyncService.instance;
+    final sync = _sync ?? SyncService.instance;
     if (sync != null) {
       await sync.queueCalendarUpdate(path);
     }

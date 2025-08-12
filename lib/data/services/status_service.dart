@@ -8,13 +8,15 @@ import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
 import 'storage/local_storage_service.dart';
 import 'sync/sync_service.dart';
+import '../repositories/calendar_repository.dart' show SyncCommander;
 
 /// Service for managing project statuses and status-related operations
 class StatusService {
   final CalendarRepository _calendarRepository;
   final LocalStorageService _localStorageService;
+  final SyncCommander? _sync;
 
-  StatusService(this._calendarRepository, this._localStorageService);
+  StatusService(this._calendarRepository, this._localStorageService, {SyncCommander? sync}) : _sync = sync;
 
   /// Create a new status
   Future<Result<void>> createStatus(String status) async {
@@ -178,8 +180,8 @@ class StatusService {
       AppLogger.info('StatusService: Calendar path: ${calendar.path}');
       AppLogger.info('StatusService: Status value: ${calendar.flowitStatus ?? "(null)"}');
       
-      // Always use sync queue for offline resilience
-      final syncService = SyncService.instance;
+      // Always use sync queue for offline resilience (prefer injected commander)
+      final syncService = _sync ?? SyncService.instance;
       if (syncService != null) {
         AppLogger.debug('StatusService: Queuing calendar update for status sync');
         final queueResult = await syncService.queueCalendarUpdate(calendar.path);

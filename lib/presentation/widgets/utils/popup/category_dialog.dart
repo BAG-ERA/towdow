@@ -430,8 +430,8 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
               TextField(
                 controller: controller,
                 decoration: InputDecoration(
-                  labelText: AppLocalizations.of(context)!.categoryName ?? 'Category name *',
-                  hintText: AppLocalizations.of(context)!.enterNewCategoryName ?? 'Enter new category name',
+                  labelText: AppLocalizations.of(context)!.categoryName,
+                  hintText: AppLocalizations.of(context)!.enterNewCategoryName,
                   border: const OutlineInputBorder(),
                 ),
                 autofocus: true,
@@ -707,8 +707,8 @@ class _CategoryDialogState extends ConsumerState<CategoryDialog> {
                 TextField(
                   controller: nameController,
                   decoration: InputDecoration(
-                    labelText: AppLocalizations.of(context)!.categoryName ?? 'Category name *',
-                    hintText: AppLocalizations.of(context)!.categoryName ?? 'e.g., Urgent, In Progress, Review',
+                    labelText: AppLocalizations.of(context)!.categoryName,
+                    hintText: 'e.g., Urgent, In Progress, Review',
                     border: const OutlineInputBorder(),
                   ),
                   autofocus: true,

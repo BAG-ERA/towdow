@@ -7,6 +7,7 @@ import '../models/category.dart';
 import '../models/task_calendar.dart';
 import 'calendar_repository.dart';
 import '../services/sync/sync_service.dart';
+import 'calendar_repository.dart' show SyncCommander;
 import 'account_repository.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
@@ -16,13 +17,15 @@ import '../../core/logger.dart';
 class CategoryRepository {
   final CalendarRepository _calendarRepository;
   final AccountRepository _accountRepository;
+  final SyncCommander? _sync;
   
   // Category cache and project mapping
   final Map<String, Category> _categoryCache = {};
   final Map<String, Set<String>> _projectCategoriesMap = {};
   final Map<String, StreamController<List<Category>>> _projectStreams = {};
   
-  CategoryRepository(this._calendarRepository, this._accountRepository);
+  CategoryRepository(this._calendarRepository, this._accountRepository, {SyncCommander? sync})
+      : _sync = sync;
   
   /// Initialize the repository by loading all categories from projects
   Future<Result<void>> initialize() async {
@@ -422,8 +425,8 @@ class CategoryRepository {
       AppLogger.info('CategoryRepository: Calendar path: ${calendar.path}');
       AppLogger.info('CategoryRepository: Categories value: ${calendar.projectCategories}');
       
-      // Always use sync queue for offline resilience
-      final syncService = SyncService.instance;
+      // Always use sync queue for offline resilience (injected commander preferred)
+      final syncService = _sync ?? SyncService.instance;
       if (syncService != null) {
         AppLogger.debug('CategoryRepository: Queuing calendar update for category sync');
         final queueResult = await syncService.queueCalendarUpdate(calendar.path);

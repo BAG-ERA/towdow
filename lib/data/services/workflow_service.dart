@@ -13,14 +13,16 @@ import '../models/step.dart';
 import '../models/requirement.dart';
 // No direct use here; step creation is delegated to repository
 import 'sync/sync_service.dart';
+import '../repositories/calendar_repository.dart' show SyncCommander;
 import 'dart:convert';
 
 class WorkflowService {
   final CalendarRepository _calendarRepository;
   StepRepository? _stepRepository; // injected lazily to avoid cycles
   TaskRepository? _taskRepository; // injected lazily to avoid cycles
+  final SyncCommander? _sync;
 
-  WorkflowService(this._calendarRepository);
+  WorkflowService(this._calendarRepository, {SyncCommander? sync}) : _sync = sync;
 
   void setStepRepository(StepRepository stepRepository) {
     _stepRepository = stepRepository;
@@ -125,7 +127,7 @@ class WorkflowService {
       }
 
       // Queue calendar creation on server
-      final syncService = SyncService.instance;
+      final syncService = _sync ?? SyncService.instance;
       if (syncService != null) {
         await syncService.queueCalendarCreation(newCalendar.path);
       }
@@ -335,7 +337,7 @@ class WorkflowService {
 
   Future<Result<void>> _queueCalendarUpdate(TaskCalendar calendar) async {
     try {
-      final syncService = SyncService.instance;
+      final syncService = _sync ?? SyncService.instance;
       if (syncService == null) {
         return Result.failure(const Failure(message: 'SyncService not initialized'));
       }
