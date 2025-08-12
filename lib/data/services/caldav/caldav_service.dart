@@ -442,6 +442,7 @@ class CalDAVService implements ICalDAVService {
     <FLOWIT:requirements/>
     <FLOWIT:steps/>
     <FLOWIT:sharedWith/>
+    <FLOWIT:author/>
   </D:prop>
 </D:propfind>''';
 

@@ -157,6 +157,7 @@ class XMLResponseParser {
         final flowitAsFlowStr = _extractFlowItPropertyWithPrefixes(responseContent, 'asflow', globalFlowItPrefixes);
         final flowitAsFlow = flowitAsFlowStr?.toLowerCase() == 'true';
         final flowitOwner = _extractFlowItPropertyWithPrefixes(responseContent, 'owner', globalFlowItPrefixes);
+        final flowitAuthor = _extractFlowItPropertyWithPrefixes(responseContent, 'author', globalFlowItPrefixes);
         final flowitTemplate = _extractFlowItPropertyWithPrefixes(responseContent, 'template', globalFlowItPrefixes);
         final flowitStatus = _extractFlowItPropertyWithPrefixes(responseContent, 'status', globalFlowItPrefixes);
         final flowitKanban = _extractFlowItPropertyWithPrefixes(responseContent, 'kanban', globalFlowItPrefixes);
@@ -174,6 +175,7 @@ class XMLResponseParser {
             flowitType: flowitType,
             flowitAsFlow: flowitAsFlow,
             flowitOwner: flowitOwner,
+            flowitAuthor: flowitAuthor,
             flowitTemplate: flowitTemplate,
             flowitStatus: flowitStatus,
             flowitKanban: flowitKanban,
