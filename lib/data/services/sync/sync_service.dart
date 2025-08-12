@@ -46,6 +46,7 @@ class SyncQueueItem {
   final Map<String, dynamic> data;
   final DateTime createdAt;
   final int retryCount;
+  final DateTime? nextAttemptAt;
 
   SyncQueueItem({
     required this.id,
@@ -54,10 +55,12 @@ class SyncQueueItem {
     required this.data,
     required this.createdAt,
     this.retryCount = 0,
+    this.nextAttemptAt,
   });
 
   SyncQueueItem copyWith({
     int? retryCount,
+    DateTime? nextAttemptAt,
   }) {
     return SyncQueueItem(
       id: id,
@@ -66,6 +69,7 @@ class SyncQueueItem {
       data: data,
       createdAt: createdAt,
       retryCount: retryCount ?? this.retryCount,
+      nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
     );
   }
 }
@@ -93,7 +97,7 @@ class SyncResult {
 /// - In production, `caldavFactory` builds a concrete `CalDAVService`.
 /// - In tests, override `SyncService.caldavFactory = (_) => mock;` to fully
 ///   control server interactions (create/update/delete/report) without network.
-class SyncService {
+class SyncService implements SyncCommander {
   static SyncService? _instance;
   static CalDavTaskService Function(CaldavAccount) taskServiceFactory =
       (account) => CalDavTaskService(account: account);
@@ -166,6 +170,7 @@ class SyncService {
   SyncStatus _status = SyncStatus.idle;
   DateTime? _lastSyncTime;
   Timer? _periodicSyncTimer;
+  Timer? _scheduledSyncTimer;
   final _statusController = StreamController<SyncStatus>.broadcast();
   final _progressController = StreamController<double>.broadcast();
 
@@ -925,11 +930,8 @@ class SyncService {
 
       return await result.when(
         success: (_) async {
-          // AppLogger.debug('SyncService: Queued ${operation.name} operation for $itemId');
-          
-          // IMMEDIATE SYNC: Trigger sync immediately instead of waiting for timer
-          _triggerImmediateSync();
-          
+          // Schedule a near-immediate sync without microtask retry loops
+          _scheduleSyncAfter(const Duration(milliseconds: 100));
           return const Result.success(null);
         },
         failure: (failure) async {
@@ -946,22 +948,18 @@ class SyncService {
     }
   }
 
-  /// Trigger immediate sync (called after queuing operations)
-  void _triggerImmediateSync() {
-    // Use Future.microtask to avoid blocking the current operation
-    Future.microtask(() async {
+  void _scheduleSyncAfter(Duration delay) {
+    // Coalesce schedules; if one is already pending, keep it
+    if (_scheduledSyncTimer != null && _scheduledSyncTimer!.isActive) {
+      return;
+    }
+    _scheduledSyncTimer = Timer(delay, () async {
       try {
-        final result = await syncAllActiveCaldav();
-        result.when(
-          success: (syncResult) {
-            // Sync completed successfully
-          },
-          failure: (failure) {
-            // Sync failed, will retry later
-          },
-        );
+        await syncAllActiveCaldav();
       } catch (e, stackTrace) {
-        AppLogger.error('SyncService: Error during immediate sync', e, stackTrace);
+        AppLogger.error('SyncService: Error during scheduled sync', e, stackTrace);
+      } finally {
+        _scheduledSyncTimer = null;
       }
     });
   }
@@ -1256,8 +1254,12 @@ class SyncService {
 
           //AppLogger.debug('🔄 SyncService: Found ${queueItems.length} queued operations for calendar $calendarPath');
 
+          final now = DateTime.now();
           for (final item in queueItems) {
             try {
+              if (item.nextAttemptAt != null && now.isBefore(item.nextAttemptAt!)) {
+                continue;
+              }
               await _processSyncQueueItem(item, caldavTask);
               // Remove from queue on success
               await _localStorage.delete(syncQueueBoxName, item.id);
@@ -1271,9 +1273,13 @@ class SyncService {
                 errors.add('Max retries reached for item ${item.id}: $e');
                 await _localStorage.delete(syncQueueBoxName, item.id);
               } else {
-                // Increment retry count
-                final updatedItem = item.copyWith(retryCount: item.retryCount + 1);
+                final delay = _computeBackoffDelay(item.retryCount);
+                final updatedItem = item.copyWith(
+                  retryCount: item.retryCount + 1,
+                  nextAttemptAt: DateTime.now().add(delay),
+                );
                 await _localStorage.put(syncQueueBoxName, item.id, _mapFromSyncQueueItem(updatedItem));
+                _scheduleSyncAfter(delay);
               }
             }
           }
@@ -1303,7 +1309,11 @@ class SyncService {
               .toList();
 
           // Find queue items for calendars that no longer exist locally
+          final now = DateTime.now();
           for (final item in queueItems) {
+            if (item.nextAttemptAt != null && now.isBefore(item.nextAttemptAt!)) {
+              continue;
+            }
             final calendarPath = item.data['calendarPath'] as String?;
             if (calendarPath != null) {
               final calendarResult = await _calendarRepository.getById(calendarPath);
@@ -1323,9 +1333,13 @@ class SyncService {
                         errors.add('Max retries reached for orphaned item ${item.id}: $e');
                         await _localStorage.delete(syncQueueBoxName, item.id);
                       } else {
-                        // Increment retry count
-                        final updatedItem = item.copyWith(retryCount: item.retryCount + 1);
+                        final delay = _computeBackoffDelay(item.retryCount);
+                        final updatedItem = item.copyWith(
+                          retryCount: item.retryCount + 1,
+                          nextAttemptAt: DateTime.now().add(delay),
+                        );
                         await _localStorage.put(syncQueueBoxName, item.id, _mapFromSyncQueueItem(updatedItem));
+                        _scheduleSyncAfter(delay);
                       }
                     }
                   }
@@ -1358,10 +1372,14 @@ class SyncService {
               .cast<SyncQueueItem>()
               .toList();
 
+          final now = DateTime.now();
           for (final item in queueItems) {
             final calendarPath = item.data['calendarPath'] as String?;
             if (calendarPath == null) continue;
             if (includedCalendarPaths.contains(calendarPath)) continue; // already processed in regular loop
+            if (item.nextAttemptAt != null && now.isBefore(item.nextAttemptAt!)) {
+              continue;
+            }
 
             // Ensure the calendar exists locally; if it does, process its queue now
             final calendarResult = await _calendarRepository.getById(calendarPath);
@@ -1376,8 +1394,13 @@ class SyncService {
                       errors.add('Max retries reached for item ${item.id}: $e');
                       await _localStorage.delete(syncQueueBoxName, item.id);
                     } else {
-                      final updatedItem = item.copyWith(retryCount: item.retryCount + 1);
+                      final delay = _computeBackoffDelay(item.retryCount);
+                      final updatedItem = item.copyWith(
+                        retryCount: item.retryCount + 1,
+                        nextAttemptAt: DateTime.now().add(delay),
+                      );
                       await _localStorage.put(syncQueueBoxName, item.id, _mapFromSyncQueueItem(updatedItem));
+                      _scheduleSyncAfter(delay);
                     }
                   }
                 }
@@ -1611,6 +1634,8 @@ class SyncService {
       // Cancel any active timers
       _instance!._periodicSyncTimer?.cancel();
       _instance!._periodicSyncTimer = null;
+      _instance!._scheduledSyncTimer?.cancel();
+      _instance!._scheduledSyncTimer = null;
       
       // Close stream controllers
       await _instance!._statusController.close();
@@ -1636,6 +1661,7 @@ class SyncService {
       'data': item.data,
       'createdAt': item.createdAt.toIso8601String(),
       'retryCount': item.retryCount,
+      'nextAttemptAt': item.nextAttemptAt?.toIso8601String(),
     };
   }
 
@@ -1668,6 +1694,9 @@ class SyncService {
         data: itemData,
         createdAt: DateTime.parse(data['createdAt'] as String),
         retryCount: data['retryCount'] as int? ?? 0,
+        nextAttemptAt: (data['nextAttemptAt'] as String?) != null
+            ? DateTime.parse(data['nextAttemptAt'] as String)
+            : null,
       );
     } catch (e) {
       AppLogger.error('SyncService: Failed to parse sync queue item', e, StackTrace.current);
@@ -1982,5 +2011,19 @@ class SyncService {
     _statusController.close();
     _progressController.close();
     // AppLogger.info('SyncService: Disposed');
+  }
+  
+  // Compute exponential backoff with base 2s, 2^retryCount, cap at 16s, ±20% jitter
+  Duration _computeBackoffDelay(int retryCount) {
+    const int baseSeconds = 2;
+    final int exponent = (1 << retryCount);
+    int seconds = baseSeconds * exponent;
+    if (seconds > 16) seconds = 16;
+    // Deterministic jitter for testability
+    final micros = DateTime.now().microsecondsSinceEpoch;
+    final jitterPct = 0.8 + (micros % 401) / 1000.0; // 0.8..1.201
+    final millis = (seconds * 1000 * jitterPct).round();
+    final withJitter = Duration(milliseconds: millis);
+    return withJitter < const Duration(seconds: 2) ? const Duration(seconds: 2) : withJitter;
   }
 } 

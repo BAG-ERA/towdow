@@ -35,16 +35,22 @@ class UserPreferencesQueueItem extends HiveObject {
   @HiveField(4)
   final int retryCount;
 
+    // Next time this item can be attempted (exponential backoff gate)
+    @HiveField(5)
+    final DateTime? nextAttemptAt;
+
   UserPreferencesQueueItem({
     required this.id,
     required this.operation,
     required this.data,
     required this.createdAt,
     this.retryCount = 0,
+    this.nextAttemptAt,
   });
 
   UserPreferencesQueueItem copyWith({
     int? retryCount,
+    DateTime? nextAttemptAt,
   }) {
     return UserPreferencesQueueItem(
       id: id,
@@ -52,11 +58,13 @@ class UserPreferencesQueueItem extends HiveObject {
       data: data,
       createdAt: createdAt,
       retryCount: retryCount ?? this.retryCount,
+      nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
     );
   }
 }
 
 class UserPreferencesQueueService {
+  // ignore: unused_field
   final UserRepository _userRepository;
   final UserSyncService _userSyncService;
   final LocalStorageService _localStorage;
@@ -124,38 +132,59 @@ class UserPreferencesQueueService {
         ));
       }
 
-      final processedItems = <UserPreferencesQueueItem>[];
-      final failedItems = <UserPreferencesQueueItem>[];
+      final now = DateTime.now();
+      final updatedItemsById = <String, UserPreferencesQueueItem>{};
+      final successfulIds = <String>{};
+      final failedIds = <String>{};
 
       for (final item in queue) {
+        // Respect backoff gate
+        if (item.nextAttemptAt != null && now.isBefore(item.nextAttemptAt!)) {
+          continue; // leave untouched in queue
+        }
+
         final result = await _processQueueItem(item);
-        
-        final isSuccess = result.when(
-          success: (_) => true,
-          failure: (_) => false,
-        );
-        
+        final isSuccess = result.when(success: (_) => true, failure: (_) => false);
+
         if (isSuccess) {
-          processedItems.add(item);
+          successfulIds.add(item.id);
         } else {
           if (item.retryCount >= _maxRetries) {
-            AppLogger.warning('UserPreferencesQueueService: Item ${item.id} exceeded max retries, marking as failed');
-            failedItems.add(item);
+            AppLogger.warning('UserPreferencesQueueService: Item ${item.id} exceeded max retries, dropping');
+            failedIds.add(item.id);
           } else {
-            // Increment retry count and keep in queue
-            final updatedItem = item.copyWith(retryCount: item.retryCount + 1);
-            processedItems.add(updatedItem);
+            // Exponential backoff with jitter: base 2s, 2^retryCount, capped at 16s, ±20%
+            final base = const Duration(seconds: 2);
+            final exponent = (1 << item.retryCount).clamp(1, 8); // 1,2,4,8 with cap helper
+            Duration rawDelay = Duration(seconds: base.inSeconds * exponent);
+            if (rawDelay.inSeconds > 16) rawDelay = const Duration(seconds: 16);
+            final jitterFactor = 0.8 + (DateTime.now().microsecondsSinceEpoch % 401) / 1000.0; // ~0.8..1.201
+            final jittered = Duration(milliseconds: (rawDelay.inMilliseconds * jitterFactor).round());
+            final updatedItem = item.copyWith(
+              retryCount: item.retryCount + 1,
+              nextAttemptAt: now.add(jittered < const Duration(seconds: 2) ? const Duration(seconds: 2) : jittered),
+            );
+            updatedItemsById[item.id] = updatedItem;
           }
         }
       }
 
-      // Remove processed items from queue
-      queue.removeWhere((item) => processedItems.contains(item));
-      
-      // Save updated queue
-      await _localStorage.put(_queueBoxName, _queueKey, queue);
+      // Rebuild queue with updates, removing successes and exceeded failures
+      final updatedQueue = <UserPreferencesQueueItem>[];
+      for (final original in queue) {
+        if (successfulIds.contains(original.id)) {
+          continue; // drop successes
+        }
+        if (failedIds.contains(original.id)) {
+          continue; // drop exceeded
+        }
+        final updated = updatedItemsById[original.id];
+        updatedQueue.add(updated ?? original);
+      }
 
-      AppLogger.info('UserPreferencesQueueService: Processed ${processedItems.length} items, ${failedItems.length} failed');
+      await _localStorage.put(_queueBoxName, _queueKey, updatedQueue);
+
+      AppLogger.info('UserPreferencesQueueService: Processed ${successfulIds.length} items, ${failedIds.length} dropped, queue size now ${updatedQueue.length}');
       return const Result.success(null);
     } catch (e, stackTrace) {
       AppLogger.error('UserPreferencesQueueService: Failed to process queue', e, stackTrace);

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../presentation/viewmodels/task_viewmodel.dart';
 import '../../presentation/viewmodels/caldav_settings_viewmodel.dart';
 import '../../presentation/viewmodels/project_list_viewmodel.dart';
+import '../../presentation/viewmodels/external_calendar_viewmodel.dart';
 import '../../presentation/viewmodels/validator_viewmodel.dart';
 import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
 import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
@@ -109,6 +110,15 @@ final workflowListViewModelProvider = StateNotifierProvider<ProjectListViewModel
   final accountRepository = ref.watch(accountRepositoryProvider);
   final userRepository = ref.watch(userRepositoryProvider);
   return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository, workflowsMode: true);
+});
+
+final externalCalendarViewModelProvider = StateNotifierProvider<ExternalCalendarViewModel, ExternalCalendarState>((ref) {
+  return ExternalCalendarViewModel(
+    ref.watch(externalAccountRepositoryProvider),
+    ref.watch(externalCalendarRepositoryProvider),
+    ref.watch(externalEventRepositoryProvider),
+    ref.watch(externalCalendarSyncServiceProvider),
+  );
 });
 
 

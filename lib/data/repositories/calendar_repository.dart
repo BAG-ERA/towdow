@@ -7,9 +7,15 @@ import '../../core/logger.dart';
 import '../models/task_calendar.dart';
 import '../services/storage/local_storage_service.dart';
 import '../services/sync/sync_service.dart';
-// import '../services/share_service.dart';
 import 'account_repository.dart';
 import 'user_repository.dart';
+// Keep interfaces together after imports
+abstract class SyncCommander {
+  Future<Result<void>> queueCalendarUpdate(String calendarPath);
+  Future<Result<void>> queueCalendarDeletion(String calendarPath);
+  Future<Result<void>> queueExitShare(String calendarPath);
+}
+// import '../services/share_service.dart';
 
 // Abstract repository interface
 abstract class CalendarRepository {
@@ -49,10 +55,14 @@ abstract class CalendarRepository {
 class LocalCalendarRepository implements CalendarRepository {
   final LocalStorageService _storageService;
   // Kept for future use (sharing-related flows during discovery/sync)
+  // ignore: unused_field
   final AccountRepository _accountRepository;
+  // ignore: unused_field
   final UserRepository _userRepository;
+  final SyncCommander? _sync;
 
-  LocalCalendarRepository(this._storageService, this._accountRepository, this._userRepository);
+  LocalCalendarRepository(this._storageService, this._accountRepository, this._userRepository, {SyncCommander? sync})
+      : _sync = sync;
 
   @override
   Future<Result<List<TaskCalendar>>> getAll() async {
@@ -128,9 +138,9 @@ class LocalCalendarRepository implements CalendarRepository {
             AppLogger.info('LocalCalendarRepository: Project at $path is SHARED WITH ME, using exitShare API');
             
             // Queue exit share operation
-            final syncService = SyncService.instance;
-            if (syncService != null) {
-              final queueResult = await syncService.queueExitShare(path);
+            final commander = _sync ?? SyncService.instance;
+            if (commander != null) {
+              final queueResult = await commander.queueExitShare(path);
               queueResult.when(
                 success: (_) => AppLogger.info('LocalCalendarRepository: Successfully queued exit share for path: $path'),
                 failure: (failure) => AppLogger.warning('LocalCalendarRepository: Failed to queue exit share: ${failure.message}'),
@@ -140,9 +150,9 @@ class LocalCalendarRepository implements CalendarRepository {
             AppLogger.info('LocalCalendarRepository: Project is owned by me, using delete: ${calendar.displayName}');
             
             // Queue calendar deletion for owned projects
-            final syncService = SyncService.instance;
-            if (syncService != null) {
-              final queueResult = await syncService.queueCalendarDeletion(path);
+            final commander = _sync ?? SyncService.instance;
+            if (commander != null) {
+              final queueResult = await commander.queueCalendarDeletion(path);
               queueResult.when(
                 success: (_) => AppLogger.info('LocalCalendarRepository: Successfully queued calendar deletion for: ${calendar.displayName}'),
                 failure: (failure) => AppLogger.warning('LocalCalendarRepository: Failed to queue calendar deletion: ${failure.message}'),
@@ -478,13 +488,13 @@ class LocalCalendarRepository implements CalendarRepository {
         success: (_) async {
           AppLogger.debug('LocalCalendarRepository: Calendar saved locally, queuing server sync');
           
-          // Always use sync queue for offline resilience via singleton
-          final syncService = SyncService.instance;
-          if (syncService != null) {
+          // Always use sync queue for offline resilience via injected commander (fallback to singleton)
+          final commander = _sync ?? SyncService.instance;
+          if (commander != null) {
             AppLogger.debug('LocalCalendarRepository: SyncService singleton found, queuing calendar update');
             AppLogger.debug('LocalCalendarRepository: Queuing update for calendar path: ${calendar.path}');
             
-            final queueResult = await syncService.queueCalendarUpdate(calendar.path);
+            final queueResult = await commander.queueCalendarUpdate(calendar.path);
             
             return await queueResult.when(
               success: (_) async {
@@ -551,11 +561,11 @@ class LocalCalendarRepository implements CalendarRepository {
   /// Queue calendar update for server sync
   Future<Result<void>> _queueCalendarSync(TaskCalendar calendar) async {
     try {
-      // Use SyncService singleton to queue the calendar update
-      final syncService = SyncService.instance;
-      if (syncService != null) {
+      // Use injected commander (fallback to singleton) to queue the calendar update
+      final commander = _sync ?? SyncService.instance;
+      if (commander != null) {
         AppLogger.debug('CalendarRepository: Queuing calendar update for domain sync');
-        final queueResult = await syncService.queueCalendarUpdate(calendar.path);
+        final queueResult = await commander.queueCalendarUpdate(calendar.path);
         
         return await queueResult.when(
           success: (_) async {

@@ -19,6 +19,8 @@ class ExternalCalendarManagementScreen extends ConsumerStatefulWidget {
 }
 
 class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalendarManagementScreen> {
+  // Local progress indicator for dialog actions
+  // ignore: unused_field
   bool _isLoading = false;
 
   @override
@@ -81,8 +83,9 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
   }
 
   Widget _buildAccountsList() {
+    ref.watch(externalCalendarViewModelProvider);
     return StreamBuilder<List<ExternalCaldavAccount>>(
-      stream: _watchExternalAccounts(),
+      stream: ref.read(externalCalendarViewModelProvider.notifier).accountsStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -222,8 +225,8 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
             _buildDetailRow('Last Sync', _formatDateTime(account.lastSyncAt!)),
           if (account.lastSuccessfulSync != null)
             _buildDetailRow('Last Success', _formatDateTime(account.lastSuccessfulSync!)),
-          _buildDetailRow('Total Calendars', account.totalCalendars?.toString() ?? '0'),
-          _buildDetailRow('Total Events', account.totalEvents?.toString() ?? '0'),
+          _buildDetailRow('Total Calendars', account.totalCalendars.toString()),
+          _buildDetailRow('Total Events', account.totalEvents.toString()),
           const SizedBox(height: 16),
           _buildCalendarsList(account),
         ],
@@ -333,15 +336,7 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
     // The actual data loading is handled by the stream builders
   }
 
-  Stream<List<ExternalCaldavAccount>> _watchExternalAccounts() {
-    try {
-      final repository = ref.read(externalAccountRepositoryProvider);
-      return repository.watchAccounts();
-    } catch (e) {
-      AppLogger.error('ExternalCalendarManagementScreen: Error watching accounts: $e');
-      return Stream.value([]);
-    }
-  }
+  // Removed: _watchExternalAccounts is now unused; StreamBuilder reads directly from VM
 
   Future<List<ExternalCalendar>> _getCalendarsForAccount(String accountId) async {
     try {
@@ -390,46 +385,15 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
 
   Future<void> _toggleAccount(ExternalCaldavAccount account) async {
     setState(() => _isLoading = true);
-    
-    try {
-      final repository = ref.read(externalAccountRepositoryProvider);
-      final result = await repository.setActive(account.id, !account.isActive);
-      
-      result.when(
-        success: (_) async {
-        },
-        failure: (failure) {
-          AppLogger.error('Failed to toggle account: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('Failed to toggle account: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    await ref.read(externalCalendarViewModelProvider.notifier).toggleAccount(account);
+    setState(() => _isLoading = false);
   }
 
 
   Future<void> _syncAccount(ExternalCaldavAccount account) async {
     setState(() => _isLoading = true);
-    
-    try {
-      final syncService = ref.read(externalCalendarSyncServiceProvider);
-      final result = await syncService.syncAccount(account.id);
-      
-      result.when(
-        success: (_) {
-          // Sync completed successfully - no notification needed
-        },
-        failure: (failure) {
-          AppLogger.error('Sync failed: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('Sync error: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    await ref.read(externalCalendarViewModelProvider.notifier).syncAccount(account.id);
+    setState(() => _isLoading = false);
   }
 
   Future<void> _deleteAccount(ExternalCaldavAccount account) async {
@@ -461,70 +425,12 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
     if (!confirmed) return;
 
     setState(() => _isLoading = true);
-    
-    try {
-      // Perform cascading deletion to clean up all associated data
-      final accountRepository = ref.read(externalAccountRepositoryProvider);
-      final calendarRepository = ref.read(externalCalendarRepositoryProvider);
-      final eventRepository = ref.read(externalEventRepositoryProvider);
-      
-      AppLogger.info('ExternalCalendarManagement: Starting cascading deletion for account ${account.id}');
-      
-      // Step 1: Delete all events for this account
-      final deleteEventsResult = await eventRepository.deleteByAccount(account.id);
-      deleteEventsResult.when(
-        success: (_) => AppLogger.info('ExternalCalendarManagement: Deleted events for account ${account.id}'),
-        failure: (failure) => throw Exception('Failed to delete events: ${failure.message}'),
-      );
-      
-      // Step 2: Delete all calendars for this account  
-      final deleteCalendarsResult = await calendarRepository.deleteCalendarsByAccount(account.id);
-      deleteCalendarsResult.when(
-        success: (_) => AppLogger.info('ExternalCalendarManagement: Deleted calendars for account ${account.id}'),
-        failure: (failure) => throw Exception('Failed to delete calendars: ${failure.message}'),
-      );
-      
-      // Step 3: Delete the account itself
-      final deleteAccountResult = await accountRepository.delete(account.id);
-      deleteAccountResult.when(
-        success: (_) => AppLogger.info('ExternalCalendarManagement: Deleted account ${account.id}'),
-        failure: (failure) => throw Exception('Failed to delete account: ${failure.message}'),
-      );
-      
-      // Note: User data upload is handled by queue system during background sync
-      // No need to upload here as it will be handled automatically
-      
-      // Success
-      if (mounted) {
-      }
-      
-    } catch (e) {
-      AppLogger.error('ExternalCalendarManagement: Failed to delete account ${account.id}', e, StackTrace.current);
-      if (mounted) {
-        AppLogger.error('Error deleting calendar: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+    await ref.read(externalCalendarViewModelProvider.notifier).deleteAccount(account);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _toggleCalendar(ExternalCalendar calendar, bool enabled) async {
-    try {
-      final repository = ref.read(externalCalendarRepositoryProvider);
-      final result = await repository.setEnabled(calendar.id, enabled);
-      
-      result.when(
-        success: (_) {
-        },
-        failure: (failure) {
-          AppLogger.error('Failed to toggle calendar: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('Failed to toggle calendar: $e');
-    }
+    await ref.read(externalCalendarViewModelProvider.notifier).toggleCalendar(calendar, enabled);
   }
 
   Future<void> _showColorPicker(ExternalCalendar calendar) async {
@@ -578,7 +484,6 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
         content: SizedBox(
           width: 300,
           child: GridView.builder(
-            shrinkWrap: true,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 6,
               crossAxisSpacing: 8,
@@ -629,28 +534,8 @@ class _ExternalCalendarManagementScreenState extends ConsumerState<ExternalCalen
   }
 
   Future<void> _updateCalendarColor(ExternalCalendar calendar, String? color) async {
-    try {
-      final repository = ref.read(externalCalendarRepositoryProvider);
-      final updatedCalendar = calendar.copyWith(
-        color: color,
-        lastModified: DateTime.now(),
-      );
-      
-      final result = await repository.save(updatedCalendar);
-      
-      result.when(
-        success: (_) {
-          // Color updated successfully - no notification needed
-          // Refresh the UI
-          setState(() {});
-        },
-        failure: (failure) {
-          AppLogger.error('Failed to update color: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('Failed to update color: $e');
-    }
+    await ref.read(externalCalendarViewModelProvider.notifier).updateCalendarColor(calendar, color);
+    if (mounted) setState(() {});
   }
 
   String _formatDateTime(DateTime dateTime) {
