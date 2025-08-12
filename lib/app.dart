@@ -204,6 +204,11 @@ class FlowItApp extends ConsumerWidget {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
+        dialogTheme: const DialogThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ),
         cardTheme: const CardThemeData(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -232,6 +237,11 @@ class FlowItApp extends ConsumerWidget {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
+        dialogTheme: const DialogThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ),
         cardTheme: const CardThemeData(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -290,10 +300,32 @@ class _TaskViewShell extends ConsumerWidget {
     // Account checking is now handled by router redirect
     // This will only be called when user has an active account
     
-    // Set the initial tab and show the home screen
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(selectedTabIndexProvider.notifier).state = initialTab;
-    });
+    // Choose the tab once: default to route tab while loading, then switch to first non-empty
+    final suggestedAsync = ref.watch(suggestedTabIndexProvider(initialTab));
+    final current = ref.watch(selectedTabIndexProvider);
+    final applied = ref.watch(initialTabAppliedProvider(initialTab));
+
+    if (!applied) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Mark as applied so we do it only once per route load
+        ref.read(initialTabAppliedProvider(initialTab).notifier).state = true;
+
+        if (suggestedAsync.isLoading) {
+          if (current != initialTab) {
+            ref.read(selectedTabIndexProvider.notifier).state = initialTab;
+          }
+        } else if (suggestedAsync.hasValue) {
+          final suggestedIndex = suggestedAsync.value ?? initialTab;
+          if (current != suggestedIndex) {
+            ref.read(selectedTabIndexProvider.notifier).state = suggestedIndex;
+          }
+        } else {
+          if (current != initialTab) {
+            ref.read(selectedTabIndexProvider.notifier).state = initialTab;
+          }
+        }
+      });
+    }
     return const HomeScreen();
   }
 } 

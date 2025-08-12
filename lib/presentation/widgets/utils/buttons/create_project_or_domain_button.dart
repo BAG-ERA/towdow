@@ -223,7 +223,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.domain_rounded),
               title: const Text('Domain'),
-              subtitle: const Text('Create a new domain'),
+              subtitle: const Text('Organize projects by business area or client'),
               onTap: () {
                 Navigator.of(context).pop();
                 _showCreateDomainDialog(context);
@@ -232,7 +232,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.folder_rounded),
               title: const Text('Project'),
-              subtitle: const Text('Create a new project'),
+              subtitle: const Text('A workspace for tasks, files, and timelines'),
               onTap: () {
                 Navigator.of(context).pop();
                 _showCreateProjectDialog(context);
@@ -241,7 +241,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.route_rounded),
               title: const Text('Workflow'),
-              subtitle: const Text('Create a new workflow'),
+              subtitle: const Text('Customize statuses and steps for your projects'),
               onTap: () {
                 Navigator.of(context).pop();
                 _showCreateWorkflowDialog(context);
