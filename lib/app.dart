@@ -99,7 +99,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (location.startsWith('/settings')) {
             currentDestination = null; // Settings handled by toolbar
           } else if (location.startsWith('/project/')) {
-            currentDestination = null; // Project details have no main navigation active
+            // Keep Projects tab active when viewing a specific project
+            currentDestination = AppDestination.projects;
+          } else if (location.startsWith('/workflow/')) {
+            // Keep Workflows tab active when viewing a specific workflow
+            currentDestination = AppDestination.workflows;
           } else if (location == '/today' || location == '/') {
             currentDestination = AppDestination.today;
           } else if (location == '/soon') {
