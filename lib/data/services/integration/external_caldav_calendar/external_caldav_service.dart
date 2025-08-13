@@ -277,7 +277,21 @@ class ExternalCalDAVService {
         success: (response) async {
           AppLogger.debug('ExternalCalDAVService: Server response: ${response.statusCode}');
           if (response.statusCode == 207) {
-            final events = VEventParser.parseEventsFromResponse(response.body, calendarUid, account.id);
+            // Preserve href + etag from REPORT by parsing as sync-collection shape
+            final parsed = XMLResponseParser.parseSyncCollectionResponse(response.body);
+            final changes = parsed['changes'] as List<SyncChange>;
+            final events = <CalendarEvent>[];
+            for (final change in changes) {
+              if (change.vtodoContent == null) continue;
+              final event = VEventParser.parseVEventFromCalendarData(
+                change.vtodoContent!,
+                calendarUid,
+                account.id,
+              );
+              if (event != null) {
+                events.add(event.copyWith(etag: change.etag, href: change.href));
+              }
+            }
             AppLogger.info('ExternalCalDAVService: Fetched ${events.length} events from $calendarPath');
             return Result.success(events);
           } else {

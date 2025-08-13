@@ -10,6 +10,7 @@ import '../services/status_service.dart';
 import '../services/storage/file_upload_queue_service.dart';
 import '../services/storage/offline_file_service.dart';
 import '../services/storage/s3_storage_service.dart';
+import '../services/vobject_service.dart';
 import '../services/sync/connection_monitor_service.dart';
 import '../services/sync/sync_orchestrator_service.dart';
 import '../services/sync/sync_service.dart';
@@ -51,13 +52,26 @@ final offlineFileServiceProvider = Provider<OfflineFileService>((ref) {
 });
 
 final fileUploadQueueServiceProvider = Provider<FileUploadQueueService>((ref) {
-  return FileUploadQueueService(
+  final service = FileUploadQueueService(
     localStorage: ref.watch(localStorageServiceProvider),
     offlineFileService: ref.watch(offlineFileServiceProvider),
     accountRepository: ref.watch(accountRepositoryProvider),
     connectionMonitorService: ref.watch(connectionMonitorServiceProvider),
     taskRepository: ref.watch(taskRepositoryProvider),
+    journalRepository: ref.watch(journalRepositoryProvider),
     syncService: ref.watch(syncServiceProvider),
+  );
+  // Inject generic VObjectService so upload pipeline is type-agnostic
+  try {
+    service.setVObjectService(ref.watch(vobjectServiceProvider));
+  } catch (_) {}
+  return service;
+});
+
+final vobjectServiceProvider = Provider<VObjectService>((ref) {
+  return VObjectService(
+    taskRepository: ref.watch(taskRepositoryProvider),
+    journalRepository: ref.watch(journalRepositoryProvider),
   );
 });
 

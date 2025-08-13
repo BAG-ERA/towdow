@@ -13,6 +13,7 @@ import '../../widgets/utils/buttons/archive_project_button.dart';
 import '../../widgets/utils/buttons/exit_share_button.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/journal.dart';
 import '../../../data/models/step.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
@@ -25,6 +26,8 @@ import '../../widgets/project_detail/project_task_list_view.dart';
 import '../../widgets/project_detail/project_kanban_view.dart';
 import '../../widgets/project_detail/project_infos_widget.dart';
 import '../../widgets/project_detail/project_warnings_banner.dart';
+import '../../widgets/project_detail/project_notes_quick_panel.dart';
+import '../../widgets/project_detail/project_note_view.dart';
 
 // ViewModel provider for a specific project
 final projectDetailViewModelProvider = StateNotifierProvider.family<ProjectDetailViewModel, ProjectDetailState, String>((ref, projectPath) {
@@ -62,6 +65,8 @@ class ProjectDetailScreen extends ConsumerStatefulWidget {
 
 class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   int _selectedTabIndex = 0;
+  bool _showNotesPanel = false;
+  Journal? _openedNote;
 
   @override
   void dispose() {
@@ -119,8 +124,99 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               children: [
                 // Project title and full project info (scrollable to avoid overflow)
                 Expanded(
-                  child: SingleChildScrollView(
-                   child: _buildDesktopHeader(context, ref.watch(projectDetailViewModelProvider(widget.projectPath)), tasksAsync),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      SingleChildScrollView(
+                        child: _buildDesktopHeader(context, ref.watch(projectDetailViewModelProvider(widget.projectPath)), tasksAsync),
+                      ),
+                      // Animated note overlay (desktop)
+                      Positioned.fill(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 360),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          transitionBuilder: (child, anim) {
+                            return FadeTransition(
+                              opacity: anim,
+                              child: SlideTransition(
+                                position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(anim),
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: _openedNote != null
+                              ? ProjectNoteView(
+                                  key: const ValueKey('note_open_desktop'),
+                                  journal: _openedNote!,
+                                  onSaved: () {
+                                    setState(() {
+                                      _openedNote = null;
+                                      _showNotesPanel = false;
+                                    });
+                                  },
+                                )
+                              : const SizedBox.shrink(key: ValueKey('note_closed_desktop')),
+                        ),
+                      ),
+                      // Animated quick panel (desktop)
+                      Positioned(
+                        left: 12,
+                        right: 12,
+                        bottom: 16,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 360),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          transitionBuilder: (child, anim) {
+                            return FadeTransition(
+                              opacity: anim,
+                              child: SizeTransition(
+                                sizeFactor: anim,
+                                axisAlignment: -1.0,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: (_showNotesPanel && _openedNote == null)
+                              ? ProjectNotesQuickPanel(
+                                  key: const ValueKey('panel_open_desktop'),
+                                  projectPath: widget.projectPath,
+                                  onOpenNote: (j) => setState(() { _openedNote = j; _showNotesPanel = false; }),
+                                  onCreateNew: () => _createNewNote(),
+                                )
+                              : const SizedBox.shrink(key: ValueKey('panel_closed_desktop')),
+                        ),
+                      ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 56,
+                  width: double.infinity,
+                  child: Center(
+                    child: TextButton.icon(
+                      onPressed: () => setState(() {
+                        if (_openedNote != null) {
+                          _openedNote = null;
+                          _showNotesPanel = false;
+                        } else {
+                          _showNotesPanel = !_showNotesPanel;
+                        }
+                      }),
+                      icon: Icon(_openedNote != null
+                          ? Icons.close_rounded
+                          : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
+                      label: Text(
+                        _openedNote != null
+                            ? 'Close note'
+                            : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -156,6 +252,21 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _createNewNote() async {
+    // Minimal inline creation; could be replaced with a dedicated dialog later
+    final repo = ref.read(journalRepositoryProvider);
+    final j = Journal.createNew(
+      summary: 'Note',
+      description: '',
+      projectPath: widget.projectPath,
+    );
+    await repo.save(j);
+    setState(() {
+      _openedNote = j;
+      _showNotesPanel = false;
+    });
   }
 
   Widget _buildDesktopHeader(BuildContext context, ProjectDetailState vmState, AsyncValue<List<Task>> tasksAsync) {
@@ -220,13 +331,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   Widget _buildMobileLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
-      body: Column(
+      body: Stack(
         children: [
-          // Scrollable content area
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
+          Column(
+            children: [
+              // Scrollable content area
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
                   // Warnings banner on mobile (if any)
                   projectAsync.when(
                     data: (project) => project != null
@@ -359,19 +472,185 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   _buildViewTabs(context),
                   
                   // Content based on selected tab
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.7, // Give content a reasonable height
-                    child: _buildTabContent(context, ref, tasksAsync),
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.7, // Give content a reasonable height
+                        child: _buildTabContent(context, ref, tasksAsync),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
+              
+              // Bottom toolbar with search and create task button (fixed at bottom)
+              TaskListToolbar(
+                projectPath: widget.projectPath,
+                projectName: projectAsync.asData?.value?.displayName,
+              ),
+            ],
+          ),
+
+          // Notes overlays
+          // Animated note overlay
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 360),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              layoutBuilder: (currentChild, previousChildren) {
+                return Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.bottomCenter,
+                  children: <Widget>[
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
+                );
+              },
+              transitionBuilder: (child, anim) {
+                return FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(anim),
+                    child: child,
+                  ),
+                );
+              },
+              child: _openedNote != null
+                  ? ProjectNoteView(
+                      key: const ValueKey('note_open'),
+                      journal: _openedNote!,
+                      onSaved: () {
+                        setState(() {
+                          _openedNote = null;
+                          _showNotesPanel = false;
+                        });
+                      },
+                    )
+                  : const SizedBox.shrink(key: ValueKey('note_closed')),
             ),
           ),
-          
-          // Bottom toolbar with search and create task button (fixed at bottom)
-          TaskListToolbar(
-            projectPath: widget.projectPath,
-            projectName: projectAsync.asData?.value?.displayName,
+
+          // Dim overlay behind quick panel (tap to dismiss)
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 360),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              child: (_showNotesPanel && _openedNote == null)
+                  ? GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _showNotesPanel = false;
+                        });
+                      },
+                      child: Container(color: Colors.black.withOpacity(0.35)),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ),
+
+          // Animated quick panel
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 128, // a bit higher to leave room for shadow halo
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 360),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              layoutBuilder: (currentChild, previousChildren) {
+                return Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.bottomCenter,
+                  children: <Widget>[
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
+                );
+              },
+              transitionBuilder: (child, anim) {
+                return FadeTransition(
+                  opacity: anim,
+                  child: SizeTransition(
+                    sizeFactor: anim,
+                    axisAlignment: -1.0,
+                    child: child,
+                  ),
+                );
+              },
+              child: (_showNotesPanel && _openedNote == null)
+                  ? ProjectNotesQuickPanel(
+                      key: const ValueKey('panel_open'),
+                      projectPath: widget.projectPath,
+                      onOpenNote: (j) => setState(() { _openedNote = j; _showNotesPanel = false; }),
+                      onCreateNew: () => _createNewNote(),
+                    )
+                  : const SizedBox.shrink(key: ValueKey('panel_closed')),
+            ),
+          ),
+
+          // Floating notes button just above search bar (render last so it's always on top)
+          AnimatedPositioned(
+            left: 16,
+            right: 16,
+            bottom: _openedNote != null ? 16 : 64, // nudge closer when closing note
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: SizedBox(
+                height: 40,
+                child: TextButton(
+                  onPressed: () {
+                    setState(() {
+                      if (_openedNote != null) {
+                        _openedNote = null;
+                        _showNotesPanel = false;
+                      } else {
+                        _showNotesPanel = !_showNotesPanel;
+                      }
+                    });
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 360),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        child: Icon(
+                          _openedNote != null
+                              ? Icons.close_rounded
+                              : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded),
+                          key: ValueKey(_openedNote != null
+                              ? 'icon_close'
+                              : (_showNotesPanel ? 'icon_hide' : 'icon_show')),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 360),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        child: Text(
+                          _openedNote != null
+                              ? 'Close note'
+                              : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                          key: ValueKey(_openedNote != null
+                              ? 'label_close'
+                              : (_showNotesPanel ? 'label_hide' : 'label_show')),
+                        ),
+                      ),
+                    ],
+                  ),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                ),
+              ),
+            ),
+            duration: const Duration(milliseconds: 360),
+            curve: Curves.easeOut,
           ),
         ],
       ),

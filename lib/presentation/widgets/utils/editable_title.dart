@@ -11,6 +11,8 @@ class EditableTitle extends StatefulWidget {
   final TextStyle? textStyle;
   final Color? textColor;
   final String? hintText;
+  final bool showActionButtons;
+  final bool saveOnFocusLost;
 
   const EditableTitle({
     super.key,
@@ -20,6 +22,8 @@ class EditableTitle extends StatefulWidget {
     this.textStyle,
     this.textColor,
     this.hintText,
+    this.showActionButtons = true,
+    this.saveOnFocusLost = true,
   });
 
   @override
@@ -37,13 +41,21 @@ class _EditableTitleState extends State<EditableTitle> {
     super.initState();
     _controller = TextEditingController(text: widget.title);
     _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
   }
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChange);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!_focusNode.hasFocus && _isEditing && widget.saveOnFocusLost) {
+      _saveTitle();
+    }
   }
 
   @override
@@ -76,21 +88,23 @@ class _EditableTitleState extends State<EditableTitle> {
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             isDense: true,
-            suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.close, size: 16),
-                  onPressed: _cancelEdit,
-                  tooltip: 'Cancel',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.check, size: 16),
-                  onPressed: _saveTitle,
-                  tooltip: 'Save',
-                ),
-              ],
-            ),
+            suffixIcon: widget.showActionButtons
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 16),
+                        onPressed: _cancelEdit,
+                        tooltip: 'Cancel',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.check, size: 16),
+                        onPressed: _saveTitle,
+                        tooltip: 'Save',
+                      ),
+                    ],
+                  )
+                : null,
           ),
           style: widget.textStyle ?? Theme.of(context).textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w600,
@@ -126,23 +140,24 @@ class _EditableTitleState extends State<EditableTitle> {
               ),
               onSubmitted: (_) => _saveTitle(),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: _cancelEdit,
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _saveTitle,
-                    child: const Text('Save'),
-                  ),
-                ],
+            if (widget.showActionButtons)
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: _cancelEdit,
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _saveTitle,
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       );

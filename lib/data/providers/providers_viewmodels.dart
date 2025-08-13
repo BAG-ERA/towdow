@@ -12,6 +12,11 @@ import '../../presentation/viewmodels/category_viewmodel.dart';
 import '../../presentation/viewmodels/project_kanban_viewmodel.dart';
 import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
 import '../../presentation/viewmodels/step_viewmodel.dart';
+import '../../presentation/viewmodels/project_notes_viewmodel.dart';
+import '../../presentation/viewmodels/note_viewmodel.dart';
+import '../../presentation/viewmodels/journal_file_attachment_viewmodel.dart';
+import '../../presentation/viewmodels/journal_media_attachment_viewmodel.dart';
+import '../../data/models/journal.dart';
 import 'providers_repositories.dart';
 import 'providers_services_core.dart';
 // import '../../presentation/viewmodels/caldav_management_viewmodel.dart';
@@ -119,6 +124,34 @@ final externalCalendarViewModelProvider = StateNotifierProvider<ExternalCalendar
     ref.watch(externalCalendarRepositoryProvider),
     ref.watch(externalEventRepositoryProvider),
     ref.watch(externalCalendarSyncServiceProvider),
+  );
+});
+
+// Notes (journals)
+final projectNotesViewModelProvider = StateNotifierProvider.family<ProjectNotesViewModel, ProjectNotesState, String>((ref, projectPath) {
+  final repo = ref.watch(journalRepositoryProvider);
+  return ProjectNotesViewModel(projectPath: projectPath, journalRepository: repo);
+});
+
+final noteViewModelProvider = StateNotifierProvider.family<NoteViewModel, NoteState, Journal>((ref, Journal journal) {
+  final repo = ref.watch(journalRepositoryProvider);
+  return NoteViewModel(journal, repo);
+});
+
+// Journal attachment ViewModels
+final journalFileAttachmentViewModelProvider = StateNotifierProvider.family<JournalFileAttachmentViewModel, JournalFileAttachmentState, String>((ref, journalUid) {
+  return JournalFileAttachmentViewModel(
+    journalRepository: ref.watch(journalRepositoryProvider),
+    offlineFileService: ref.watch(offlineFileServiceProvider),
+    fileUploadQueueService: ref.watch(fileUploadQueueServiceProvider),
+  );
+});
+
+final journalMediaAttachmentViewModelProvider = StateNotifierProvider.family<JournalMediaAttachmentViewModel, JournalMediaAttachmentState, String>((ref, journalUid) {
+  return JournalMediaAttachmentViewModel(
+    journalRepository: ref.watch(journalRepositoryProvider),
+    offlineFileService: ref.watch(offlineFileServiceProvider),
+    fileUploadQueueService: ref.watch(fileUploadQueueServiceProvider),
   );
 });
 

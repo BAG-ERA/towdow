@@ -41,6 +41,8 @@ class OfflineFile with _$OfflineFile {
     @HiveField(13) @Default(0) int retryCount,
     @HiveField(14) DateTime? lastRetryAt,
     @HiveField(15) String? validatorId, // Optional: for validator-specific files (backward compatibility)
+    @HiveField(16) String? ownerType, // 'task' | 'journal' (generic owner)
+    @HiveField(17) String? ownerUid, // UID of task/journal
   }) = _OfflineFile;
 
   factory OfflineFile.fromJson(Map<String, dynamic> json) => _$OfflineFileFromJson(json);

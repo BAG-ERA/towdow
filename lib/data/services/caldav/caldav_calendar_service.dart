@@ -50,6 +50,7 @@ class CalDavCalendarService {
       <C:supported-calendar-component-set>
         <C:comp name="VTODO"/>
         <C:comp name="VEVENT"/>
+        <C:comp name="VJOURNAL"/>
       </C:supported-calendar-component-set>
       <C:calendar-description><![CDATA[${description ?? 'Created by FlowIt'}]]></C:calendar-description>
       <FLOWIT:type>${asWorkflow ? 'WORKFLOW' : 'PROJECT'}</FLOWIT:type>

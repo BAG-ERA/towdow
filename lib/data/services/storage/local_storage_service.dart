@@ -13,6 +13,7 @@ class LocalStorageService {
   static const String projectsBoxName = 'projects'; // DEPRECATED - kept for migration
   static const String calendarsBoxName = 'calendars'; // Replaces projects
   static const String automatedTasksBoxName = 'automated_tasks';
+  static const String journalsBoxName = 'journals';
   static const String accountsBoxName = 'accounts';
   static const String syncQueueBoxName = 'sync_queue';
   static const String domainsBoxName = 'domains'; // For storing domain names
@@ -36,6 +37,7 @@ class LocalStorageService {
   late Box _projectsBox; // DEPRECATED - kept for migration
   late Box _calendarsBox; // New calendar box
   late Box _automatedTasksBox;
+  late Box _journalsBox;
   late Box _accountsBox;
   late Box _syncQueueBox;
   late Box _domainsBox;
@@ -77,6 +79,7 @@ class LocalStorageService {
       await _initializeBoxSafely(projectsBoxName, 'projects'); 
       await _initializeBoxSafely(calendarsBoxName, 'calendars');
       await _initializeBoxSafely(automatedTasksBoxName, 'automated_tasks');
+      await _initializeBoxSafely(journalsBoxName, 'journals');
       await _initializeBoxSafely(accountsBoxName, 'accounts');
       await _initializeBoxSafely(syncQueueBoxName, 'sync_queue');
       await _initializeBoxSafely(domainsBoxName, 'domains');
@@ -98,6 +101,7 @@ class LocalStorageService {
       _projectsBox = Hive.box(projectsBoxName);
       _calendarsBox = Hive.box(calendarsBoxName);
       _automatedTasksBox = Hive.box(automatedTasksBoxName);
+      _journalsBox = Hive.box(journalsBoxName);
       _accountsBox = Hive.box(accountsBoxName);
       _syncQueueBox = Hive.box(syncQueueBoxName);
       _domainsBox = Hive.box(domainsBoxName);
@@ -184,6 +188,7 @@ class LocalStorageService {
         projectsBoxName,
         calendarsBoxName,
         automatedTasksBoxName,
+        journalsBoxName,
         accountsBoxName,
         syncQueueBoxName,
         domainsBoxName,
@@ -476,6 +481,8 @@ class LocalStorageService {
         return _calendarsBox;
       case automatedTasksBoxName:
         return _automatedTasksBox;
+      case journalsBoxName:
+        return _journalsBox;
       case accountsBoxName:
         return _accountsBox;
       case syncQueueBoxName:
