@@ -53,98 +53,100 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
       children: [
         SizedBox(
           width: 320,
-          child: Stack(
-            clipBehavior: Clip.none,
+          child: Column(
             children: [
-              SingleChildScrollView(
-                child: _buildDesktopHeader(context, projectAsync, tasksAsync),
-              ),
-              // Animated note overlay (desktop)
-              Positioned.fill(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 360),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  transitionBuilder: (child, anim) {
-                    return FadeTransition(
-                      opacity: anim,
-                      child: SlideTransition(
-                        position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(anim),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: _openedNote != null
-                      ? ProjectNoteView(
-                          key: const ValueKey('wf_note_open_desktop'),
-                          journal: _openedNote!,
-                          onSaved: () {
-                            setState(() {
-                              _openedNote = null;
-                              _showNotesPanel = false;
-                            });
-                          },
-                        )
-                      : const SizedBox.shrink(key: ValueKey('wf_note_closed_desktop')),
-                ),
-              ),
-              // Animated quick panel (desktop)
-              Positioned(
-                left: 12,
-                right: 12,
-                bottom: 16,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 360),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    transitionBuilder: (child, anim) {
-                      return FadeTransition(
-                        opacity: anim,
-                        child: SizeTransition(
-                          sizeFactor: anim,
-                          axisAlignment: -1.0,
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: (_showNotesPanel && _openedNote == null)
-                        ? ProjectNotesQuickPanel(
-                            key: const ValueKey('wf_panel_open_desktop'),
-                            projectPath: widget.workflowPath,
-                            onOpenNote: (j) => setState(() { _openedNote = j; _showNotesPanel = false; }),
-                            onCreateNew: () => _createNewNote(),
-                          )
-                        : const SizedBox.shrink(key: ValueKey('wf_panel_closed_desktop')),
-                  ),
-                ),
-              ),
-              // Bottom button row (matches project screen style)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  height: 56,
-                  alignment: Alignment.center,
-                  child: TextButton.icon(
-                    onPressed: () => setState(() {
-                      if (_openedNote != null) {
-                        _openedNote = null;
-                        _showNotesPanel = false;
-                      } else {
-                        _showNotesPanel = !_showNotesPanel;
-                      }
-                    }),
-                    icon: Icon(_openedNote != null
-                        ? Icons.close_rounded
-                        : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
-                    label: Text(
-                      _openedNote != null
-                          ? 'Close note'
-                          : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+              Expanded(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    SingleChildScrollView(
+                      child: _buildDesktopHeader(context, projectAsync, tasksAsync),
                     ),
+                    // Animated note overlay (desktop)
+                    Positioned.fill(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 360),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        transitionBuilder: (child, anim) {
+                          return FadeTransition(
+                            opacity: anim,
+                            child: SlideTransition(
+                              position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(anim),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: _openedNote != null
+                            ? ProjectNoteView(
+                                key: const ValueKey('wf_note_open_desktop'),
+                                journal: _openedNote!,
+                                onSaved: () {
+                                  setState(() {
+                                    _openedNote = null;
+                                    _showNotesPanel = false;
+                                  });
+                                },
+                              )
+                            : const SizedBox.shrink(key: ValueKey('wf_note_closed_desktop')),
+                      ),
+                    ),
+                    // Animated quick panel (desktop)
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 16,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 360),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          transitionBuilder: (child, anim) {
+                            return FadeTransition(
+                              opacity: anim,
+                              child: SizeTransition(
+                                sizeFactor: anim,
+                                axisAlignment: -1.0,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: (_showNotesPanel && _openedNote == null)
+                              ? ProjectNotesQuickPanel(
+                                  key: const ValueKey('wf_panel_open_desktop'),
+                                  projectPath: widget.workflowPath,
+                                  onOpenNote: (j) => setState(() { _openedNote = j; _showNotesPanel = false; }),
+                                  onCreateNew: () => _createNewNote(),
+                                )
+                              : const SizedBox.shrink(key: ValueKey('wf_panel_closed_desktop')),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                height: 56,
+                width: double.infinity,
+                alignment: Alignment.center,
+                child: TextButton.icon(
+                  onPressed: () => setState(() {
+                    if (_openedNote != null) {
+                      _openedNote = null;
+                      _showNotesPanel = false;
+                    } else {
+                      _showNotesPanel = !_showNotesPanel;
+                    }
+                  }),
+                  icon: Icon(_openedNote != null
+                      ? Icons.close_rounded
+                      : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
+                  label: Text(
+                    _openedNote != null
+                        ? 'Close note'
+                        : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
                   ),
                 ),
               ),
@@ -326,7 +328,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
             alignment: Alignment.bottomCenter,
             child: SizedBox(
               height: 40,
-              child: TextButton.icon(
+              child: TextButton(
                 onPressed: () {
                   setState(() {
                     if (_openedNote != null) {
@@ -337,10 +339,32 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
                     }
                   });
                 },
-                icon: Icon(_openedNote != null
-                    ? Icons.close_rounded
-                    : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
-                label: Text(_openedNote != null ? 'Close note' : (_showNotesPanel ? 'Hide notes' : 'Show notes')),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 360),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      child: Icon(
+                        _openedNote != null
+                            ? Icons.close_rounded
+                            : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded),
+                        key: ValueKey(_openedNote != null ? 'wf_icon_close' : (_showNotesPanel ? 'wf_icon_hide' : 'wf_icon_show')),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 360),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      child: Text(
+                        _openedNote != null ? 'Close note' : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                        key: ValueKey(_openedNote != null ? 'wf_label_close' : (_showNotesPanel ? 'wf_label_hide' : 'wf_label_show')),
+                      ),
+                    ),
+                  ],
+                ),
                 style: TextButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.surface,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
