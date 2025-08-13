@@ -184,7 +184,13 @@ class ExitShareButton extends ConsumerWidget {
             final currentRoute = GoRouterState.of(context).uri.path;
             if (currentRoute == '/project/${Uri.encodeComponent(projectPath)}') {
               AppLogger.info('ExitShareButton: Navigating away from exited shared project');
-              context.go('/today');
+              // Prefer returning to Projects list; if workflows context, go to workflows
+              final isWorkflow = projectPath.toUpperCase().contains('WORKFLOW') || projectDisplayName.toUpperCase().contains('WORKFLOW');
+              if (isWorkflow) {
+                context.go('/workflows');
+              } else {
+                context.go('/projects');
+              }
             }
           }
           
