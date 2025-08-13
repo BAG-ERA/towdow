@@ -2018,6 +2018,15 @@ class SyncService implements SyncCommander {
       AppLogger.debug('SyncService: Extracted project path: $projectPath');
       AppLogger.debug('SyncService: Calling ShareService.getProjectMembers...');
       
+      // Determine if this project is shared-with-me (drives delete vs exitShare behavior)
+      bool isSharedWithMeFlag = calendar.isSharedWithMe;
+      try {
+        isSharedWithMeFlag = await sharingService.isSharedWithMe(projectPath);
+        AppLogger.debug('SyncService: isSharedWithMe=$isSharedWithMeFlag for ${calendar.path}');
+      } catch (_) {
+        // Ignore errors; keep existing value
+      }
+      
       // Get current sharing members from API
       final membersResult = await sharingService.getProjectMembers(projectPath);
       await membersResult.when(
@@ -2033,7 +2042,9 @@ class SyncService implements SyncCommander {
           AppLogger.debug('SyncService: Converting members to JSON: $membersJson');
           
           // Update calendar with sharing information
-          final updatedCalendar = calendar.withSharedWith(membersJson);
+          final updatedCalendar = calendar
+              .withSharedWith(membersJson)
+              .copyWith(isSharedWithMe: isSharedWithMeFlag);
           AppLogger.debug('SyncService: Updated calendar sharedWith field: "${updatedCalendar.sharedWith}"');
           
           await _calendarRepository.save(updatedCalendar);
@@ -2044,6 +2055,16 @@ class SyncService implements SyncCommander {
           AppLogger.warning('SyncService: Failed to get sharing info for ${calendar.path}: ${failure.message}');
           AppLogger.debug('SyncService: Sharing API error code: ${failure.code}');
           AppLogger.debug('SyncService: Sharing API error details: ${failure.exception}');
+          // Still persist isSharedWithMe flag if we could compute it
+          if (isSharedWithMeFlag != calendar.isSharedWithMe) {
+            try {
+              final updatedCalendar = calendar.copyWith(isSharedWithMe: isSharedWithMeFlag);
+              await _calendarRepository.save(updatedCalendar);
+              AppLogger.debug('SyncService: Persisted isSharedWithMe=$isSharedWithMeFlag for ${calendar.path}');
+            } catch (_) {
+              // swallow
+            }
+          }
         },
       );
     } catch (e, stackTrace) {
