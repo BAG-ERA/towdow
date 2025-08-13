@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../services/export_import_service.dart';
 import '../services/kanban_service.dart';
+import '../services/deeplink/deep_link_service.dart';
 import '../services/workflow_service.dart';
 import '../services/status_service.dart';
 import '../services/storage/file_upload_queue_service.dart';
@@ -268,6 +269,13 @@ void handleSessionExpired([ProviderRef? ref]) {
     ref.read(sessionEpochProvider.notifier).state++;
   }
 }
+
+// Deep link service provider
+final deepLinkServiceProvider = Provider<DeepLinkService>((ref) {
+  final service = PlatformDeepLinkService();
+  ref.onDispose(service.dispose);
+  return service;
+});
 
 // External calendar data providers
 final externalCalendarListProvider = StreamProvider<List<ExternalCalendar>>((ref) {

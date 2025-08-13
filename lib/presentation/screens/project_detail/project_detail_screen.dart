@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/kanban_board.dart';
@@ -69,6 +70,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   bool _showNotesPanel = false;
   Journal? _openedNote;
   bool _isDetailColumnCollapsed = false; // New state variable for desktop layout
+  String? _pendingTaskUid;
 
   @override
   void dispose() {
@@ -101,6 +103,12 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           // Auto-acknowledge shared project when viewing project detail
           ref.read(projectDetailViewModelProvider(widget.projectPath).notifier)
               .acknowledgeSharedProjectIfNeeded(project);
+
+          // If a task query is present, scroll/focus once tasks are loaded
+          final taskUid = GoRouterState.of(context).uri.queryParameters['task'];
+          if (taskUid != null && taskUid.isNotEmpty) {
+            _pendingTaskUid = taskUid;
+          }
         });
       }
     });
@@ -839,6 +847,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       0 => ProjectTaskListView(
         projectPath: widget.projectPath,
         tasksAsync: tasksAsync,
+        onTasksRefresh: () => _refreshProjectTasks(ref),
+        // If we have a pending task UID from deeplink, hint the list to focus it
+        initialFocusedTaskUid: _pendingTaskUid,
       ),
       1 => _buildTimingView(context, ref, tasksAsync),
       2 => _buildAttendeeView(context, ref, tasksAsync),

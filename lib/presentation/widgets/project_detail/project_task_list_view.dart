@@ -15,12 +15,14 @@ class ProjectTaskListView extends ConsumerStatefulWidget {
   final String projectPath;
   final AsyncValue<List<Task>> tasksAsync;
   final VoidCallback? onTasksRefresh;
+  final String? initialFocusedTaskUid;
 
   const ProjectTaskListView({
     super.key,
     required this.projectPath,
     required this.tasksAsync,
     this.onTasksRefresh,
+    this.initialFocusedTaskUid,
   });
 
   @override
@@ -96,6 +98,15 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
         _initializeControllers('overdue', overdueTasks);
         _initializeControllers('pending', pendingTasks);
         _initializeControllers('completed', completedTasks);
+
+        // If an initial focus UID is provided, expand the right section and scroll it into view
+        if (widget.initialFocusedTaskUid != null) {
+          final uid = widget.initialFocusedTaskUid!;
+          final controller = _sectionControllers['overdue']?[uid] ??
+              _sectionControllers['pending']?[uid] ??
+              _sectionControllers['completed']?[uid];
+          controller?.highlight();
+        }
 
         return Column(
           children: [
