@@ -161,6 +161,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
       final success = await offlineFileResult.when(
         success: (offlineFile) async {
           AppLogger.info('FileValidatorViewModel: File stored locally with ID: ${offlineFile.id}');
+          AppLogger.info('FVVM.enqueue: task=$taskUid validator=$validatorId offlineFileId=${offlineFile.id} size=${fileData.length} contentType=$contentType');
           
           // Create file info for validator (using offline file ID)
           final fileInfo = {
@@ -203,13 +204,16 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
 
           // Queue file for upload
           AppLogger.info('FileValidatorViewModel: Queueing file for upload: ${offlineFile.id}');
+          AppLogger.info('FVVM.enqueue: queueing offlineFileId=${offlineFile.id}');
           final queueResult = await _fileUploadQueueService.queueFileUpload(offlineFile.id);
           await queueResult.when(
             success: (_) async {
               AppLogger.info('FileValidatorViewModel: File successfully queued for upload');
+              AppLogger.info('FVVM.enqueue: queued OK offlineFileId=${offlineFile.id}');
             },
             failure: (failure) async {
               AppLogger.error('FileValidatorViewModel: Failed to queue file for upload: ${failure.message}');
+              AppLogger.error('FVVM.enqueue: queue FAILED offlineFileId=${offlineFile.id} error=${failure.message}');
             },
           );
 

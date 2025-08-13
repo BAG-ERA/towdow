@@ -32,13 +32,6 @@ class SharingSyncService {
         return const Result.success(null);
       }
 
-      // No sharing data to sync
-      if (calendar.sharedWithMembers.isEmpty) {
-        AppLogger.debug(
-          'SharingSyncService: No members in calendar.sharedWithMembers for ${calendar.path}',
-        );
-        return const Result.success(null);
-      }
 
       final sharingService = ShareService(account: account);
 

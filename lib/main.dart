@@ -67,6 +67,8 @@ void main() async {
   // Register Offline File adapters
   Hive.registerAdapter(OfflineFileStatusAdapter());
   Hive.registerAdapter(OfflineFileAdapter());
+  // Register File Upload Queue item adapter
+  Hive.registerAdapter(FileUploadQueueItemAdapter());
   
   // Register Category adapter
   Hive.registerAdapter(CategoryAdapter());

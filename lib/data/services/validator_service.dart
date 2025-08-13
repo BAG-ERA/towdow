@@ -597,6 +597,10 @@ class ValidatorService {
           's3Url': s3Url,
           'status': status,
         };
+        if (newState['removeOfflineRef'] == true) {
+          updatedFile.remove('offlineFileId');
+          updatedFile.remove('uploadedAt');
+        }
         AppLogger.debug('ValidatorService: Updated file: $updatedFile');
         return updatedFile;
       }

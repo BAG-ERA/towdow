@@ -411,22 +411,39 @@ class S3StorageService {
               try {
                 // Add debug logging for troubleshooting
                 AppLogger.debug('S3StorageService.uploadFile: Uploading $uploadType file');
-                AppLogger.debug('S3StorageService.uploadFile: AsKey: $key.length');
+                AppLogger.debug('S3StorageService.uploadFile: Key: $key');
                 AppLogger.debug('S3StorageService.uploadFile: Bucket: $bucket');
                 AppLogger.debug('S3StorageService.uploadFile: Content-Type: $contentType');
                 AppLogger.debug('S3StorageService.uploadFile: Original data length: ${data.length} bytes');
                 AppLogger.debug('S3StorageService.uploadFile: ${uploadType[0].toUpperCase() + uploadType.substring(1)} data length: ${dataToUpload.length} bytes');
                 AppLogger.debug('S3StorageService.uploadFile: Final Content-Type: $finalContentType');
-                
-                await _s3Client!.putObject(
+
+                final putResult = await _s3Client!.putObject(
                   bucket: bucket,
                   key: key,
                   body: dataToUpload,
                   contentType: finalContentType,
                 );
-                
+
+                // Validate server acknowledgement (ETag) or verify via HEAD
+                String? etag = putResult.eTag;
+                if (etag == null || etag.isEmpty) {
+                  AppLogger.debug('S3StorageService.uploadFile: No ETag in PutObject response, verifying via HEAD');
+                  try {
+                    final head = await _s3Client!.headObject(bucket: bucket, key: key);
+                    etag = head.eTag;
+                  } catch (verifyError, verifyStack) {
+                    AppLogger.error('S3StorageService.uploadFile: Verification via HEAD failed for $key', verifyError, verifyStack);
+                  }
+                }
+
+                if (etag == null || etag.isEmpty) {
+                  AppLogger.error('S3StorageService.uploadFile: Upload verification failed - missing ETag for $key');
+                  return Result.failure(Failure(message: 'Upload verification failed: object not found after put'));
+                }
+
                 final fileUrl = '$_s3Endpoint/$bucket/$key';
-                AppLogger.debug('S3StorageService.uploadFile: Uploaded $uploadType file $key to $bucket');
+                AppLogger.debug('S3StorageService.uploadFile: Uploaded $uploadType file $key to $bucket (ETag: $etag)');
                 return Result.success(fileUrl);
               } catch (e, stackTrace) {
                 AppLogger.error('S3StorageService.uploadFile: Failed to upload $uploadType file $key', e, stackTrace);
@@ -460,15 +477,32 @@ class S3StorageService {
           AppLogger.debug('S3StorageService.uploadFile: Data length: ${dataToUpload.length} bytes');
           AppLogger.debug('S3StorageService.uploadFile: Final Content-Type: $finalContentType');
           
-          await _s3Client!.putObject(
+          final putResult = await _s3Client!.putObject(
             bucket: bucket,
             key: key,
             body: dataToUpload,
             contentType: finalContentType,
           );
-          
+
+          // Validate server acknowledgement (ETag) or verify via HEAD
+          String? etag = putResult.eTag;
+          if (etag == null || etag.isEmpty) {
+            AppLogger.debug('S3StorageService.uploadFile: No ETag in PutObject response, verifying via HEAD');
+            try {
+              final head = await _s3Client!.headObject(bucket: bucket, key: key);
+              etag = head.eTag;
+            } catch (verifyError, verifyStack) {
+              AppLogger.error('S3StorageService.uploadFile: Verification via HEAD failed for $key', verifyError, verifyStack);
+            }
+          }
+
+          if (etag == null || etag.isEmpty) {
+            AppLogger.error('S3StorageService.uploadFile: Upload verification failed - missing ETag for $key');
+            return Result.failure(Failure(message: 'Upload verification failed: object not found after put'));
+          }
+
           final fileUrl = '$_s3Endpoint/$bucket/$key';
-          AppLogger.debug('S3StorageService.uploadFile: Uploaded $uploadType file $key to $bucket');
+          AppLogger.debug('S3StorageService.uploadFile: Uploaded $uploadType file $key to $bucket (ETag: $etag)');
           return Result.success(fileUrl);
         } catch (e, stackTrace) {
           AppLogger.error('S3StorageService.uploadFile: Failed to upload $uploadType file $key', e, stackTrace);

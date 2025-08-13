@@ -13,6 +13,7 @@ import '../../models/shared_with_me_project.dart';
 import '../../repositories/account_repository.dart';
 import '../../repositories/calendar_repository.dart';
 import '../../repositories/category_repository.dart';
+import '../../repositories/task_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../repositories/external_account_repository.dart';
 
@@ -33,6 +34,7 @@ class CalDAVMonitor {
   final CalendarRepository _calendarRepository;
   final UserRepository _userRepository;
   final ExternalAccountRepository _externalAccountRepository;
+  final TaskRepository? _taskRepository;
 
   final ConnectionMonitorService _connectionMonitorService;
   final SyncService _syncService;
@@ -65,11 +67,13 @@ class CalDAVMonitor {
     required SyncService syncService,
     required UserSyncService userSyncService,
     required UserPreferencesQueueService userPreferencesQueueService,
+    TaskRepository? taskRepository,
   })  : _ref = ref,
         _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
         _userRepository = userRepository,
         _externalAccountRepository = externalAccountRepository,
+        _taskRepository = taskRepository,
         _connectionMonitorService = connectionMonitorService,
         _syncService = syncService,
         _userSyncService = userSyncService,
@@ -131,11 +135,18 @@ class CalDAVMonitor {
 
     _isPerformingMonitoring = true;
     try {
-      // Check connection status first
-      final connectionStatus = _connectionMonitorService.currentStatus;
-      if (connectionStatus != ConnectionStatus.connected) {
-        AppLogger.warning('CalDAVMonitor: No internet connection, skipping change monitoring');
-        _updateInterval(false); /// if no connexion update intervel
+      // Check connection status first (defensive against unconfigured mocks)
+      try {
+        final connectionStatus = _connectionMonitorService.currentStatus;
+        if (connectionStatus != ConnectionStatus.connected) {
+          AppLogger.warning('CalDAVMonitor: No internet connection, skipping change monitoring');
+          _updateInterval(false); /// if no connexion update intervel
+          return;
+        }
+      } catch (e, st) {
+        AppLogger.warning('CalDAVMonitor: Could not read connection status, skipping cycle');
+        AppLogger.debug('CalDAVMonitor: Connection status error: $e');
+        _updateInterval(false);
         return;
       }
 
@@ -156,6 +167,17 @@ class CalDAVMonitor {
             success: (calendars) async {
               bool changesDetected = discoveryChanges; // Include discovery changes
               
+               // If discovery added/updated calendars, trigger an immediate full sync
+               if (discoveryChanges) {
+                 try {
+                   AppLogger.info('CalDAVMonitor: Discovery detected changes - triggering immediate full sync');
+                   await _syncService.syncAllActiveCaldav();
+                 } catch (e, st) {
+                   AppLogger.warning('CalDAVMonitor: Failed to trigger full sync after discovery: $e');
+                   AppLogger.debug('CalDAVMonitor: Stack: $st');
+                 }
+               }
+
               // Process queued operations
               changesDetected |= await _processQueuedOperations();
               
@@ -591,7 +613,90 @@ class CalDAVMonitor {
         AppLogger.debug('CalDAVMonitor: Stack: $st');
       }
     }
+    // Remove calendars that disappeared from discovery (owned projects only)
+    try {
+      await _removeCalendarsMissingFromDiscovery(availableCalendars);
+    } catch (e, st) {
+      AppLogger.warning('CalDAVMonitor: Failed to remove calendars missing from discovery: $e');
+      AppLogger.debug('CalDAVMonitor: Stack: $st');
+    }
     return addedCount > 0;
+  }
+
+  /// Remove locally stored calendars that are no longer returned by discovery.
+  /// Only applies to owned projects. Shared-with-me removals are handled by
+  /// _checkAndUpdateSharedProjects using ShareService API semantics.
+  Future<void> _removeCalendarsMissingFromDiscovery(List<TaskCalendar> availableCalendars) async {
+    try {
+      final discoveredPaths = availableCalendars.map((c) => c.path).toSet();
+      final localResult = await _calendarRepository.getProjectCalendars();
+      await localResult.when(
+        success: (localCalendars) async {
+          final toRemove = localCalendars
+              .where((c) => !discoveredPaths.contains(c.path))
+              .toList();
+
+          if (toRemove.isEmpty) {
+            return;
+          }
+
+          AppLogger.info('CalDAVMonitor: ${toRemove.length} local calendars not present in discovery');
+
+          // For owned calendars, just unsync locally. Shared-with-me calendars are removed via share flow.
+          for (final calendar in toRemove) {
+            if (calendar.isSharedWithMe) {
+              // Skip here; handled by _checkAndUpdateSharedProjects
+              AppLogger.debug('CalDAVMonitor: Skipping shared-with-me calendar missing from discovery: ${calendar.path}');
+              continue;
+            }
+            AppLogger.info('CalDAVMonitor: Unsyncing disappeared owned calendar: ${calendar.path}');
+            final res = await _calendarRepository.unsyncCalendar(calendar.path);
+            res.when(
+              success: (_) => AppLogger.debug('CalDAVMonitor: Unsynced ${calendar.path}'),
+              failure: (f) => AppLogger.warning('CalDAVMonitor: Failed to unsync ${calendar.path}: ${f.message}'),
+            );
+          }
+
+          // Cleanup orphaned tasks referencing calendars that are not in discovery
+          try {
+            if (_taskRepository != null) {
+              final cleanup = await _taskRepository!.deleteOrphanedTasksLocalOnly(discoveredPaths);
+            cleanup.when(
+              success: (_) => AppLogger.info('CalDAVMonitor: Cleaned up orphaned tasks for missing calendars'),
+              failure: (f) => AppLogger.warning('CalDAVMonitor: Failed to cleanup orphaned tasks: ${f.message}'),
+            );
+            }
+          } catch (_) {}
+
+          // Update user preferences to remove missing calendars from project order/excluded lists
+          try {
+            final prefsResult = await _userRepository.getUserPreferences();
+            await prefsResult.when(
+              success: (prefs) async {
+                final updatedOrder = prefs.projectOrder.where((p) => discoveredPaths.contains(p)).toList();
+                final updatedExcluded = prefs.excludedProjects.where((p) => discoveredPaths.contains(p)).toList();
+                if (updatedOrder.length != prefs.projectOrder.length || updatedExcluded.length != prefs.excludedProjects.length) {
+                  final updatedPrefs = prefs.copyWith(
+                    projectOrder: updatedOrder,
+                    excludedProjects: updatedExcluded,
+                  );
+                  await _userRepository.saveUserPreferences(updatedPrefs);
+                  AppLogger.info('CalDAVMonitor: Updated user preferences after removing missing calendars');
+                }
+              },
+              failure: (f) async {
+                AppLogger.warning('CalDAVMonitor: Could not load user preferences to update removed calendars: ${f.message}');
+              },
+            );
+          } catch (_) {}
+        },
+        failure: (failure) async {
+          AppLogger.warning('CalDAVMonitor: Failed to load local calendars for removal check: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVMonitor: Exception while removing calendars missing from discovery', e, stackTrace);
+    }
   }
 
   /// Check and update shared projects from server

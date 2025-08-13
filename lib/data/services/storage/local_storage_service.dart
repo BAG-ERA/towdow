@@ -260,11 +260,18 @@ class LocalStorageService {
   Future<Result<void>> put<T>(String boxName, String key, T item) async {
     try {
       final box = _getBox(boxName);
+      if (boxName == LocalStorageService.fileUploadQueueBoxName) {
+        AppLogger.debug('LSS.put(queue): isOpen=${Hive.isBoxOpen(boxName)} lenBefore=${_fileUploadQueueBox.length} key=$key itemType=${item.runtimeType}');
+      }
       await box.put(key, item);
+      if (boxName == LocalStorageService.fileUploadQueueBoxName) {
+        final contains = _fileUploadQueueBox.containsKey(key);
+        AppLogger.debug('LSS.put(queue): lenAfter=${_fileUploadQueueBox.length} containsKey=$contains key=$key');
+      }
       
       return const Result.success(null);
     } catch (e, stackTrace) {
-      AppLogger.error('LocalStorageService: Failed to put item $key in $boxName', e, stackTrace);
+      AppLogger.error('LocalStorageService: Failed to put item $key in $boxName (${e.runtimeType}): $e', e, stackTrace);
       return Result.failure(Failure(
         message: 'Failed to put item in $boxName',
         exception: e is Exception ? e : Exception(e.toString()),

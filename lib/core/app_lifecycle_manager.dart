@@ -91,7 +91,44 @@ class AppLifecycleManager {
           if (account != null) {
             // Skip starting sync services for offline scheme (offline-only)
             if (account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost')) {
-              AppLogger.info('AppLifecycleManager: Offline-only mode detected - skipping sync services start');
+              AppLogger.info('AppLifecycleManager: Offline-only mode detected - skipping CalDAV sync services');
+
+              // Even in offline-only mode, start file upload queue and connection monitoring
+              // so S3-backed features (validators, attachments) can upload when connectivity exists
+              try {
+                if (_fileUploadQueueService != null) {
+                  final accRes2 = await _accountRepository!.getActiveAccount();
+                  await accRes2.when(
+                    success: (acc2) async {
+                      final fileFeaturesEnabled = acc2 != null && acc2.providerType != 'custom';
+                      if (fileFeaturesEnabled) {
+                        AppLogger.debug('AppLifecycleManager: Starting FileUploadQueueService (offline-only mode)');
+                        _fileUploadQueueService!.startQueueProcessing();
+                        AppLogger.info('AppLifecycleManager: FileUploadQueueService started (offline-only mode)');
+                      } else {
+                        AppLogger.info('AppLifecycleManager: File features disabled (custom provider) - not starting FileUploadQueueService');
+                      }
+                    },
+                    failure: (_) async {
+                      AppLogger.info('AppLifecycleManager: No active account - file upload queue not started');
+                    },
+                  );
+                }
+
+                if (_connectionMonitorService != null) {
+                  AppLogger.debug('AppLifecycleManager: Starting ConnectionMonitorService (offline-only mode)');
+                  await _connectionMonitorService!.startMonitoring();
+                  // Trigger file queue when connection is restored
+                  _connectionMonitorService!.connectionRestoredStream.listen((_) {
+                    AppLogger.info('AppLifecycleManager: Connection restored, triggering queued file uploads');
+                    _fileUploadQueueService?.startQueueProcessing();
+                  });
+                  AppLogger.info('AppLifecycleManager: ConnectionMonitorService started (offline-only mode)');
+                }
+              } catch (e) {
+                AppLogger.warning('AppLifecycleManager: Failed to start offline-only services: $e');
+              }
+
               _updateState(FlowItAppState.ready);
             } else {
               // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Active account found: ${account.username}');
@@ -131,22 +168,7 @@ class AppLifecycleManager {
     try {
       // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting main sync services');
 
-      // Initialize main sync service
-      if (_syncService != null) {
-        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Initializing SyncService');
-        final syncResult = await _syncService!.initialize();
-        syncResult.when(
-          success: (_) {
-            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService initialized successfully');
-          },
-          failure: (failure) {
-            AppLogger.warning('AppLifecycleManager: SyncService initialization failed: ${failure.message}');
-            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService init failed: ${failure.message}');
-          },
-        );
-      }
-
-      // Start CalDAV monitor service
+      // Start CalDAV monitor service FIRST to perform discovery before initial sync
       if (_caldavMonitor != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting CalDAVMonitor');
         
@@ -158,6 +180,21 @@ class AppLifecycleManager {
           failure: (failure) {
             AppLogger.warning('AppLifecycleManager: CalDAVMonitor start failed: ${failure.message}');
             // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] CalDAVMonitor start failed: ${failure.message}');
+          },
+        );
+      }
+
+      // Initialize main sync service AFTER discovery to ensure calendars exist locally
+      if (_syncService != null) {
+        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Initializing SyncService');
+        final syncResult = await _syncService!.initialize();
+        syncResult.when(
+          success: (_) {
+            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService initialized successfully');
+          },
+          failure: (failure) {
+            AppLogger.warning('AppLifecycleManager: SyncService initialization failed: ${failure.message}');
+            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService init failed: ${failure.message}');
           },
         );
       }
