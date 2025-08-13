@@ -79,24 +79,11 @@ class _TaskItemTitlebarState extends State<TaskItemTitlebar> {
         
         const SizedBox(width: 4),
         
-        // Trailing override (e.g., close button in popup) or default expand/collapse
+        // Trailing override (e.g., close button in popup); no default expand/collapse icon
         if (widget.trailing != null)
           widget.trailing!
         else
-          InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: widget.onToggleExpanded,
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: Icon(
-                widget.isExpanded 
-                    ? Icons.expand_less_rounded 
-                    : Icons.expand_more_rounded,
-                size: 20,
-                color: colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-          ),
+          const SizedBox.shrink(),
       ],
     );
   }

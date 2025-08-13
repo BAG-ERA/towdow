@@ -103,18 +103,17 @@ class ArchiveProjectButton extends ConsumerWidget {
     final effectiveTextColor = textColor ?? chartTheme.typography.primaryButton.color;
     
     final buttonPadding = _getPadding(chartTheme);
-    final fontSize = _getFontSize();
+    final scale = (chartTheme.typography.primaryButton.fontSize ?? 14) / 14.0;
     
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       child: ElevatedButton.icon(
         onPressed: () => _handleArchiveProject(context, ref),
-        icon: icon != null ? Icon(icon, size: _getIconSize()) : const SizedBox.shrink(),
+        icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
         label: Text(
           text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
           style: chartTheme.typography.primaryButton.copyWith(
             color: effectiveTextColor,
-            fontSize: fontSize,
           ),
         ),
         style: ElevatedButton.styleFrom(
@@ -147,17 +146,6 @@ class ArchiveProjectButton extends ConsumerWidget {
           horizontal: chartTheme.dimensions.paddingLarge * 1.5,
           vertical: chartTheme.dimensions.paddingMedium * 1.2,
         );
-    }
-  }
-
-  double _getFontSize() {
-    switch (size) {
-      case ArchiveProjectButtonSize.small:
-        return 12;
-      case ArchiveProjectButtonSize.medium:
-        return 14;
-      case ArchiveProjectButtonSize.large:
-        return 16;
     }
   }
 
@@ -207,29 +195,7 @@ class ArchiveProjectButton extends ConsumerWidget {
     }
   }
 
-  Future<void> _handleUnarchiveProject(BuildContext context, WidgetRef ref) async {
-    try {
-      AppLogger.info('ArchiveProjectButton: Unarchiving project $projectPath');
-      
-      // Get the status service from providers
-      final statusService = ref.read(statusServiceProvider);
-      
-      // Unarchive the project
-      final result = await statusService.unarchiveCalendar(projectPath);
-      
-      result.when(
-        success: (_) {
-          AppLogger.info('ArchiveProjectButton: Successfully unarchived project $projectPath');
-          
-        },
-        failure: (failure) {
-          AppLogger.error('ArchiveProjectButton: Failed to unarchive project $projectPath: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('ArchiveProjectButton: Exception while unarchiving project $projectPath: $e');
-    }
-  }
+  // _handleUnarchiveProject removed as unused (unarchive is not exposed here)
 }
 
 /// Size variants for the archive project button

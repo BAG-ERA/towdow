@@ -4,9 +4,8 @@
  */
 
 import 'package:test/test.dart';
-import '../lib/data/services/caldav_service.dart';
-import '../lib/data/models/caldav_account.dart';
-import '../lib/core/result.dart';
+import 'package:towdow_app/data/services/caldav/caldav_service.dart';
+import 'package:towdow_app/data/models/caldav_account.dart';
 
 void main() {
   group('Calendar Creation Integration Tests', () {
@@ -63,10 +62,11 @@ void main() {
 
     test('Test MKCALENDAR XML generation', () {
       // Test the XML generation without network calls
-      final testAccount = CaldavAccount(
+      // Build a sample account (not used directly; ensure no network calls happen here)
+      final _ = CaldavAccount(
         id: 'xml-test',
-        providerType: 'test',
-        serverUrl: 'https://test.example.com',
+        providerType: 'custom',
+        serverUrl: 'http://localhost',
         username: 'testuser',
         password: 'testpass',
         createdAt: DateTime.now(),

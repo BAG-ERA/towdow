@@ -7,6 +7,7 @@ import '../../../../core/logger.dart';
 import '../../../../data/models/task_calendar.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../viewmodels/project_sharing_viewmodel.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 class ProjectSharingDialog extends ConsumerStatefulWidget {
   final TaskCalendar project;
@@ -52,7 +53,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
         title: Row(
           children: [
             Expanded(
-              child: Text('Share ${widget.project.displayName}'),
+              child: Text(AppLocalizations.of(context)!.shareProject(widget.project.displayName)),
             ),
             if (sharingState.hasUnsavedChanges) ...[
               Container(
@@ -62,7 +63,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'Unsaved',
+                  AppLocalizations.of(context)!.unsaved,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -81,7 +82,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             onPressed: sharingState.hasUnsavedChanges && !sharingState.isSaving 
@@ -93,7 +94,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Save'),
+                : Text(AppLocalizations.of(context)!.save),
           ),
         ],
       ),
@@ -114,13 +115,13 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
           children: [
             const Icon(Icons.info_outline, size: 48, color: Colors.orange),
             const SizedBox(height: 16),
-            const Text(
-              'Sharing not supported',
+            Text(
+              AppLocalizations.of(context)!.sharingNotSupportedTitle,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              state.error ?? 'Sharing is only available for TowDow Cloud and self-hosted accounts.',
+              state.error ?? AppLocalizations.of(context)!.sharingNotSupportedBody,
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey[600]),
             ),
@@ -136,13 +137,13 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Debug Info:', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(AppLocalizations.of(context)!.debugInfo, style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  Text('Current User: ${state.currentUserEmail ?? 'Unknown'}'),
-                  Text('Project Path: ${state.projectPath}'),
+                  Text('${AppLocalizations.of(context)!.currentUser}: ${state.currentUserEmail ?? AppLocalizations.of(context)!.unknown}'),
+                  Text('${AppLocalizations.of(context)!.projectPath}: ${state.projectPath}'),
                   if (state.currentProject != null) ...[
-                    Text('Shared With Field: "${state.currentProject!.sharedWith}"'),
-                    Text('Last Sync: ${state.currentProject!.lastSyncAt?.toString() ?? 'Never'}'),
+                    Text('${AppLocalizations.of(context)!.sharedWithField}: "${state.currentProject!.sharedWith}"'),
+                    Text('${AppLocalizations.of(context)!.lastSync}: ${state.currentProject!.lastSyncAt?.toString() ?? 'Never'}'),
                   ],
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
@@ -160,7 +161,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                       );
                     },
                     icon: const Icon(Icons.info),
-                    label: const Text('Show Account Info'),
+                    label: Text(AppLocalizations.of(context)!.showAccountInfo),
                   ),
                 ],
               ),
@@ -177,7 +178,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
         Row(
           children: [
             Text(
-              'Members (${state.editedMembers.length}):',
+              AppLocalizations.of(context)!.membersCount(state.editedMembers.length),
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
             if (state.hasUnsavedChanges) ...[
@@ -189,7 +190,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'Unsaved',
+                  AppLocalizations.of(context)!.unsaved,
                   style: TextStyle(
                     fontSize: 11,
                     color: Theme.of(context).colorScheme.onPrimaryContainer,
@@ -202,7 +203,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
               TextButton.icon(
                 onPressed: state.isSaving ? null : () => notifier.refresh(),
                 icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Refresh'),
+                label: Text(AppLocalizations.of(context)!.refresh),
               ),
             ],
           ],
@@ -211,18 +212,19 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
         
         // Members list (showing edited members) - fit content height
         state.editedMembers.isEmpty
-            ? const Center(
+            ? Center(
                 child: Text(
-                  'No members yet.\nAdd an email address below to share this project.',
+                  AppLocalizations.of(context)!.noMembersYet,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
+                  style: const TextStyle(color: Colors.grey),
                 ),
               )
-            : ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: state.editedMembers.length,
-                itemBuilder: (context, index) {
+            : SizedBox(
+                height: 240,
+                child: ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: state.editedMembers.length,
+                  itemBuilder: (context, index) {
                   final member = state.editedMembers[index];
                   final isNew = !state.members.any((m) => m.targetUserEmail == member.targetUserEmail);
                   
@@ -239,29 +241,32 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                         fontWeight: isNew ? FontWeight.w500 : FontWeight.normal,
                       ),
                     ),
-                    subtitle: isNew ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'NEW',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                    ) : null,
+                    subtitle: isNew
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'NEW',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          )
+                        : null,
                     trailing: IconButton(
                       icon: const Icon(Icons.remove_circle_outline),
                       onPressed: state.isSaving ? null : () => notifier.removeMemberFromEdit(member),
-                      tooltip: 'Remove from list',
+                      tooltip: AppLocalizations.of(context)!.removeFromList,
                     ),
                   );
                 },
               ),
+            ),
         
         const SizedBox(height: 16),
         
@@ -272,10 +277,10 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                   Expanded(
                     child: TextField(
                       controller: _emailController,
-                      decoration: InputDecoration(
-                        hintText: 'Enter email address',
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: InputDecoration(
+                      hintText: AppLocalizations.of(context)!.enterEmailAddress,
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         filled: false,
                       ),
                       enabled: !state.isSaving,
@@ -287,7 +292,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                   IconButton(
                     onPressed: state.isSaving ? null : () => _addMember(notifier),
                     icon: const Icon(Icons.check, color: Colors.green),
-                    tooltip: 'Add member',
+                    tooltip: AppLocalizations.of(context)!.addMember,
                   ),
                   IconButton(
                     onPressed: () {
@@ -297,7 +302,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                       });
                     },
                     icon: const Icon(Icons.close, color: Colors.red),
-                    tooltip: 'Cancel',
+                    tooltip: AppLocalizations.of(context)!.cancel,
                   ),
                 ],
               )
@@ -322,7 +327,7 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Add member',
+                        AppLocalizations.of(context)!.addMember,
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: 14,
@@ -336,14 +341,14 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
         const SizedBox(height: 16),
         
         // Error display
-        if (state.error != null) ...[
-          Container(
+        (state.error != null)
+          ? Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.errorContainer,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Row(
+          child: Row(
               children: [
                 Icon(
                   Icons.error_outline,
@@ -366,63 +371,66 @@ class _ProjectSharingDialogState extends ConsumerState<ProjectSharingDialog> {
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
+          )
+          : const SizedBox.shrink(),
+        SizedBox(height: state.error != null ? 16 : 0),
         
         // Suggested members section
-        if (widget.suggestedMembers != null && widget.suggestedMembers!.isNotEmpty) ...[
-          const SizedBox(height: 44),
-          Row(
-            children: [
-              Text(
-                'Suggested Members:',
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: widget.suggestedMembers!.map((email) {
-              final isAlreadyAdded = state.editedMembers.any((m) => m.targetUserEmail == email);
-              return ActionChip(
-                avatar: Icon(
-                  isAlreadyAdded ? Icons.check : Icons.person_add,
-                  size: 16,
-                  color: isAlreadyAdded 
-                      ? Theme.of(context).colorScheme.onSecondary 
-                      : Theme.of(context).colorScheme.onPrimary,
-                ),
-                label: Text(
-                  email,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isAlreadyAdded 
-                        ? Theme.of(context).colorScheme.onSecondary 
-                        : Theme.of(context).colorScheme.onPrimary,
+        (widget.suggestedMembers != null && widget.suggestedMembers!.isNotEmpty)
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 44),
+                  Row(
+                    children: [
+                      const Text(
+                        'Suggested Members:',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ],
                   ),
-                ),
-                backgroundColor: isAlreadyAdded 
-                    ? Theme.of(context).colorScheme.secondary 
-                    : Theme.of(context).colorScheme.primary,
-                onPressed: isAlreadyAdded || state.isSaving 
-                    ? null 
-                    : () {
-                        setState(() {
-                          _isInputActive = true;
-                        });
-                        _emailController.text = email;
-                        _addMember(notifier);
-                      },
-                tooltip: isAlreadyAdded 
-                    ? 'Already added' 
-                    : 'Click to add this member',
-              );
-            }).toList(),
-          ),
-        ],
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: widget.suggestedMembers!.map((email) {
+                      final isAlreadyAdded = state.editedMembers.any((m) => m.targetUserEmail == email);
+                      return ActionChip(
+                        avatar: Icon(
+                          isAlreadyAdded ? Icons.check : Icons.person_add,
+                          size: 16,
+                          color: isAlreadyAdded
+                              ? Theme.of(context).colorScheme.onSecondary
+                              : Theme.of(context).colorScheme.onPrimary,
+                        ),
+                        label: Text(
+                          email,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isAlreadyAdded
+                                ? Theme.of(context).colorScheme.onSecondary
+                                : Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        ),
+                        backgroundColor: isAlreadyAdded
+                            ? Theme.of(context).colorScheme.secondary
+                            : Theme.of(context).colorScheme.primary,
+                        onPressed: isAlreadyAdded || state.isSaving
+                            ? null
+                            : () {
+                                setState(() {
+                                  _isInputActive = true;
+                                });
+                                _emailController.text = email;
+                                _addMember(notifier);
+                              },
+                        tooltip: isAlreadyAdded ? AppLocalizations.of(context)!.alreadyAdded : AppLocalizations.of(context)!.clickToAddMember,
+                      );
+                    }).toList(),
+                  ),
+                ],
+              )
+            : const SizedBox.shrink(),
       ],
     );
   }

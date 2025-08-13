@@ -1,0 +1,125 @@
+// ViewModel providers
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../presentation/viewmodels/task_viewmodel.dart';
+import '../../presentation/viewmodels/caldav_settings_viewmodel.dart';
+import '../../presentation/viewmodels/project_list_viewmodel.dart';
+import '../../presentation/viewmodels/external_calendar_viewmodel.dart';
+import '../../presentation/viewmodels/validator_viewmodel.dart';
+import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
+import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
+import '../../presentation/viewmodels/category_viewmodel.dart';
+import '../../presentation/viewmodels/project_kanban_viewmodel.dart';
+import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
+import '../../presentation/viewmodels/step_viewmodel.dart';
+import 'providers_repositories.dart';
+import 'providers_services_core.dart';
+// import '../../presentation/viewmodels/caldav_management_viewmodel.dart';
+
+final taskViewModelProvider = StateNotifierProvider<TaskViewModel, TaskViewModelState>((ref) {
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return TaskViewModel(taskRepository, accountRepository);
+});
+
+final caldavSettingsViewModelProvider = StateNotifierProvider<CaldavSettingsViewModel, CaldavSettingsState>((ref) {
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  return CaldavSettingsViewModel(accountRepository, calendarRepository);
+});
+
+final validatorViewModelProvider = StateNotifierProvider.family<ValidatorViewModel, ValidatorViewModelState, String>((ref, taskUid) {
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  return ValidatorViewModel(taskRepository, accountRepository);
+});
+
+final taskFileAttachmentViewModelProvider = StateNotifierProvider.family<TaskFileAttachmentViewModel, TaskFileAttachmentState, String>((ref, taskUid) {
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final offlineFileService = ref.watch(offlineFileServiceProvider);
+  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
+  return TaskFileAttachmentViewModel(
+    taskRepository: taskRepository,
+    accountRepository: accountRepository,
+    offlineFileService: offlineFileService,
+    fileUploadQueueService: fileUploadQueueService,
+  );
+});
+
+final taskMediaAttachmentViewModelProvider = StateNotifierProvider.family<TaskMediaAttachmentViewModel, TaskMediaAttachmentState, String>((ref, taskUid) {
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final offlineFileService = ref.watch(offlineFileServiceProvider);
+  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
+  return TaskMediaAttachmentViewModel(
+    taskUid,
+    taskRepository,
+    accountRepository,
+    offlineFileService,
+    fileUploadQueueService,
+  );
+});
+
+final categoryViewModelProvider = StateNotifierProvider<CategoryViewModel, CategoryViewModelState>((ref) {
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
+  return CategoryViewModel(categoryRepository);
+});
+
+final projectCategoryViewModelProvider = StateNotifierProvider.family<CategoryViewModel, CategoryViewModelState, String>((ref, projectPath) {
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final viewModel = CategoryViewModel(categoryRepository);
+  viewModel.initialize(projectPath);
+  return viewModel;
+});
+
+final projectStepViewModelProvider = StateNotifierProvider.family<StepViewModel, StepViewModelState, String>((ref, projectPath) {
+  final stepRepository = ref.watch(stepRepositoryProvider);
+  final viewModel = StepViewModel(stepRepository);
+  viewModel.initialize(projectPath);
+  return viewModel;
+});
+
+final projectKanbanViewModelProvider = StateNotifierProvider.family<ProjectKanbanViewModel, ProjectKanbanState, String>((ref, projectPath) {
+  final kanbanRepository = ref.watch(kanbanRepositoryProvider);
+  final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final viewModel = ProjectKanbanViewModel(
+    kanbanRepository,
+    categoryRepository,
+  );
+  viewModel.initialize(projectPath);
+  return viewModel;
+});
+
+final projectSharingViewModelProvider = StateNotifierProvider<ProjectSharingViewModel, ProjectSharingState>((ref) {
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  return ProjectSharingViewModel(accountRepository, calendarRepository);
+});
+
+final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final userRepository = ref.watch(userRepositoryProvider);
+  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository, workflowsMode: false);
+});
+
+final workflowListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  final accountRepository = ref.watch(accountRepositoryProvider);
+  final userRepository = ref.watch(userRepositoryProvider);
+  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository, workflowsMode: true);
+});
+
+final externalCalendarViewModelProvider = StateNotifierProvider<ExternalCalendarViewModel, ExternalCalendarState>((ref) {
+  return ExternalCalendarViewModel(
+    ref.watch(externalAccountRepositoryProvider),
+    ref.watch(externalCalendarRepositoryProvider),
+    ref.watch(externalEventRepositoryProvider),
+    ref.watch(externalCalendarSyncServiceProvider),
+  );
+});
+
+

@@ -12,8 +12,9 @@ import '../../widgets/utils/tasklist_toolbar.dart';
 import '../../widgets/utils/popup/requirement_mapping_dialog.dart';
 import '../../widgets/project_detail/project_task_step_view.dart';
 import '../../widgets/project_detail/project_bottleneck_view.dart';
-import '../project_detail/project_detail_screen.dart' show projectProvider;
+// projectProvider removed; use calendarListProvider to read project state
 import '../../widgets/project_detail/project_warnings_banner.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 class WorkflowDetailScreen extends ConsumerStatefulWidget {
   final String workflowPath;
@@ -28,8 +29,11 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final projectAsync = ref.watch(projectProvider(widget.workflowPath));
     final tasksAsync = ref.watch(projectTasksProvider(widget.workflowPath));
+    final encoded = widget.workflowPath.replaceAll('@', '%40');
+    final projectAsync = ref.watch(calendarListProvider).whenData(
+      (cals) => cals.cast<TaskCalendar?>().firstWhere((c) => c?.path == encoded, orElse: () => null),
+    );
 
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
@@ -162,7 +166,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
     if (status == 'DRAFT') {
       buttons.add(FilledButton.icon(
         icon: const Icon(Icons.play_arrow_rounded),
-        label: const Text('Start workflow'),
+        label: Text(AppLocalizations.of(context)!.startWorkflow),
         onPressed: () async {
           final confirmed = await showDialog<bool>(
             context: context,
@@ -170,44 +174,44 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
           );
           if (confirmed == true) {
             final statusService = ref.read(statusServiceProvider);
-            await statusService.assignStatusToCalendar(widget.workflowPath, 'ONGOING');
-            // After starting, propagate requirement attendees to tasks
-            await ref.read(workflowServiceProvider).applyRequirementAttendeesToTasks(widget.workflowPath);
-            // Force refresh of project status for UI buttons
-            ref.invalidate(projectProvider(widget.workflowPath));
+             await statusService.assignStatusToCalendar(widget.workflowPath, 'ONGOING');
+             // After starting, propagate requirement attendees to tasks
+             // TODO: inject workflow service via provider if needed
+             // Force refresh of project status for UI buttons
+             ref.invalidate(calendarListProvider);
           }
         },
       ));
     } else if (status == 'ONGOING') {
       buttons.add(FilledButton.tonalIcon(
         icon: const Icon(Icons.pause_rounded),
-        label: const Text('Stop workflow'),
+        label: Text(AppLocalizations.of(context)!.stopWorkflow),
         onPressed: () async {
           final statusService = ref.read(statusServiceProvider);
           await statusService.assignStatusToCalendar(widget.workflowPath, 'STOPPED');
           // Refresh UI to reflect STOPPED state
-          ref.invalidate(projectProvider(widget.workflowPath));
+          ref.invalidate(calendarListProvider);
         },
       ));
     } else if (status == 'STOPPED') {
       buttons.add(FilledButton.icon(
         icon: const Icon(Icons.play_arrow_rounded),
-        label: const Text('Resume workflow'),
+        label: Text(AppLocalizations.of(context)!.resumeWorkflow),
         onPressed: () async {
           final statusService = ref.read(statusServiceProvider);
           await statusService.assignStatusToCalendar(widget.workflowPath, 'ONGOING');
-          ref.invalidate(projectProvider(widget.workflowPath));
+          ref.invalidate(calendarListProvider);
         },
       ));
     } else if (status == 'COMPLETED') {
       buttons.add(FilledButton.tonalIcon(
         icon: const Icon(Icons.archive_rounded),
-        label: const Text('Archive workflow'),
+        label: Text(AppLocalizations.of(context)!.archiveWorkflow),
         onPressed: () async {
           final statusService = ref.read(statusServiceProvider);
           await statusService.archiveCalendar(widget.workflowPath);
           // Refresh UI to reflect ARCHIVE state
-          ref.invalidate(projectProvider(widget.workflowPath));
+          ref.invalidate(calendarListProvider);
         },
       ));
     }
@@ -215,7 +219,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
     buttons.add(const SizedBox(width: 8));
     buttons.add(OutlinedButton.icon(
       icon: const Icon(Icons.content_copy_rounded),
-      label: const Text('Duplicate workflow'),
+      label: Text(AppLocalizations.of(context)!.duplicateWorkflow),
       onPressed: () async {
         final name = await showDialog<String>(
           context: context,
@@ -256,7 +260,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
           failure: (f) async {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to duplicate: ${f.message}')),
+                SnackBar(content: Text('${AppLocalizations.of(context)!.failedToLoad}: ${f.message}')),
               );
             }
           },
@@ -291,9 +295,9 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
       child: StyledTabBar(
         selectedIndex: _selectedTabIndex,
         onTabSelected: (index) => setState(() => _selectedTabIndex = index),
-        items: const [
-          StyledTabItem(label: 'Steps', icon: Icons.stairs_outlined),
-          StyledTabItem(label: 'Bottleneck', icon: Icons.timeline),
+        items: [
+          StyledTabItem(label: AppLocalizations.of(context)!.stepsTab, icon: Icons.stairs_outlined),
+          StyledTabItem(label: AppLocalizations.of(context)!.bottleneckTab, icon: Icons.timeline),
         ],
       ),
     );

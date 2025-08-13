@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../core/logger.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/models/task.dart';
 import 'chips/attendee_chip.dart';
 import 'chips/category_chip.dart';
@@ -65,6 +66,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
 
   @override
   Widget build(BuildContext context) {
+    final fileFeaturesEnabled = ref.watch(fileFeaturesEnabledProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -72,16 +74,18 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
         _buildCompactDescriptionSection(context),
         
         // File Attachments
-        TaskFileAttachmentList(
-          task: widget.task,
-          onTaskUpdated: widget.onTaskUpdated,
-        ),
+        if (fileFeaturesEnabled)
+          TaskFileAttachmentList(
+            task: widget.task,
+            onTaskUpdated: widget.onTaskUpdated,
+          ),
         
         // Media Attachments
-        TaskMediaAttachmentList(
-          task: widget.task,
-          onTaskUpdated: widget.onTaskUpdated,
-        ),
+        if (fileFeaturesEnabled)
+          TaskMediaAttachmentList(
+            task: widget.task,
+            onTaskUpdated: widget.onTaskUpdated,
+          ),
         
         // Attendees
         if (widget.task.attendees.isNotEmpty) ...[
@@ -100,6 +104,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
 
   Widget _buildCompactDescriptionSection(BuildContext context) {
     final hasDescription = widget.task.description.isNotEmpty;
+    final fileFeaturesEnabled = ref.watch(fileFeaturesEnabledProvider);
     
     return Container(
       width: double.infinity,
@@ -122,7 +127,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
             focusNode: _focusNode,
             maxLines: null,
             readOnly: !_isEditing,
-            hintText: hasDescription ? null : 'No description provided • Click to add one or attach files',
+            hintText: hasDescription ? null : AppLocalizations.of(context)!.noDescriptionHint,
             style: TextStyle(
               fontSize: 13,
               color: hasDescription 
@@ -140,38 +145,40 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
             const SizedBox(height: 8),
             Row(
               children: [
-                // File attachment button
-                IconButton(
-                  onPressed: _triggerFileAttachment,
-                  icon: const Icon(Icons.attach_file, size: 16),
-                  tooltip: 'Attach file',
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(32, 32),
-                    padding: EdgeInsets.zero,
-                    foregroundColor: Theme.of(context).colorScheme.primary,
+                if (fileFeaturesEnabled) ...[
+                  // File attachment button
+                  IconButton(
+                    onPressed: _triggerFileAttachment,
+                    icon: const Icon(Icons.attach_file, size: 16),
+                    tooltip: AppLocalizations.of(context)!.attachFile,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(32, 32),
+                      padding: EdgeInsets.zero,
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
-                ),
-                // Media attachment button
-                IconButton(
-                  onPressed: _triggerMediaAttachment,
-                  icon: const Icon(Icons.perm_media, size: 16),
-                  tooltip: 'Attach media',
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(32, 32),
-                    padding: EdgeInsets.zero,
-                    foregroundColor: Theme.of(context).colorScheme.secondary,
+                  // Media attachment button
+                  IconButton(
+                    onPressed: _triggerMediaAttachment,
+                    icon: const Icon(Icons.perm_media, size: 16),
+                    tooltip: AppLocalizations.of(context)!.attachMedia,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(32, 32),
+                      padding: EdgeInsets.zero,
+                      foregroundColor: Theme.of(context).colorScheme.secondary,
+                    ),
                   ),
-                ),
+                ],
                 const Spacer(),
                 // Cancel and Save buttons
                 TextButton(
                   onPressed: _cancelEdit,
-                  child: const Text('Cancel'),
+                  child: Text(AppLocalizations.of(context)!.cancel),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: _saveDescription,
-                  child: const Text('Save'),
+                  child: Text(AppLocalizations.of(context)!.save),
                 ),
               ],
             ),

@@ -35,6 +35,10 @@ class UserPreferences extends HiveObject {
   @HiveField(9)
   final List<String> excludedProjects; // Projects explicitly excluded from sync (NEW approach)
 
+  // UI appearance: global font scale preference ('small' | 'medium' | 'large')
+  @HiveField(10)
+  final String? fontScale;
+
   UserPreferences({
     this.projectOrder = const [],
     this.preferredTheme,
@@ -45,6 +49,7 @@ class UserPreferences extends HiveObject {
     this.etag,
     this.userPrincipal,
     this.excludedProjects = const [], // Default: no projects excluded (sync all)
+    this.fontScale,
   });
 
   /// Create a copy with updated values
@@ -58,6 +63,7 @@ class UserPreferences extends HiveObject {
     String? etag,
     String? userPrincipal,
     List<String>? excludedProjects,
+    String? fontScale,
   }) {
     return UserPreferences(
       projectOrder: projectOrder ?? this.projectOrder,
@@ -69,6 +75,7 @@ class UserPreferences extends HiveObject {
       etag: etag ?? this.etag,
       userPrincipal: userPrincipal ?? this.userPrincipal,
       excludedProjects: excludedProjects ?? this.excludedProjects,
+      fontScale: fontScale ?? this.fontScale,
     );
   }
 
@@ -82,6 +89,7 @@ class UserPreferences extends HiveObject {
       customSettings: const {},
       sharedWithMeProjects: const [],
       excludedProjects: const [], // New users: sync all projects by default
+      fontScale: 'medium',
     );
   }
 
@@ -178,6 +186,6 @@ class UserPreferences extends HiveObject {
 
   @override
   String toString() {
-    return 'UserPreferences(projectOrder: $projectOrder, theme: $preferredTheme, notifications: $enableNotifications, excludedProjects: ${excludedProjects.length}, sharedWithMe: ${sharedWithMeProjects.length})';
+    return 'UserPreferences(projectOrder: $projectOrder, theme: $preferredTheme, fontScale: $fontScale, notifications: $enableNotifications, excludedProjects: ${excludedProjects.length}, sharedWithMe: ${sharedWithMeProjects.length})';
   }
 } 

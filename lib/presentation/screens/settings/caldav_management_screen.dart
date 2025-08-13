@@ -11,10 +11,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../viewmodels/caldav_management_viewmodel.dart';
 import '../../../data/services/webdav_client.dart';
 import '../../../data/models/task_calendar.dart';
-import '../../../core/logger.dart';
 
 class CalDAVManagementScreen extends ConsumerStatefulWidget {
   const CalDAVManagementScreen({super.key});
@@ -54,7 +54,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
         
         return Scaffold(
           appBar: AppBar(
-            title: const Text('CalDAV Calendar Management'),
+            title: Text(AppLocalizations.of(context)!.caldavManagementTitle),
             actions: [
               if (state.capabilities != null && !state.isLoading)
                 IconButton(
@@ -66,7 +66,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                       _handleRefreshTokenExpired();
                     }
                   },
-                  tooltip: 'Refresh calendar list',
+                   tooltip: AppLocalizations.of(context)!.retry,
                 ),
             ],
           ),
@@ -93,7 +93,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'CalDAV Account',
+                            AppLocalizations.of(context)!.caldavAccount,
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -101,11 +101,11 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text('Server: ${state.currentAccount!.serverUrl}'),
-                      Text('User: ${state.currentAccount!.username}'),
+                       Text('${AppLocalizations.of(context)!.server}: ${state.currentAccount!.serverUrl}'),
+                       Text('${AppLocalizations.of(context)!.username}: ${state.currentAccount!.username}'),
                       if (state.capabilities != null) ...[
                         const SizedBox(height: 4),
-                        Text('Capabilities: ${state.capabilities!.serverInfo}'),
+                         Text('${AppLocalizations.of(context)!.capabilities}: ${state.capabilities!.serverInfo}'),
                       ],
                     ],
                   ),
@@ -125,9 +125,9 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                     children: [
                       TextButton(
                         onPressed: () async {
-                          await viewModel.resetChanges();
+                           await viewModel.resetChanges();
                         },
-                        child: const Text('Reset'),
+                         child: Text(AppLocalizations.of(context)!.reset),
                       ),
                       const Spacer(),
                       ElevatedButton.icon(
@@ -135,7 +135,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                           await viewModel.saveChanges();
                         },
                         icon: const Icon(Icons.save_rounded),
-                        label: Text('Save ${state.selectedCalendars.length} selections'),
+                       label: Text(AppLocalizations.of(context)!.saveSelections(state.selectedCalendars.length)),
                       ),
                     ],
                   ),
@@ -149,16 +149,16 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
 
   Widget _buildCalendarList(CalDAVManagementState state, CalDAVManagementViewModel viewModel) {
     if (state.isLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Discovering calendars...'),
+            Text(AppLocalizations.of(context)!.discoveringCalendars),
             SizedBox(height: 8),
             Text(
-              'This may take a few moments',
+              AppLocalizations.of(context)!.thisMayTakeAMoment,
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
@@ -180,7 +180,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                'Error',
+                AppLocalizations.of(context)!.error,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: Theme.of(context).colorScheme.error,
                 ),
@@ -195,7 +195,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
               ElevatedButton.icon(
                 onPressed: () => viewModel.initialize(),
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Retry'),
+                label: Text(AppLocalizations.of(context)!.retry),
               ),
             ],
           ),
@@ -217,7 +217,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                state.capabilities == null ? 'No calendars discovered' : 'No task calendars found',
+                state.capabilities == null ? AppLocalizations.of(context)!.noCalendarsDiscovered : AppLocalizations.of(context)!.noTaskCalendarsFound,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Colors.grey[600],
                 ),
@@ -225,8 +225,8 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
               const SizedBox(height: 8),
               Text(
                 state.capabilities == null 
-                  ? 'Calendar discovery may still be in progress or failed.'
-                  : 'No calendars found that support tasks (VTODO).\n\nMake sure your CalDAV server has task-enabled calendars.',
+                  ? AppLocalizations.of(context)!.discoveryHelp
+                  : AppLocalizations.of(context)!.noTaskCalendarsHelp,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[600]),
               ),
@@ -248,7 +248,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                   viewModel.selectAllCalendars();
                 },
                 icon: const Icon(Icons.select_all_rounded),
-                label: const Text('Select All'),
+                 label: Text(AppLocalizations.of(context)!.selectAll),
               ),
               const SizedBox(width: 8),
               TextButton.icon(
@@ -256,7 +256,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                   viewModel.deselectAllCalendars();
                 },
                 icon: const Icon(Icons.deselect_rounded),
-                label: const Text('Deselect All'),
+                 label: Text(AppLocalizations.of(context)!.deselectAll),
               ),
             ],
           ),
@@ -268,7 +268,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
             controller: _searchController,
             onChanged: (value) => viewModel.updateSearchQuery(value),
             decoration: InputDecoration(
-              hintText: 'Search calendars...',
+              hintText: AppLocalizations.of(context)!.searchCalendarsHint,
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: state.searchQuery.isNotEmpty
                   ? IconButton(
@@ -340,8 +340,8 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                     children: [
                       if (calendar.etag != null) ...[
                         const SizedBox(height: 2),
-                        Text(
-                          'ETag: ${calendar.etag}',
+                         Text(
+                           '${AppLocalizations.of(context)!.etag}: ${calendar.etag}',
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.grey[500],
@@ -359,13 +359,13 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                       IconButton(
                         icon: Icon(Icons.archive_rounded, color: Colors.grey[600]),
                         onPressed: () => _showArchiveConfirmation(context, calendar, viewModel),
-                        tooltip: 'Archive calendar',
+                         tooltip: AppLocalizations.of(context)!.archiveCalendar,
                       ),
                       const SizedBox(width: 4),
                       IconButton(
                         icon: const Icon(Icons.delete_forever_rounded, color: Colors.red),
                         onPressed: () => _showDeleteConfirmation(context, calendar, viewModel),
-                        tooltip: 'Delete calendar permanently',
+                         tooltip: AppLocalizations.of(context)!.deleteCalendar,
                       ),
                     ],
                   ),
@@ -460,16 +460,12 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Archive Calendar'),
-        content: Text(
-          'Are you sure you want to archive "${calendar.displayName}"?\n\n'
-          'This will move the calendar to the archived projects section. '
-          'You can unarchive it later from the archived projects screen.',
-        ),
+        title: Text(AppLocalizations.of(context)!.archiveCalendar),
+        content: Text(AppLocalizations.of(context)!.areYouSureArchiveCalendar(calendar.displayName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -477,7 +473,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
               backgroundColor: Colors.orange,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Archive'),
+            child: Text(AppLocalizations.of(context)!.archive),
           ),
         ],
       ),
@@ -492,16 +488,12 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Calendar'),
-        content: Text(
-          'Are you sure you want to delete "${calendar.displayName}"?\n\n'
-          'This will permanently delete the calendar from both the server and local storage. '
-          'This action cannot be undone.',
-        ),
+        title: Text(AppLocalizations.of(context)!.deleteCalendar),
+        content: Text(AppLocalizations.of(context)!.areYouSureDeleteCalendar(calendar.displayName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -509,7 +501,7 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
               backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
-            child: const Text('Delete'),
+            child: Text(AppLocalizations.of(context)!.delete),
           ),
         ],
       ),

@@ -8,13 +8,48 @@ import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
-import 'package:towdow_app/data/services/sync_service.dart';
-import 'package:towdow_app/data/services/local_storage_service.dart';
+import 'package:towdow_app/data/services/sync/sync_service.dart';
+import 'package:towdow_app/data/services/storage/local_storage_service.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
+import 'delete_functionality_test.mocks.dart';
+
+// Minimal fake TaskRepository to satisfy cascade delete without complex stubbing
+class _FakeTaskRepositoryForDelete implements TaskRepository {
+  @override
+  Future<Result<void>> deleteByProjectLocalOnly(String projectPath) async {
+    return const Result.success(null);
+  }
+
+  // Unused in this specific test; throw to surface accidental calls
+  @override
+  Future<Result<void>> delete(String uid) => throw UnimplementedError();
+  @override
+  Future<Result<List<Task>>> getAll() => throw UnimplementedError();
+  @override
+  Future<Result<Task?>> getById(String uid) => throw UnimplementedError();
+  @override
+  Future<Result<List<Task>>> getByProject(String projectUid) => throw UnimplementedError();
+  @override
+  Future<Result<List<Task>>> getTasksWithDueDate(DateTime date) => throw UnimplementedError();
+  @override
+  Future<Result<List<Task>>> getTasksWithoutDueDate() => throw UnimplementedError();
+  @override
+  Future<Result<List<Task>>> getUnregisteredTasks() => throw UnimplementedError();
+  @override
+  Future<Result<void>> save(Task task) => throw UnimplementedError();
+  @override
+  Future<Result<void>> saveFromSync(Task task) => throw UnimplementedError();
+  @override
+  Stream<List<Task>> watchTasks() => const Stream.empty();
+  @override
+  Stream<List<Task>> watchTasksByProject(String projectPath) => const Stream.empty();
+  @override
+  Future<Result<void>> deleteOrphanedTasksLocalOnly(Set<String> validCalendarPaths) => throw UnimplementedError();
+}
 
 @GenerateNiceMocks([
   MockSpec<LocalStorageService>(),
@@ -24,20 +59,19 @@ import 'package:mockito/annotations.dart';
   MockSpec<UserRepository>(),
   MockSpec<SyncService>(),
 ])
-import 'delete_functionality_test.mocks.dart';
 
 void main() {
   group('Delete Functionality Tests', () {
     late MockCalendarRepository mockCalendarRepository;
     late MockTaskRepository mockTaskRepository;
-    late MockSyncService mockSyncService;
     late MockAccountRepository mockAccountRepository;
     late MockUserRepository mockUserRepository;
 
     setUp(() {
       mockCalendarRepository = MockCalendarRepository();
       mockTaskRepository = MockTaskRepository();
-      mockSyncService = MockSyncService();
+      // Avoid stream-driven reloads in tests unless explicitly needed
+      when(mockCalendarRepository.watchCalendars()).thenAnswer((_) => const Stream<List<TaskCalendar>>.empty());
       mockAccountRepository = MockAccountRepository();
       mockUserRepository = MockUserRepository();
 
@@ -64,7 +98,7 @@ void main() {
 
         final viewModel = ProjectListViewModel(
           mockCalendarRepository,
-          mockTaskRepository,
+          _FakeTaskRepositoryForDelete(),
           mockAccountRepository,
           mockUserRepository,
         );
@@ -76,6 +110,11 @@ void main() {
         // Mock getById to return the test project
         when(mockCalendarRepository.getById('project1'))
             .thenAnswer((_) async => Result.success(testProject.project));
+
+        // Mock repository stream to avoid debounce-triggered reloads altering local state mid-assertions
+        when(mockCalendarRepository.watchCalendars()).thenAnswer((_) => const Stream<List<TaskCalendar>>.empty());
+
+        // Task cascade handled by fake repository above
 
         // Mock successful deletion
         when(mockCalendarRepository.delete('project1'))

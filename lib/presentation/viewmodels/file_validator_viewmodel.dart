@@ -7,10 +7,10 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
-import '../../data/services/s3_storage_service.dart';
+import '../../data/services/storage/s3_storage_service.dart';
 import '../../data/services/validator_service.dart';
-import '../../data/services/offline_file_service.dart';
-import '../../data/services/file_upload_queue_service.dart';
+import '../../data/services/storage/offline_file_service.dart';
+import '../../data/services/storage/file_upload_queue_service.dart';
 import '../../data/providers/providers.dart';
 import '../../core/logger.dart';
 
@@ -161,6 +161,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
       final success = await offlineFileResult.when(
         success: (offlineFile) async {
           AppLogger.info('FileValidatorViewModel: File stored locally with ID: ${offlineFile.id}');
+          AppLogger.info('FVVM.enqueue: task=$taskUid validator=$validatorId offlineFileId=${offlineFile.id} size=${fileData.length} contentType=$contentType');
           
           // Create file info for validator (using offline file ID)
           final fileInfo = {
@@ -203,13 +204,16 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
 
           // Queue file for upload
           AppLogger.info('FileValidatorViewModel: Queueing file for upload: ${offlineFile.id}');
+          AppLogger.info('FVVM.enqueue: queueing offlineFileId=${offlineFile.id}');
           final queueResult = await _fileUploadQueueService.queueFileUpload(offlineFile.id);
           await queueResult.when(
             success: (_) async {
               AppLogger.info('FileValidatorViewModel: File successfully queued for upload');
+              AppLogger.info('FVVM.enqueue: queued OK offlineFileId=${offlineFile.id}');
             },
             failure: (failure) async {
               AppLogger.error('FileValidatorViewModel: Failed to queue file for upload: ${failure.message}');
+              AppLogger.error('FVVM.enqueue: queue FAILED offlineFileId=${offlineFile.id} error=${failure.message}');
             },
           );
 

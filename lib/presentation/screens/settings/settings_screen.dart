@@ -2,10 +2,9 @@
 // CalDAV connections, theme, and app preferences
 
 import 'package:flutter/material.dart';
+import '../../../l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:hive_flutter/hive_flutter.dart';
 import '../../../core/logger.dart';
-import '../../../data/services/local_storage_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
 import 'caldav_management_screen.dart';
@@ -13,9 +12,9 @@ import 'connection_info_screen.dart';
 import 'external_calendar_management_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
-import '../../../data/services/web_storage.dart';
-import '../../../data/services/sync_service.dart';
+import '../../../data/services/sync/sync_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../viewmodels/appearance_settings_viewmodel.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -28,7 +27,7 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: isDesktop
           ? AppBar(
-              title: const Text('Settings'),
+              title: Text(AppLocalizations.of(context)!.settings),
               automaticallyImplyLeading: false,
               scrolledUnderElevation: 0,
               elevation: 0,
@@ -40,17 +39,42 @@ class SettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         children: [
           _SettingsSection(
-            title: 'Account',
+            title: AppLocalizations.of(context)!.appearance,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                      Text(AppLocalizations.of(context)!.themeLabel, style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    _ThemeModeSelector(),
+                    const SizedBox(height: 16),
+                    Text(AppLocalizations.of(context)!.language, style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    const _LanguageSelector(),
+                    const SizedBox(height: 16),
+                      Text(AppLocalizations.of(context)!.fontSizeLabel, style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    _FontScaleSelector(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _SettingsSection(
+            title: AppLocalizations.of(context)!.account,
             children: [
               _SettingsItem(
-                title: 'Connection Information',
-                subtitle: 'View account details and status',
+                title: AppLocalizations.of(context)!.connectionInfo,
+                subtitle: AppLocalizations.of(context)!.connectionInfoSubtitle,
                 icon: Icons.info_rounded,
                 onTap: () => _showConnectionInfo(context, ref),
               ),
               _SettingsItem(
-                title: 'Sync Setting',
-                subtitle: 'Manage CalDAV synchronization',
+                title: AppLocalizations.of(context)!.syncSettings,
+                subtitle: AppLocalizations.of(context)!.syncSettingsSubtitle,
                 icon: Icons.sync_rounded,
                 onTap: () => _showSyncSettings(context, ref),
               ),
@@ -58,23 +82,23 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           _SettingsSection(
-            title: 'Integration',
+            title: AppLocalizations.of(context)!.integration,
             children: [
               _SettingsItem(
-                title: 'External Calendars',
-                subtitle: 'Connect external CalDAV calendars',
+                title: AppLocalizations.of(context)!.externalCalendars,
+                subtitle: AppLocalizations.of(context)!.externalCalendarsSubtitle,
                 icon: Icons.calendar_view_month_rounded,
                 onTap: () => _showExternalCalendars(context, ref),
               ),
               _SettingsItem(
-                title: 'Export Data',
-                subtitle: 'Export all local data to a file',
+                title: AppLocalizations.of(context)!.exportData,
+                subtitle: AppLocalizations.of(context)!.exportDataSubtitle,
                 icon: Icons.download_rounded,
                 onTap: () => _showExportData(context, ref),
               ),
               _SettingsItem(
-                title: 'Import Data',
-                subtitle: 'Import data from a file',
+                title: AppLocalizations.of(context)!.importData,
+                subtitle: AppLocalizations.of(context)!.importDataSubtitle,
                 icon: Icons.upload_rounded,
                 onTap: () => _showImportData(context, ref),
               ),
@@ -82,17 +106,17 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           _SettingsSection(
-            title: 'About',
+            title: AppLocalizations.of(context)!.about,
             children: [
               _SettingsItem(
-                title: 'About us',
-                subtitle: 'Learn more about TowDow',
+                title: AppLocalizations.of(context)!.aboutUs,
+                subtitle: AppLocalizations.of(context)!.aboutUsSubtitle,
                 icon: Icons.public_rounded,
                 onTap: () => _openExternalUrl('https://gettowdow.com'),
               ),
               _SettingsItem(
-                title: 'License',
-                subtitle: 'Mozilla Public License 2.0',
+                title: AppLocalizations.of(context)!.license,
+                subtitle: AppLocalizations.of(context)!.licenseSubtitle,
                 icon: Icons.description_rounded,
                 onTap: () => _openExternalUrl('https://gitlab.com/towdow/towdow-flutter/-/blob/develop/LICENSE'),
               ),
@@ -100,11 +124,11 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           _SettingsSection(
-            title: 'Danger Zone',
+            title: AppLocalizations.of(context)!.dangerZone,
             children: [
               _SettingsItem(
-                title: 'Disconnect & Clear Data',
-                subtitle: 'Clear all data and restart the app',
+                title: AppLocalizations.of(context)!.disconnectAndClearData,
+                subtitle: AppLocalizations.of(context)!.disconnectAndClearDataSubtitle,
                 icon: Icons.logout_rounded,
                 isDestructive: true,
                 onTap: () => _showDisconnectConfirmation(context, ref),
@@ -131,19 +155,12 @@ class SettingsScreen extends ConsumerWidget {
         await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('⚠️ Disconnect & Clear Data'),
-            content: const Text(
-              'This will permanently delete:\n'
-              '• All tasks\n'
-              '• All projects\n'
-              '• All accounts\n'
-              '• All sync data\n\n'
-              'This action cannot be undone!',
-            ),
+            title: Text(AppLocalizations.of(context)!.disconnectDialogTitle),
+            content: Text(AppLocalizations.of(context)!.disconnectDialogBody),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text(AppLocalizations.of(context)!.cancel),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
@@ -151,7 +168,7 @@ class SettingsScreen extends ConsumerWidget {
                   backgroundColor: Theme.of(context).colorScheme.error,
                   foregroundColor: Theme.of(context).colorScheme.onError,
                 ),
-                child: const Text('DISCONNECT'),
+                child: Text(AppLocalizations.of(context)!.disconnect),
               ),
             ],
           ),
@@ -166,7 +183,7 @@ class SettingsScreen extends ConsumerWidget {
       // Special handling for web platform
       if (kIsWeb) {
         // For web browsers, we need to clear the browser's localStorage as well
-        await _clearWebStorageAndCache();
+        await _clearWebStorageAndCache(ref);
       }
 
       // Perform full on-disk wipe to ensure nothing lingers
@@ -241,77 +258,12 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   // Helper method to clear web-specific storage and cache
-  Future<void> _clearWebStorageAndCache() async {
-    if (kIsWeb) {
-      try {
-        // Use dart:html's window.localStorage to clear browser storage
-        // This needs to be done using JS interop in a web-safe way
-        await _clearLocalStorageUsingJsInterop();
-
-        // Clear Hive's IndexedDB storage more aggressively using known box names
-        final boxNames = [
-          LocalStorageService.tasksBoxName,
-          LocalStorageService.projectsBoxName,
-          LocalStorageService.calendarsBoxName,
-          LocalStorageService.automatedTasksBoxName,
-          LocalStorageService.accountsBoxName,
-          LocalStorageService.syncQueueBoxName,
-          LocalStorageService.domainsBoxName,
-          LocalStorageService.statusesBoxName,
-          LocalStorageService.userPreferencesBoxName,
-          LocalStorageService.externalAccountsBoxName,
-          LocalStorageService.externalCalendarsBoxName,
-          LocalStorageService.externalEventsBoxName,
-          LocalStorageService.offlineFilesBoxName,
-          LocalStorageService.fileUploadQueueBoxName,
-        ];
-
-        for (final boxName in boxNames) {
-          if (Hive.isBoxOpen(boxName)) {
-            try {
-              await Hive.box(boxName).clear();
-              await Hive.box(boxName).close();
-              await Hive.deleteBoxFromDisk(boxName);
-            } catch (e) {
-              AppLogger.warning('Failed to clear box $boxName: $e');
-            }
-          }
-        }
-
-        // Force page refresh to ensure clean state (only in production)
-        if (!const bool.fromEnvironment('dart.vm.product')) {
-          await _reloadPageUsingJsInterop();
-        }
-      } catch (e) {
-        AppLogger.error('Failed to clear web storage', e);
-      }
-    }
+  Future<void> _clearWebStorageAndCache(WidgetRef ref) async {
+    final storage = ref.read(localStorageServiceProvider);
+    await storage.clearAllBoxesWebSafe();
   }
 
-  // Clear localStorage using JS interop
-  Future<void> _clearLocalStorageUsingJsInterop() async {
-    if (kIsWeb) {
-      try {
-        await clearLocalStorage();
-        AppLogger.info('localStorage cleared successfully via JS interop');
-      } catch (e, stacktrace) {
-        AppLogger.error('Failed to clear localStorage', e, stacktrace);
-      }
-    }
-  }
-
-  // Reload the page using JS interop
-  Future<void> _reloadPageUsingJsInterop() async {
-    if (kIsWeb) {
-      try {
-        // In a real implementation with conditional imports:
-        // js.context.callMethod('eval', ['window.location.reload();']);
-        AppLogger.info('Web platform: page would be reloaded here');
-      } catch (e) {
-        AppLogger.error('Failed to reload page', e);
-      }
-    }
-  }
+  // JS interop helpers removed; handled by LocalStorageService
 
   Future<void> _openExternalUrl(String url) async {
     try {
@@ -391,6 +343,89 @@ class _SettingsItem extends StatelessWidget {
           () {
             // Feature coming soon - no action needed
           },
+    );
+  }
+}
+
+class _ThemeModeSelector extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(themeModeProvider);
+    final vm = ref.read(appearanceSettingsViewModelProvider.notifier);
+    return SegmentedButton<ThemeMode>(
+      segments: [
+        ButtonSegment(value: ThemeMode.system, icon: const Icon(Icons.phone_android), label: Text(AppLocalizations.of(context)!.themeSystem)),
+        ButtonSegment(value: ThemeMode.light, icon: const Icon(Icons.light_mode_rounded), label: Text(AppLocalizations.of(context)!.themeLight)),
+        ButtonSegment(value: ThemeMode.dark, icon: const Icon(Icons.dark_mode_rounded), label: Text(AppLocalizations.of(context)!.themeDark)),
+      ],
+      selected: {current},
+      onSelectionChanged: (set) {
+        if (set.isNotEmpty) {
+          vm.setThemeMode(set.first);
+        }
+      },
+    );
+  }
+}
+
+class _FontScaleSelector extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentScale = ref.watch(fontScaleProvider);
+    final vm = ref.read(appearanceSettingsViewModelProvider.notifier);
+
+    String currentKey;
+    if (currentScale <= 0.95) {
+      currentKey = 'small';
+    } else if (currentScale >= 1.1) {
+      currentKey = 'large';
+    } else {
+      currentKey = 'medium';
+    }
+
+    return SegmentedButton<String>(
+      segments: [
+        ButtonSegment(value: 'small', label: Text(AppLocalizations.of(context)!.fontSmall)),
+        ButtonSegment(value: 'medium', label: Text(AppLocalizations.of(context)!.fontMedium)),
+        ButtonSegment(value: 'large', label: Text(AppLocalizations.of(context)!.fontLarge)),
+      ],
+      selected: {currentKey},
+      onSelectionChanged: (set) {
+        if (set.isNotEmpty) {
+          vm.setFontScale(set.first);
+        }
+      },
+    );
+  }
+}
+
+class _LanguageSelector extends ConsumerWidget {
+  const _LanguageSelector();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vm = ref.read(appearanceSettingsViewModelProvider.notifier);
+    final currentLocale = ref.watch(localeProvider);
+    String selected = currentLocale == null
+        ? 'system'
+        : currentLocale.countryCode == null
+            ? currentLocale.languageCode
+            : '${currentLocale.languageCode}-${currentLocale.countryCode}';
+
+    return SegmentedButton<String>(
+      segments: [
+        ButtonSegment(value: 'system', label: Text(AppLocalizations.of(context)!.languageSystem)),
+        ButtonSegment(value: 'en', label: Text(AppLocalizations.of(context)!.languageEn)),
+        ButtonSegment(value: 'fr', label: Text(AppLocalizations.of(context)!.languageFr)),
+      ],
+      selected: {selected}
+          .where((e) => e == 'system' || e == 'en' || e == 'fr')
+          .toSet(),
+      onSelectionChanged: (set) {
+        if (set.isNotEmpty) {
+          vm.setLocale(set.first);
+        }
+      },
     );
   }
 }

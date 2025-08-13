@@ -74,7 +74,13 @@ class TaskItemPopup extends StatelessWidget {
               TaskItemToolbar(
                 task: task,
                 onTaskUpdated: onTaskUpdated,
-                onTaskDeleted: onTaskDeleted,
+                onTaskDeleted: () {
+                  if (onTaskDeleted != null) {
+                    onTaskDeleted!();
+                  }
+                  // Close the popup after deletion
+                  Navigator.of(context).maybePop();
+                },
               ),
             ],
           ),
@@ -91,7 +97,7 @@ class TaskItemPopup extends StatelessWidget {
     if (validators.isNotEmpty && !ValidatorService.areValidatorsCompleted(validators)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please complete all required validators before marking the task as done'),
+          content: const Text('Please complete all required completion requirements before marking the task as done'),
           backgroundColor: Theme.of(context).colorScheme.error,
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
@@ -370,7 +376,12 @@ class _AnchoredPopupScaffoldState extends State<_AnchoredPopupScaffold> {
         child: TaskItemToolbar(
           task: widget.task,
           onTaskUpdated: widget.onTaskUpdated,
-          onTaskDeleted: widget.onTaskDeleted,
+          onTaskDeleted: () {
+            if (widget.onTaskDeleted != null) {
+              widget.onTaskDeleted!();
+            }
+            Navigator.of(context).maybePop();
+          },
           vertical: true,
           alignRight: true,
         ),
@@ -416,7 +427,12 @@ class _AnchoredPopupScaffoldState extends State<_AnchoredPopupScaffold> {
             child: TaskItemToolbar(
               task: widget.task,
               onTaskUpdated: widget.onTaskUpdated,
-              onTaskDeleted: widget.onTaskDeleted,
+              onTaskDeleted: () {
+                if (widget.onTaskDeleted != null) {
+                  widget.onTaskDeleted!();
+                }
+                Navigator.of(context).maybePop();
+              },
               vertical: true,
               alignRight: false,
             ),
@@ -573,7 +589,7 @@ class _AnchoredTaskCardState extends State<_AnchoredTaskCard>
     if (validators.isNotEmpty && !ValidatorService.areValidatorsCompleted(validators)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please complete all required validators before marking the task as done'),
+          content: const Text('Please complete all required completion requirements before marking the task as done'),
           backgroundColor: Theme.of(context).colorScheme.error,
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,

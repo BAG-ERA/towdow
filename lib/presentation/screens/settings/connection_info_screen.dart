@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/models/caldav_account.dart';
 import '../../../data/providers/providers.dart';
 
@@ -17,12 +18,12 @@ class ConnectionInfoScreen extends ConsumerWidget {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Connection Information'),
+        title: Text(AppLocalizations.of(context)!.connectionInfo),
       ),
       body: accountAsync.when(
         data: (account) {
           if (account == null) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -33,7 +34,7 @@ class ConnectionInfoScreen extends ConsumerWidget {
                   ),
                   SizedBox(height: 16),
                   Text(
-                    'No CalDAV account connected',
+                    AppLocalizations.of(context)!.noCaldavAccountConnected,
                     style: TextStyle(
                       fontSize: 18,
                       color: Colors.grey,
@@ -58,7 +59,7 @@ class ConnectionInfoScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Error loading account: $error',
+                AppLocalizations.of(context)!.errorLoadingAccount(error.toString()),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.red),
               ),
@@ -75,24 +76,24 @@ class ConnectionInfoScreen extends ConsumerWidget {
       children: [
         // User Information Section
         _InfoSection(
-          title: 'User Information',
+          title: AppLocalizations.of(context)!.userInformation,
           icon: Icons.person_rounded,
           children: [
             if (account.firstName != null || account.lastName != null)
               _InfoItem(
-                label: 'Full Name (CN)',
+                label: AppLocalizations.of(context)!.fullName,
                 value: '${account.firstName ?? ''} ${account.lastName ?? ''}'.trim(),
                 icon: Icons.badge_rounded,
               ),
             if (account.email != null)
               _InfoItem(
-                label: 'Email Address',
+                label: AppLocalizations.of(context)!.emailAddress,
                 value: account.email!,
                 icon: Icons.email_rounded,
                 copyable: true,
               ),
             _InfoItem(
-              label: 'Username',
+              label: AppLocalizations.of(context)!.username,
               value: account.username,
               icon: Icons.account_circle_rounded,
               copyable: true,
@@ -104,23 +105,23 @@ class ConnectionInfoScreen extends ConsumerWidget {
         
         // Server Information Section
         _InfoSection(
-          title: 'Server Information',
+          title: AppLocalizations.of(context)!.serverInformation,
           icon: Icons.dns_rounded,
           children: [
             _InfoItem(
-              label: 'Server URL',
+              label: AppLocalizations.of(context)!.serverUrlLabel,
               value: account.serverUrl,
               icon: Icons.link_rounded,
               copyable: true,
             ),
             _InfoItem(
-              label: 'Provider Type',
-              value: _formatProviderType(account.providerType),
+              label: AppLocalizations.of(context)!.providerType,
+              value: _formatProviderType(context, account.providerType, account.serverUrl),
               icon: Icons.category_rounded,
             ),
             _InfoItem(
-              label: 'Authentication',
-              value: _getAuthType(account),
+              label: AppLocalizations.of(context)!.authentication,
+              value: _getAuthType(context, account),
               icon: Icons.security_rounded,
             ),
           ],
@@ -130,28 +131,28 @@ class ConnectionInfoScreen extends ConsumerWidget {
         
         // Connection Status Section
         _InfoSection(
-          title: 'Connection Status',
+          title: AppLocalizations.of(context)!.connectionStatus,
           icon: Icons.wifi_rounded,
           children: [
             _InfoItem(
-              label: 'Status',
-              value: account.isActive ? 'Active' : 'Inactive',
+              label: AppLocalizations.of(context)!.status,
+              value: account.isActive ? AppLocalizations.of(context)!.active : AppLocalizations.of(context)!.inactive,
               icon: account.isActive ? Icons.check_circle_rounded : Icons.error_rounded,
               valueColor: account.isActive ? Colors.green : Colors.red,
             ),
             _InfoItem(
-              label: 'Account Created',
+              label: AppLocalizations.of(context)!.accountCreated,
               value: DateFormat('MMM dd, yyyy - HH:mm').format(account.createdAt),
               icon: Icons.event_rounded,
             ),
             _InfoItem(
-              label: 'Last Sync',
+              label: AppLocalizations.of(context)!.lastSync,
               value: DateFormat('MMM dd, yyyy - HH:mm').format(account.lastSyncAt),
               icon: Icons.sync_rounded,
             ),
             if (account.tokenExpiry != null)
               _InfoItem(
-                label: 'Token Expires',
+                label: AppLocalizations.of(context)!.tokenExpires,
                 value: DateFormat('MMM dd, yyyy - HH:mm').format(account.tokenExpiry!),
                 icon: Icons.schedule_rounded,
                 valueColor: account.tokenExpiry!.isBefore(DateTime.now()) ? Colors.red : null,
@@ -163,11 +164,11 @@ class ConnectionInfoScreen extends ConsumerWidget {
         
         // Account ID (for debugging)
         _InfoSection(
-          title: 'Technical Details',
+          title: AppLocalizations.of(context)!.technicalDetails,
           icon: Icons.info_rounded,
           children: [
             _InfoItem(
-              label: 'Account ID',
+              label: AppLocalizations.of(context)!.accountId,
               value: account.id,
               icon: Icons.fingerprint_rounded,
               copyable: true,
@@ -178,28 +179,35 @@ class ConnectionInfoScreen extends ConsumerWidget {
     );
   }
 
-  String _formatProviderType(String providerType) {
+  String _formatProviderType(BuildContext context, String providerType, String serverUrl) {
+    // Detect offline-only via localhost URL hint
+    if (serverUrl.startsWith('https://localhost') || serverUrl.startsWith('http://localhost')) {
+      return AppLocalizations.of(context)!.offlineOnly;
+    }
     switch (providerType.toLowerCase()) {
       case 'towdow_cloud':
-        return 'TowDow Cloud';
+        return AppLocalizations.of(context)!.towDowCloud;
       case 'google':
-        return 'Google Calendar';
+        return AppLocalizations.of(context)!.googleCalendar;
       case 'nextcloud':
-        return 'Nextcloud';
+        return AppLocalizations.of(context)!.nextcloud;
       case 'custom':
-        return 'Custom CalDAV';
+        return AppLocalizations.of(context)!.customCaldav;
       default:
         return providerType;
     }
   }
 
-  String _getAuthType(CaldavAccount account) {
+  String _getAuthType(BuildContext context, CaldavAccount account) {
+    if (account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost')) {
+      return AppLocalizations.of(context)!.noneOfflineMode;
+    }
     if (account.accessToken != null) {
-      return 'OAuth 2.0';
+      return AppLocalizations.of(context)!.oauth2;
     } else if (account.password != null) {
-      return 'Basic Authentication';
+      return AppLocalizations.of(context)!.basicAuthentication;
     } else {
-      return 'Unknown';
+      return AppLocalizations.of(context)!.unknown;
     }
   }
 }

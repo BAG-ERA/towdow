@@ -7,11 +7,10 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
-import '../../data/services/s3_storage_service.dart';
+import '../../data/services/storage/s3_storage_service.dart';
 import '../../data/services/validator_service.dart';
-import '../../data/services/sync_service.dart';
-import '../../data/services/offline_file_service.dart';
-import '../../data/services/file_upload_queue_service.dart';
+import '../../data/services/storage/offline_file_service.dart';
+import '../../data/services/storage/file_upload_queue_service.dart';
 import '../../data/providers/providers.dart';
 import '../../core/logger.dart';
 
@@ -555,13 +554,11 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
       // Download image bytes from S3
       final downloadResult = await _downloadFromS3(s3Key, validatorId);
       
-      if (downloadResult != null) {
-        // Cache the downloaded image locally
-        _imageCache[fileId] = downloadResult; // Cache the data
-        return downloadResult;
-      }
+ 
+      // Cache the downloaded image locally
+      _imageCache[fileId] = downloadResult; // Cache the data
+      return downloadResult;
       
-      return null;
     } catch (e) {
       AppLogger.debug('MediaValidatorViewModel: Failed to download and cache image: $e');
       return null;

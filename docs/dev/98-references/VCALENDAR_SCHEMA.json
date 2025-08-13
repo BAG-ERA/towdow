@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FlowIt VCALENDAR Properties",
+  "type": "object",
+  "properties": {
+    "path": { "type": "string" },
+    "displayName": { "type": "string" },
+    "description": { "type": "string" },
+    "etag": { "type": ["string", "null"] },
+    "color": { "type": ["string", "null"] },
+    "syncToken": { "type": ["string", "null"] },
+
+    "dtstamp": { "type": "string", "format": "date-time" },
+    "created": { "type": "string", "format": "date-time" },
+    "lastModified": { "type": "string", "format": "date-time" },
+    "status": { "type": "string" },
+    "percentComplete": { "type": "integer" },
+
+    "flowitType": { "type": "string", "enum": ["PROJECT"] },
+    "flowitAsFlow": { "type": "boolean" },
+    "flowitKanban": { "type": "string", "description": "JSON array string" },
+    "flowitTemplate": { "type": ["string", "null"] },
+    "calendarOrder": { "type": "integer" },
+    "attendees": { "type": "array" },
+
+    "projectCategories": { "type": "string", "description": "JSON array string" },
+    "projectRequirements": { "type": "string", "description": "JSON array string" },
+    "projectSteps": { "type": "string", "description": "JSON array string" },
+
+    "flowitDomain": { "type": ["string", "null"] },
+    "flowitStatus": { "type": ["string", "null"] },
+    "sharedWith": { "type": "string", "description": "JSON array string" },
+
+    "flowitAuthor": { "type": ["string", "null"] },
+    "flowitOwner": { "type": ["string", "null"] },
+    "flowitStartedAt": { "type": ["string", "null"], "format": "date-time" },
+    "flowitEndedAt": { "type": ["string", "null"], "format": "date-time" },
+
+    "isSharedWithMe": { "type": "boolean" }
+  },
+  "required": [
+    "path", "displayName", "dtstamp", "created", "lastModified", "status"
+  ]
+}

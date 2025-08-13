@@ -167,7 +167,7 @@ class _TaskItemState extends State<TaskItem> {
       // Show validation message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please complete all required validators before marking the task as done'),
+          content: const Text('Please complete all required completion requirements before marking the task as done'),
           backgroundColor: Theme.of(context).colorScheme.error,
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,

@@ -2,7 +2,7 @@
 // Handles account storage, retrieval, and connection status
 
 import '../models/caldav_account.dart';
-import '../services/local_storage_service.dart';
+import '../services/storage/local_storage_service.dart';
 import '../../core/result.dart';
 import '../../core/logger.dart';
 

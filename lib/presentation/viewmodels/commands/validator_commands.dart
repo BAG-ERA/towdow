@@ -5,7 +5,7 @@ import '../../../core/command.dart';
 import '../../../data/models/task.dart';
 import '../../../data/repositories/task_repository.dart';
 import '../../../data/repositories/account_repository.dart';
-import '../../../data/services/sync_service.dart';
+import '../../../data/services/sync/sync_service.dart';
 import '../../../data/services/validator_service.dart';
 import '../../../core/logger.dart';
 
@@ -169,15 +169,22 @@ class AddValidatorFromTemplateCommand extends ParameterizedCommand<Task, AddVali
 
     // Get current user email to check permissions
     String? currentUserEmail;
+    String? providerType;
     final accountResult = await _accountRepository.getActiveAccount();
     await accountResult.when(
       success: (account) async {
         currentUserEmail = account?.email ?? account?.username;
+        providerType = account?.providerType;
       },
       failure: (_) async {
         // Continue without user email - permission check will fail gracefully
       },
     );
+
+    // Gate file/media validators for custom CalDAV accounts
+    if (providerType == 'custom' && (params.templateType == 'file' || params.templateType == 'media')) {
+      throw Exception('File and media completion requirements are disabled for this account type');
+    }
 
     // Get current task
     final taskResult = await _taskRepository.getById(params.taskUid);
@@ -188,9 +195,9 @@ class AddValidatorFromTemplateCommand extends ParameterizedCommand<Task, AddVali
           throw Exception('Task not found: ${params.taskUid}');
         }
 
-        // Check permissions - only organizer can add validators
+        // Check permissions - only organizer can add completion requirements
         if (!ValidatorService.canEditValidators(task.organizer, currentUserEmail)) {
-          throw Exception('You do not have permission to add validators to this task');
+          throw Exception('You do not have permission to add completion requirements to this task');
         }
 
         // Create validator based on template type
@@ -326,9 +333,9 @@ class RemoveValidatorCommand extends ParameterizedCommand<Task, UpdateValidatorS
           throw Exception('Task not found: ${params.taskUid}');
         }
 
-        // Check permissions - only organizer can remove validators
+        // Check permissions - only organizer can remove completion requirements
         if (!ValidatorService.canEditValidators(task.organizer, currentUserEmail)) {
-          throw Exception('You do not have permission to remove validators from this task');
+          throw Exception('You do not have permission to remove completion requirements from this task');
         }
 
         // Parse current validators and remove the specified one
@@ -405,9 +412,9 @@ class CompleteTaskWithValidatorsCommand extends ParameterizedCommand<Task, Compl
     // Parse validators and check completion
     final validatorLists = ValidatorService.parseValidators(params.task.flowitValidator);
     
-    // Check if all required validators are completed
+    // Check if all required completion requirements are completed
     if (!ValidatorService.areValidatorsCompleted(validatorLists)) {
-      throw Exception('All required validators must be completed before marking the task as done');
+      throw Exception('All required completion requirements must be completed before marking the task as done');
     }
 
     // Create completed task

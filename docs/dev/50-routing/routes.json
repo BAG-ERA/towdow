@@ -1,0 +1,30 @@
+{
+  "source": "lib/app.dart",
+  "initialLocation": "/projects",
+  "shell": {
+    "component": "AdaptiveAppLayout",
+    "destinations": [
+      { "name": "today", "path": "/today" },
+      { "name": "soon", "path": "/soon" },
+      { "name": "anytime", "path": "/anytime" },
+      { "name": "projects", "path": "/projects" },
+      { "name": "workflows", "path": "/workflows" }
+    ],
+    "innerRoutes": [
+      { "path": "/", "page": "_AppShell" },
+      { "path": "/today", "page": "_TaskViewShell" },
+      { "path": "/soon", "page": "_TaskViewShell" },
+      { "path": "/next-week", "page": "_TaskViewShell" },
+      { "path": "/later", "page": "_TaskViewShell" },
+      { "path": "/anytime", "page": "_TaskViewShell" },
+      { "path": "/projects", "page": "ProjectsListScreen" },
+      { "path": "/workflows", "page": "WorkflowListScreen" },
+      { "path": "/project/:path", "page": "ProjectDetailScreen" },
+      { "path": "/workflow/:path", "page": "WorkflowDetailScreen" },
+      { "path": "/settings", "page": "SettingsScreen" }
+    ]
+  },
+  "outsideShell": [
+    { "path": "/connect", "page": "ConnectionScreen" }
+  ]
+}

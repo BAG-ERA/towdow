@@ -2,6 +2,7 @@
 // Provides quick and custom date selection options for tasks
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../../core/logger.dart';
 import '../../../../data/models/task.dart';
 
@@ -35,37 +36,37 @@ class DueDateDialog extends StatelessWidget {
     final currentDue = task.due;
     
     return AlertDialog(
-      title: const Text('Due Date'),
+      title: Text(AppLocalizations.of(context)!.dueDateTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (currentDue != null) ...[
             ListTile(
               leading: const Icon(Icons.clear_rounded),
-              title: const Text('Remove due date'),
+              title: Text(AppLocalizations.of(context)!.removeDueDate),
               onTap: () => _selectDate(context, null),
             ),
             const Divider(),
           ],
           ListTile(
             leading: const Icon(Icons.today_rounded),
-            title: const Text('Today'),
+            title: Text(AppLocalizations.of(context)!.today),
             onTap: () => _selectDate(context, _getToday()),
           ),
           ListTile(
             leading: const Icon(Icons.event_rounded),
-            title: const Text('Tomorrow'),
+            title: Text(AppLocalizations.of(context)!.tomorrow),
             onTap: () => _selectDate(context, _getTomorrow()),
           ),
           ListTile(
             leading: const Icon(Icons.calendar_view_week_rounded),
-            title: const Text('In 7 days'),
+            title: Text(AppLocalizations.of(context)!.nextWeek),
             onTap: () => _selectDate(context, _getInDays(7)),
           ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.calendar_today_rounded),
-            title: const Text('Pick a date...'),
+            title: Text(AppLocalizations.of(context)!.pickADate),
             onTap: () async {
               Navigator.of(context).pop(); // Close current dialog
               final picked = await showDatePicker(
@@ -84,7 +85,7 @@ class DueDateDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(AppLocalizations.of(context)!.cancel),
         ),
       ],
     );

@@ -3,14 +3,10 @@
 // Follows MVVM architecture pattern consistent with other ViewModels
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'dart:convert';
 
 import '../../core/logger.dart';
-import '../../core/result.dart';
 import '../../data/models/kanban.dart';
-import '../../data/models/task_calendar.dart';
 import '../../data/models/category.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/kanban_repository.dart';

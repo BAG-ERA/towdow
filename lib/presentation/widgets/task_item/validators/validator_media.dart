@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../viewmodels/media_validator_viewmodel.dart';
 import '../../../../core/logger.dart';
 import '../../utils/full_screen_image_viewer.dart';
@@ -220,7 +221,7 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.download, size: 16),
-                  tooltip: 'Download',
+                  tooltip: AppLocalizations.of(context)!.download,
                   style: IconButton.styleFrom(
                     minimumSize: const Size(32, 32),
                     padding: EdgeInsets.zero,
@@ -232,7 +233,7 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
                   IconButton(
                     onPressed: () => _removeMediaFile(validatorId, fileId),
                     icon: const Icon(Icons.delete_outline, size: 16),
-                    tooltip: 'Remove',
+                    tooltip: AppLocalizations.of(context)!.remove,
                     style: IconButton.styleFrom(
                       minimumSize: const Size(32, 32),
                       padding: EdgeInsets.zero,

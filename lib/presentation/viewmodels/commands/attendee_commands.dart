@@ -11,7 +11,7 @@ import '../../../core/logger.dart';
 import '../../../data/models/task.dart';
 import '../../../data/models/attendee.dart';
 import '../../../data/repositories/task_repository.dart';
-import '../../../data/services/sync_service.dart';
+import '../../../data/services/sync/sync_service.dart';
 
 /// Command to add an attendee to a task
 class AddAttendeeCommand extends ParameterizedCommand<Task, AddAttendeeParams> {

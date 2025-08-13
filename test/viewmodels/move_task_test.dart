@@ -9,7 +9,7 @@ import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
-import 'package:towdow_app/data/services/sync_service.dart';
+import 'package:towdow_app/data/services/sync/sync_service.dart';
 import 'package:towdow_app/presentation/viewmodels/task_viewmodel.dart';
 import 'package:towdow_app/presentation/viewmodels/commands/task_commands.dart';
 import 'package:towdow_app/core/result.dart';

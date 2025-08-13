@@ -306,9 +306,6 @@ class ValidatorService {
   }
   
   /// Private helper methods
-  
-
-  
   static Map<String, dynamic> _migrateFormQuestion(Map<String, dynamic> question) {
     final type = question['questiontype'] as String?;
     final id = question['questionid'] as String? ?? const Uuid().v4();
@@ -600,6 +597,10 @@ class ValidatorService {
           's3Url': s3Url,
           'status': status,
         };
+        if (newState['removeOfflineRef'] == true) {
+          updatedFile.remove('offlineFileId');
+          updatedFile.remove('uploadedAt');
+        }
         AppLogger.debug('ValidatorService: Updated file: $updatedFile');
         return updatedFile;
       }

@@ -6,21 +6,21 @@ import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
-import 'package:towdow_app/data/models/task_calendar.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
-import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
 import 'package:towdow_app/data/repositories/external_account_repository.dart';
 import 'package:towdow_app/data/repositories/external_calendar_repository.dart';
-import 'package:towdow_app/data/services/caldav_monitor.dart';
-import 'package:towdow_app/data/services/connection_monitor_service.dart';
-import 'package:towdow_app/data/services/sync_service.dart';
-import 'package:towdow_app/data/services/user_sync_service.dart';
-import 'package:towdow_app/data/services/user_preferences_queue_service.dart';
+import 'package:towdow_app/data/services/sync/sync_orchestrator_service.dart';
+import 'package:towdow_app/data/services/sync/sync_service.dart';
+import 'package:towdow_app/data/services/sync/connection_monitor_service.dart';
+import 'package:towdow_app/data/services/user/user_sync_service.dart';
+import 'package:towdow_app/data/services/user/user_preferences_queue_service.dart';
 import 'package:towdow_app/data/services/webdav_client.dart';
-import 'package:towdow_app/core/logger.dart';
+import '../helpers/monitor_test_doubles.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/data/models/task_calendar.dart';
 
 import 'caldav_monitor_test.mocks.dart';
 
@@ -40,12 +40,18 @@ import 'caldav_monitor_test.mocks.dart';
 void main() {
   group('CalDAVMonitor', () {
     late CalDAVMonitor monitor;
+    // Test DI ref and fakes
+    late ProviderContainer container;
+    late Ref testRef;
+    late CaldavAccount fixtureAccount;
+    late FakeCalDAVService fakeCalDAV;
+    late FakeS3StorageService fakeS3;
     late MockAccountRepository mockAccountRepository;
     late MockCalendarRepository mockCalendarRepository;
     late MockCategoryRepository mockCategoryRepository;
     late MockUserRepository mockUserRepository;
     late MockExternalAccountRepository mockExternalAccountRepository;
-    late MockExternalCalendarRepository mockExternalCalendarRepository;
+    // Intentionally omitted: MockExternalCalendarRepository isn't required by CalDAVMonitor constructor
     late MockConnectionMonitorService mockConnectionMonitorService;
     late MockSyncService mockSyncService;
     late MockUserSyncService mockUserSyncService;
@@ -57,13 +63,36 @@ void main() {
       mockCategoryRepository = MockCategoryRepository();
       mockUserRepository = MockUserRepository();
       mockExternalAccountRepository = MockExternalAccountRepository();
-      mockExternalCalendarRepository = MockExternalCalendarRepository();
+      // No need to initialize MockExternalCalendarRepository for these tests
       mockConnectionMonitorService = MockConnectionMonitorService();
       mockSyncService = MockSyncService();
       mockUserSyncService = MockUserSyncService();
       mockUserPreferencesQueueService = MockUserPreferencesQueueService();
 
+      // Build DI ref with fakes (no calendars by default)
+      fixtureAccount = CaldavAccount(
+        id: 'test-account',
+        providerType: 'custom',
+        serverUrl: 'https://test.com',
+        username: 'test',
+        createdAt: DateTime(2024, 1, 1),
+        lastSyncAt: DateTime(2024, 1, 1),
+      );
+      fakeCalDAV = FakeCalDAVService(account: fixtureAccount, availableCalendars: const <TaskCalendar>[]);
+      fakeS3 = FakeS3StorageService(account: fixtureAccount);
+      final di = createContainerWithServiceFakes(
+        account: fixtureAccount,
+        caldavFake: fakeCalDAV,
+        s3Fake: fakeS3,
+      );
+      // Keep the container alive so provider overrides remain in scope for monitor
+      container = di.container;
+      testRef = di.ref;
+      // Mark container as used to satisfy linter without side-effects
+      expect(container.read(capturedRefProvider), isA<Ref>());
+
       monitor = CalDAVMonitor(
+        ref: testRef,
         accountRepository: mockAccountRepository,
         calendarRepository: mockCalendarRepository,
         categoryRepository: mockCategoryRepository,
@@ -74,6 +103,26 @@ void main() {
         userSyncService: mockUserSyncService,
         userPreferencesQueueService: mockUserPreferencesQueueService,
       );
+
+      // Default stubs to avoid hitting real services during monitor loops
+      // Do not count user prefs queue as a change in default path
+      when(mockUserPreferencesQueueService.processQueue())
+          .thenAnswer((_) async => const Result.failure(Failure(message: 'skip')));
+      when(mockUserRepository.getEtag())
+          .thenAnswer((_) async => const Result.success(null));
+      when(mockExternalAccountRepository.getCredentialsFileEtag())
+          .thenAnswer((_) async => const Result.success(null));
+      when(mockUserSyncService.downloadUserData())
+          .thenAnswer((_) async => const Result.success(false));
+      when(mockUserSyncService.uploadUserData())
+          .thenAnswer((_) async => const Result.success(null));
+
+      // Default connection status to connected unless overridden per test
+      when(mockConnectionMonitorService.currentStatus)
+          .thenReturn(ConnectionStatus.connected);
+
+      // Default: no active account (tests override when needed)
+      when(mockAccountRepository.getActiveAccount()).thenAnswer((_) async => const Result.success(null));
     });
 
     tearDown(() {
@@ -164,7 +213,7 @@ void main() {
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
-            providerType: 'test',
+            providerType: 'custom',
             serverUrl: 'https://test.com',
             username: 'test',
             createdAt: DateTime(2024, 1, 1),
@@ -197,7 +246,7 @@ void main() {
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
-            providerType: 'test',
+            providerType: 'custom',
             serverUrl: 'https://test.com',
             username: 'test',
             createdAt: DateTime(2024, 1, 1),
@@ -229,7 +278,7 @@ void main() {
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
-            providerType: 'test',
+            providerType: 'custom',
             serverUrl: 'https://test.com',
             username: 'test',
             createdAt: DateTime(2024, 1, 1),
@@ -263,7 +312,7 @@ void main() {
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
-            providerType: 'test',
+            providerType: 'custom',
             serverUrl: 'https://test.com',
             username: 'test',
             createdAt: DateTime(2024, 1, 1),
@@ -309,7 +358,7 @@ void main() {
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
-            providerType: 'test',
+            providerType: 'custom',
             serverUrl: 'https://test.com',
             username: 'test',
             createdAt: DateTime(2024, 1, 1),
@@ -343,7 +392,7 @@ void main() {
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
-            providerType: 'test',
+            providerType: 'custom',
             serverUrl: 'https://test.com',
             username: 'test',
             createdAt: DateTime(2024, 1, 1),
@@ -396,7 +445,7 @@ void main() {
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
-            providerType: 'test',
+            providerType: 'custom',
             serverUrl: 'https://test.com',
             username: 'test',
             createdAt: DateTime(2024, 1, 1),
@@ -423,7 +472,7 @@ void main() {
         when(mockAccountRepository.getActiveAccount()).thenAnswer(
           (_) async => Result.success(CaldavAccount(
             id: 'test-account',
-            providerType: 'test',
+            providerType: 'custom',
             serverUrl: 'https://test.com',
             username: 'test',
             createdAt: DateTime(2024, 1, 1),

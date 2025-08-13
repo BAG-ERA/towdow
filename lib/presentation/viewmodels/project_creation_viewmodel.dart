@@ -4,6 +4,9 @@ import '../../core/logger.dart';
 import '../../data/models/caldav_account.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/providers/providers.dart';
+import 'package:uuid/uuid.dart';
+import '../../data/services/caldav/caldav_calendar_service.dart';
+import '../../data/services/caldav/caldav_discovery_service.dart';
 
 // ----- STATE -----
 class ProjectCreationState {
@@ -57,39 +60,78 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
       if (account == null) {
         throw Exception('No active CalDAV account found');
       }
+      // Offline-first: if using localhost endpoint or no connectivity, create locally and queue
+      final isOfflineOnly = account!.serverUrl.startsWith('https://localhost') || account!.serverUrl.startsWith('http://localhost');
 
-      // Create calendar using CalDAV service
-      final caldavService = _ref.read(caldavServiceProvider(account!));
-      final createResult = await caldavService.createCalendar(
-        displayName: name,
-        description: description,
-        domain: domain,
-        author: account!.email?.isNotEmpty == true ? account!.email : account!.username,
-        owner: account!.email?.isNotEmpty == true ? account!.email : account!.username,
-      );
-      
-      TaskCalendar? createdCalendar;
+      TaskCalendar createdCalendar;
       bool wasCreatedLocally = false;
-      
-      createResult.when(
-        success: (calendar) {
-          AppLogger.info('ProjectCreationViewModel: Successfully created calendar');
-          createdCalendar = calendar;
-        },
-        failure: (failure) {
-          AppLogger.warning('ProjectCreationViewModel: Calendar creation failed: ${failure.message}');
-          wasCreatedLocally = true;
-          throw Exception('Failed to create calendar: ${failure.message}');
-        },
-      );
 
-      if (createdCalendar == null) {
-        throw Exception('Failed to create calendar');
+      if (isOfflineOnly) {
+        wasCreatedLocally = true;
+        final localPath = '/local/${const Uuid().v4()}/';
+        createdCalendar = TaskCalendarFactory.createNew(
+          path: localPath,
+          displayName: name,
+          description: description,
+          domain: domain,
+          author: account!.email?.isNotEmpty == true ? account!.email : account!.username,
+          owner: account!.email?.isNotEmpty == true ? account!.email : account!.username,
+        );
+
+        final calendarRepository = _ref.read(calendarRepositoryProvider);
+        await calendarRepository.save(createdCalendar);
+
+        // Queue remote creation for later
+        final syncService = _ref.read(syncServiceProvider);
+        await syncService.queueCalendarCreation(createdCalendar.path);
+      } else {
+        // Online path: attempt immediate remote creation using split services
+        final discovery = CalDavDiscoveryService(account: account!);
+        final caps = await discovery.testConnection();
+        final calendarHome = await caps.when(
+          success: (c) async => c.calendarHome,
+          failure: (f) async => throw Exception('Discovery failed: ${f.message}'),
+        );
+        final caldavCalendar = CalDavCalendarService(account: account!);
+        final createResult = await caldavCalendar.createCalendar(
+          calendarHome: calendarHome,
+          displayName: name,
+          description: description,
+          domain: domain,
+          author: account!.email?.isNotEmpty == true ? account!.email : account!.username,
+          owner: account!.email?.isNotEmpty == true ? account!.email : account!.username,
+        );
+
+        createdCalendar = await createResult.when(
+          success: (calendar) async {
+            AppLogger.info('ProjectCreationViewModel: Successfully created calendar');
+            return calendar;
+          },
+          failure: (failure) async {
+            // Fallback to local create + queue on failure
+            AppLogger.warning('ProjectCreationViewModel: Remote creation failed, falling back to local queue: ${failure.message}');
+            wasCreatedLocally = true;
+            final localPath = '/local/${const Uuid().v4()}/';
+            final localCalendar = TaskCalendarFactory.createNew(
+              path: localPath,
+              displayName: name,
+              description: description,
+              domain: domain,
+              author: account!.email?.isNotEmpty == true ? account!.email : account!.username,
+              owner: account!.email?.isNotEmpty == true ? account!.email : account!.username,
+            );
+            final calendarRepository = _ref.read(calendarRepositoryProvider);
+            await calendarRepository.save(localCalendar);
+            final syncService = _ref.read(syncServiceProvider);
+            await syncService.queueCalendarCreation(localCalendar.path);
+            return localCalendar;
+          },
+        );
       }
 
-      // Save the created calendar to repository to add it to sync list
+      // Save again to ensure persisted (noop if already saved)
       final calendarRepository = _ref.read(calendarRepositoryProvider);
-      final saveResult = await calendarRepository.save(createdCalendar!);
+      final saveResult = await calendarRepository.save(createdCalendar);
       saveResult.when(
         success: (_) {
           AppLogger.info('ProjectCreationViewModel: Calendar saved to repository successfully');
@@ -103,7 +145,7 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
       // Assign domain if provided
       if (domain != null && domain.isNotEmpty) {
         final domainService = _ref.read(domainServiceProvider);
-        final res = await domainService.assignDomainToCalendar(createdCalendar!.path, domain);
+        final res = await domainService.assignDomainToCalendar(createdCalendar.path, domain);
         res.when(
           success: (_) {
             AppLogger.info('ProjectCreationViewModel: Domain assigned successfully');
@@ -127,7 +169,7 @@ class ProjectCreationViewModel extends StateNotifier<ProjectCreationState> {
         isLoading: false, 
         error: null,
         wasCreatedLocally: wasCreatedLocally,
-        createdProjectPath: createdCalendar!.path,
+        createdProjectPath: createdCalendar.path,
       );
       
     } catch (e, st) {

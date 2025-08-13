@@ -687,6 +687,12 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           await result.when(
             success: (_) async {
               AppLogger.info('ProjectListViewModel: Project deleted successfully: $projectPath');
+              // Local-only cascade delete of project tasks to avoid queuing per-task deletes
+              final cascadeResult = await _taskRepository.deleteByProjectLocalOnly(calendar.path);
+              cascadeResult.when(
+                success: (_) => AppLogger.info('ProjectListViewModel: Locally removed tasks for deleted project: ${calendar.path}'),
+                failure: (f) => AppLogger.warning('ProjectListViewModel: Failed to locally remove project tasks: ${f.message}'),
+              );
               // Remove from user ordering
               await _removeProjectFromUserOrder(projectPath);
               // Remove from local state

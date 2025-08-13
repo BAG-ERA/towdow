@@ -2,6 +2,7 @@
 // Shows projects grouped by domain with expandable domain sections
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/logger.dart';
@@ -144,7 +145,7 @@ class ProjectsSection extends ConsumerWidget {
           OutlinedButton.icon(
             onPressed: () => context.go('/settings'),
             icon: const Icon(Icons.settings_rounded, size: 18),
-            label: const Text('Settings'),
+            label: Text(AppLocalizations.of(context)!.settings),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),

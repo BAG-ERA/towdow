@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 import '../../../core/logger.dart';
 import '../../../core/theme/chart_theme.dart';
@@ -15,7 +16,7 @@ import '../step_item/step_container.dart';
 import '../step_item/step_tasklist.dart';
 import '../utils/popup/step_dialog.dart';
 import '../utils/popup/task_creation_dialog.dart';
-import '../../screens/project_detail/project_detail_screen.dart' show projectProvider;
+// projectProvider removed
 
 class ProjectTaskStepView extends ConsumerStatefulWidget {
   final String projectPath;
@@ -68,7 +69,17 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
         _initializeControllers('unassigned', tasksByStep['unassigned'] ?? const <Task>[]);
 
         // Determine flow state for gating edits
-        final project = ref.watch(projectProvider(widget.projectPath)).asData?.value;
+        final encoded = widget.projectPath.replaceAll('@', '%40');
+        final project = ref.watch(calendarListProvider).maybeWhen(
+          data: (cals) {
+            try {
+              return cals.firstWhere((c) => c.path == encoded);
+            } catch (_) {
+              return null;
+            }
+          },
+          orElse: () => null,
+        );
         final isFlow = project?.flowitAsFlow == true;
         final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
         final isOngoingFlow = isFlow && status == 'ONGOING';
@@ -96,7 +107,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                             ? TextButton.icon(
                                 onPressed: () => _addTaskInStep(context, ref, null),
                                 icon: const Icon(Icons.add_rounded, size: 18),
-                                label: const Text('Add task'),
+                                label: Text(AppLocalizations.of(context)!.addTask),
                               )
                             : null,
                         isEmpty: false,
@@ -139,7 +150,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                             ? TextButton.icon(
                                 onPressed: () => _addTaskInStep(context, ref, steps[idx].id),
                                 icon: const Icon(Icons.add_rounded, size: 18),
-                                label: const Text('Add task'),
+                                label: Text(AppLocalizations.of(context)!.addTask),
                               )
                             : null,
                         canMoveUp: (isStoppedFlow ? steps[idx].status != StepStatus.completed : !isOngoingFlow) && idx > 0,
@@ -168,16 +179,16 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                           final confirmed = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
-                              title: const Text('Delete step?'),
+                              title: Text(AppLocalizations.of(context)!.areYouSureDelete(steps[idx].name)),
                               content: Text('Are you sure you want to delete "${steps[idx].name}"? Tasks assigned to this step will become unassigned.'),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.of(context).pop(false),
-                                  child: const Text('Cancel'),
+                                  child: Text(AppLocalizations.of(context)!.cancel),
                                 ),
                                 FilledButton(
                                   onPressed: () => Navigator.of(context).pop(true),
-                                  child: const Text('Delete'),
+                                  child: Text(AppLocalizations.of(context)!.delete),
                                 ),
                               ],
                             ),
@@ -246,13 +257,13 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
           ],
         );
       },
-      loading: () => const Center(
+      loading: () => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading tasks...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(AppLocalizations.of(context)!.discoveringCalendars),
           ],
         ),
       ),
@@ -282,7 +293,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
             ElevatedButton.icon(
               onPressed: widget.onTasksRefresh,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
+              label: Text(AppLocalizations.of(context)!.retry),
             ),
           ],
         ),
@@ -318,7 +329,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
           }
         },
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Add step'),
+        label: Text(AppLocalizations.of(context)!.addStep),
       ),
     );
   }
@@ -494,7 +505,17 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
 
   Future<void> _toggleTaskComplete(BuildContext context, WidgetRef ref, Task task) async {
     // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
-    final project = ref.read(projectProvider(widget.projectPath)).asData?.value;
+    final encoded = widget.projectPath.replaceAll('@', '%40');
+    final project = ref.read(calendarListProvider).maybeWhen(
+      data: (cals) {
+        try {
+          return cals.firstWhere((c) => c.path == encoded);
+        } catch (_) {
+          return null;
+        }
+      },
+      orElse: () => null,
+    );
     final stepRepo = ref.read(stepRepositoryProvider);
     ProjectStep? step;
     if (task.stepId != null && task.stepId!.isNotEmpty) {
@@ -508,7 +529,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
 
     if (isFlow && status == 'ONGOING' && !stepIsAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This task belongs to a waiting step and cannot be completed yet.')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.waitingStepCannotComplete)),
       );
       return;
     }

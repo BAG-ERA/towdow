@@ -2,6 +2,7 @@
 // Displays the active account's avatar (initials), name and email
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -95,7 +96,7 @@ class UserAccountBadge extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
             Tooltip(
-              message: 'Settings',
+              message: AppLocalizations.of(context)!.settings,
               child: Material(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
@@ -131,7 +132,7 @@ class UserAccountBadge extends ConsumerWidget {
       child: Align(
         alignment: Alignment.centerRight,
         child: Tooltip(
-          message: 'Settings',
+          message: AppLocalizations.of(context)!.settings,
           child: Material(
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(10),

@@ -2,10 +2,11 @@
 // Allows users to configure their own CalDAV server connection
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../data/models/caldav_account.dart';
-import '../../../../data/services/caldav_service.dart';
+import '../../../../data/services/caldav/caldav_discovery_service.dart';
 import '../../../../data/providers/providers.dart';
 import 'package:uuid/uuid.dart';
 import '../../../widgets/utils/enhanced_text_field.dart';
@@ -155,22 +156,22 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
               ),
               const SizedBox(height: 16),
               
-              // Email field
+              // Email field (mandatory)
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(
-                  labelText: 'Email Address',
+                  labelText: 'Email Address *',
                   hintText: 'john.doe@example.com',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.email_rounded),
                 ),
                 validator: (value) {
-                  if (value != null && value.trim().isNotEmpty) {
-                    // Basic email validation
-                    final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-                    if (!emailRegex.hasMatch(value.trim())) {
-                      return 'Please enter a valid email address';
-                    }
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Email is required';
+                  }
+                  final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+                  if (!emailRegex.hasMatch(value.trim())) {
+                    return 'Please enter a valid email address';
                   }
                   return null;
                 },
@@ -302,7 +303,7 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Connect'),
+              : Text(AppLocalizations.of(context)!.connect),
         ),
       ],
     );
@@ -335,8 +336,8 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
       );
 
       // Test the CalDAV connection
-      final ICalDAVService caldavService = CalDAVService(account: account);
-      final testResult = await caldavService.testConnection();
+      final discovery = CalDavDiscoveryService(account: account);
+      final testResult = await discovery.testConnection();
       
       await testResult.when(
         success: (capabilities) async {
@@ -357,9 +358,15 @@ class _CustomCaldavDialogState extends ConsumerState<CustomCaldavDialog> {
             
             // Invalidate the account status provider to ensure router recognizes the account
             ref.invalidate(hasActiveAccountProvider);
+            // Also invalidate active account details so the navbar badge updates immediately
+            ref.invalidate(activeAccountProvider);
             
-            // Navigate to today screen using GoRouter
-            GoRouter.of(context).go('/today');
+            // Navigate to projects screen on first connection (delay to avoid router race)
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (mounted) {
+                GoRouter.of(context).go('/projects');
+              }
+            });
           }
         },
         failure: (failure) {

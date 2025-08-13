@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 
-import 'package:towdow_app/data/services/sync_service.dart';
-import 'package:towdow_app/data/services/local_storage_service.dart';
+import 'package:towdow_app/data/services/sync/sync_service.dart';
+import 'package:towdow_app/data/services/storage/local_storage_service.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';

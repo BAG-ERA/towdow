@@ -5,7 +5,8 @@ import 'dart:convert';
 import '../models/requirement.dart';
 import '../models/task_calendar.dart';
 import 'calendar_repository.dart';
-import '../services/sync_service.dart';
+import '../services/sync/sync_service.dart';
+import 'calendar_repository.dart' show SyncCommander;
 import '../../core/result.dart';
 import '../../core/logger.dart';
 
@@ -14,8 +15,9 @@ class RequirementRepository {
 
   final Map<String, Requirement> _requirementCache = {};
   final Map<String, Set<String>> _projectRequirementsMap = {};
+  final SyncCommander? _sync;
 
-  RequirementRepository(this._calendarRepository);
+  RequirementRepository(this._calendarRepository, {SyncCommander? sync}) : _sync = sync;
 
   Future<Result<void>> initialize() async {
     AppLogger.info('RequirementRepository: Initializing requirement cache');
@@ -153,7 +155,7 @@ class RequirementRepository {
 
   Future<Result<void>> _syncRequirementsToServer(TaskCalendar calendar) async {
     try {
-      final syncService = SyncService.instance;
+      final syncService = _sync ?? SyncService.instance;
       if (syncService == null) {
         return Result.failure(const Failure(message: 'SyncService not initialized'));
       }

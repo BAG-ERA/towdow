@@ -4,6 +4,7 @@
 
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 /// Full screen image viewer dialog
 class FullScreenImageViewer extends StatelessWidget {
@@ -53,7 +54,7 @@ class FullScreenImageViewer extends StatelessWidget {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'Failed to load image',
+                              AppLocalizations.of(context)!.failedToLoad,
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 16,
@@ -121,7 +122,7 @@ class FullScreenImageViewer extends StatelessWidget {
                     IconButton(
                       onPressed: onDownload,
                       icon: const Icon(Icons.download, color: Colors.white),
-                      tooltip: 'Download',
+                      tooltip: AppLocalizations.of(context)!.download,
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.black26,
                       ),

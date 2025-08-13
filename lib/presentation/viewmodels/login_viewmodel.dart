@@ -19,7 +19,8 @@ import 'package:uuid/uuid.dart';
 import '../../core/logger.dart';
 
 import '../../data/models/caldav_account.dart';
-import '../../data/services/external_sync_service.dart';
+import '../../data/services/integration/external_caldav_calendar/external_sync_service.dart';
+import '../../data/services/storage/s3_storage_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/providers/providers.dart';
 
@@ -28,21 +29,25 @@ class LoginState {
   final bool isLoading;
   final String? error;
   final CaldavAccount? account;
+  final bool? isReturningUser; // null until checked
 
   const LoginState({
     this.isLoading = false,
     this.error,
     this.account,
+    this.isReturningUser,
   });
 
   LoginState copyWith({
     bool? isLoading,
     String? error,
     CaldavAccount? account,
+    bool? isReturningUser,
   }) => LoginState(
     isLoading: isLoading ?? this.isLoading,
     error: error,
     account: account ?? this.account,
+    isReturningUser: isReturningUser ?? this.isReturningUser,
   );
 }
 
@@ -57,6 +62,28 @@ class LoginViewModel extends StateNotifier<LoginState> {
   }) : _accountRepository = accountRepository,
        _externalSyncService = externalSyncService,
        super(const LoginState());
+
+  // Detect returning user via S3 private bucket marker (preferences.json presence or any object)
+  Future<bool> _detectReturningUser(CaldavAccount account) async {
+    try {
+      // Only for TowDow providers that have S3 credentials
+      if (account.providerType != 'towdow_cloud' && account.providerType != 'towdow_self_hosted') {
+        return false;
+      }
+
+      // Lightweight check: attempt to HEAD preferences.json in private bucket
+      final s3 = S3StorageService(account: account);
+      final prefix = s3.getUserPrefix();
+      final key = '${prefix}preferences.json';
+      final etagResult = await s3.getCurrentEtag(key: key, isPrivate: true);
+      return await etagResult.when(
+        success: (etag) => etag != null,
+        failure: (_) async => false,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Authenticate with TowDow Cloud using fixed configuration
   Future<void> authenticateWithTowDowCloud() async {
@@ -160,6 +187,12 @@ class LoginViewModel extends StateNotifier<LoginState> {
 
       // Save account
       await _accountRepository.save(account);
+
+      // Detect returning user (non-blocking)
+      try {
+        final returning = await _detectReturningUser(account);
+        state = state.copyWith(isReturningUser: returning);
+      } catch (_) {}
 
       // Trigger external calendar sync
       try {
@@ -272,6 +305,12 @@ class LoginViewModel extends StateNotifier<LoginState> {
 
       // Save account
       await _accountRepository.save(account);
+
+      // Detect returning user (non-blocking)
+      try {
+        final returning = await _detectReturningUser(account);
+        state = state.copyWith(isReturningUser: returning);
+      } catch (_) {}
 
       // Trigger external calendar sync
       try {

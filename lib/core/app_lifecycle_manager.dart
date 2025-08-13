@@ -4,12 +4,12 @@
 
 import 'dart:async';
 import 'package:flutter/widgets.dart';
-import '../data/services/sync_service.dart';
-import '../data/services/caldav_monitor.dart';
-import '../data/services/external_sync_service.dart';
-import '../data/services/file_upload_queue_service.dart';
-import '../data/services/connection_monitor_service.dart';
-import '../data/services/user_sync_service.dart';
+import '../data/services/sync/sync_service.dart';
+import '../data/services/sync/sync_orchestrator_service.dart';
+import '../data/services/integration/external_caldav_calendar/external_sync_service.dart';
+import '../data/services/storage/file_upload_queue_service.dart';
+import '../data/services/sync/connection_monitor_service.dart';
+import '../data/services/user/user_sync_service.dart';
 import '../data/repositories/account_repository.dart';
 import 'logger.dart';
 import 'result.dart';
@@ -89,8 +89,51 @@ class AppLifecycleManager {
       accountResult.when(
         success: (account) async {
           if (account != null) {
-            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Active account found: ${account.username}');
-            await _startMainServices();
+            // Skip starting sync services for offline scheme (offline-only)
+            if (account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost')) {
+              AppLogger.info('AppLifecycleManager: Offline-only mode detected - skipping CalDAV sync services');
+
+              // Even in offline-only mode, start file upload queue and connection monitoring
+              // so S3-backed features (validators, attachments) can upload when connectivity exists
+              try {
+                if (_fileUploadQueueService != null) {
+                  final accRes2 = await _accountRepository!.getActiveAccount();
+                  await accRes2.when(
+                    success: (acc2) async {
+                      final fileFeaturesEnabled = acc2 != null && acc2.providerType != 'custom';
+                      if (fileFeaturesEnabled) {
+                        AppLogger.debug('AppLifecycleManager: Starting FileUploadQueueService (offline-only mode)');
+                        _fileUploadQueueService!.startQueueProcessing();
+                        AppLogger.info('AppLifecycleManager: FileUploadQueueService started (offline-only mode)');
+                      } else {
+                        AppLogger.info('AppLifecycleManager: File features disabled (custom provider) - not starting FileUploadQueueService');
+                      }
+                    },
+                    failure: (_) async {
+                      AppLogger.info('AppLifecycleManager: No active account - file upload queue not started');
+                    },
+                  );
+                }
+
+                if (_connectionMonitorService != null) {
+                  AppLogger.debug('AppLifecycleManager: Starting ConnectionMonitorService (offline-only mode)');
+                  await _connectionMonitorService!.startMonitoring();
+                  // Trigger file queue when connection is restored
+                  _connectionMonitorService!.connectionRestoredStream.listen((_) {
+                    AppLogger.info('AppLifecycleManager: Connection restored, triggering queued file uploads');
+                    _fileUploadQueueService?.startQueueProcessing();
+                  });
+                  AppLogger.info('AppLifecycleManager: ConnectionMonitorService started (offline-only mode)');
+                }
+              } catch (e) {
+                AppLogger.warning('AppLifecycleManager: Failed to start offline-only services: $e');
+              }
+
+              _updateState(FlowItAppState.ready);
+            } else {
+              // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Active account found: ${account.username}');
+              await _startMainServices();
+            }
           } else {
             // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] No active account - main services will start when account is configured');
             _updateState(FlowItAppState.ready);
@@ -125,22 +168,7 @@ class AppLifecycleManager {
     try {
       // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting main sync services');
 
-      // Initialize main sync service
-      if (_syncService != null) {
-        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Initializing SyncService');
-        final syncResult = await _syncService!.initialize();
-        syncResult.when(
-          success: (_) {
-            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService initialized successfully');
-          },
-          failure: (failure) {
-            AppLogger.warning('AppLifecycleManager: SyncService initialization failed: ${failure.message}');
-            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService init failed: ${failure.message}');
-          },
-        );
-      }
-
-      // Start CalDAV monitor service
+      // Start CalDAV monitor service FIRST to perform discovery before initial sync
       if (_caldavMonitor != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting CalDAVMonitor');
         
@@ -156,35 +184,77 @@ class AppLifecycleManager {
         );
       }
 
-      // Start file upload queue service
-      if (_fileUploadQueueService != null) {
-        AppLogger.debug('AppLifecycleManager: Starting FileUploadQueueService');
-        _fileUploadQueueService!.startQueueProcessing();
-        AppLogger.info('AppLifecycleManager: FileUploadQueueService started successfully');
+      // Initialize main sync service AFTER discovery to ensure calendars exist locally
+      if (_syncService != null) {
+        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Initializing SyncService');
+        final syncResult = await _syncService!.initialize();
+        syncResult.when(
+          success: (_) {
+            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService initialized successfully');
+          },
+          failure: (failure) {
+            AppLogger.warning('AppLifecycleManager: SyncService initialization failed: ${failure.message}');
+            // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] SyncService init failed: ${failure.message}');
+          },
+        );
       }
 
-      // Start user sync service (for cloud/self-hosted users)
-      if (_userSyncService != null) {
-        AppLogger.debug('AppLifecycleManager: Starting UserSyncService periodic sync');
-        _userSyncService!.startPeriodicSync(interval: const Duration(hours: 2)); // Check every 2 hours for user data updates
-        
-        // Fetch shared projects on startup
-        AppLogger.debug('AppLifecycleManager: Fetching shared projects on startup');
-        try {
-          final sharedProjectsResult = await _userSyncService!.updateSharedProjects();
-          sharedProjectsResult.when(
-            success: (_) {
-              AppLogger.info('AppLifecycleManager: Shared projects fetched successfully on startup');
-            },
-            failure: (failure) {
-              AppLogger.warning('AppLifecycleManager: Failed to fetch shared projects on startup: ${failure.message}');
-            },
-          );
-        } catch (e) {
-          AppLogger.warning('AppLifecycleManager: Error fetching shared projects on startup: $e');
-        }
-        
-        AppLogger.info('AppLifecycleManager: UserSyncService started successfully');
+      // Start file upload queue service only if file features are enabled for current account
+      if (_fileUploadQueueService != null && _accountRepository != null) {
+        final accRes = await _accountRepository!.getActiveAccount();
+        await accRes.when(
+          success: (acc) async {
+            final fileFeaturesEnabled = acc != null && acc.providerType != 'custom';
+            if (fileFeaturesEnabled) {
+              AppLogger.debug('AppLifecycleManager: Starting FileUploadQueueService');
+              _fileUploadQueueService!.startQueueProcessing();
+              AppLogger.info('AppLifecycleManager: FileUploadQueueService started successfully');
+            } else {
+              AppLogger.info('AppLifecycleManager: File features disabled (custom provider) - not starting FileUploadQueueService');
+            }
+          },
+          failure: (_) async {
+            // Default to not starting when account unknown
+            AppLogger.info('AppLifecycleManager: No active account - file upload queue not started');
+          },
+        );
+      }
+
+      // Start user sync service (cloud only)
+      if (_userSyncService != null && _accountRepository != null) {
+        final accRes = await _accountRepository!.getActiveAccount();
+        await accRes.when(
+          success: (acc) async {
+            final enableUserSync = acc != null && acc.providerType == 'towdow_cloud';
+            if (enableUserSync) {
+              AppLogger.debug('AppLifecycleManager: Starting UserSyncService periodic sync');
+              _userSyncService!.startPeriodicSync(interval: const Duration(hours: 2)); // Check every 2 hours for user data updates
+
+              // Fetch shared projects on startup
+              AppLogger.debug('AppLifecycleManager: Fetching shared projects on startup');
+              try {
+                final sharedProjectsResult = await _userSyncService!.updateSharedProjects();
+                sharedProjectsResult.when(
+                  success: (_) {
+                    AppLogger.info('AppLifecycleManager: Shared projects fetched successfully on startup');
+                  },
+                  failure: (failure) {
+                    AppLogger.warning('AppLifecycleManager: Failed to fetch shared projects on startup: ${failure.message}');
+                  },
+                );
+              } catch (e) {
+                AppLogger.warning('AppLifecycleManager: Error fetching shared projects on startup: $e');
+              }
+
+              AppLogger.info('AppLifecycleManager: UserSyncService started successfully');
+            } else {
+              AppLogger.info('AppLifecycleManager: UserSyncService disabled for providerType ${acc?.providerType ?? 'unknown'}');
+            }
+          },
+          failure: (_) async {
+            AppLogger.info('AppLifecycleManager: No active account - UserSyncService not started');
+          },
+        );
       }
 
       // Start connection monitoring service

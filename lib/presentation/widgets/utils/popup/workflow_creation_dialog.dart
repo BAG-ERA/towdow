@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
 import '../../../../data/providers/providers.dart';
+import '../../../../data/models/task_calendar.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../data/services/caldav/caldav_calendar_service.dart';
+import '../../../../data/services/caldav/caldav_discovery_service.dart';
 
 class WorkflowCreationDialog extends ConsumerStatefulWidget {
   const WorkflowCreationDialog({super.key});
@@ -74,7 +77,7 @@ class _WorkflowCreationDialogState extends ConsumerState<WorkflowCreationDialog>
     setState(() => isLoading = true);
 
     try {
-      // Create calendar directly as workflow on server
+      // Account
       final accountRepository = ref.read(accountRepositoryProvider);
       final accountResult = await accountRepository.getActiveAccount();
       final account = await accountResult.when(
@@ -85,32 +88,85 @@ class _WorkflowCreationDialogState extends ConsumerState<WorkflowCreationDialog>
         throw Exception('No active CalDAV account found');
       }
 
-      final caldavService = ref.read(caldavServiceProvider(account));
-      // Determine current user identifier for author/owner (prefer email, fallback to username)
       final currentUser =
           (account.email != null && account.email!.isNotEmpty) ? account.email : account.username;
-      final createResult = await caldavService.createCalendar(
-        displayName: name,
-        description: description.isEmpty ? 'Workflow created by FlowIt' : description,
-        author: currentUser,
-        owner: currentUser,
-        asWorkflow: true,
-      );
 
-      await createResult.when(
-        success: (calendar) async {
-          // Save to repository
-          final calendarRepository = ref.read(calendarRepositoryProvider);
-          await calendarRepository.save(calendar);
-          // Navigate
-          final encodedPath = Uri.encodeComponent(calendar.path);
-          Future.delayed(const Duration(milliseconds: 300), () {
-            globalNavigatorKey.currentContext?.go('/workflow/$encodedPath');
-          });
-          if (mounted) Navigator.of(context).pop(name);
-        },
-        failure: (f) async => throw Exception(f.message),
-      );
+      final isOfflineOnly = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
+
+      String createdPath;
+      if (isOfflineOnly) {
+        // Local create + queue for workflow
+        final calendarRepository = ref.read(calendarRepositoryProvider);
+        final localPath = '/local_workflows/${DateTime.now().microsecondsSinceEpoch}/';
+        final workflowCal = TaskCalendarFactory.createNew(
+          path: localPath,
+          displayName: name,
+          description: description.isEmpty ? 'Workflow created by FlowIt' : description,
+          author: currentUser,
+          owner: currentUser,
+        ).copyWith(
+          flowitAsFlow: true,
+          flowitType: 'WORKFLOW',
+        );
+        await calendarRepository.save(workflowCal);
+        // Queue creation
+        final syncService = ref.read(syncServiceProvider);
+        await syncService.queueCalendarCreation(workflowCal.path);
+        createdPath = workflowCal.path;
+      } else {
+        // Try immediate server creation via split services; on failure fallback to local + queue
+        final discovery = CalDavDiscoveryService(account: account);
+        final caps = await discovery.testConnection();
+        final calendarHome = await caps.when(
+          success: (c) async => c.calendarHome,
+          failure: (f) async => throw Exception('Discovery failed: ${f.message}'),
+        );
+        final caldavCalendar = CalDavCalendarService(account: account);
+        final createResult = await caldavCalendar.createCalendar(
+          calendarHome: calendarHome,
+          displayName: name,
+          description: description.isEmpty ? 'Workflow created by FlowIt' : description,
+          author: currentUser,
+          owner: currentUser,
+          asWorkflow: true,
+        );
+
+        final calendar = await createResult.when(
+          success: (calendar) async {
+            final calendarRepository = ref.read(calendarRepositoryProvider);
+            await calendarRepository.save(calendar);
+            return calendar;
+          },
+          failure: (f) async {
+            // Fallback to local create + queue
+            AppLogger.warning('WorkflowCreationDialog: Remote creation failed, fallback to local queue: ${f.message}');
+            final calendarRepository = ref.read(calendarRepositoryProvider);
+            final localPath = '/local_workflows/${DateTime.now().microsecondsSinceEpoch}/';
+            final workflowCal = TaskCalendarFactory.createNew(
+              path: localPath,
+              displayName: name,
+              description: description.isEmpty ? 'Workflow created by FlowIt' : description,
+              author: currentUser,
+              owner: currentUser,
+            ).copyWith(
+              flowitAsFlow: true,
+              flowitType: 'WORKFLOW',
+            );
+            await calendarRepository.save(workflowCal);
+            final syncService = ref.read(syncServiceProvider);
+            await syncService.queueCalendarCreation(workflowCal.path);
+            return workflowCal;
+          },
+        );
+        createdPath = calendar.path;
+      }
+
+      // Navigate
+      final encodedPath = Uri.encodeComponent(createdPath);
+      Future.delayed(const Duration(milliseconds: 300), () {
+        globalNavigatorKey.currentContext?.go('/workflow/$encodedPath');
+      });
+      if (mounted) Navigator.of(context).pop(name);
     } catch (e) {
       AppLogger.error('WorkflowCreationDialog: Failed to create workflow', e);
     } finally {

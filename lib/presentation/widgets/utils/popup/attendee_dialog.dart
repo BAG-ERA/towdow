@@ -2,6 +2,7 @@
 // Provides a clean interface for adding attendees by email address
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/models/task.dart';
@@ -31,10 +32,12 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
   
   bool _isLoading = false;
   String? _emailWarning;
+  late Task _task; // local, live-updating copy for dialog rendering
 
   @override
   void initState() {
     super.initState();
+    _task = widget.task;
     _emailController.addListener(_validateEmail);
   }
 
@@ -74,11 +77,11 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
         }
       },
       child: AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.person_add_rounded),
             SizedBox(width: 12),
-            Text('Add Attendee'),
+            Text(AppLocalizations.of(context)!.addAttendee),
           ],
         ),
         content: SizedBox(
@@ -88,7 +91,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Task: ${widget.task.summary}',
+                '${AppLocalizations.of(context)!.taskLabel}: ${_task.summary}',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontStyle: FontStyle.italic,
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
@@ -97,22 +100,22 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
               const SizedBox(height: 16),
               
               // Current attendees list
-              if (widget.task.attendees.isNotEmpty) ...[
+              if (_task.attendees.isNotEmpty) ...[
                 Text(
-                  'Current attendees:',
+                  AppLocalizations.of(context)!.currentAttendees,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 8),
-                ...widget.task.attendees.map((attendee) => _buildAttendeeItem(attendee)),
+                ..._task.attendees.map((attendee) => _buildAttendeeItem(attendee)),
                 const SizedBox(height: 16),
               ],
               
               // Suggested attendees
               if (widget.suggestedAttendees != null && widget.suggestedAttendees!.isNotEmpty) ...[
                 Text(
-                  'Suggested attendees:',
+                  AppLocalizations.of(context)!.suggestedAttendees,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -130,7 +133,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
         actions: [
           TextButton(
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
         ],
       ),
@@ -174,7 +177,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
   Widget _buildSuggestedAttendeesList() {
     // Filter out suggested attendees that are already added
     final availableSuggestions = widget.suggestedAttendees!
-        .where((email) => !widget.task.attendees.any((a) => a.email.toLowerCase() == email.toLowerCase()))
+        .where((email) => !_task.attendees.any((a) => a.email.toLowerCase() == email.toLowerCase()))
         .toList();
 
     if (availableSuggestions.isEmpty) {
@@ -338,11 +341,15 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
 
       AppLogger.info('AttendeeDialog: Adding attendee ${newAttendee.email} to task ${widget.task.uid}');
 
-      final updatedTask = widget.task.copyWith(
-        attendees: [...widget.task.attendees, newAttendee],
+      final updatedTask = _task.copyWith(
+        attendees: [..._task.attendees, newAttendee],
         lastModified: DateTime.now(),
       );
 
+      // Update local dialog view and notify parent
+      setState(() {
+        _task = updatedTask;
+      });
       widget.onTaskUpdated(updatedTask);
 
       // Clear form
@@ -411,11 +418,15 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
 
       AppLogger.info('AttendeeDialog: Adding suggested attendee ${newAttendee.email} to task ${widget.task.uid}');
 
-      final updatedTask = widget.task.copyWith(
-        attendees: [...widget.task.attendees, newAttendee],
+      final updatedTask = _task.copyWith(
+        attendees: [..._task.attendees, newAttendee],
         lastModified: DateTime.now(),
       );
 
+      // Update local dialog view and notify parent
+      setState(() {
+        _task = updatedTask;
+      });
       widget.onTaskUpdated(updatedTask);
 
       if (mounted) {
@@ -471,15 +482,19 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
     if (confirmed == true) {
       AppLogger.info('AttendeeDialog: Removing attendee ${attendee.email} from task ${widget.task.uid}');
 
-      final updatedAttendees = widget.task.attendees
+      final updatedAttendees = _task.attendees
           .where((a) => a.email != attendee.email)
           .toList();
 
-      final updatedTask = widget.task.copyWith(
+      final updatedTask = _task.copyWith(
         attendees: updatedAttendees,
         lastModified: DateTime.now(),
       );
 
+      // Update local dialog view and notify parent
+      setState(() {
+        _task = updatedTask;
+      });
       widget.onTaskUpdated(updatedTask);
 
       if (mounted) {

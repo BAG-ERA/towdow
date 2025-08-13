@@ -9,18 +9,23 @@ import '../models/kanban.dart';
 import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
-import '../services/caldav_service.dart';
-import '../services/sync_service.dart';
+import 'caldav/caldav_properties_service.dart';
+import 'webdav_client.dart';
+import 'sync/sync_service.dart';
+import '../repositories/calendar_repository.dart' show SyncCommander;
 
 class KanbanService {
   final CalendarRepository _calendarRepository;
   final AccountRepository _accountRepository;
+  final SyncCommander? _sync;
 
   KanbanService({
     required CalendarRepository calendarRepository,
     required AccountRepository accountRepository,
+    SyncCommander? sync,
   })  : _calendarRepository = calendarRepository,
-        _accountRepository = accountRepository;
+        _accountRepository = accountRepository,
+        _sync = sync;
 
   /// Load kanbans for a project, creating default if none exist
   Future<Result<List<Kanban>>> loadKanbansForProject(String projectPath) async {
@@ -97,8 +102,8 @@ class KanbanService {
             return [];
           }
 
-          // Use CalDAV service to refresh calendar info from server
-          final ICalDAVService caldavService = CalDAVService(account: account);
+          // Use CalDAV properties service to refresh calendar info from server
+          final caldavProps = CalDavPropertiesService(client: WebDAVClient.fromAccount(account));
           
           // Create a minimal calendar object to get properties
           final tempCalendar = TaskCalendarFactory.fromCalDAVDiscovery(
@@ -106,12 +111,11 @@ class KanbanService {
             displayName: 'Temp',
           );
           
-          final refreshResult = await caldavService.getCalendarProperties(tempCalendar);
+          final refreshResult = await caldavProps.getCalendarProperties(tempCalendar);
           
           return await refreshResult.when(
             success: (updatedCalendar) async {
-              if (updatedCalendar != null && 
-                  updatedCalendar.flowitKanban.isNotEmpty && 
+              if (updatedCalendar.flowitKanban.isNotEmpty && 
                   updatedCalendar.flowitKanban != '[]') {
                 try {
                   final kanbanData = jsonDecode(updatedCalendar.flowitKanban);
@@ -227,7 +231,7 @@ class KanbanService {
                 AppLogger.info('KanbanService: Saved kanban locally for project $projectPath');
                 
                 // Always use sync queue for offline resilience
-                final syncService = SyncService.instance;
+                final syncService = _sync ?? SyncService.instance;
                 if (syncService != null) {
                   AppLogger.debug('KanbanService: Queuing calendar update for kanban sync');
                   final queueResult = await syncService.queueCalendarUpdate(updatedCalendar.path);
@@ -242,7 +246,7 @@ class KanbanService {
                     },
                   );
                 } else {
-                  AppLogger.error('KanbanService: SyncService singleton not initialized - kanban sync skipped');
+                  AppLogger.error('KanbanService: SyncService commander not available - kanban sync skipped');
                 }
               },
               failure: (failure) async {

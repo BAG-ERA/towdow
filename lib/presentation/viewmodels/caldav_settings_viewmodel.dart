@@ -6,9 +6,10 @@ import '../../data/models/caldav_account.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
-import '../../data/services/caldav_service.dart';
-import '../../data/services/capability_discovery_service.dart';
-import '../../data/services/sync_service.dart';
+import '../../data/services/caldav/caldav_discovery_service.dart';
+import '../../data/services/caldav/capability_discovery_service.dart';
+import '../../data/services/sync/sync_service.dart';
+import '../../data/repositories/calendar_repository.dart' show SyncCommander;
 import '../../core/logger.dart';
 
 // CalDAV Settings ViewModel State
@@ -56,11 +57,13 @@ class CaldavSettingsState {
 class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
+  final SyncCommander? _sync;
 
   CaldavSettingsViewModel(
     this._accountRepository,
     this._calendarRepository,
-  ) : super(const CaldavSettingsState());
+    {SyncCommander? sync}
+  ) : _sync = sync, super(const CaldavSettingsState());
 
   /// Initialize the view model with current account data
   Future<void> initialize() async {
@@ -236,7 +239,7 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
       await result.when(
         success: (_) async {
           // Queue calendar creation on server
-          final syncService = SyncService.instance;
+          final syncService = _sync ?? SyncService.instance;
           if (syncService != null) {
             final queueResult = await syncService.queueCalendarCreation(newCalendar.uid);
             queueResult.when(
@@ -291,8 +294,8 @@ class CaldavSettingsViewModel extends StateNotifier<CaldavSettingsState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final ICalDAVService caldavService = CalDAVService(account: account);
-      final testResult = await caldavService.testConnection();
+      final discovery = CalDavDiscoveryService(account: account);
+      final testResult = await discovery.testConnection();
       
       await testResult.when(
         success: (capabilities) async {

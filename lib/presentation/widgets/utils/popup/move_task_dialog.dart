@@ -117,7 +117,6 @@ class MoveTaskDialog extends ConsumerWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 300),
       child: ListView.builder(
-        shrinkWrap: true,
         itemCount: availableCalendars.length,
         itemBuilder: (context, index) {
           final calendar = availableCalendars[index];

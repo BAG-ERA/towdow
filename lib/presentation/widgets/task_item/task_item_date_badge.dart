@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/models/task.dart';
 import '../../../core/theme/chart_theme.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 class TaskItemDateBadge extends StatelessWidget {
   final Task task;
@@ -18,7 +19,7 @@ class TaskItemDateBadge extends StatelessWidget {
     if (task.due == null) return const SizedBox.shrink();
     
     final dueColor = _getDueDateColor(context);
-    final dueText = _formatCompactDueDate(task.due!);
+    final dueText = _formatCompactDueDate(context, task.due!);
     final isOverdue = _dateOnly(task.due!).isBefore(_dateOnly(DateTime.now()));
     
     return Container(
@@ -69,18 +70,20 @@ class TaskItemDateBadge extends StatelessWidget {
     }
   }
 
-  String _formatCompactDueDate(DateTime dueDate) {
+  String _formatCompactDueDate(BuildContext context, DateTime dueDate) {
     final today = _dateOnly(DateTime.now());
     final dueDay = _dateOnly(dueDate);
     final daysDifference = dueDay.difference(today).inDays;
     
     if (daysDifference < 0) {
       final daysOverdue = -daysDifference;
-      return daysOverdue == 1 ? '1d ago' : '${daysOverdue}d ago';
+      final l10n = AppLocalizations.of(context)!;
+      if (daysOverdue == 1) return l10n.oneDayAgo;
+      return l10n.nDaysAgo(daysOverdue);
     } else if (daysDifference == 0) {
-      return 'Today';
+      return AppLocalizations.of(context)!.today;
     } else if (daysDifference == 1) {
-      return 'Tomorrow';
+      return AppLocalizations.of(context)!.tomorrow;
     } else if (daysDifference <= 7) {
       return '${daysDifference}d';
     } else if (daysDifference <= 30) {

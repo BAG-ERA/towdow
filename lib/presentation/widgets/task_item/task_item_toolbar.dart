@@ -3,14 +3,17 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../utils/popup/attendee_dialog.dart';
 import '../utils/popup/category_dialog.dart';
 import '../utils/popup/due_date_dialog.dart';
 import '../utils/popup/move_task_dialog.dart';
+import '../utils/popup/validator_type_picker_dialog.dart';
+import '../../viewmodels/attendee_suggestions_viewmodel.dart';
 
-class TaskItemToolbar extends ConsumerWidget {
+class TaskItemToolbar extends ConsumerStatefulWidget {
   final Task task;
   final Function(Task)? onTaskUpdated;
   final VoidCallback? onTaskDeleted;
@@ -29,30 +32,44 @@ class TaskItemToolbar extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TaskItemToolbar> createState() => _TaskItemToolbarState();
+}
+
+class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
+  bool _showMore = false;
+
+  @override
+  Widget build(BuildContext context) {
     // Always render vertical toolbar
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {},
       child: Column(
-        crossAxisAlignment: alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            widget.alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildVerticalAction(
             context: context,
             icon: Icons.calendar_today_rounded,
-            label: 'Due date',
+            label: AppLocalizations.of(context)!.dueDateTitle,
             onPressed: () => DueDateDialog.show(
               context,
-              task: task,
-              onTaskUpdated: onTaskUpdated,
+              task: widget.task,
+              onTaskUpdated: widget.onTaskUpdated,
             ),
           ),
-          if (_isOrganizer()) _buildVerticalValidatorAction(context, ref),
+          if (_isOrganizer())
+            _buildVerticalAction(
+              context: context,
+              icon: Icons.fact_check,
+              label: AppLocalizations.of(context)!.completionRequirement,
+              onPressed: () => _openValidatorTypePicker(context, ref),
+            ),
           _buildVerticalAction(
             context: context,
             icon: Icons.person_add_rounded,
-            label: 'Attendee',
+            label: AppLocalizations.of(context)!.attendee,
             onPressed: () => _showAttendeeDialog(context),
           ),
           _buildVerticalMenu(context),
@@ -66,36 +83,38 @@ class TaskItemToolbar extends ConsumerWidget {
 
   // Vertical variant of 3-dots menu rendered as a labeled row
   Widget _buildVerticalMenu(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: '',
-      onSelected: (action) => _handleMenuAction(context, action),
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'category',
-          child: ListTile(
-            leading: Icon(Icons.label_rounded),
-            title: Text('Add Category'),
-            contentPadding: EdgeInsets.zero,
-          ),
+    return Column(
+      crossAxisAlignment:
+          widget.alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ToolbarTile(
+          icon: _showMore ? Icons.expand_less_rounded : Icons.more_vert_rounded,
+          label: _showMore ? AppLocalizations.of(context)!.less : AppLocalizations.of(context)!.more,
+          onTap: () => setState(() => _showMore = !_showMore),
         ),
-        const PopupMenuItem(
-          value: 'move',
-          child: ListTile(
-            leading: Icon(Icons.drive_file_move_rounded),
-            title: Text('Move Task'),
-            contentPadding: EdgeInsets.zero,
+        if (_showMore) const SizedBox(height: 8),
+        if (_showMore)
+          _ToolbarTile(
+            icon: Icons.label_rounded,
+            label: AppLocalizations.of(context)!.addCategory,
+            onTap: () => _showCategoryDialog(context),
           ),
-        ),
-        const PopupMenuItem(
-          value: 'delete',
-          child: ListTile(
-            leading: Icon(Icons.delete_rounded, color: Colors.red),
-            title: Text('Delete Task', style: TextStyle(color: Colors.red)),
-            contentPadding: EdgeInsets.zero,
+        if (_showMore) const SizedBox(height: 8),
+        if (_showMore)
+          _ToolbarTile(
+            icon: Icons.drive_file_move_rounded,
+            label: AppLocalizations.of(context)!.moveTask,
+            onTap: () => _showMoveDialog(context),
           ),
-        ),
+        if (_showMore) const SizedBox(height: 8),
+        if (_showMore)
+          _ToolbarTile(
+            icon: Icons.delete_rounded,
+            label: AppLocalizations.of(context)!.deleteTask,
+            onTap: () => _showDeleteDialog(context),
+          ),
       ],
-      child: const _ToolbarTile(icon: Icons.more_vert_rounded, label: 'More'),
     );
   }
 
@@ -108,83 +127,13 @@ class TaskItemToolbar extends ConsumerWidget {
     return _ToolbarTile(icon: icon, label: label, onTap: onPressed);
   }
 
-  Widget _buildVerticalValidatorAction(BuildContext context, WidgetRef ref) {
-    return PopupMenuButton<String>(
-      offset: const Offset(0, 36),
-      tooltip: '',
-      onSelected: (validatorType) => _addValidator(context, ref, validatorType),
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'checklist',
-          child: ListTile(
-            leading: Icon(Icons.checklist),
-            title: Text('Checklist'),
-            subtitle: Text('Multiple checkable items'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'single_select',
-          child: ListTile(
-            leading: Icon(Icons.radio_button_checked),
-            title: Text('Single Select'),
-            subtitle: Text('Choose one option'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'free_field',
-          child: ListTile(
-            leading: Icon(Icons.text_fields),
-            title: Text('Free Field'),
-            subtitle: Text('Text input'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'file',
-          child: ListTile(
-            leading: Icon(Icons.attach_file),
-            title: Text('File'),
-            subtitle: Text('File attachments'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'media',
-          child: ListTile(
-            leading: Icon(Icons.perm_media),
-            title: Text('Media'),
-            subtitle: Text('Photos and videos'),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-      ],
-      child: const _ToolbarTile(icon: Icons.fact_check, label: 'Validator'),
-    );
+  Future<void> _openValidatorTypePicker(BuildContext context, WidgetRef ref) async {
+    final picked = await ValidatorTypePickerDialog.show(context);
+    if (picked == null || picked.isEmpty) return;
+    _addValidator(context, ref, picked);
   }
   
-  // (removed old horizontal validator trigger)
-
-  void _handleMenuAction(BuildContext context, String action) {
-    switch (action) {
-      case 'category':
-        _showCategoryDialog(context);
-        break;
-      case 'move':
-        _showMoveDialog(context);
-        break;
-      case 'gps':
-        _showGpsDialog(context);
-        break;
-      case 'delete':
-        _showDeleteDialog(context);
-        break;
-      case 'debug':
-        _showUidDialog(context);
-        break;
-    }
-  }
+  // (validator menu replaced by dialog)
 
   bool _isOrganizer() {
     // TODO: Implement organizer check based on current user and task.organizer
@@ -194,7 +143,8 @@ class TaskItemToolbar extends ConsumerWidget {
 
   void _addValidator(BuildContext context, WidgetRef ref, String validatorType) {
     // Use ValidatorViewModel to add validator properly
-    final validatorViewModel = ref.read(validatorViewModelProvider(task.uid).notifier);
+    final validatorViewModel =
+        ref.read(validatorViewModelProvider(widget.task.uid).notifier);
     
     // Create default options based on type
     List<String> defaultOptions;
@@ -203,26 +153,26 @@ class TaskItemToolbar extends ConsumerWidget {
     switch (validatorType) {
       case 'checklist':
         defaultOptions = ['Item 1', 'Item 2', 'Item 3'];
-        title = 'Checklist';
+        title = AppLocalizations.of(context)!.checklist;
         break;
       case 'single_select':
         defaultOptions = ['Option 1', 'Option 2', 'Option 3'];
-        title = 'Choose an option';
+        title = AppLocalizations.of(context)!.chooseAnOption;
         break;
       case 'free_field':
         defaultOptions = [];
-        title = 'Text field';
+        title = AppLocalizations.of(context)!.textField;
         break;
       case 'file':
         defaultOptions = [];
-        title = 'File attachment';
+        title = AppLocalizations.of(context)!.fileAttachment;
         break;
       case 'media':
         defaultOptions = [];
-        title = 'Media attachment';
+        title = AppLocalizations.of(context)!.mediaAttachment;
         break;
       default:
-        return;
+         return;
     }
     
     // Add validator using ViewModel
@@ -235,16 +185,28 @@ class TaskItemToolbar extends ConsumerWidget {
   }
 
   // Dialog methods
-  void _showAttendeeDialog(BuildContext context) {
+  Future<void> _showAttendeeDialog(BuildContext context) async {
+    // Prepare suggestions via ViewModel (MVVM) just like in task creation
+    List<String>? suggestedEmails;
+    final projectPath = widget.task.projectPath;
+    if (projectPath != null && projectPath.isNotEmpty) {
+      await ref.read(attendeeSuggestionsProvider(projectPath).notifier).load();
+      final state = ref.read(attendeeSuggestionsProvider(projectPath));
+      suggestedEmails = state.suggestions.isEmpty ? null : state.suggestions;
+    }
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
       builder: (context) => AttendeeDialog(
-        task: task,
+        task: widget.task,
         onTaskUpdated: (updatedTask) {
-          if (onTaskUpdated != null) {
-            onTaskUpdated!(updatedTask);
+          if (widget.onTaskUpdated != null) {
+            widget.onTaskUpdated!(updatedTask);
           }
         },
+        suggestedAttendees: suggestedEmails,
       ),
     );
   }
@@ -253,11 +215,11 @@ class TaskItemToolbar extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => CategoryDialog(
-        task: task,
-        projectPath: task.projectPath,
+        task: widget.task,
+        projectPath: widget.task.projectPath,
         onTaskUpdated: (updatedTask) {
-          if (onTaskUpdated != null) {
-            onTaskUpdated!(updatedTask);
+          if (widget.onTaskUpdated != null) {
+            widget.onTaskUpdated!(updatedTask);
           }
         },
       ),
@@ -265,25 +227,18 @@ class TaskItemToolbar extends ConsumerWidget {
   }
 
   void _showMoveDialog(BuildContext context) {
-    showMoveTaskDialog(context, task);
+    showMoveTaskDialog(context, widget.task);
   }
 
-  void _showGpsDialog(BuildContext context) {
-    // TODO: Implement GPS coordinate dialog
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('GPS dialog not implemented yet')),
-      );
-    }
-  }
+  // Removed unused _showGpsDialog
 
   void _showDeleteDialog(BuildContext context) {
-    if (onTaskDeleted != null) {
+    if (widget.onTaskDeleted != null) {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Delete Task'),
-          content: Text('Are you sure you want to delete "${task.summary}"?'),
+          content: Text('Are you sure you want to delete "${widget.task.summary}"?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -292,7 +247,7 @@ class TaskItemToolbar extends ConsumerWidget {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                onTaskDeleted!();
+                widget.onTaskDeleted!();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.error,
@@ -306,21 +261,7 @@ class TaskItemToolbar extends ConsumerWidget {
     }
   }
 
-  void _showUidDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Task UID'),
-        content: SelectableText(task.uid),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
+  // Removed unused _showUidDialog
 
 }
 

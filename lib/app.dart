@@ -2,6 +2,7 @@
 // Configures Material theme, routing, and global app setup
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'presentation/screens/home/home_screen.dart';
@@ -12,10 +13,13 @@ import 'presentation/screens/workflows_list/workflow_list_screen.dart';
 import 'presentation/screens/workflow_detail/workflow_detail_screen.dart';
 
 import 'presentation/screens/project_detail/project_detail_screen.dart';
+import 'presentation/viewmodels/appearance_settings_viewmodel.dart';
 import 'presentation/widgets/adaptive_app_layout.dart';
 import 'presentation/providers/home_providers.dart';
 import 'data/providers/providers.dart';
 import 'core/theme/chart_theme.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
 
 // ChangeNotifier wrapper for AsyncValue to make GoRouter reactive
 class AsyncValueNotifier<T> extends ChangeNotifier {
@@ -50,14 +54,14 @@ final routerProvider = Provider<GoRouter>((ref) {
   final accountNotifier = ref.watch(accountStatusNotifierProvider);
   final sessionEpoch = ref.watch(sessionEpochProvider);
 
-  return GoRouter(
+      return GoRouter(
     navigatorKey: globalNavigatorKey,
-    initialLocation: '/today',
+    initialLocation: '/projects',
     refreshListenable: Listenable.merge([accountNotifier, ValueNotifier(sessionEpoch)]),
     redirect: (context, state) {
-      // Redirect root path to today view
+      // Redirect root path to projects on first-run
       if (state.uri.path == '/') {
-        return '/today';
+        return '/projects';
       }
       
       // Skip account check if already on connection screen
@@ -95,7 +99,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           if (location.startsWith('/settings')) {
             currentDestination = null; // Settings handled by toolbar
           } else if (location.startsWith('/project/')) {
-            currentDestination = null; // Project details have no main navigation active
+            // Keep Projects tab active when viewing a specific project
+            currentDestination = AppDestination.projects;
+          } else if (location.startsWith('/workflow/')) {
+            // Keep Workflows tab active when viewing a specific workflow
+            currentDestination = AppDestination.workflows;
           } else if (location == '/today' || location == '/') {
             currentDestination = AppDestination.today;
           } else if (location == '/soon') {
@@ -121,52 +129,56 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/',
-            builder: (context, state) => const _AppShell(),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _AppShell()),
           ),
           GoRoute(
             path: '/today',
-            builder: (context, state) => const _TaskViewShell(initialTab: 0),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 0)),
           ),
           GoRoute(
             path: '/soon',
-            builder: (context, state) => const _TaskViewShell(initialTab: 1),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 1)),
           ),
           GoRoute(
             path: '/next-week',
-            builder: (context, state) => const _TaskViewShell(initialTab: 2),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 2)),
           ),
           GoRoute(
             path: '/later',
-            builder: (context, state) => const _TaskViewShell(initialTab: 3),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 3)),
           ),
           GoRoute(
             path: '/anytime',
-            builder: (context, state) => const _TaskViewShell(initialTab: 4),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 4)),
           ),
 
           GoRoute(
             path: '/project/:path',
-            builder: (context, state) => ProjectDetailScreen(
-              projectPath: Uri.decodeComponent(state.pathParameters['path']!),
+            pageBuilder: (context, state) => _buildPageForDesktop(
+              child: ProjectDetailScreen(
+                projectPath: Uri.decodeComponent(state.pathParameters['path']!),
+              ),
             ),
           ),
           GoRoute(
             path: '/settings',
-            builder: (context, state) => const SettingsScreen(),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const SettingsScreen()),
           ),
           
           GoRoute(
             path: '/projects',
-            builder: (context, state) => const ProjectsListScreen(),
+            pageBuilder: (context, state) => _buildPageForDesktop(child: const ProjectsListScreen()),
           ),
            GoRoute(
              path: '/workflows',
-             builder: (context, state) => const WorkflowListScreen(),
+             pageBuilder: (context, state) => _buildPageForDesktop(child: const WorkflowListScreen()),
            ),
            GoRoute(
              path: '/workflow/:path',
-             builder: (context, state) => WorkflowDetailScreen(
-               workflowPath: Uri.decodeComponent(state.pathParameters['path']!),
+             pageBuilder: (context, state) => _buildPageForDesktop(
+               child: WorkflowDetailScreen(
+                 workflowPath: Uri.decodeComponent(state.pathParameters['path']!),
+               ),
              ),
            ),
         ],
@@ -175,7 +187,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Routes outside the main shell
       GoRoute(
         path: '/connect',
-        builder: (context, state) => const ConnectionScreen(),
+        pageBuilder: (context, state) => _buildPageForDesktop(child: const ConnectionScreen()),
       ),
     ],
   );
@@ -192,14 +204,22 @@ class FlowItApp extends ConsumerWidget {
     // Get the reactive router
     final router = ref.watch(routerProvider);
 
-    return MaterialApp.router(
-      title: 'TowDow',
+      final fontScale = ref.watch(fontScaleProvider);
+      final themeMode = ref.watch(themeModeProvider);
+
+      return MaterialApp.router(
+      title: AppLocalizations.of(context)?.appTitle ?? 'TowDow',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: FlowItColors.primary,
           brightness: Brightness.light,
         ),
         useMaterial3: true,
+        dialogTheme: const DialogThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ),
         cardTheme: const CardThemeData(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -215,11 +235,11 @@ class FlowItApp extends ConsumerWidget {
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
         ),
-        extensions: <ThemeExtension<dynamic>>[
-          ChartTheme.light(ColorScheme.fromSeed(
+          extensions: <ThemeExtension<dynamic>>[
+            ChartTheme.light(ColorScheme.fromSeed(
             seedColor: FlowItColors.primary,
             brightness: Brightness.light,
-          )),
+            ), scale: fontScale),
         ],
       ),
       darkTheme: ThemeData(
@@ -228,6 +248,11 @@ class FlowItApp extends ConsumerWidget {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
+        dialogTheme: const DialogThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ),
         cardTheme: const CardThemeData(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -243,15 +268,33 @@ class FlowItApp extends ConsumerWidget {
             borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
         ),
-        extensions: <ThemeExtension<dynamic>>[
-          ChartTheme.dark(ColorScheme.fromSeed(
+          extensions: <ThemeExtension<dynamic>>[
+            ChartTheme.dark(ColorScheme.fromSeed(
             seedColor: FlowItColors.primary,
             brightness: Brightness.dark,
-          )),
+            ), scale: fontScale),
         ],
       ),
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
+      locale: ref.watch(localeProvider),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('fr'),
+      ],
       routerConfig: router,
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(textScaler: TextScaler.linear(fontScale)),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }
@@ -279,10 +322,45 @@ class _TaskViewShell extends ConsumerWidget {
     // Account checking is now handled by router redirect
     // This will only be called when user has an active account
     
-    // Set the initial tab and show the home screen
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(selectedTabIndexProvider.notifier).state = initialTab;
-    });
+    // Choose the tab once: default to route tab while loading, then switch to first non-empty
+    final suggestedAsync = ref.watch(suggestedTabIndexProvider(initialTab));
+    final current = ref.watch(selectedTabIndexProvider);
+    final applied = ref.watch(initialTabAppliedProvider(initialTab));
+
+    if (!applied) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Mark as applied so we do it only once per route load
+        ref.read(initialTabAppliedProvider(initialTab).notifier).state = true;
+
+        if (suggestedAsync.isLoading) {
+          if (current != initialTab) {
+            ref.read(selectedTabIndexProvider.notifier).state = initialTab;
+          }
+        } else if (suggestedAsync.hasValue) {
+          final suggestedIndex = suggestedAsync.value ?? initialTab;
+          if (current != suggestedIndex) {
+            ref.read(selectedTabIndexProvider.notifier).state = suggestedIndex;
+          }
+        } else {
+          if (current != initialTab) {
+            ref.read(selectedTabIndexProvider.notifier).state = initialTab;
+          }
+        }
+      });
+    }
     return const HomeScreen();
   }
 } 
+
+// Returns a page without transitions on desktop platforms, default transitions elsewhere
+Page<dynamic> _buildPageForDesktop({required Widget child}) {
+  final isDesktop = !kIsWeb && (
+    defaultTargetPlatform == TargetPlatform.windows ||
+    defaultTargetPlatform == TargetPlatform.linux ||
+    defaultTargetPlatform == TargetPlatform.macOS
+  );
+  if (isDesktop) {
+    return NoTransitionPage(child: child);
+  }
+  return MaterialPage(child: child);
+}

@@ -16,8 +16,8 @@ import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
-import 'package:towdow_app/data/services/local_storage_service.dart';
-import 'package:towdow_app/data/services/sync_service.dart';
+import 'package:towdow_app/data/services/storage/local_storage_service.dart';
+import 'package:towdow_app/data/services/sync/sync_service.dart';
 import 'package:towdow_app/presentation/viewmodels/task_viewmodel.dart';
 import 'sync_delete_flow_test.mocks.dart';
 

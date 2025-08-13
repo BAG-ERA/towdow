@@ -3,6 +3,7 @@
 // Supports both category-based and custom kanban configurations
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/task.dart';
 import '../../../data/models/category.dart';
@@ -11,7 +12,7 @@ import '../../../core/logger.dart';
 import '../../widgets/kanban_board.dart';
 import '../utils/popup/task_creation_dialog.dart';
 import '../../../data/models/step.dart';
-import '../../screens/project_detail/project_detail_screen.dart' show projectProvider;
+// projectProvider removed; use calendarListProvider to read project state
 
 class ProjectKanbanView extends ConsumerWidget {
   final String projectPath;
@@ -30,7 +31,7 @@ class ProjectKanbanView extends ConsumerWidget {
     return tasksAsync.when(
       data: (tasks) => _buildKanbanWithViewModel(context, ref, tasks),
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('Error loading tasks: $error')),
+      error: (error, _) => Center(child: Text('${AppLocalizations.of(context)!.failedToLoad}: $error')),
     );
   }
 
@@ -44,7 +45,7 @@ class ProjectKanbanView extends ConsumerWidget {
     }
     
     if (kanbanViewModelState.error != null) {
-      return Center(child: Text('Error loading kanban: ${kanbanViewModelState.error}'));
+      return Center(child: Text('${AppLocalizations.of(context)!.failedToLoad}: ${kanbanViewModelState.error}'));
     }
     
     // For now, fall back to the original category-based kanban
@@ -62,7 +63,7 @@ class ProjectKanbanView extends ConsumerWidget {
     }
     
     if (categoryViewModelState.error != null) {
-      return Center(child: Text('Error loading categories: ${categoryViewModelState.error}'));
+      return Center(child: Text('${AppLocalizations.of(context)!.failedToLoad}: ${categoryViewModelState.error}'));
     }
     
     final projectCategories = categoryViewModelState.projectCategories;
@@ -139,8 +140,8 @@ class ProjectKanbanView extends ConsumerWidget {
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      '${hiddenCategories.length} hidden',
+                     Text(
+                      AppLocalizations.of(context)!.hiddenCount(hiddenCategories.length),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
@@ -149,7 +150,7 @@ class ProjectKanbanView extends ConsumerWidget {
                     OutlinedButton.icon(
                       onPressed: () => _showHiddenColumnsDialog(context, ref, hiddenCategories),
                       icon: const Icon(Icons.visibility_rounded, size: 16),
-                      label: const Text('Show'),
+                      label: Text(AppLocalizations.of(context)!.show),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Theme.of(context).colorScheme.primary,
                         side: BorderSide(
@@ -168,7 +169,17 @@ class ProjectKanbanView extends ConsumerWidget {
       },
       onTaskToggle: (task) async {
         // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
-        final project = ref.read(projectProvider(projectPath)).asData?.value;
+        final encoded = projectPath.replaceAll('@', '%40');
+        final project = ref.read(calendarListProvider).maybeWhen(
+          data: (cals) {
+            try {
+              return cals.firstWhere((c) => c.path == encoded);
+            } catch (_) {
+              return null;
+            }
+          },
+          orElse: () => null,
+        );
         final stepRepo = ref.read(stepRepositoryProvider);
         ProjectStep? step;
         if (task.stepId != null && task.stepId!.isNotEmpty) {
@@ -181,7 +192,7 @@ class ProjectKanbanView extends ConsumerWidget {
 
         if (isFlow && status == 'ONGOING' && !stepIsAvailable) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('This task belongs to a waiting step and cannot be completed yet.')),
+            SnackBar(content: Text(AppLocalizations.of(context)!.waitingStepCannotComplete)),
           );
           return;
         }
@@ -280,7 +291,7 @@ class ProjectKanbanView extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error moving task: $error'),
+            content: Text('${AppLocalizations.of(context)!.failedToLoad}: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -306,7 +317,7 @@ class ProjectKanbanView extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error hiding column: $error'),
+            content: Text('${AppLocalizations.of(context)!.failedToLoad}: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -356,7 +367,7 @@ class ProjectKanbanView extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error showing column: $error'),
+            content: Text('${AppLocalizations.of(context)!.failedToLoad}: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -369,14 +380,14 @@ class ProjectKanbanView extends ConsumerWidget {
     return showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
+            title: Row(
           children: [
             Icon(
               Icons.visibility_off_rounded,
               color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 8),
-            Text('Hidden Columns'),
+                Text(AppLocalizations.of(context)!.hiddenColumns),
           ],
         ),
         content: SizedBox(
@@ -386,7 +397,7 @@ class ProjectKanbanView extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'The following columns are hidden by the kanban filter:',
+                AppLocalizations.of(context)!.hiddenColumnsExplainer,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
@@ -416,7 +427,7 @@ class ProjectKanbanView extends ConsumerWidget {
                         Navigator.of(context).pop();
                         await _handleColumnShow(context, ref, category.id);
                       },
-                      child: const Text('Show'),
+                      child: Text(AppLocalizations.of(context)!.show),
                     ),
                   ],
                 ),
@@ -427,7 +438,7 @@ class ProjectKanbanView extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: Text(AppLocalizations.of(context)!.close),
           ),
         ],
       ),

@@ -7,9 +7,9 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
-import '../../data/services/sync_service.dart';
-import '../../data/services/offline_file_service.dart';
-import '../../data/services/file_upload_queue_service.dart';
+import '../../data/services/storage/offline_file_service.dart';
+import '../../data/services/storage/file_upload_queue_service.dart';
+import '../../data/services/storage/s3_storage_service.dart';
 import '../../core/logger.dart';
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
@@ -251,8 +251,54 @@ class TaskMediaAttachmentViewModel extends StateNotifier<TaskMediaAttachmentStat
             // File not found offline, try S3 if we have s3Key
             if (s3Key != null) {
               AppLogger.info('TaskMediaAttachmentViewModel: File not found offline, trying S3');
-              // S3 download would be implemented here if needed
-              throw Exception('S3 download not implemented for media attachments yet');
+              try {
+                // Load task to find the matching media attachment and its AES key
+                final taskResult = await _taskRepository.getById(_taskUid);
+                final task = await taskResult.when(
+                  success: (t) async => t,
+                  failure: (f) async => throw Exception('Failed to get task: ${f.message}'),
+                );
+                if (task == null) {
+                  throw Exception('Task not found');
+                }
+                // Find media attachment by uri
+                final mediaList = _parseMediaAttachments(task.mediaAttachments);
+                final media = mediaList.firstWhere(
+                  (m) => m['uri'] == fileId,
+                  orElse: () => <String, dynamic>{},
+                );
+                final aesKey = media['aesKey'] as String?;
+                if (aesKey == null || aesKey.isEmpty) {
+                  throw Exception('Missing encryption key for media attachment');
+                }
+                // Get account and download from S3
+                final accountResult = await _accountRepository.getActiveAccount();
+                final account = await accountResult.when(
+                  success: (acc) async => acc,
+                  failure: (f) async => throw Exception('Failed to get account: ${f.message}'),
+                );
+                if (account == null) {
+                  throw Exception('No active account found');
+                }
+                final s3Service = S3StorageService(account: account);
+                final downloadResult = await s3Service.downloadFile(
+                  key: s3Key,
+                  isPrivate: false,
+                  symmetricKey: aesKey,
+                );
+                final data = await downloadResult.when(
+                  success: (bytes) async => bytes,
+                  failure: (failure) async => throw Exception('S3 download failed: ${failure.message}'),
+                );
+                state = state.copyWith(
+                  isDownloading: false,
+                  downloadingFileId: null,
+                  successMessage: 'Media file downloaded successfully',
+                );
+                return data;
+              } catch (e) {
+                throw Exception('Failed to download from S3: $e');
+              }
             } else {
               throw Exception('Media file not found locally and no S3 key available');
             }

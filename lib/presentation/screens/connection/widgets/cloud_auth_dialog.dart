@@ -2,6 +2,7 @@
 // Shared functionality between TowDow Cloud and Self-Hosted dialogs
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -111,10 +112,19 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
       if (mounted) {
         // Invalidate the account status provider to ensure router recognizes the account
         ref.invalidate(hasActiveAccountProvider);
+        // Also invalidate active account details so the navbar badge updates immediately
+        ref.invalidate(activeAccountProvider);
 
         Navigator.of(context).pop(); // Close dialog
-        // Navigate to home screen using GoRouter
-        GoRouter.of(context).go('/today');
+        // Navigate based on returning/new detection; default to projects when custom/offline/new
+        final account = state.account;
+        final isOffline = account != null && (account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost'));
+        final destination = (isOffline || state.isReturningUser == false) ? '/projects' : '/today';
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            GoRouter.of(context).go(destination);
+          }
+        });
       }
     }
   }
@@ -171,7 +181,7 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
                         _authenticateAndConnect();
                       }
                     },
-                    child: const Text('Retry'),
+                    child: Text(AppLocalizations.of(context)!.retry),
                   ),
                 ],
               ],
@@ -200,22 +210,22 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Server Configuration',
+          AppLocalizations.of(context)!.serverInformation,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 16),
         TextFormField(
           controller: _serverUrlController,
-          decoration: const InputDecoration(
-            labelText: 'Server URL',
+          decoration: InputDecoration(
+            labelText: AppLocalizations.of(context)!.serverUrlLabel,
             hintText: 'https://api.your-server.com',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.dns_rounded),
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.dns_rounded),
           ),
           autofillHints: const [AutofillHints.url],
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Server URL is required';
+              return AppLocalizations.of(context)!.noneFound(AppLocalizations.of(context)!.serverUrlLabel.toLowerCase());
             }
             return null;
           },
@@ -224,16 +234,16 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
         const SizedBox(height: 16),
         TextFormField(
           controller: _issuerUrlController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Issuer URL',
             hintText: 'https://your-keycloak/realms/yourrealm',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.security_rounded),
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.security_rounded),
           ),
           autofillHints: const [AutofillHints.url],
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Issuer URL is required';
+              return AppLocalizations.of(context)!.noneFound('issuer url');
             }
             return null;
           },
@@ -242,16 +252,16 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
         const SizedBox(height: 16),
         TextFormField(
           controller: _clientIdController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Client ID',
             hintText: 'radicale-api',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.vpn_key_rounded),
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.vpn_key_rounded),
           ),
           autofillHints: const [AutofillHints.username],
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Client ID is required';
+              return AppLocalizations.of(context)!.noneFound('client id');
             }
             return null;
           },
@@ -265,19 +275,19 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
       children: [
         TextFormField(
           controller: _emailController,
-          decoration: const InputDecoration(
-            labelText: 'Email',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.email_outlined),
+          decoration: InputDecoration(
+            labelText: AppLocalizations.of(context)!.emailAddress,
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.email_outlined),
           ),
           keyboardType: TextInputType.emailAddress,
           autofillHints: const [AutofillHints.username, AutofillHints.email],
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Please enter your email';
+              return AppLocalizations.of(context)!.noneFound(AppLocalizations.of(context)!.emailAddress.toLowerCase());
             }
             if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(value)) {
-              return 'Please enter a valid email';
+              return AppLocalizations.of(context)!.pleaseEnterValidEmail;
             }
             return null;
           },
@@ -285,16 +295,16 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
         const SizedBox(height: 16),
         TextFormField(
           controller: _passwordController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Password',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.lock_outline),
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.lock_outline),
           ),
           obscureText: true,
           autofillHints: const [AutofillHints.password],
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Please enter your password';
+              return AppLocalizations.of(context)!.noneFound('password');
             }
             return null;
           },
@@ -336,7 +346,7 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
                 width: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : const Text('Connect'),
+            : Text(AppLocalizations.of(context)!.connect),
       ),
     );
   }

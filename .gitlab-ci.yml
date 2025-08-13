@@ -71,6 +71,7 @@ test:
   script:
     - flutter pub get
     - dart run build_runner build --delete-conflicting-outputs
+    - flutter gen-l10n
     - flutter test
 
 build_appimage:
@@ -103,6 +104,7 @@ build_android:
     - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
     - flutter pub get
     - dart run build_runner build --delete-conflicting-outputs
+    - flutter gen-l10n
     - flutter build apk --release --build-name=$CI_COMMIT_TAG --build-number=$CI_PIPELINE_IID
     - mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/app-release-$CI_COMMIT_TAG.apk"
   artifacts:
@@ -124,6 +126,7 @@ build_windows:
     - git config --global --add safe.directory C:/flutter
     - flutter pub get
     - dart run build_runner build --delete-conflicting-outputs
+    - flutter gen-l10n
     - echo "tag $env:CI_COMMIT_TAG"
     - echo "build name $env:CI_COMMIT_TAG"
     - echo "build number:$env:CI_PIPELINE_IID"
@@ -173,6 +176,7 @@ build_web:
     - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
     - flutter pub get
     - dart run build_runner build --delete-conflicting-outputs
+    - flutter gen-l10n
     - flutter build web --release
     - tar zcf "build/web_${CI_COMMIT_TAG}.tar.gz" build/web
   artifacts:

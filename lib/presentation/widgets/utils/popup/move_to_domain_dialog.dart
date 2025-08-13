@@ -89,26 +89,35 @@ class _MoveToDomainDialogState extends ConsumerState<MoveToDomainDialog> {
             ),
             const SizedBox(height: 8),
             
-            // No domain option
-            RadioListTile<String?>(
-              title: const Text('No domain'),
-              value: null,
-              groupValue: selectedDomain,
-              onChanged: (value) => setState(() => selectedDomain = value),
-              contentPadding: EdgeInsets.zero,
-            ),
-            
-            // Existing domains
-            ...availableDomains.map((domain) => RadioListTile<String?>(
-              title: Text(
-                domain,
-                style: context.domainNameStyle,
+            // Dropdown domain selector (replaces radio list)
+            DropdownButtonFormField<String?>(
+              value: selectedDomain,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Domain',
+                border: OutlineInputBorder(),
               ),
-              value: domain,
-              groupValue: selectedDomain,
-              onChanged: (value) => setState(() => selectedDomain = value),
-              contentPadding: EdgeInsets.zero,
-            )),
+              items: <DropdownMenuItem<String?>>[
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('No domain'),
+                ),
+                ...availableDomains.map(
+                  (domain) => DropdownMenuItem<String?>(
+                    value: domain,
+                    child: Text(
+                      domain,
+                      style: context.domainNameStyle,
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  selectedDomain = value;
+                });
+              },
+            ),
             
             const SizedBox(height: 8),
             Row(

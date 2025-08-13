@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../widgets/task_item/task_item.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/external_calendar/external_events_list.dart';
@@ -11,7 +12,7 @@ import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/calendar_event.dart';
-import '../../../data/services/sync_service.dart';
+import '../../../data/services/sync/sync_service.dart';
 import '../../providers/home_providers.dart';
 import '../../../core/theme/chart_theme_usage.dart';
 
@@ -49,7 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     
     return Scaffold(
       appBar: isDesktop ? AppBar(
-        title: const Text('My Tasks'),
+        title: Text(AppLocalizations.of(context)!.myTasks),
         scrolledUnderElevation: 0,
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -101,23 +102,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: StyledTabBar(
             items: [
               StyledTabItem(
-                label: 'Today (${ref.watch(todayTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                label: '${AppLocalizations.of(context)!.today} (${ref.watch(todayTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                 icon: Icons.today_rounded
               ),
               StyledTabItem(
-                label: 'Soon (${ref.watch(soonTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                label: '${AppLocalizations.of(context)!.soon} (${ref.watch(soonTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                 icon: Icons.schedule_rounded
               ),
               StyledTabItem(
-                label: 'Next Week (${ref.watch(nextWeekTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                label: '${AppLocalizations.of(context)!.nextWeek} (${ref.watch(nextWeekTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                 icon: Icons.date_range_rounded
               ),
               StyledTabItem(
-                label: 'Later (${ref.watch(laterTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                label: '${AppLocalizations.of(context)!.later} (${ref.watch(laterTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                 icon: Icons.event_rounded
               ),
               StyledTabItem(
-                label: 'Anytime (${ref.watch(anytimeTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                label: '${AppLocalizations.of(context)!.anytime} (${ref.watch(anytimeTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                 icon: Icons.inbox_rounded
               ),
             ],
@@ -135,23 +136,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             StyledTabBar(
               items: [
                 StyledTabItem(
-                  label: 'Today (${ref.watch(todayTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                  label: '${AppLocalizations.of(context)!.today} (${ref.watch(todayTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                   icon: Icons.today_rounded
                 ),
                 StyledTabItem(
-                  label: 'Soon (${ref.watch(soonTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                  label: '${AppLocalizations.of(context)!.soon} (${ref.watch(soonTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                   icon: Icons.schedule_rounded
                 ),
                 StyledTabItem(
-                  label: 'Next Week (${ref.watch(nextWeekTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                  label: '${AppLocalizations.of(context)!.nextWeek} (${ref.watch(nextWeekTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                   icon: Icons.date_range_rounded
                 ),
                 StyledTabItem(
-                  label: 'Later (${ref.watch(laterTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                  label: '${AppLocalizations.of(context)!.later} (${ref.watch(laterTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                   icon: Icons.event_rounded
                 ),
                 StyledTabItem(
-                  label: 'Anytime (${ref.watch(anytimeTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
+                  label: '${AppLocalizations.of(context)!.anytime} (${ref.watch(anytimeTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
                   icon: Icons.inbox_rounded
                 ),
               ],
@@ -246,11 +247,11 @@ class _TaskListTab extends ConsumerWidget {
           children: [
             Icon(Icons.error_rounded, size: 64, color: Theme.of(context).colorScheme.error),
             const SizedBox(height: 16),
-            Text('Error loading tasks: $error'),
+            Text('${AppLocalizations.of(context)!.failedToLoad}: $error'),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => ref.refresh(todayTasksProvider),
-              child: const Text('Retry'),
+              child: Text(AppLocalizations.of(context)!.retry),
             ),
           ],
         ),
@@ -290,7 +291,7 @@ class _TaskListTab extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 32),
-                const Text('No tasks yet. Tap + to create your first task!'),
+                Text(AppLocalizations.of(context)!.noneFound(AppLocalizations.of(context)!.projects.toLowerCase())),
               ],
             ),
           );
@@ -379,7 +380,7 @@ class _TaskListTab extends ConsumerWidget {
                                 const SizedBox(height: 8),
                                 Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
                                 const SizedBox(height: 32),
-                                const Text('No tasks yet. Tap + to create your first task!'),
+                                Text(AppLocalizations.of(context)!.noneFound(AppLocalizations.of(context)!.projects.toLowerCase())),
                               ],
                             ),
                           ),

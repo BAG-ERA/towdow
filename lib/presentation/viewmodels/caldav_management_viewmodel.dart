@@ -15,13 +15,13 @@ import '../../core/logger.dart';
 import '../../data/models/caldav_account.dart';
 import '../../data/models/task_calendar.dart';
 
-import '../../data/services/caldav_service.dart';
+import '../../data/services/caldav/caldav_discovery_service.dart';
 import '../../data/services/status_service.dart';
-import '../../data/services/local_storage_service.dart';
-import '../../data/services/user_sync_service.dart';
+import '../../data/services/storage/local_storage_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/user_repository.dart';
+import '../../data/repositories/task_repository.dart';
 import '../../data/providers/providers.dart';
 import '../viewmodels/commands/status_commands.dart';
 
@@ -69,19 +69,19 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
   final UserRepository _userRepository;
-  final UserSyncService _userSyncService;
+  final TaskRepository _taskRepository;
   final void Function()? _onInvalidateProjectList;
 
   CalDAVManagementViewModel({
     required AccountRepository accountRepository,
     required CalendarRepository calendarRepository,
     required UserRepository userRepository,
-    required UserSyncService userSyncService,
+    required TaskRepository taskRepository,
     void Function()? onInvalidateProjectList,
   })  : _accountRepository = accountRepository,
         _calendarRepository = calendarRepository,
         _userRepository = userRepository,
-        _userSyncService = userSyncService,
+        _taskRepository = taskRepository,
         _onInvalidateProjectList = onInvalidateProjectList,
         super(const CalDAVManagementState());
 
@@ -177,8 +177,8 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
     AppLogger.info('CalDAVManagement: Starting calendar discovery for ${account.serverUrl}');
     
     try {
-      final ICalDAVService caldavService = CalDAVService(account: account);
-      final capabilitiesResult = await caldavService.testConnection();
+      final discovery = CalDavDiscoveryService(account: account);
+      final capabilitiesResult = await discovery.testConnection();
       
       await capabilitiesResult.when(
         success: (capabilities) async {
@@ -289,6 +289,13 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
           AppLogger.error('CalDAVManagement: Failed to delete calendar: ${failure.message}');
           state = state.copyWith(error: 'Failed to delete calendar: ${failure.message}');
         },
+      );
+
+      // Local-only cascade remove tasks for this calendar to avoid per-task sync deletes
+      final cascadeResult = await _taskRepository.deleteByProjectLocalOnly(calendar.path);
+      cascadeResult.when(
+        success: (_) => AppLogger.info('CalDAVManagement: Locally removed tasks for deleted calendar ${calendar.path}'),
+        failure: (f) => AppLogger.warning('CalDAVManagement: Failed local task cleanup for ${calendar.path}: ${f.message}'),
       );
 
       // Remove from selected calendars if it was selected
@@ -459,6 +466,12 @@ class CalDAVManagementViewModel extends StateNotifier<CalDAVManagementState> {
             // Calendar is no longer selected - unsync it (remove from local storage only)
             AppLogger.info('CalDAVManagement: Unsyncing calendar ${calendar.displayName} (no longer selected)');
             await _calendarRepository.unsyncCalendar(calendar.path);
+            // Remove its tasks locally to avoid orphaned items
+            final cleanup = await _taskRepository.deleteByProjectLocalOnly(calendar.path);
+            cleanup.when(
+              success: (_) => AppLogger.info('CalDAVManagement: Locally removed tasks for unsynced calendar ${calendar.path}'),
+              failure: (f) => AppLogger.warning('CalDAVManagement: Failed to remove tasks for unsynced calendar ${calendar.path}: ${f.message}')
+            );
           }
           // If calendar is still selected, keep it as is
         }
@@ -517,7 +530,7 @@ final caldavManagementViewModelProvider = StateNotifierProvider.autoDispose<CalD
     accountRepository: ref.read(accountRepositoryProvider),
     calendarRepository: ref.read(calendarRepositoryProvider),
     userRepository: ref.read(userRepositoryProvider),
-    userSyncService: ref.read(userSyncServiceProvider),
+    taskRepository: ref.read(taskRepositoryProvider),
     onInvalidateProjectList: () => ref.invalidate(projectListProvider),
   ),
-); 
+);

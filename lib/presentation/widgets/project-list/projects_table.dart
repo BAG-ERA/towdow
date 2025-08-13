@@ -5,7 +5,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/models/task_calendar.dart';
+import 'package:towdow_app/data/providers/providers_services_core.dart';
 import '../../viewmodels/project_list_viewmodel.dart';
 import '../navbar/project_popup_menu.dart';
 import '../addaptative_table/addaptative_table_container.dart';
@@ -310,10 +312,34 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
       switch (columnType) {
         case ColumnType.project:
           return AddaptativeTableRowCell(
-            Text(
-              projectWithStats.project.displayName,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    projectWithStats.project.displayName,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                  ),
+                ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final notif = ref.watch(projectSharedNotificationProvider(projectWithStats.project.uid));
+                    final showDot = notif.maybeWhen(data: (v) => v, orElse: () => false);
+                    if (!showDot) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             flex: _flexFor(columnType),
           );
@@ -449,14 +475,14 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
     if (widget.menuBuilder != null) {
       return PopupMenuButton<String>(
         icon: const Icon(Icons.more_vert_rounded),
-        tooltip: 'Options',
+        tooltip: AppLocalizations.of(context)!.show,
         onSelected: (value) => widget.onProjectAction(value, projectWithStats),
         itemBuilder: (context) => widget.menuBuilder!(context, ref, projectWithStats.project),
       );
     }
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert_rounded),
-      tooltip: 'Options',
+      tooltip: AppLocalizations.of(context)!.show,
       onSelected: (value) => widget.onProjectAction(value, projectWithStats),
       itemBuilder: (context) => ProjectPopupMenu.getMenuItems(context, ref, project: projectWithStats.project),
     );

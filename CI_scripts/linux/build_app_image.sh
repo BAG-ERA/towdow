@@ -19,6 +19,7 @@ export PATH="$(pwd)/squashfs-root:$PATH"
 echo "building app"
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
+flutter gen-l10n
 flutter build linux --release --build-name="$1" --build-number="$2"
 
 echo "preparing AppDir ${APP_DIR}"

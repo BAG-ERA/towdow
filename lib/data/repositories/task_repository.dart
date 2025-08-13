@@ -4,8 +4,8 @@
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/task.dart';
-import '../services/local_storage_service.dart';
-import '../services/sync_service.dart';
+import '../services/storage/local_storage_service.dart';
+import '../services/sync/sync_service.dart';
 
 // Abstract repository interface
 abstract class TaskRepository {
@@ -18,9 +18,14 @@ abstract class TaskRepository {
   Future<Result<void>> save(Task task);
   Future<Result<void>> delete(String uid);
   Stream<List<Task>> watchTasks();
+    Stream<List<Task>> watchTasksByProject(String projectPath);
   
   // Internal methods for sync operations (don't trigger sync)
   Future<Result<void>> saveFromSync(Task task);
+
+  // Local-only maintenance utilities (no sync side effects)
+  Future<Result<void>> deleteByProjectLocalOnly(String projectPath);
+  Future<Result<void>> deleteOrphanedTasksLocalOnly(Set<String> validCalendarPaths);
 }
 
 // Local implementation using Hive
@@ -192,7 +197,85 @@ class LocalTaskRepository implements TaskRepository {
   }
 
   @override
+  Stream<List<Task>> watchTasksByProject(String projectPath) async* {
+    final encoded = projectPath.replaceAll('@', '%40');
+    // Emit initial
+    final init = await getByProject(encoded);
+    yield init.when(success: (tasks) => tasks, failure: (_) => <Task>[]);
+    // Then listen for changes and filter
+    yield* _storageService.getStream(LocalStorageService.tasksBoxName).asyncMap((_) async {
+      final res = await getByProject(encoded);
+      return res.when(success: (tasks) => tasks, failure: (_) => <Task>[]);
+    });
+  }
+
+  @override
   Future<Result<void>> saveFromSync(Task task) async {
     return await _storageService.put(LocalStorageService.tasksBoxName, task.uid, task);
+  }
+
+  @override
+  Future<Result<void>> deleteByProjectLocalOnly(String projectPath) async {
+    try {
+      final encodedProjectPath = projectPath.replaceAll('@', '%40');
+      final tasksResult = await getAll();
+      return await tasksResult.when(
+        success: (tasks) async {
+          final tasksToDelete = tasks.where((t) => t.projectPath == encodedProjectPath).toList();
+          AppLogger.info('TaskRepository: Local-only delete of ${tasksToDelete.length} tasks for project $projectPath');
+          for (final task in tasksToDelete) {
+            final res = await _storageService.delete(LocalStorageService.tasksBoxName, task.uid);
+            if (res is Error<void>) {
+              return res;
+            }
+          }
+          return const Result.success(null);
+        },
+        failure: (failure) async {
+          return Result.failure(failure);
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('TaskRepository: Exception during local-only delete by project', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to delete tasks for project: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  @override
+  Future<Result<void>> deleteOrphanedTasksLocalOnly(Set<String> validCalendarPaths) async {
+    try {
+      // Ensure we compare against encoded paths because tasks store encoded projectPath
+      final encodedValid = validCalendarPaths
+          .map((p) => p.replaceAll('@', '%40'))
+          .toSet();
+      final tasksResult = await getAll();
+      return await tasksResult.when(
+        success: (tasks) async {
+          final orphans = tasks.where((t) => t.projectPath == null || !encodedValid.contains(t.projectPath)).toList();
+          if (orphans.isNotEmpty) {
+            AppLogger.warning('TaskRepository: Cleaning ${orphans.length} orphan task(s) locally');
+          }
+          for (final task in orphans) {
+            final res = await _storageService.delete(LocalStorageService.tasksBoxName, task.uid);
+            if (res is Error<void>) {
+              return res;
+            }
+          }
+          return const Result.success(null);
+        },
+        failure: (failure) async => Result.failure(failure),
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('TaskRepository: Exception during orphan cleanup', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to cleanup orphan tasks: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
   }
 } 

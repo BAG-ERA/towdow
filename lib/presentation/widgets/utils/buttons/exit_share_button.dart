@@ -3,6 +3,7 @@
 // Uses FlowIt typography system with automatic capitalization
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/logger.dart';
@@ -22,8 +23,8 @@ class ExitShareButton extends ConsumerWidget {
   /// Custom text color (defaults to white for primary buttons)
   final Color? textColor;
   
-  /// Button text (will be automatically capitalized)
-  final String text;
+  /// Button text (will be automatically capitalized). If null, uses localized default
+  final String? text;
   
   /// Optional icon to display alongside text
   final IconData? icon;
@@ -43,7 +44,7 @@ class ExitShareButton extends ConsumerWidget {
     required this.projectDisplayName,
     this.backgroundColor,
     this.textColor,
-    this.text = 'Exit Share',
+    this.text,
     this.icon = Icons.exit_to_app_rounded,
     this.size = ExitShareButtonSize.medium,
     this.isFullWidth = false,
@@ -65,7 +66,7 @@ class ExitShareButton extends ConsumerWidget {
       projectDisplayName: projectDisplayName,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Exit Share',
+      text: null,
       icon: Icons.exit_to_app_rounded,
       size: ExitShareButtonSize.small,
       onShareExited: onShareExited,
@@ -88,7 +89,7 @@ class ExitShareButton extends ConsumerWidget {
       projectDisplayName: projectDisplayName,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Exit Share',
+      text: null,
       icon: Icons.exit_to_app_rounded,
       size: ExitShareButtonSize.large,
       isFullWidth: isFullWidth,
@@ -102,18 +103,17 @@ class ExitShareButton extends ConsumerWidget {
     final effectiveBackgroundColor = backgroundColor ?? chartTheme.colors.primary;
     
     final buttonPadding = _getPadding(chartTheme);
-    final fontSize = _getFontSize();
+    final scale = (chartTheme.typography.primaryButton.fontSize ?? 14) / 14.0;
     
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       child: OutlinedButton.icon(
         onPressed: () => _handleExitShare(context, ref),
-        icon: icon != null ? Icon(icon, size: _getIconSize()) : const SizedBox.shrink(),
+        icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
         label: Text(
-          text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
+          (text ?? AppLocalizations.of(context)!.exitShare).toUpperCase(),
           style: chartTheme.typography.primaryButton.copyWith(
             color: effectiveBackgroundColor,
-            fontSize: fontSize,
           ),
         ),
         style: OutlinedButton.styleFrom(
@@ -145,17 +145,6 @@ class ExitShareButton extends ConsumerWidget {
           horizontal: chartTheme.dimensions.paddingLarge * 1.5,
           vertical: chartTheme.dimensions.paddingMedium * 1.2,
         );
-    }
-  }
-
-  double _getFontSize() {
-    switch (size) {
-      case ExitShareButtonSize.small:
-        return 12;
-      case ExitShareButtonSize.medium:
-        return 14;
-      case ExitShareButtonSize.large:
-        return 16;
     }
   }
 
@@ -196,7 +185,8 @@ class ExitShareButton extends ConsumerWidget {
             final currentRoute = GoRouterState.of(context).uri.path;
             if (currentRoute == '/project/${Uri.encodeComponent(projectPath)}') {
               AppLogger.info('ExitShareButton: Navigating away from exited shared project');
-              context.go('/today');
+              // Deterministic navigation after exit-share: always go to Projects
+              context.go('/projects');
             }
           }
           

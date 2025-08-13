@@ -2,13 +2,14 @@
 // Mirrors CreateProjectButton styling and semantics for workflows
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../../core/theme/chart_theme.dart';
 import '../popup/workflow_creation_dialog.dart';
 
 class CreateWorkflowButton extends StatelessWidget {
   final Color? backgroundColor;
   final Color? textColor;
-  final String text;
+  final String? text;
   final IconData? icon;
   final CreateWorkflowButtonSize size;
   final bool isFullWidth;
@@ -18,7 +19,7 @@ class CreateWorkflowButton extends StatelessWidget {
     super.key,
     this.backgroundColor,
     this.textColor,
-    this.text = 'Create Workflow',
+    this.text,
     this.icon = Icons.add,
     this.size = CreateWorkflowButtonSize.medium,
     this.isFullWidth = false,
@@ -35,7 +36,7 @@ class CreateWorkflowButton extends StatelessWidget {
       key: key,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Create Workflow',
+      text: null,
       icon: Icons.add,
       size: CreateWorkflowButtonSize.small,
       onWorkflowCreated: onWorkflowCreated,
@@ -53,7 +54,7 @@ class CreateWorkflowButton extends StatelessWidget {
       key: key,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Create Workflow',
+      text: null,
       icon: Icons.add_rounded,
       size: CreateWorkflowButtonSize.large,
       isFullWidth: isFullWidth,
@@ -67,16 +68,16 @@ class CreateWorkflowButton extends StatelessWidget {
     final effectiveBackgroundColor = backgroundColor ?? chartTheme.colors.primary;
     final effectiveTextColor = textColor ?? chartTheme.typography.primaryButton.color;
 
+    final scale = (chartTheme.typography.primaryButton.fontSize ?? 14) / 14.0;
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       child: ElevatedButton.icon(
         onPressed: () => _showCreateWorkflowDialog(context),
-        icon: icon != null ? Icon(icon, size: _getIconSize()) : const SizedBox.shrink(),
+        icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
         label: Text(
-          text.toUpperCase(),
+          (text ?? AppLocalizations.of(context)!.createWorkflow).toUpperCase(),
           style: chartTheme.typography.primaryButton.copyWith(
             color: effectiveTextColor,
-            fontSize: _getFontSize(),
           ),
         ),
         style: ElevatedButton.styleFrom(
@@ -109,17 +110,6 @@ class CreateWorkflowButton extends StatelessWidget {
           horizontal: chartTheme.dimensions.paddingLarge * 1.5,
           vertical: chartTheme.dimensions.paddingMedium * 1.2,
         );
-    }
-  }
-
-  double _getFontSize() {
-    switch (size) {
-      case CreateWorkflowButtonSize.small:
-        return 12;
-      case CreateWorkflowButtonSize.medium:
-        return 14;
-      case CreateWorkflowButtonSize.large:
-        return 16;
     }
   }
 

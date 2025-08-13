@@ -30,32 +30,15 @@ class CategoryChip extends ConsumerWidget {
       }
     }
     
-    // Fallback to general category repository
-    final categoryRepository = ref.watch(categoryRepositoryProvider);
-    
-    return FutureBuilder(
-      future: categoryRepository.getCategoryById(categoryId),
-      builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data != null) {
-          final result = snapshot.data!;
-          return result.when(
-            success: (category) {
-              if (category != null) {
-                return _buildChip(context, category.name, category.colorValue);
-              } else {
-                return _buildChip(context, 'Unknown Category', Colors.grey);
-              }
-            },
-            failure: (_) => _buildChip(context, 'Error', Colors.red),
-          );
-        } else if (snapshot.hasError) {
-          return _buildChip(context, 'Error', Colors.red);
-        } else {
-          // Loading or unknown category
-          return _buildChip(context, 'Loading...', Colors.grey);
-        }
-      },
+    // Fallback: use general category viewmodel to retrieve by id via state
+    final categoryState = ref.watch(categoryViewModelProvider);
+    final found = categoryState.categories.firstWhere(
+      (cat) => cat.id == categoryId,
+      orElse: () => const Category(id: '', name: 'Unknown Category', color: 0xFF9E9E9E),
     );
+    final isUnknown = found.id.isEmpty;
+    final color = isUnknown ? Colors.grey : found.colorValue;
+    return _buildChip(context, isUnknown ? 'Unknown Category' : found.name, color);
   }
   
   Widget _buildChip(BuildContext context, String text, Color color) {

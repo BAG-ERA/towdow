@@ -5,7 +5,7 @@
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/external_calendar.dart';
-import '../services/local_storage_service.dart';
+import '../services/storage/local_storage_service.dart';
 
 // Abstract repository interface
 abstract class ExternalCalendarRepository {

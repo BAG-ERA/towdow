@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/attendee.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
-import 'package:towdow_app/data/services/local_storage_service.dart';
+import 'package:towdow_app/data/services/storage/local_storage_service.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';

@@ -114,6 +114,7 @@ abstract class WebDAVClient {
 
   /// Build URI correctly handling absolute vs relative paths
   Uri _buildUri(String path) {
+    // No special offline scheme anymore; offline-only uses https://localhost which is valid but unreachable
     final serverUri = Uri.parse(serverUrl);
 
     if (path.startsWith('/')) {

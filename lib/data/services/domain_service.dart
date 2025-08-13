@@ -7,16 +7,19 @@ import '../../core/logger.dart';
 import '../models/task_calendar.dart';
 import '../repositories/calendar_repository.dart';
 import '../repositories/account_repository.dart';
-import 'local_storage_service.dart';
-import 'sync_service.dart';
+import 'storage/local_storage_service.dart';
+import 'sync/sync_service.dart';
+import '../repositories/calendar_repository.dart' show SyncCommander;
 
 /// Service for managing project domains and domain-related operations
 class DomainService {
   final CalendarRepository _calendarRepository;
   final LocalStorageService _localStorageService;
+  // ignore: unused_field
   final AccountRepository _accountRepository;
+  final SyncCommander? _sync;
 
-  DomainService(this._calendarRepository, this._localStorageService, this._accountRepository);
+  DomainService(this._calendarRepository, this._localStorageService, this._accountRepository, {SyncCommander? sync}) : _sync = sync;
 
   /// Create a new domain
   Future<Result<void>> createDomain(String domain) async {
@@ -180,7 +183,7 @@ class DomainService {
       AppLogger.info('DomainService: Domain value: ${calendar.flowitDomain ?? "(null)"}');
       
       // Always use sync queue for offline resilience
-      final syncService = SyncService.instance;
+      final syncService = _sync ?? SyncService.instance;
       if (syncService != null) {
         AppLogger.debug('DomainService: Queuing calendar update for domain sync');
         final queueResult = await syncService.queueCalendarUpdate(calendar.path);
