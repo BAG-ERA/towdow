@@ -434,10 +434,40 @@ class _AttachmentRow extends ConsumerWidget {
               icon: const Icon(Icons.download, size: 16),
               tooltip: 'Download',
               onPressed: () async {
-                // For now, just no-op or future wiring to download for journals
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Download coming soon for notes')),
+                final s3Key = (data['s3Key'] ?? '').toString();
+                final aesKey = (data['aesKey'] ?? '').toString();
+                final fileId = (data['uri'] ?? '').toString();
+                final fileName = (data['filename'] ?? 'download').toString();
+                if (aesKey.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Missing encryption key')),
+                  );
+                  return;
+                }
+                final bytes = await ref.read(journalFileAttachmentViewModelProvider(uid).notifier)
+                    .downloadFileBytes(
+                  fileId: fileId,
+                  fileName: fileName,
+                  s3Key: s3Key.isEmpty ? null : s3Key,
+                  aesKey: aesKey,
                 );
+                if (bytes == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Download failed')),
+                  );
+                  return;
+                }
+                final savePath = await FilePicker.platform.saveFile(
+                  dialogTitle: 'Save File',
+                  fileName: fileName,
+                  type: FileType.any,
+                  bytes: bytes,
+                );
+                if (savePath != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('File saved successfully')),
+                  );
+                }
               },
             ),
         ],

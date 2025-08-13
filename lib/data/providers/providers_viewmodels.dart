@@ -142,6 +142,7 @@ final noteViewModelProvider = StateNotifierProvider.family<NoteViewModel, NoteSt
 final journalFileAttachmentViewModelProvider = StateNotifierProvider.family<JournalFileAttachmentViewModel, JournalFileAttachmentState, String>((ref, journalUid) {
   return JournalFileAttachmentViewModel(
     journalRepository: ref.watch(journalRepositoryProvider),
+    accountRepository: ref.watch(accountRepositoryProvider),
     offlineFileService: ref.watch(offlineFileServiceProvider),
     fileUploadQueueService: ref.watch(fileUploadQueueServiceProvider),
   );

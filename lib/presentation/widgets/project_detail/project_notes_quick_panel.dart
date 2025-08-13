@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/journal.dart';
 // repo accessed via provider only, no direct symbol here
 import '../../../data/providers/providers_viewmodels.dart';
+import '../../../data/providers/providers_repositories.dart';
 
 class ProjectNotesQuickPanel extends ConsumerWidget {
   final String projectPath;
@@ -138,6 +139,30 @@ class _NoteRow extends StatelessWidget {
       leading: const Icon(Icons.sticky_note_2_outlined, size: 18),
       minLeadingWidth: 16,
       horizontalTitleGap: 8,
+      trailing: IconButton(
+        icon: const Icon(Icons.delete_outline, size: 16),
+        color: Theme.of(context).colorScheme.error,
+        tooltip: 'Delete note',
+        onPressed: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Delete note'),
+              content: const Text('Are you sure you want to delete this note?'),
+              actions: [
+                TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+                FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Delete')),
+              ],
+            ),
+          );
+          if (confirmed == true) {
+            // Obtain provider container and delete
+            final container = ProviderScope.containerOf(context);
+            final repo = container.read(journalRepositoryProvider);
+            await repo.delete(journal.uid);
+          }
+        },
+      ),
     );
   }
 }

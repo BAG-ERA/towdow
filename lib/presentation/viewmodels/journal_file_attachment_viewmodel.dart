@@ -6,8 +6,10 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/repositories/journal_repository.dart';
+import '../../data/repositories/account_repository.dart';
 import '../../data/services/storage/offline_file_service.dart';
 import '../../data/services/storage/file_upload_queue_service.dart';
+import '../../data/services/storage/s3_storage_service.dart';
 import '../../core/logger.dart';
 
 class JournalFileAttachmentState {
@@ -44,14 +46,17 @@ class JournalFileAttachmentState {
 
 class JournalFileAttachmentViewModel extends StateNotifier<JournalFileAttachmentState> {
   final JournalRepository _journalRepository;
+  final AccountRepository _accountRepository;
   final OfflineFileService _offlineFileService;
   final FileUploadQueueService _fileUploadQueueService;
 
   JournalFileAttachmentViewModel({
     required JournalRepository journalRepository,
+    required AccountRepository accountRepository,
     required OfflineFileService offlineFileService,
     required FileUploadQueueService fileUploadQueueService,
   })  : _journalRepository = journalRepository,
+        _accountRepository = accountRepository,
         _offlineFileService = offlineFileService,
         _fileUploadQueueService = fileUploadQueueService,
         super(const JournalFileAttachmentState());
@@ -129,6 +134,35 @@ class JournalFileAttachmentViewModel extends StateNotifier<JournalFileAttachment
       AppLogger.error('JournalFileAttachmentVM: Upload failed', e, st);
       state = state.copyWith(isUploading: false, error: 'Upload failed: $e');
       return false;
+    }
+  }
+
+  /// Download file bytes for a journal attachment (offline-first)
+  Future<Uint8List?> downloadFileBytes({
+    required String fileId,
+    required String fileName,
+    String? s3Key,
+    required String aesKey,
+  }) async {
+    try {
+      // Try offline first
+      final localRes = await _offlineFileService.readLocalFile(fileId);
+      final localData = await localRes.when(success: (d) async => d, failure: (_) async => null);
+      if (localData != null) {
+        return localData;
+      }
+      if (s3Key == null || s3Key.isEmpty) {
+        return null;
+      }
+      // Download from S3
+      final accRes = await _accountRepository.getActiveAccount();
+      final account = await accRes.when(success: (a) async => a, failure: (_) async => null);
+      if (account == null) return null;
+      final s3 = S3StorageService(account: account);
+      final dlRes = await s3.downloadFile(key: s3Key, isPrivate: false, symmetricKey: aesKey);
+      return await dlRes.when(success: (bytes) async => bytes, failure: (_) async => null);
+    } catch (_) {
+      return null;
     }
   }
 
