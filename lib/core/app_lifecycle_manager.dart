@@ -45,6 +45,10 @@ class AppLifecycleManager {
   // Timers and subscriptions
   Timer? _backgroundSyncTimer;
   StreamSubscription<FlowItAppState>? _lifecycleSubscription;
+  
+  // Cooldown control to prevent overly frequent health-check syncs
+  DateTime? _lastHealthCheckSyncAt;
+  static const Duration _healthCheckCooldown = Duration(minutes: 3);
 
   // Getters
   FlowItAppState get state => _state;
@@ -393,10 +397,16 @@ class AppLifecycleManager {
       // Ensure services are still running
       _ensureServicesRunning();
       
-      // Trigger immediate sync to get latest data
+      // Optional immediate sync is gated by cooldown; avoid double-trigger with _ensureServicesRunning
       if (_syncService != null) {
-        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Triggering sync on app resume');
-        _syncService!.syncAllActiveCaldav();
+        final lastSync = _syncService!.lastSyncTime ?? _lastHealthCheckSyncAt;
+        final shouldSync = lastSync == null || DateTime.now().difference(lastSync) > _healthCheckCooldown;
+        if (shouldSync) {
+          _lastHealthCheckSyncAt = DateTime.now();
+          _syncService!.syncAllActiveCaldav();
+        } else {
+          AppLogger.debug('AppLifecycleManager: Skipping immediate resume sync due to cooldown');
+        }
       }
       
       // Update shared projects when app resumes
@@ -471,8 +481,15 @@ class AppLifecycleManager {
           success: (account) {
             if (account != null && _syncService != null) {
               // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account available, ensuring sync service is initialized');
-              // Services should be running, trigger a health check sync
-              _syncService!.syncAllActiveCaldav();
+              // Services should be running, trigger a health check sync (cooldown guarded)
+              final lastSync = _syncService!.lastSyncTime ?? _lastHealthCheckSyncAt;
+              final shouldSync = lastSync == null || DateTime.now().difference(lastSync) > _healthCheckCooldown;
+              if (shouldSync) {
+                _lastHealthCheckSyncAt = DateTime.now();
+                _syncService!.syncAllActiveCaldav();
+              } else {
+                AppLogger.debug('AppLifecycleManager: Skipping health-check sync due to cooldown');
+              }
             }
           },
           failure: (failure) {

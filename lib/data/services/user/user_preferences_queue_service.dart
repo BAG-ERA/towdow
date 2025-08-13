@@ -185,7 +185,14 @@ class UserPreferencesQueueService {
       await _localStorage.put(_queueBoxName, _queueKey, updatedQueue);
 
       AppLogger.info('UserPreferencesQueueService: Processed ${successfulIds.length} items, ${failedIds.length} dropped, queue size now ${updatedQueue.length}');
-      return const Result.success(null);
+
+      // Only report success ("changes") when something actually happened
+      if (successfulIds.isNotEmpty || failedIds.isNotEmpty) {
+        return const Result.success(null);
+      }
+
+      // No item was processed this cycle (e.g., all were gated by backoff) → report no-op
+      return const Result.failure(Failure(message: 'No user preferences queue items processed'));
     } catch (e, stackTrace) {
       AppLogger.error('UserPreferencesQueueService: Failed to process queue', e, stackTrace);
       return Result.failure(Failure(

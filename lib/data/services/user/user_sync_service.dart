@@ -354,14 +354,37 @@ class UserSyncService {
         success: (preferences) async {
           final data = _serializeUserPreferences(preferences);
           final dataBytes = Uint8List.fromList(utf8.encode(data));
-          
-          return await s3Service.uploadFile(
+          // Upload then persist fresh ETag locally to avoid unnecessary download cycles
+          final uploadResult = await s3Service.uploadFile(
             key: _getUserPreferencesPath(s3Service),
             data: dataBytes,
             isPrivate: true, // User preferences are always private
             symmetricKey: 'dummy-key', // TODO: Use proper encryption key when encryption is implemented
             contentType: 'application/json',
             skipEncryption: true, // Skip encryption for user preferences
+          );
+          return await uploadResult.when(
+            success: (_) async {
+              // Retrieve current ETag and store it in local preferences
+              final etagResult = await s3Service.getCurrentEtag(
+                key: _getUserPreferencesPath(s3Service),
+                isPrivate: true,
+              );
+              await etagResult.when(
+                success: (etag) async {
+                  final setRes = await _userRepository.setEtag(etag);
+                  setRes.when(
+                    success: (_) => AppLogger.debug('UserSyncService: Updated local user preferences ETag after upload: $etag'),
+                    failure: (f) => AppLogger.warning('UserSyncService: Failed to persist local ETag after upload: ${f.message}'),
+                  );
+                },
+                failure: (f) async {
+                  AppLogger.warning('UserSyncService: Could not fetch ETag after upload: ${f.message}');
+                },
+              );
+              return const Result.success(null);
+            },
+            failure: (failure) async => Result.failure(failure),
           );
         },
         failure: (failure) async => Result.failure(failure),
@@ -473,13 +496,37 @@ class UserSyncService {
             success: (calendars) async {
               final data = _serializeExternalCredentials(accounts, calendars);
               final dataBytes = Uint8List.fromList(utf8.encode(data));
-              
-              return await s3Service.uploadFile(
+              // Upload then persist fresh credentials file ETag locally to avoid unnecessary download cycles
+              final uploadResult = await s3Service.uploadFile(
                 key: _getExternalCredentialsPath(s3Service),
                 data: dataBytes,
                 isPrivate: true, // External credentials are always private
                 symmetricKey: 'dummy-key', // TODO: Use proper encryption key when encryption is implemented
                 contentType: 'application/json',
+              );
+              return await uploadResult.when(
+                success: (_) async {
+                  final etagResult = await s3Service.getCurrentEtag(
+                    key: _getExternalCredentialsPath(s3Service),
+                    isPrivate: true,
+                  );
+                  await etagResult.when(
+                    success: (etag) async {
+                      if (etag != null) {
+                        final res = await _externalAccountRepository.setCredentialsFileEtag(etag);
+                        res.when(
+                          success: (_) => AppLogger.debug('UserSyncService: Updated local external credentials ETag after upload: $etag'),
+                          failure: (f) => AppLogger.warning('UserSyncService: Failed to persist external credentials ETag: ${f.message}'),
+                        );
+                      }
+                    },
+                    failure: (f) async {
+                      AppLogger.warning('UserSyncService: Could not fetch credentials ETag after upload: ${f.message}');
+                    },
+                  );
+                  return const Result.success(null);
+                },
+                failure: (failure) async => Result.failure(failure),
               );
             },
             failure: (failure) async => Result.failure(failure),
