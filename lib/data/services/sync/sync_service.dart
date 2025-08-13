@@ -16,6 +16,7 @@ import '../../repositories/user_repository.dart';
 import '../caldav/caldav_task_service.dart';
 import '../caldav/caldav_calendar_service.dart';
 import '../caldav/caldav_properties_service.dart';
+import '../caldav/caldav_service.dart';
 import '../caldav/caldav_discovery_service.dart';
 import '../storage/local_storage_service.dart';
 import '../webdav_client.dart';
@@ -669,14 +670,14 @@ class SyncService implements SyncCommander {
               throw Exception('Calendar not found in repository: $calendarPath');
             }
             
-            AppLogger.debug('SyncService: Found calendar ${calendar.displayName}, calling CalDAV update');
-            
-            // Update calendar properties on server
-            final caldavProps = SyncService.propertiesServiceFactory(caldavTask.account);
-            final result = await caldavProps.getCalendarProperties(calendar).then((_) => const Result.success(null));
+            AppLogger.debug('SyncService: Found calendar ${calendar.displayName}, performing PROPPATCH via CalDAVService');
+
+            // Perform PROPPATCH update (also triggers sharing sync downstream)
+            final caldav = CalDAVService(account: caldavTask.account);
+            final result = await caldav.updateCalendarProperties(calendar);
             await result.when(
               success: (_) async {
-                AppLogger.debug('SyncService: Updated calendar properties ${calendar.displayName} on server');
+                AppLogger.debug('SyncService: PROPPATCH completed for ${calendar.displayName}');
               },
               failure: (failure) async {
                 throw Exception('Failed to update calendar properties: ${failure.message}');

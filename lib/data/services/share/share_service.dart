@@ -36,7 +36,7 @@ class ShareService {
     
     try {
       // For sharing API, we need to use direct HTTP client since it's not CalDAV
-      final url = '$_baseUrl/share/$_extractUidFromPath(projectPath)';
+      final url = '$_baseUrl/share/${_extractUidFromPath(projectPath)}';
       AppLogger.debug('ShareService: Making GET request to: $url');
       
       // Get auth headers from WebDAV client
@@ -83,7 +83,7 @@ class ShareService {
     
     try {
       // For sharing API, we need to use direct HTTP client since it's not CalDAV
-      final url = '$_baseUrl/share/$_extractUidFromPath(projectPath)';
+      final url = '$_baseUrl/share/${_extractUidFromPath(projectPath)}';
       final requestBody = jsonEncode(memberEmails);
       AppLogger.debug('ShareService: Making PUT request to: $url');
       AppLogger.debug('ShareService: PUT request body: $requestBody');
@@ -134,7 +134,7 @@ class ShareService {
     try {
       AppLogger.info('ShareService: Adding member $targetUserEmail to project $projectPath');
       
-      final url = Uri.parse('$_baseUrl/share/$_extractUidFromPath(projectPath)');
+      final url = Uri.parse('$_baseUrl/share/${_extractUidFromPath(projectPath)}');
       final headers = await _client.getAuthHeaders();
       headers['Content-Type'] = 'application/json';
       
@@ -178,7 +178,7 @@ class ShareService {
     try {
       AppLogger.info('ShareService: Removing member $targetUserEmail from project $projectPath');
       
-      final url = Uri.parse('$_baseUrl/share/$_extractUidFromPath(projectPath)}?targetUserEmail=${Uri.encodeComponent(targetUserEmail)}');
+      final url = Uri.parse('$_baseUrl/share/${_extractUidFromPath(projectPath)}?targetUserEmail=${Uri.encodeComponent(targetUserEmail)}');
       final headers = await _client.getAuthHeaders();
       
       final response = await http.delete(url, headers: headers);
