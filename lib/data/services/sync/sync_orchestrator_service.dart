@@ -504,6 +504,7 @@ class CalDAVMonitor {
     // Ensure all discovered calendars exist in local repository
     int addedCount = 0;
     int existingCount = 0;
+    final newlyAddedPaths = <String>[];
     for (final serverCalendar in availableCalendars) {
       final pendingDeletion = await _syncService.hasPendingDeletionForCalendar(serverCalendar.path);
       if (pendingDeletion) {
@@ -519,6 +520,7 @@ class CalDAVMonitor {
               success: (_) {
                 addedCount++;
                 AppLogger.info('CalDAVMonitor: Added discovered calendar: ${serverCalendar.displayName}');
+                newlyAddedPaths.add(serverCalendar.path);
               },
               failure: (failure) {
                 AppLogger.warning('CalDAVMonitor: Failed to save discovered calendar ${serverCalendar.displayName}: ${failure.message}');
@@ -544,6 +546,7 @@ class CalDAVMonitor {
             success: (_) {
               addedCount++;
               AppLogger.info('CalDAVMonitor: Added discovered calendar (after lookup error): ${serverCalendar.displayName}');
+              newlyAddedPaths.add(serverCalendar.path);
             },
             failure: (failure) {
               AppLogger.warning('CalDAVMonitor: Failed to save discovered calendar ${serverCalendar.displayName}: ${failure.message}');
@@ -553,6 +556,41 @@ class CalDAVMonitor {
       );
     }
     AppLogger.info('CalDAVMonitor: Calendar discovery complete - $addedCount added, $existingCount already existed');
+
+    // Ensure newly added calendars are included for sync and visible in project order by default
+    if (newlyAddedPaths.isNotEmpty) {
+      try {
+        final prefsResult = await _userRepository.getUserPreferences();
+        await prefsResult.when(
+          success: (prefs) async {
+            var updated = prefs;
+            // Remove from excluded list if present
+            for (final path in newlyAddedPaths) {
+              if (!updated.shouldSyncProject(path)) {
+                updated = updated.includeProject(path);
+                AppLogger.info('CalDAVMonitor: Included newly discovered project in sync: $path');
+              }
+            }
+            // Append to project order for visibility
+            final currentOrder = [...updated.projectOrder];
+            for (final path in newlyAddedPaths) {
+              if (!currentOrder.contains(path)) {
+                currentOrder.add(path);
+              }
+            }
+            updated = updated.copyWith(projectOrder: currentOrder);
+            await _userRepository.saveUserPreferences(updated);
+            AppLogger.info('CalDAVMonitor: Updated user preferences for ${newlyAddedPaths.length} newly discovered projects');
+          },
+          failure: (failure) async {
+            AppLogger.warning('CalDAVMonitor: Could not load user preferences to include new calendars: ${failure.message}');
+          },
+        );
+      } catch (e, st) {
+        AppLogger.warning('CalDAVMonitor: Failed to update preferences for new calendars: $e');
+        AppLogger.debug('CalDAVMonitor: Stack: $st');
+      }
+    }
     return addedCount > 0;
   }
 
