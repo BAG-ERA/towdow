@@ -123,7 +123,7 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     final isDesktop = MediaQuery.of(context).size.width >= AdaptiveAppLayout._desktopBreakpoint;
     final isFirstMobileLoad = ref.read(_firstMobileLoadProvider);
     
-    // Open drawer on mobile startup, but with proper timing to avoid layout issues
+    // Do not auto-open drawer anymore; first screen on mobile is /nav
     if (!isDesktop && isFirstMobileLoad && !_hasOpenedDrawerOnStart) {
       _hasOpenedDrawerOnStart = true;
       
@@ -132,7 +132,6 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
         // Add an additional delay to ensure everything is rendered
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted && _scaffoldKey.currentState != null) {
-            _scaffoldKey.currentState!.openDrawer();
             // Mark that we've completed the first mobile load
             ref.read(_firstMobileLoadProvider.notifier).state = false;
           }
@@ -179,9 +178,8 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
               }
             });
           } else {
-            // Drawer is closed, open it - reset animation
-            _slideAnimationController.reset();
-            scaffoldState.openDrawer();
+            // Drawer is closed, go to nav screen instead of opening drawer
+            context.go('/nav');
           }
         }
       },
@@ -245,14 +243,13 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
           builder: (context) => IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () {
-              // On mobile detail pages, navigate back to the corresponding list
+              // Detail pages go back to their list; list/settings/my tasks go to nav
               if (location.startsWith('/project/')) {
                 context.go('/projects');
               } else if (location.startsWith('/workflow/')) {
                 context.go('/workflows');
               } else {
-                // Fallback: open navigation drawer
-                Scaffold.of(context).openDrawer();
+                context.go('/nav');
               }
             },
             tooltip: location.startsWith('/project/')

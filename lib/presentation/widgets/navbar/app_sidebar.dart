@@ -13,17 +13,21 @@ class AppSidebar extends ConsumerWidget {
   const AppSidebar({
     super.key,
     required this.currentDestination,
+    this.fullWidth = false,
   });
 
   final AppDestination? currentDestination;
+  final bool fullWidth;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
+    final double containerWidth = isDesktop ? 280 : (fullWidth ? double.infinity : 280);
+
     return Container(
-      width: 280,
+      width: containerWidth,
       decoration: BoxDecoration(
         borderRadius: isDesktop ? null : BorderRadius.zero, // Remove rounded corners on mobile
         border: isDesktop ? Border(
