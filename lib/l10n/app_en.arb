@@ -324,6 +324,18 @@
   "pleaseEnterValidEmail": "Please enter a valid email address"
   ,
   "categoryName": "Category name *",
-  "enterNewCategoryName": "Enter new category name"
+  "enterNewCategoryName": "Enter new category name",
+  "createNew": "Create New",
+  "domain": "Domain",
+  "project": "Project",
+  "workflow": "Workflow",
+  "domainExplainer": "Organize projects by business area or client",
+  "projectExplainer": "A workspace for tasks, files, and timelines",
+  "workflowExplainer": "Customize statuses and steps for your projects",
+  "createProject": "Create Project",
+  "createNewProject": "Create New Project",
+  "createWorkflow": "Create Workflow",
+  "addNewTask": "Add New Task",
+  "exitShare": "Exit Share"
 }
 

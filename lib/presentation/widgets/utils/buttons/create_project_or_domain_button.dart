@@ -4,6 +4,7 @@
 // Uses FlowIt typography system with automatic capitalization
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../../core/theme/chart_theme.dart';
 import '../popup/domain_creation_dialog.dart';
 import '../popup/project_creation_dialog.dart';
@@ -16,8 +17,8 @@ class CreateProjectOrDomainButton extends StatelessWidget {
   /// Custom text color (defaults to white for primary buttons)
   final Color? textColor;
   
-  /// Button text (will be automatically capitalized)
-  final String text;
+  /// Button text (will be automatically capitalized). If null, uses localized default
+  final String? text;
   
   /// Optional icon to display alongside text
   final IconData? icon;
@@ -42,7 +43,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
     super.key,
     this.backgroundColor,
     this.textColor,
-    this.text = 'Create',
+    this.text,
     this.icon = Icons.add_rounded,
     this.size = CreateProjectOrDomainButtonSize.medium,
     this.isFullWidth = false,
@@ -65,7 +66,6 @@ class CreateProjectOrDomainButton extends StatelessWidget {
       key: key,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Create',
       icon: Icons.add,
       size: CreateProjectOrDomainButtonSize.small,
       isFullWidth: isFullWidth,
@@ -95,6 +95,8 @@ class CreateProjectOrDomainButton extends StatelessWidget {
       elevation: size == CreateProjectOrDomainButtonSize.large ? 2 : 1,
     );
 
+    final localizedLabel = (text ?? AppLocalizations.of(context)!.create).toUpperCase();
+
     if (!showDropdownAffordance) {
       return SizedBox(
         width: isFullWidth ? double.infinity : null,
@@ -102,7 +104,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
           onPressed: () => _showCreateDialog(context),
           icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
           label: Text(
-            text.toUpperCase(),
+            localizedLabel,
             style: chartTheme.typography.primaryButton.copyWith(
               color: effectiveTextColor,
             ),
@@ -145,7 +147,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
                       SizedBox(width: chartTheme.dimensions.paddingSmall),
                     ],
                     Text(
-                      text.toUpperCase(),
+                      localizedLabel,
                       style: chartTheme.typography.primaryButton.copyWith(
                         color: effectiveTextColor,
                       ),
@@ -215,15 +217,15 @@ class CreateProjectOrDomainButton extends StatelessWidget {
   void _showCreateDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create New'),
+        builder: (context) => AlertDialog(
+        title: Text(AppLocalizations.of(context)!.createNew),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.domain_rounded),
-              title: const Text('Domain'),
-              subtitle: const Text('Organize projects by business area or client'),
+              title: Text(AppLocalizations.of(context)!.domain),
+              subtitle: Text(AppLocalizations.of(context)!.domainExplainer),
               onTap: () {
                 Navigator.of(context).pop();
                 _showCreateDomainDialog(context);
@@ -231,8 +233,8 @@ class CreateProjectOrDomainButton extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.folder_rounded),
-              title: const Text('Project'),
-              subtitle: const Text('A workspace for tasks, files, and timelines'),
+              title: Text(AppLocalizations.of(context)!.project),
+              subtitle: Text(AppLocalizations.of(context)!.projectExplainer),
               onTap: () {
                 Navigator.of(context).pop();
                 _showCreateProjectDialog(context);
@@ -240,8 +242,8 @@ class CreateProjectOrDomainButton extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.route_rounded),
-              title: const Text('Workflow'),
-              subtitle: const Text('Customize statuses and steps for your projects'),
+              title: Text(AppLocalizations.of(context)!.workflow),
+              subtitle: Text(AppLocalizations.of(context)!.workflowExplainer),
               onTap: () {
                 Navigator.of(context).pop();
                 _showCreateWorkflowDialog(context);

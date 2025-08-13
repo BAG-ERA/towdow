@@ -3,6 +3,7 @@
 // Uses FlowIt typography system with automatic capitalization
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../../core/theme/chart_theme.dart';
 import '../popup/project_creation_dialog.dart';
 
@@ -13,8 +14,8 @@ class CreateProjectButton extends StatelessWidget {
   /// Custom text color (defaults to white for primary buttons)
   final Color? textColor;
   
-  /// Button text (will be automatically capitalized)
-  final String text;
+  /// Button text (will be automatically capitalized). If null, uses localized default
+  final String? text;
   
   /// Optional icon to display alongside text
   final IconData? icon;
@@ -32,7 +33,7 @@ class CreateProjectButton extends StatelessWidget {
     super.key,
     this.backgroundColor,
     this.textColor,
-    this.text = 'Create Project',
+    this.text,
     this.icon = Icons.add,
     this.size = CreateProjectButtonSize.medium,
     this.isFullWidth = false,
@@ -50,7 +51,7 @@ class CreateProjectButton extends StatelessWidget {
       key: key,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Create Project',
+      text: null,
       icon: Icons.add,
       size: CreateProjectButtonSize.small,
       onProjectCreated: onProjectCreated,
@@ -69,7 +70,7 @@ class CreateProjectButton extends StatelessWidget {
       key: key,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Create New Project',
+      text: null,
       icon: Icons.add_rounded,
       size: CreateProjectButtonSize.large,
       isFullWidth: isFullWidth,
@@ -92,7 +93,9 @@ class CreateProjectButton extends StatelessWidget {
         onPressed: () => _showCreateProjectDialog(context),
         icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
         label: Text(
-          text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
+          (text ?? (size == CreateProjectButtonSize.large
+              ? AppLocalizations.of(context)!.createNewProject
+              : AppLocalizations.of(context)!.createProject)).toUpperCase(),
           style: chartTheme.typography.primaryButton.copyWith(
             color: effectiveTextColor,
           ),

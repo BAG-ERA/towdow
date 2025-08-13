@@ -3,6 +3,7 @@
 // Uses FlowIt typography system with automatic capitalization
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/logger.dart';
@@ -22,8 +23,8 @@ class ExitShareButton extends ConsumerWidget {
   /// Custom text color (defaults to white for primary buttons)
   final Color? textColor;
   
-  /// Button text (will be automatically capitalized)
-  final String text;
+  /// Button text (will be automatically capitalized). If null, uses localized default
+  final String? text;
   
   /// Optional icon to display alongside text
   final IconData? icon;
@@ -43,7 +44,7 @@ class ExitShareButton extends ConsumerWidget {
     required this.projectDisplayName,
     this.backgroundColor,
     this.textColor,
-    this.text = 'Exit Share',
+    this.text,
     this.icon = Icons.exit_to_app_rounded,
     this.size = ExitShareButtonSize.medium,
     this.isFullWidth = false,
@@ -65,7 +66,7 @@ class ExitShareButton extends ConsumerWidget {
       projectDisplayName: projectDisplayName,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Exit Share',
+      text: null,
       icon: Icons.exit_to_app_rounded,
       size: ExitShareButtonSize.small,
       onShareExited: onShareExited,
@@ -88,7 +89,7 @@ class ExitShareButton extends ConsumerWidget {
       projectDisplayName: projectDisplayName,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Exit Share',
+      text: null,
       icon: Icons.exit_to_app_rounded,
       size: ExitShareButtonSize.large,
       isFullWidth: isFullWidth,
@@ -110,7 +111,7 @@ class ExitShareButton extends ConsumerWidget {
         onPressed: () => _handleExitShare(context, ref),
         icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
         label: Text(
-          text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
+          (text ?? AppLocalizations.of(context)!.exitShare).toUpperCase(),
           style: chartTheme.typography.primaryButton.copyWith(
             color: effectiveBackgroundColor,
           ),

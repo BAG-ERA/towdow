@@ -3,6 +3,7 @@
 // Uses FlowIt typography system with automatic capitalization
 
 import 'package:flutter/material.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../../core/theme/chart_theme.dart';
 import '../popup/task_creation_dialog.dart';
 
@@ -18,8 +19,8 @@ class CreateTaskButton extends StatelessWidget {
   /// Custom text color (defaults to white for primary buttons)
   final Color? textColor;
   
-  /// Button text (will be automatically capitalized)
-  final String text;
+  /// Button text (will be automatically capitalized). If null, uses localized default
+  final String? text;
   
   /// Optional icon to display alongside text
   final IconData? icon;
@@ -38,7 +39,7 @@ class CreateTaskButton extends StatelessWidget {
     this.projectCalendarUid,
     this.backgroundColor,
     this.textColor,
-    this.text = 'Add Task',
+    this.text,
     this.icon = Icons.add,
     this.size = CreateTaskButtonSize.medium,
     this.isFullWidth = false,
@@ -60,7 +61,7 @@ class CreateTaskButton extends StatelessWidget {
       projectCalendarUid: projectCalendarUid,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Add Task',
+      text: null,
       icon: Icons.add,
       size: CreateTaskButtonSize.small,
       onTaskCreated: onTaskCreated,
@@ -83,7 +84,7 @@ class CreateTaskButton extends StatelessWidget {
       projectCalendarUid: projectCalendarUid,
       backgroundColor: backgroundColor,
       textColor: textColor,
-      text: 'Add New Task',
+      text: null,
       icon: Icons.add_rounded,
       size: CreateTaskButtonSize.large,
       isFullWidth: isFullWidth,
@@ -107,7 +108,9 @@ class CreateTaskButton extends StatelessWidget {
         onPressed: () => _showCreateTaskDialog(context),
         icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
         label: Text(
-          text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
+          (text ?? (size == CreateTaskButtonSize.large
+              ? AppLocalizations.of(context)!.addNewTask
+              : AppLocalizations.of(context)!.addTask)).toUpperCase(),
           style: chartTheme.typography.primaryButton.copyWith(
             color: effectiveTextColor,
           ),
