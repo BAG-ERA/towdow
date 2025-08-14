@@ -2,8 +2,10 @@
 // Orchestrates smaller components and maintains expansion state
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/task.dart';
 import '../../../data/services/validator_service.dart';
+import '../../../data/providers/providers_viewmodels.dart';
 import 'task_item_titlebar.dart';
 import 'task_item_description.dart';
 import 'task_item_validatorlist.dart';
@@ -19,7 +21,7 @@ class TaskItemController {
   void collapse() => _state?.collapseTask();
 }
 
-class TaskItem extends StatefulWidget {
+class TaskItem extends ConsumerStatefulWidget {
   final Task task;
   final VoidCallback? onTap;
   final VoidCallback? onToggleComplete;
@@ -38,10 +40,10 @@ class TaskItem extends StatefulWidget {
   });
 
   @override
-  State<TaskItem> createState() => _TaskItemState();
+  ConsumerState<TaskItem> createState() => _TaskItemState();
 }
 
-class _TaskItemState extends State<TaskItem> {
+class _TaskItemState extends ConsumerState<TaskItem> {
   bool _isExpanded = false;
   final GlobalKey _cardKey = GlobalKey();
 
@@ -49,6 +51,11 @@ class _TaskItemState extends State<TaskItem> {
   void initState() {
     super.initState();
     widget.controller?._attach(this);
+    
+    // Set the selected task in the TaskViewModel to watch for updates
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(taskViewModelProvider.notifier).selectTask(widget.task);
+    });
   }
 
   @override
@@ -75,7 +82,14 @@ class _TaskItemState extends State<TaskItem> {
 
   @override
   Widget build(BuildContext context) {
-    final isCompleted = widget.task.status == 'COMPLETED';
+    // Watch the TaskViewModel state to get the latest task data
+    final taskState = ref.watch(taskViewModelProvider);
+    
+    // Use the selected task from the ViewModel if it matches our task, otherwise use the prop
+    final currentTask = (taskState.selectedTask?.uid == widget.task.uid) 
+        ? taskState.selectedTask! 
+        : widget.task;
+    final isCompleted = currentTask.status == 'COMPLETED';
 
     return Container(
       key: _cardKey,
@@ -95,7 +109,7 @@ class _TaskItemState extends State<TaskItem> {
           children: [
             // Titlebar with checkbox, date, title, indicators, and expand button
             TaskItemTitlebar(
-              task: widget.task,
+              task: currentTask,
               isExpanded: _isExpanded,
               isCompleted: isCompleted,
               onToggleComplete: () => _handleTaskCompletion(),
@@ -106,7 +120,7 @@ class _TaskItemState extends State<TaskItem> {
                     await TaskItemPopup.showFromContext(
                       context,
                       sourceContext: sourceContext,
-                      task: widget.task,
+                      task: currentTask,
                       onTaskUpdated: widget.onTaskUpdated,
                       onTaskDeleted: widget.onTaskDeleted,
                       onToggleComplete: widget.onToggleComplete,
@@ -114,7 +128,7 @@ class _TaskItemState extends State<TaskItem> {
                   } else {
                     await TaskItemPopup.show(
                       context,
-                      task: widget.task,
+                      task: currentTask,
                       onTaskUpdated: widget.onTaskUpdated,
                       onTaskDeleted: widget.onTaskDeleted,
                       onToggleComplete: widget.onToggleComplete,
@@ -135,14 +149,14 @@ class _TaskItemState extends State<TaskItem> {
               
               // Description, attendees, and categories
               TaskItemDescription(
-                task: widget.task,
+                task: currentTask,
                 onTaskUpdated: widget.onTaskUpdated,
               ),
               
               // Validators
               const SizedBox(height: 4),
               TaskItemValidatorList(
-                task: widget.task,
+                task: currentTask,
                 onTaskUpdated: widget.onTaskUpdated,
               ),
               
@@ -155,8 +169,12 @@ class _TaskItemState extends State<TaskItem> {
   }
 
   void _handleTaskCompletion() {
+    // Get the current task data from the reactive provider
+    final taskState = ref.read(taskViewModelProvider);
+    final currentTask = taskState.selectedTask ?? widget.task;
+    
     // Check if task has validators and if they're completed
-    final validators = ValidatorService.parseValidators(widget.task.flowitValidator);
+    final validators = ValidatorService.parseValidators(currentTask.flowitValidator);
     
     if (validators.isNotEmpty && !ValidatorService.areValidatorsCompleted(validators)) {
       // Task has validators that aren't completed - expand to show them

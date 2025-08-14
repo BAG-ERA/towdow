@@ -13,7 +13,6 @@ import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/user_preferences.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
-import 'package:towdow_app/data/repositories/journal_repository.dart';
 import 'package:towdow_app/core/result.dart';
 
 import '../services/sync_service_test.mocks.dart';

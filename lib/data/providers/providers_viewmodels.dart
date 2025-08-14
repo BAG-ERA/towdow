@@ -176,6 +176,7 @@ final journalFileAttachmentViewModelProvider = StateNotifierProvider.family<Jour
 final journalMediaAttachmentViewModelProvider = StateNotifierProvider.family<JournalMediaAttachmentViewModel, JournalMediaAttachmentState, String>((ref, journalUid) {
   return JournalMediaAttachmentViewModel(
     journalRepository: ref.watch(journalRepositoryProvider),
+    accountRepository: ref.watch(accountRepositoryProvider),
     offlineFileService: ref.watch(offlineFileServiceProvider),
     fileUploadQueueService: ref.watch(fileUploadQueueServiceProvider),
   );

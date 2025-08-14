@@ -2,10 +2,8 @@
 // Vérifie chaque étape du processus depuis la suppression UI jusqu'à la sync serveur
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/material.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import 'package:riverpod/riverpod.dart';
 import 'package:towdow_app/core/logger.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
