@@ -8,6 +8,7 @@ import '../../../core/logger.dart';
 import '../../models/task.dart';
 import '../../models/caldav_account.dart';
 import '../../models/task_calendar.dart';
+import '../../models/journal.dart';
 import '../../repositories/task_repository.dart';
 import '../../repositories/account_repository.dart';
 import '../../repositories/calendar_repository.dart';
@@ -23,6 +24,7 @@ import '../caldav/caldav_journal_service.dart';
 import '../storage/local_storage_service.dart';
 import '../webdav_client.dart';
 import '../parsers/vtodo_parser.dart';
+import '../parsers/vjournal_parser.dart';
 import '../share/share_service.dart';
 
 enum SyncOperation {
@@ -1243,7 +1245,7 @@ class SyncService implements SyncCommander {
       }
       
       if (calendar.syncToken == null) {
-        // First sync - fetch all tasks
+        // First sync - fetch all tasks and journals
         final tasksResult = await caldavTask.fetchTasks(calendar.path);
         await tasksResult.when(
           success: (remoteTasks) async {
@@ -1251,10 +1253,26 @@ class SyncService implements SyncCommander {
               final taskWithCalendar = task.copyWith(projectPath: calendar.path);
               await _taskRepository.saveFromSync(taskWithCalendar);
             }
-            //AppLogger.debug('🔄 SyncService: Full sync completed - ${remoteTasks.length} tasks from ${calendar.path}');
+            AppLogger.debug('🔄 SyncService: Full sync completed - ${remoteTasks.length} tasks from ${calendar.path}');
           },
           failure: (failure) async {
             errors.add('Failed to fetch tasks from ${calendar.path}: ${failure.message}');
+          },
+        );
+
+        // Fetch journals
+        final caldavJournal = CalDavJournalService(account: caldavTask.account);
+        final journalsResult = await caldavJournal.fetchJournals(calendar.path);
+        await journalsResult.when(
+          success: (remoteJournals) async {
+            for (final journal in remoteJournals) {
+              final journalWithCalendar = journal.copyWith(projectPath: calendar.path);
+              await _journalRepository.saveFromSync(journalWithCalendar);
+            }
+            AppLogger.debug('🔄 SyncService: Full sync completed - ${remoteJournals.length} journals from ${calendar.path}');
+          },
+          failure: (failure) async {
+            errors.add('Failed to fetch journals from ${calendar.path}: ${failure.message}');
           },
         );
       } else {
@@ -1272,16 +1290,27 @@ class SyncService implements SyncCommander {
               final href = changeMap['href'] as String;
               
               if (changeType == 'deleted') {
-                // Delete task from local storage
+                // Delete task or journal from local storage
                 await _deleteTaskByHref(href, calendar.path);
-                //AppLogger.debug('🔄 SyncService: Deleted task $href');
+                await _deleteJournalByHref(href, calendar.path);
+                //AppLogger.debug('🔄 SyncService: Deleted item $href');
               } else if (changeType == 'updated') {
-                // Create or update task in local storage
-                final taskData = changeMap['task'] as Map<String, dynamic>;
-                final task = Task.fromJson(taskData);
-                final taskWithCalendar = task.copyWith(projectPath: calendar.path);
-                await _taskRepository.saveFromSync(taskWithCalendar);
-                //AppLogger.debug('🔄 SyncService: Updated task ${task.uid}');
+                // Check if it's a task or journal based on the data
+                if (changeMap.containsKey('task')) {
+                  // Create or update task in local storage
+                  final taskData = changeMap['task'] as Map<String, dynamic>;
+                  final task = Task.fromJson(taskData);
+                  final taskWithCalendar = task.copyWith(projectPath: calendar.path);
+                  await _taskRepository.saveFromSync(taskWithCalendar);
+                  //AppLogger.debug('🔄 SyncService: Updated task ${task.uid}');
+                } else if (changeMap.containsKey('journal')) {
+                  // Create or update journal in local storage
+                  final journalData = changeMap['journal'] as Map<String, dynamic>;
+                  final journal = Journal.fromJson(journalData);
+                  final journalWithCalendar = journal.copyWith(projectPath: calendar.path);
+                  await _journalRepository.saveFromSync(journalWithCalendar);
+                  //AppLogger.debug('🔄 SyncService: Updated journal ${journal.uid}');
+                }
               }
             }
           },
@@ -1699,18 +1728,18 @@ class SyncService implements SyncCommander {
                   //AppLogger.debug('🔄 SyncService: VTODO content length: ${vtodoContent.length}');
                   //AppLogger.debug('🔄 SyncService: VTODO content: $vtodoContent');
                   
-                  final task = _parseVTODOFromCalendarData(vtodoContent);
+                  final parsedResult = _parseCalendarData(vtodoContent);
                   
-                  if (task != null) {
+                  if (parsedResult != null) {
                     changes.add({
                       'href': href,
                       'etag': etag,
                       'type': 'updated',
-                      'task': task.toJson(),
+                      ...parsedResult,
                     });
-                    AppLogger.debug('🔄 SyncService: Added updated change for task ${task.uid}');
+                    AppLogger.debug('🔄 SyncService: Added updated change for ${parsedResult.keys.first}');
                   } else {
-                    AppLogger.warning('🔄 SyncService: Failed to parse VTODO for $href');
+                    AppLogger.warning('🔄 SyncService: Failed to parse calendar data for $href');
                   }
                   break;
                 }
@@ -1720,18 +1749,18 @@ class SyncService implements SyncCommander {
               //AppLogger.debug('🔄 SyncService: VTODO content length: ${vtodoContent.length}');
               //AppLogger.debug('🔄 SyncService: VTODO content: $vtodoContent');
               
-              final task = _parseVTODOFromCalendarData(vtodoContent);
+              final parsedResult = _parseCalendarData(vtodoContent);
               
-              if (task != null) {
+              if (parsedResult != null) {
                 changes.add({
                   'href': href,
                   'etag': etag,
                   'type': 'updated',
-                  'task': task.toJson(),
+                  ...parsedResult,
                 });
-                //AppLogger.debug('🔄 SyncService: Added updated change for task ${task.uid}');
+                //AppLogger.debug('🔄 SyncService: Added updated change for ${parsedResult.keys.first}');
               } else {
-                AppLogger.warning('🔄 SyncService: Failed to parse VTODO for $href');
+                AppLogger.warning('🔄 SyncService: Failed to parse calendar data for $href');
               }
             }
           } else {
@@ -1762,6 +1791,33 @@ class SyncService implements SyncCommander {
       AppLogger.error('SyncService: Failed to parse VTODO from calendar data', e, StackTrace.current);
     }
     return null;
+  }
+
+  /// Parse calendar data (VTODO or VJOURNAL) and return appropriate result
+  Map<String, dynamic>? _parseCalendarData(String calendarData) {
+    try {
+      // Check if it's a VTODO
+      if (calendarData.contains('BEGIN:VTODO')) {
+        final task = VTODOParser.parseVTODOFromCalendarData(calendarData);
+        if (task != null) {
+          return {'task': task.toJson()};
+        }
+      }
+      
+      // Check if it's a VJOURNAL
+      if (calendarData.contains('BEGIN:VJOURNAL')) {
+        final journal = VJournalParser.parseVJOURNALFromCalendarData(calendarData);
+        if (journal != null) {
+          return {'journal': journal.toJson()};
+        }
+      }
+      
+      AppLogger.warning('SyncService: Unknown calendar data type');
+      return null;
+    } catch (e) {
+      AppLogger.error('SyncService: Failed to parse calendar data', e, StackTrace.current);
+      return null;
+    }
   }
 
   /// Update sync status and notify listeners
@@ -1873,6 +1929,30 @@ class SyncService implements SyncCommander {
       );
     } catch (e, stackTrace) {
       AppLogger.error('SyncService: Failed to delete task by href $href', e, stackTrace);
+    }
+  }
+
+  /// Delete journal by href from local storage
+  Future<void> _deleteJournalByHref(String href, String calendarPath) async {
+    try {
+      // Extract UID from href (assuming href ends with UID.ics)
+      final filename = href.split('/').last;
+      final uid = filename.endsWith('.ics') ? filename.substring(0, filename.length - 4) : filename;
+      
+      final journalResult = await _journalRepository.getById(uid);
+      await journalResult.when(
+        success: (journal) async {
+          if (journal != null && journal.projectPath == calendarPath) {
+            await _journalRepository.delete(uid);
+            //AppLogger.debug('🔄 SyncService: Deleted local journal $uid');
+          }
+        },
+        failure: (failure) async {
+          AppLogger.debug('🔄 SyncService: Journal $uid not found locally for deletion');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('SyncService: Failed to delete journal by href $href', e, stackTrace);
     }
   }
 
