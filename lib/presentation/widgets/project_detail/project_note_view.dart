@@ -44,7 +44,7 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
   void dispose() {
     // Final autosave on dispose to ensure no changes are lost
     try {
-      final noteVm = ref.read(noteViewModelProvider(widget.journal).notifier);
+      final noteVm = ref.read(noteViewModelProvider(widget.journal.uid).notifier);
       noteVm.updateSummary(_summary.text.trim());
       noteVm.updateDescription(_desc.text);
       // Fire-and-forget save
@@ -59,8 +59,8 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
 
   @override
   Widget build(BuildContext context) {
-    final noteState = ref.watch(noteViewModelProvider(widget.journal));
-    final noteVm = ref.read(noteViewModelProvider(widget.journal).notifier);
+    final noteState = ref.watch(noteViewModelProvider(widget.journal.uid));
+    final noteVm = ref.read(noteViewModelProvider(widget.journal.uid).notifier);
     return Stack(
       children: [
         // Blur overlay instead of dark overlay
@@ -350,7 +350,7 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
   }
 
   Widget _buildAttachmentsList(BuildContext context) {
-    final journalAsync = ref.watch(noteViewModelProvider(widget.journal));
+    final journalAsync = ref.watch(noteViewModelProvider(widget.journal.uid));
     final j = journalAsync.journal;
     final files = _decodeList(j.attachments);
     final media = _decodeList(j.mediaAttachments);

@@ -13,6 +13,7 @@ import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/user_preferences.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
+import 'package:towdow_app/data/repositories/journal_repository.dart';
 import 'package:towdow_app/core/result.dart';
 
 import '../services/sync_service_test.mocks.dart';
@@ -27,6 +28,7 @@ void main() {
     late MockCalendarRepository mockCalendarRepo;
     late MockCategoryRepository mockCategoryRepo;
     late MockUserRepository mockUserRepo;
+    late MockJournalRepository mockJournalRepo;
     late MockLocalStorageService mockStorage;
 
     late SyncService syncService;
@@ -48,6 +50,7 @@ void main() {
       mockCalendarRepo = MockCalendarRepository();
       mockCategoryRepo = MockCategoryRepository();
       mockUserRepo = MockUserRepository();
+      mockJournalRepo = MockJournalRepository();
       mockStorage = MockLocalStorageService();
 
       // Provide factories that return our fakes
@@ -105,6 +108,7 @@ void main() {
         calendarRepository: mockCalendarRepo,
         categoryRepository: mockCategoryRepo,
         userRepository: mockUserRepo,
+        journalRepository: mockJournalRepo,
         localStorage: mockStorage,
       );
     });

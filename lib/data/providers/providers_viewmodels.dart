@@ -133,9 +133,34 @@ final projectNotesViewModelProvider = StateNotifierProvider.family<ProjectNotesV
   return ProjectNotesViewModel(projectPath: projectPath, journalRepository: repo);
 });
 
-final noteViewModelProvider = StateNotifierProvider.family<NoteViewModel, NoteState, Journal>((ref, Journal journal) {
-  final repo = ref.watch(journalRepositoryProvider);
-  return NoteViewModel(journal, repo);
+// Reactive journal provider that watches the repository for changes
+final journalProvider = StreamProvider.family<Journal?, String>((ref, journalUid) {
+  final journalRepository = ref.watch(journalRepositoryProvider);
+  return journalRepository.watchJournals().map((journals) {
+    try {
+      return journals.firstWhere((journal) => journal.uid == journalUid);
+    } catch (e) {
+      return null;
+    }
+  });
+});
+
+final noteViewModelProvider = StateNotifierProvider.family<NoteViewModel, NoteState, String>((ref, journalUid) {
+  final journalRepository = ref.watch(journalRepositoryProvider);
+  final journalAsync = ref.watch(journalProvider(journalUid));
+  
+  // Get the current journal or create a placeholder
+  final journal = journalAsync.value ?? Journal(
+    uid: journalUid,
+    summary: '',
+    description: '',
+    lastModified: DateTime.now(),
+    created: DateTime.now(),
+    dtstamp: DateTime.now(),
+    projectPath: '',
+  );
+  
+  return NoteViewModel(journal, journalRepository);
 });
 
 // Journal attachment ViewModels

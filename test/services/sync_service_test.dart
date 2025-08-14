@@ -13,6 +13,7 @@ import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
+import 'package:towdow_app/data/repositories/journal_repository.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
@@ -27,6 +28,7 @@ import 'sync_service_test.mocks.dart';
   CalendarRepository,
   CategoryRepository,
   UserRepository,
+  JournalRepository,
   LocalStorageService,
   CalDAVService,
 ])
@@ -38,6 +40,7 @@ void main() {
     late MockCalendarRepository mockCalendarRepository;
     late MockCategoryRepository mockCategoryRepository;
     late MockUserRepository mockUserRepository;
+    late MockJournalRepository mockJournalRepository;
     late MockLocalStorageService mockLocalStorage;
 
     // Test data
@@ -50,6 +53,7 @@ void main() {
       mockTaskRepository = MockTaskRepository();
       mockCategoryRepository = MockCategoryRepository();
       mockUserRepository = MockUserRepository();
+      mockJournalRepository = MockJournalRepository();
       mockLocalStorage = MockLocalStorageService();
 
       // Add stubs for commonly used methods
@@ -71,6 +75,7 @@ void main() {
         calendarRepository: mockCalendarRepository,
         categoryRepository: mockCategoryRepository,
         userRepository: mockUserRepository,
+        journalRepository: mockJournalRepository,
         localStorage: mockLocalStorage,
       );
 
@@ -454,6 +459,7 @@ void main() {
     final mockCategoryRepository = MockCategoryRepository();
     final mockAccountRepository = MockAccountRepository();
     final mockUserRepository = MockUserRepository();
+    final mockJournalRepository = MockJournalRepository();
     final mockLocalStorage = MockLocalStorageService();
     
     final syncService = SyncService(
@@ -462,6 +468,7 @@ void main() {
       calendarRepository: mockCalendarRepository,
       categoryRepository: mockCategoryRepository,
       userRepository: mockUserRepository,
+      journalRepository: mockJournalRepository,
       localStorage: mockLocalStorage,
     );
 
