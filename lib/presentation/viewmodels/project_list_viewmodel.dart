@@ -1187,4 +1187,9 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     
     return domainGroups;
   }
+
+  /// Get filtered domain groups based on current filter
+  List<DomainGroup> get filteredDomainGroups {
+    return _buildDomainGroups(state.filteredProjects);
+  }
 } 

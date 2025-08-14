@@ -150,7 +150,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          for (final group in state.domainGroups)
+          for (final group in ref.read(projectListViewModelProvider.notifier).filteredDomainGroups)
             _DomainTableSection(
               title: group.domain,
               projects: group.projects,

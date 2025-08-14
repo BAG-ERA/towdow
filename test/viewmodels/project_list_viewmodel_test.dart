@@ -282,4 +282,81 @@ void main() {
       });
     });
   });
+
+  group('Filtering', () {
+    test('filteredDomainGroups should return filtered projects based on current filter', () {
+      // Arrange
+      final mockCalendarRepository = MockCalendarRepository();
+      final mockTaskRepository = MockTaskRepository();
+      final mockAccountRepository = MockAccountRepository();
+      final mockUserRepository = MockUserRepository();
+      
+      // Stub the watchCalendars method to prevent errors
+      when(mockCalendarRepository.watchCalendars()).thenAnswer((_) => Stream.value([]));
+      
+      final viewModel = ProjectListViewModel(
+        mockCalendarRepository,
+        mockTaskRepository,
+        mockAccountRepository,
+        mockUserRepository,
+      );
+
+      // Create test projects with different statuses
+      final activeProject = TaskCalendarFactory.createNew(
+        path: '/test/active',
+        displayName: 'Active Project',
+        description: 'An active project',
+      ).copyWith(flowitStatus: 'ONGOING');
+      
+      final archivedProject = TaskCalendarFactory.createNew(
+        path: '/test/archived',
+        displayName: 'Archived Project',
+        description: 'An archived project',
+      ).copyWith(flowitStatus: 'ARCHIVE');
+
+      final activeProjectWithStats = ProjectWithStats(
+        project: activeProject,
+        stats: ProjectStats(
+          totalTasks: 5,
+          completedTasks: 2,
+          inProgressTasks: 1,
+          pendingTasks: 2,
+          progressPercentage: 40,
+        ),
+      );
+      
+      final archivedProjectWithStats = ProjectWithStats(
+        project: archivedProject,
+        stats: ProjectStats(
+          totalTasks: 3,
+          completedTasks: 3,
+          inProgressTasks: 0,
+          pendingTasks: 0,
+          progressPercentage: 100,
+        ),
+      );
+
+      // Set up state with both projects
+      viewModel.state = viewModel.state.copyWith(
+        projects: [activeProjectWithStats, archivedProjectWithStats],
+        filter: ProjectFilter.all,
+      );
+
+      // Test: All filter should return both projects
+      expect(viewModel.filteredDomainGroups.length, 1); // Both in same domain (No Domain)
+      expect(viewModel.filteredDomainGroups.first.projects.length, 2);
+
+      // Test: Active filter should return only active project
+      viewModel.state = viewModel.state.copyWith(filter: ProjectFilter.active);
+      expect(viewModel.filteredDomainGroups.length, 1);
+      expect(viewModel.filteredDomainGroups.first.projects.length, 1);
+      expect(viewModel.filteredDomainGroups.first.projects.first.project.displayName, 'Active Project');
+
+      // Test: Completed filter should return only archived project
+      viewModel.state = viewModel.state.copyWith(filter: ProjectFilter.completed);
+      expect(viewModel.filteredDomainGroups.length, 1);
+      expect(viewModel.filteredDomainGroups.first.projects.length, 1);
+      expect(viewModel.filteredDomainGroups.first.projects.first.project.displayName, 'Archived Project');
+    });
+  });
 } 
