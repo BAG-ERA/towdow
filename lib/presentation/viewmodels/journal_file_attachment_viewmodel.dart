@@ -144,24 +144,61 @@ class JournalFileAttachmentViewModel extends StateNotifier<JournalFileAttachment
     String? s3Key,
     required String aesKey,
   }) async {
+    AppLogger.debug('JournalFileAttachmentVM: Starting download for file $fileId ($fileName)');
+    
     try {
       // Try offline first
+      AppLogger.debug('JournalFileAttachmentVM: Checking local file for $fileId');
       final localRes = await _offlineFileService.readLocalFile(fileId);
-      final localData = await localRes.when(success: (d) async => d, failure: (_) async => null);
+      final localData = await localRes.when(
+        success: (d) async => d, 
+        failure: (f) async {
+          AppLogger.debug('JournalFileAttachmentVM: Local file not found for $fileId: ${f.message}');
+          return null;
+        }
+      );
+      
       if (localData != null) {
+        AppLogger.debug('JournalFileAttachmentVM: Found local file for $fileId, size: ${localData.length} bytes');
         return localData;
       }
+      
       if (s3Key == null || s3Key.isEmpty) {
+        AppLogger.error('JournalFileAttachmentVM: No S3 key provided for file $fileId');
         return null;
       }
+      
       // Download from S3
+      AppLogger.debug('JournalFileAttachmentVM: Downloading from S3 for file $fileId, key: $s3Key');
       final accRes = await _accountRepository.getActiveAccount();
-      final account = await accRes.when(success: (a) async => a, failure: (_) async => null);
-      if (account == null) return null;
+      final account = await accRes.when(
+        success: (a) async => a, 
+        failure: (f) async {
+          AppLogger.error('JournalFileAttachmentVM: Failed to get active account for file $fileId: ${f.message}');
+          return null;
+        }
+      );
+      
+      if (account == null) {
+        AppLogger.error('JournalFileAttachmentVM: No active account found for file $fileId');
+        return null;
+      }
+      
       final s3 = S3StorageService(account: account);
       final dlRes = await s3.downloadFile(key: s3Key, isPrivate: false, symmetricKey: aesKey);
-      return await dlRes.when(success: (bytes) async => bytes, failure: (_) async => null);
-    } catch (_) {
+      
+      return await dlRes.when(
+        success: (bytes) async {
+          AppLogger.debug('JournalFileAttachmentVM: Successfully downloaded file $fileId from S3, size: ${bytes.length} bytes');
+          return bytes;
+        }, 
+        failure: (f) async {
+          AppLogger.error('JournalFileAttachmentVM: S3 download failed for file $fileId: ${f.message}');
+          return null;
+        }
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('JournalFileAttachmentVM: Unexpected error downloading file $fileId', e, stackTrace);
       return null;
     }
   }

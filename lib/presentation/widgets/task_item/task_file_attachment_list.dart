@@ -327,23 +327,36 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
     final s3Key = attachment['s3Key'] as String?;
     final encryptionKey = attachment['aesKey'] as String?;
 
+    AppLogger.debug('TaskFileAttachmentList: Starting download for file $fileId ($fileName)');
+
     if (encryptionKey == null) {
+      AppLogger.error('TaskFileAttachmentList: Missing encryption key for file $fileId');
       _showErrorSnackbar('Missing encryption key for file');
       return;
     }
 
-    // Call ViewModel to handle download and get file bytes
-    final downloadResult = await ref.read(taskFileAttachmentViewModelProvider(widget.task.uid).notifier)
-        .downloadFileBytes(
-          fileId: fileId,
-          fileName: fileName,
-          taskUid: widget.task.uid,
-          encryptionKey: encryptionKey,
-          s3Key: s3Key,
-        );
+    Uint8List? downloadResult;
+    try {
+      // Call ViewModel to handle download and get file bytes
+      downloadResult = await ref.read(taskFileAttachmentViewModelProvider(widget.task.uid).notifier)
+          .downloadFileBytes(
+            fileId: fileId,
+            fileName: fileName,
+            taskUid: widget.task.uid,
+            encryptionKey: encryptionKey,
+            s3Key: s3Key,
+          );
 
-    if (downloadResult == null) {
-      _showErrorSnackbar('Download failed');
+      if (downloadResult == null) {
+        AppLogger.error('TaskFileAttachmentList: Download returned null for file $fileId');
+        _showErrorSnackbar('Download failed');
+        return;
+      }
+
+      AppLogger.debug('TaskFileAttachmentList: Download successful, got ${downloadResult.length} bytes');
+    } catch (e, stackTrace) {
+      AppLogger.error('TaskFileAttachmentList: Download failed for file $fileId', e, stackTrace);
+      _showErrorSnackbar('Download failed: $e');
       return;
     }
 
@@ -358,7 +371,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
       try {
         // Actually write the file to the chosen location
         final saveFile = File(savePath);
-        await saveFile.writeAsBytes(downloadResult);
+        await saveFile.writeAsBytes(downloadResult!);
         _showSuccessSnackbar('File saved successfully');
       } catch (e) {
         AppLogger.error('TaskFileAttachmentList: Failed to save file', e);

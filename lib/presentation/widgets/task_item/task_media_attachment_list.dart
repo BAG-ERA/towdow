@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -282,16 +283,28 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
     final fileName = mediaAttachment['filename'] as String;
     final s3Key = mediaAttachment['s3Key'] as String?;
 
-    // Call ViewModel to handle download and get file bytes
-    final downloadResult = await ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier)
-        .downloadMediaFileBytes(
-          fileId: fileId,
-          fileName: fileName,
-          s3Key: s3Key,
-        );
+    AppLogger.debug('TaskMediaAttachmentList: Starting download for media file $fileId ($fileName)');
 
-    if (downloadResult == null) {
-      _showErrorSnackbar('Download failed');
+    Uint8List? downloadResult;
+    try {
+      // Call ViewModel to handle download and get file bytes
+      downloadResult = await ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier)
+          .downloadMediaFileBytes(
+            fileId: fileId,
+            fileName: fileName,
+            s3Key: s3Key,
+          );
+
+      if (downloadResult == null) {
+        AppLogger.error('TaskMediaAttachmentList: Download returned null for media file $fileId');
+        _showErrorSnackbar('Download failed');
+        return;
+      }
+
+      AppLogger.debug('TaskMediaAttachmentList: Download successful, got ${downloadResult.length} bytes');
+    } catch (e, stackTrace) {
+      AppLogger.error('TaskMediaAttachmentList: Download failed for media file $fileId', e, stackTrace);
+      _showErrorSnackbar('Download failed: $e');
       return;
     }
 

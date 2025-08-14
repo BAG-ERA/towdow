@@ -516,24 +516,39 @@ class _AttachmentRow extends ConsumerWidget {
   }
 
   Future<void> _downloadMediaFile(BuildContext context, WidgetRef ref, String fileId, String fileName, String s3Key, String aesKey) async {
+    AppLogger.debug('ProjectNoteView: Starting download for media file $fileId ($fileName)');
+
     if (aesKey.isEmpty) {
+      AppLogger.error('ProjectNoteView: Missing encryption key for media file $fileId');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Missing encryption key')),
       );
       return;
     }
 
-    final bytes = await ref.read(journalMediaAttachmentViewModelProvider(uid).notifier)
-        .downloadMediaFileBytes(
-          fileId: fileId,
-          fileName: fileName,
-          s3Key: s3Key.isEmpty ? null : s3Key,
-          aesKey: aesKey,
-        );
+    Uint8List? bytes;
+    try {
+      bytes = await ref.read(journalMediaAttachmentViewModelProvider(uid).notifier)
+          .downloadMediaFileBytes(
+            fileId: fileId,
+            fileName: fileName,
+            s3Key: s3Key.isEmpty ? null : s3Key,
+            aesKey: aesKey,
+          );
 
-    if (bytes == null) {
+      if (bytes == null) {
+        AppLogger.error('ProjectNoteView: Download returned null for media file $fileId');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download failed')),
+        );
+        return;
+      }
+
+      AppLogger.debug('ProjectNoteView: Media download successful, got ${bytes.length} bytes');
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectNoteView: Download failed for media file $fileId', e, stackTrace);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Download failed')),
+        SnackBar(content: Text('Download failed: $e')),
       );
       return;
     }
@@ -561,24 +576,39 @@ class _AttachmentRow extends ConsumerWidget {
   }
 
   Future<void> _downloadFile(BuildContext context, WidgetRef ref, String fileId, String fileName, String s3Key, String aesKey) async {
+    AppLogger.debug('ProjectNoteView: Starting download for file $fileId ($fileName)');
+
     if (aesKey.isEmpty) {
+      AppLogger.error('ProjectNoteView: Missing encryption key for file $fileId');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Missing encryption key')),
       );
       return;
     }
 
-    final bytes = await ref.read(journalFileAttachmentViewModelProvider(uid).notifier)
-        .downloadFileBytes(
-          fileId: fileId,
-          fileName: fileName,
-          s3Key: s3Key.isEmpty ? null : s3Key,
-          aesKey: aesKey,
-        );
+    Uint8List? bytes;
+    try {
+      bytes = await ref.read(journalFileAttachmentViewModelProvider(uid).notifier)
+          .downloadFileBytes(
+            fileId: fileId,
+            fileName: fileName,
+            s3Key: s3Key.isEmpty ? null : s3Key,
+            aesKey: aesKey,
+          );
 
-    if (bytes == null) {
+      if (bytes == null) {
+        AppLogger.error('ProjectNoteView: Download returned null for file $fileId');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download failed')),
+        );
+        return;
+      }
+
+      AppLogger.debug('ProjectNoteView: File download successful, got ${bytes.length} bytes');
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectNoteView: Download failed for file $fileId', e, stackTrace);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Download failed')),
+        SnackBar(content: Text('Download failed: $e')),
       );
       return;
     }
