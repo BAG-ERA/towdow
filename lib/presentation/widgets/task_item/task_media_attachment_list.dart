@@ -3,6 +3,7 @@
 // Follows MVVM architecture - UI logic delegated to TaskMediaAttachmentViewModel
 
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -299,11 +300,18 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
       dialogTitle: 'Save Media File',
       fileName: fileName,
       type: FileType.any,
-      bytes: downloadResult,
     );
 
     if (savePath != null) {
-      _showSuccessSnackbar('Media file saved successfully');
+      try {
+        // Actually write the file to the chosen location
+        final saveFile = File(savePath);
+        await saveFile.writeAsBytes(downloadResult);
+        _showSuccessSnackbar('Media file saved successfully');
+      } catch (e) {
+        AppLogger.error('TaskMediaAttachmentList: Failed to save file', e);
+        _showErrorSnackbar('Failed to save file: $e');
+      }
     }
   }
 

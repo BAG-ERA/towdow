@@ -441,16 +441,23 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
       return;
     }
 
-    // Show file picker dialog to choose save location with bytes for Android/iOS
+    // Show file picker dialog to choose save location
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Save Media File',
       fileName: fileName,
       type: FileType.any,
-      bytes: downloadResult, // Provide bytes for Android/iOS compatibility
     );
 
     if (savePath != null) {
-      _showSuccessSnackbar('Media file saved successfully');
+      try {
+        // Actually write the file to the chosen location
+        final saveFile = File(savePath);
+        await saveFile.writeAsBytes(downloadResult);
+        _showSuccessSnackbar('Media file saved successfully');
+      } catch (e) {
+        AppLogger.error('ValidatorMedia: Failed to save file', e);
+        _showErrorSnackbar('Failed to save file: $e');
+      }
     }
   }
 

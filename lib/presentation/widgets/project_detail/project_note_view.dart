@@ -15,6 +15,7 @@ import '../../widgets/utils/editable_title.dart';
 import '../../widgets/utils/enhanced_text_field.dart';
 import '../../../data/providers/providers_services_core.dart';
 import '../../../data/providers/providers.dart';
+import '../../../core/logger.dart';
 
 class ProjectNoteView extends ConsumerStatefulWidget {
   final Journal journal;
@@ -461,12 +462,21 @@ class _AttachmentRow extends ConsumerWidget {
                   dialogTitle: 'Save File',
                   fileName: fileName,
                   type: FileType.any,
-                  bytes: bytes,
                 );
                 if (savePath != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('File saved successfully')),
-                  );
+                  try {
+                    // Actually write the file to the chosen location
+                    final saveFile = File(savePath);
+                    await saveFile.writeAsBytes(bytes);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('File saved successfully')),
+                    );
+                  } catch (e) {
+                    AppLogger.error('ProjectNoteView: Failed to save file', e);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to save file: $e')),
+                    );
+                  }
                 }
               },
             ),

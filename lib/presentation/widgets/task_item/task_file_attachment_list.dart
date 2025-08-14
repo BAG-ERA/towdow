@@ -352,11 +352,18 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
       dialogTitle: 'Save File',
       fileName: fileName,
       type: FileType.any,
-      bytes: downloadResult, // Provide bytes for Android/iOS compatibility
     );
 
     if (savePath != null) {
-      _showSuccessSnackbar('File saved successfully');
+      try {
+        // Actually write the file to the chosen location
+        final saveFile = File(savePath);
+        await saveFile.writeAsBytes(downloadResult);
+        _showSuccessSnackbar('File saved successfully');
+      } catch (e) {
+        AppLogger.error('TaskFileAttachmentList: Failed to save file', e);
+        _showErrorSnackbar('Failed to save file: $e');
+      }
     }
   }
 
