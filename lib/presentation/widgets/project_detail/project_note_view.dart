@@ -16,6 +16,8 @@ import '../../widgets/utils/enhanced_text_field.dart';
 import '../../../data/providers/providers_services_core.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
+import '../utils/image_thumbnail.dart';
+import '../utils/full_screen_image_viewer.dart';
 
 class ProjectNoteView extends ConsumerStatefulWidget {
   final Journal journal;
@@ -399,22 +401,94 @@ class _AttachmentRow extends ConsumerWidget {
     final fileName = (data['filename'] ?? data['name'] ?? '').toString();
     final status = (data['status'] ?? '').toString();
     final kind = (data['kind'] ?? '').toString();
-    // final s3Key = (data['s3Key'] ?? '').toString();
-    // final fileId = (data['uri'] ?? '').toString();
-    // final aesKey = (data['aesKey'] ?? '').toString();
+    final s3Key = (data['s3Key'] ?? '').toString();
+    final fileId = (data['uri'] ?? '').toString();
+    final aesKey = (data['aesKey'] ?? '').toString();
 
-    IconData icon;
+    // Handle media attachments with ImageThumbnail
     if (kind == 'media') {
-      icon = Icons.perm_media;
-    } else {
-      icon = Icons.attach_file;
+      return _buildMediaAttachment(context, ref, fileName, status, s3Key, fileId, aesKey);
     }
 
+    // Handle file attachments
+    return _buildFileAttachment(context, ref, fileName, status, s3Key, fileId, aesKey);
+  }
+
+  Widget _buildMediaAttachment(BuildContext context, WidgetRef ref, String fileName, String status, String s3Key, String fileId, String aesKey) {
+    // Check if it's an image based on file extension
+    final isImage = _isImageFile(fileName);
+    
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Theme.of(context).colorScheme.secondary),
+          if (isImage)
+            // Use ImageThumbnail for image files
+            ImageThumbnail(
+              fileId: fileId,
+              fileName: fileName,
+              file: data,
+              taskUid: uid, // Using uid as taskUid for journal context
+              isLarge: false,
+              onTap: () => _showFullScreenImage(context, ref, fileId, fileName, s3Key),
+              onLoadImageData: () => ref.read(journalMediaAttachmentViewModelProvider(uid).notifier)
+                  .getImageData(
+                    fileId: fileId,
+                    fileName: fileName,
+                    s3Key: s3Key.isEmpty ? null : s3Key,
+                  ),
+            )
+          else
+            // Show icon for non-image media files
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                _getMediaIcon(fileName),
+                size: 24,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              fileName.isEmpty ? '(media)' : fileName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (status == 'local')
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.download, size: 16),
+              tooltip: 'Download',
+              onPressed: () => _downloadMediaFile(context, ref, fileId, fileName, s3Key, aesKey),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFileAttachment(BuildContext context, WidgetRef ref, String fileName, String status, String s3Key, String fileId, String aesKey) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(Icons.attach_file, size: 16, color: Theme.of(context).colorScheme.secondary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -434,55 +508,162 @@ class _AttachmentRow extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.download, size: 16),
               tooltip: 'Download',
-              onPressed: () async {
-                final s3Key = (data['s3Key'] ?? '').toString();
-                final aesKey = (data['aesKey'] ?? '').toString();
-                final fileId = (data['uri'] ?? '').toString();
-                final fileName = (data['filename'] ?? 'download').toString();
-                if (aesKey.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Missing encryption key')),
-                  );
-                  return;
-                }
-                final bytes = await ref.read(journalFileAttachmentViewModelProvider(uid).notifier)
-                    .downloadFileBytes(
-                  fileId: fileId,
-                  fileName: fileName,
-                  s3Key: s3Key.isEmpty ? null : s3Key,
-                  aesKey: aesKey,
-                );
-                if (bytes == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Download failed')),
-                  );
-                  return;
-                }
-                final savePath = await FilePicker.platform.saveFile(
-                  dialogTitle: 'Save File',
-                  fileName: fileName,
-                  type: FileType.any,
-                );
-                if (savePath != null) {
-                  try {
-                    // Actually write the file to the chosen location
-                    final saveFile = File(savePath);
-                    await saveFile.writeAsBytes(bytes);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('File saved successfully')),
-                    );
-                  } catch (e) {
-                    AppLogger.error('ProjectNoteView: Failed to save file', e);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to save file: $e')),
-                    );
-                  }
-                }
-              },
+              onPressed: () => _downloadFile(context, ref, fileId, fileName, s3Key, aesKey),
             ),
         ],
       ),
     );
+  }
+
+  Future<void> _downloadMediaFile(BuildContext context, WidgetRef ref, String fileId, String fileName, String s3Key, String aesKey) async {
+    if (aesKey.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Missing encryption key')),
+      );
+      return;
+    }
+
+    final bytes = await ref.read(journalMediaAttachmentViewModelProvider(uid).notifier)
+        .downloadMediaFileBytes(
+          fileId: fileId,
+          fileName: fileName,
+          s3Key: s3Key.isEmpty ? null : s3Key,
+          aesKey: aesKey,
+        );
+
+    if (bytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Download failed')),
+      );
+      return;
+    }
+
+    final savePath = await FilePicker.platform.saveFile(
+      dialogTitle: 'Save Media File',
+      fileName: fileName,
+      type: FileType.any,
+    );
+
+    if (savePath != null) {
+      try {
+        final saveFile = File(savePath);
+        await saveFile.writeAsBytes(bytes);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Media file saved successfully')),
+        );
+      } catch (e) {
+        AppLogger.error('ProjectNoteView: Failed to save media file', e);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save file: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadFile(BuildContext context, WidgetRef ref, String fileId, String fileName, String s3Key, String aesKey) async {
+    if (aesKey.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Missing encryption key')),
+      );
+      return;
+    }
+
+    final bytes = await ref.read(journalFileAttachmentViewModelProvider(uid).notifier)
+        .downloadFileBytes(
+          fileId: fileId,
+          fileName: fileName,
+          s3Key: s3Key.isEmpty ? null : s3Key,
+          aesKey: aesKey,
+        );
+
+    if (bytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Download failed')),
+      );
+      return;
+    }
+
+    final savePath = await FilePicker.platform.saveFile(
+      dialogTitle: 'Save File',
+      fileName: fileName,
+      type: FileType.any,
+    );
+
+    if (savePath != null) {
+      try {
+        final saveFile = File(savePath);
+        await saveFile.writeAsBytes(bytes);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File saved successfully')),
+        );
+      } catch (e) {
+        AppLogger.error('ProjectNoteView: Failed to save file', e);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save file: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showFullScreenImage(BuildContext context, WidgetRef ref, String fileId, String fileName, String s3Key) async {
+    final imageData = await ref.read(journalMediaAttachmentViewModelProvider(uid).notifier)
+        .getImageData(
+          fileId: fileId,
+          fileName: fileName,
+          s3Key: s3Key.isEmpty ? null : s3Key,
+        );
+
+    if (imageData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to load image')),
+      );
+      return;
+    }
+
+    if (context.mounted) {
+      showFullScreenImageViewer(
+        context: context,
+        imageData: imageData,
+        fileName: fileName,
+        onDownload: () {
+          Navigator.of(context).pop();
+          _downloadMediaFile(context, ref, fileId, fileName, s3Key, data['aesKey'] ?? '');
+        },
+      );
+    }
+  }
+
+  bool _isImageFile(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'tif'].contains(extension);
+  }
+
+  IconData _getMediaIcon(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
+    switch (extension) {
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'bmp':
+      case 'svg':
+      case 'webp':
+      case 'tiff':
+      case 'tif':
+        return Icons.image;
+      case 'mp4':
+      case 'avi':
+      case 'mov':
+      case 'wmv':
+      case 'flv':
+      case 'webm':
+      case 'mkv':
+      case '3gp':
+      case 'm4v':
+        return Icons.video_file;
+      default:
+        return Icons.perm_media;
+    }
   }
 }
 

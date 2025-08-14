@@ -4,8 +4,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/journal_repository.dart';
+import '../../data/repositories/account_repository.dart';
 import '../../data/services/storage/offline_file_service.dart';
 import '../../data/services/storage/file_upload_queue_service.dart';
+import '../../data/services/storage/s3_storage_service.dart';
 import '../../core/logger.dart';
 
 class JournalMediaAttachmentState {
@@ -27,14 +29,17 @@ class JournalMediaAttachmentViewModel extends StateNotifier<JournalMediaAttachme
   final JournalRepository _journalRepository;
   final OfflineFileService _offlineFileService;
   final FileUploadQueueService _fileUploadQueueService;
+  final AccountRepository _accountRepository;
 
   JournalMediaAttachmentViewModel({
     required JournalRepository journalRepository,
     required OfflineFileService offlineFileService,
     required FileUploadQueueService fileUploadQueueService,
+    required AccountRepository accountRepository,
   })  : _journalRepository = journalRepository,
         _offlineFileService = offlineFileService,
         _fileUploadQueueService = fileUploadQueueService,
+        _accountRepository = accountRepository,
         super(const JournalMediaAttachmentState());
 
   Future<bool> uploadMediaFile({
@@ -105,6 +110,68 @@ class JournalMediaAttachmentViewModel extends StateNotifier<JournalMediaAttachme
       return [];
     } catch (_) {
       return [];
+    }
+  }
+
+  /// Get image data for preview
+  Future<Uint8List?> getImageData({
+    required String fileId,
+    required String fileName,
+    String? s3Key,
+  }) async {
+    try {
+      // For image preview, we use the same logic as download but without state updates
+      final offlineFileResult = await _offlineFileService.getOfflineFile(fileId);
+      
+      return await offlineFileResult.when(
+        success: (offlineFile) async {
+          if (offlineFile != null) {
+            // Read file data from local path
+            final fileDataResult = await _offlineFileService.readLocalFile(fileId);
+            return await fileDataResult.when(
+              success: (fileData) async => fileData,
+              failure: (_) async => null,
+            );
+          }
+          return null;
+        },
+        failure: (failure) async {
+          AppLogger.debug('JournalMediaAttachmentViewModel: Failed to get image data: ${failure.message}');
+          return null;
+        },
+      );
+    } catch (e) {
+      AppLogger.debug('JournalMediaAttachmentViewModel: Error getting image data: $e');
+      return null;
+    }
+  }
+
+  /// Download media file bytes for platform-specific saving
+  Future<Uint8List?> downloadMediaFileBytes({
+    required String fileId,
+    required String fileName,
+    String? s3Key,
+    required String aesKey,
+  }) async {
+    try {
+      // Try offline first
+      final localRes = await _offlineFileService.readLocalFile(fileId);
+      final localData = await localRes.when(success: (d) async => d, failure: (_) async => null);
+      if (localData != null) {
+        return localData;
+      }
+      if (s3Key == null || s3Key.isEmpty) {
+        return null;
+      }
+      // Download from S3
+      final accRes = await _accountRepository.getActiveAccount();
+      final account = await accRes.when(success: (a) async => a, failure: (_) async => null);
+      if (account == null) return null;
+      final s3 = S3StorageService(account: account);
+      final dlRes = await s3.downloadFile(key: s3Key, isPrivate: false, symmetricKey: aesKey);
+      return await dlRes.when(success: (bytes) async => bytes, failure: (_) async => null);
+    } catch (_) {
+      return null;
     }
   }
 }
