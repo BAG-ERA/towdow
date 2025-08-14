@@ -218,6 +218,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final categoryRepository = ref.watch(categoryRepositoryProvider);
   final userRepository = ref.watch(userRepositoryProvider);
+  final journalRepository = ref.watch(journalRepositoryProvider);
   final localStorage = ref.watch(localStorageServiceProvider);
   final syncService = SyncService(
     taskRepository: taskRepository,
@@ -225,6 +226,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     calendarRepository: calendarRepository,
     categoryRepository: categoryRepository,
     userRepository: userRepository,
+    journalRepository: journalRepository,
     localStorage: localStorage,
   );
   // Best-effort injection without importing LocalTaskRepository type
@@ -233,6 +235,8 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     // dynamic call; will no-op if method not present
     // ignore: avoid_dynamic_calls
     (taskRepository as dynamic).setSyncService(syncService);
+    // ignore: avoid_dynamic_calls
+    (journalRepository as dynamic).setSyncService(syncService);
   } catch (_) {}
   return syncService;
 });

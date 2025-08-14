@@ -13,11 +13,13 @@ import '../../repositories/account_repository.dart';
 import '../../repositories/calendar_repository.dart';
 import '../../repositories/category_repository.dart';
 import '../../repositories/user_repository.dart';
+import '../../repositories/journal_repository.dart';
 import '../caldav/caldav_task_service.dart';
 import '../caldav/caldav_calendar_service.dart';
 import '../caldav/caldav_properties_service.dart';
 import '../caldav/caldav_service.dart';
 import '../caldav/caldav_discovery_service.dart';
+import '../caldav/caldav_journal_service.dart';
 import '../storage/local_storage_service.dart';
 import '../webdav_client.dart';
 import '../parsers/vtodo_parser.dart';
@@ -31,6 +33,9 @@ enum SyncOperation {
   createCalendar,
   deleteCalendar,
   exitShare,
+  createJournal,
+  updateJournal,
+  deleteJournal,
 }
 
 enum SyncStatus {
@@ -112,6 +117,7 @@ class SyncService implements SyncCommander {
   final CalendarRepository _calendarRepository;
   final CategoryRepository _categoryRepository;
   final UserRepository _userRepository;
+  final JournalRepository _journalRepository;
   final LocalStorageService _localStorage;
   // Note: _shareService is currently unused here; sharing updates handled elsewhere
   // ignore: unused_field
@@ -124,6 +130,7 @@ class SyncService implements SyncCommander {
     required CalendarRepository calendarRepository,
     required CategoryRepository categoryRepository,
     required UserRepository userRepository,
+    required JournalRepository journalRepository,
     required LocalStorageService localStorage,
     ShareService? shareService,
   })  : _taskRepository = taskRepository,
@@ -131,6 +138,7 @@ class SyncService implements SyncCommander {
         _calendarRepository = calendarRepository,
         _categoryRepository = categoryRepository,
         _userRepository = userRepository,
+        _journalRepository = journalRepository,
         _localStorage = localStorage,
         _shareService = shareService;
 
@@ -141,6 +149,7 @@ class SyncService implements SyncCommander {
     required CalendarRepository calendarRepository,
     required CategoryRepository categoryRepository,
     required UserRepository userRepository,
+    required JournalRepository journalRepository,
     required LocalStorageService localStorage,
     ShareService? shareService,
   }) {
@@ -150,6 +159,7 @@ class SyncService implements SyncCommander {
       calendarRepository: calendarRepository,
       categoryRepository: categoryRepository,
       userRepository: userRepository,
+      journalRepository: journalRepository,
       localStorage: localStorage,
       shareService: shareService,
     );
@@ -840,6 +850,97 @@ class SyncService implements SyncCommander {
           },
           failure: (failure) async {
             throw Exception('Failed to exit share: ${failure.message}');
+          },
+        );
+        break;
+
+      case SyncOperation.createJournal:
+        final journalUid = item.data['journalUid'] as String?;
+        final calendarPath = item.data['calendarPath'] as String?;
+
+        if (journalUid == null || calendarPath == null) {
+          AppLogger.warning('SyncService: Missing journalUid or calendarPath for journal creation');
+          throw Exception('Missing required data for journal creation');
+        }
+
+        final journalResult = await _journalRepository.getById(journalUid);
+        await journalResult.when(
+          success: (journal) async {
+            if (journal == null) {
+              throw Exception('Journal not found in repository: $journalUid');
+            }
+
+            final caldavJournal = CalDavJournalService(account: caldavTask.account);
+            final result = await caldavJournal.createJournal(journal, calendarPath);
+            await result.when(
+              success: (_) async {
+                AppLogger.debug('SyncService: Successfully created journal on server: $journalUid');
+              },
+              failure: (failure) async {
+                throw Exception('Failed to create journal: ${failure.message}');
+              },
+            );
+          },
+          failure: (failure) async {
+            AppLogger.warning('SyncService: Could not find journal $journalUid for creation');
+            throw Exception('Journal not found for creation: ${failure.message}');
+          },
+        );
+        break;
+
+      case SyncOperation.updateJournal:
+        final journalUid = item.data['journalUid'] as String?;
+        final calendarPath = item.data['calendarPath'] as String?;
+
+        if (journalUid == null || calendarPath == null) {
+          AppLogger.warning('SyncService: Missing journalUid or calendarPath for journal update');
+          throw Exception('Missing required data for journal update');
+        }
+
+        final journalResult = await _journalRepository.getById(journalUid);
+        await journalResult.when(
+          success: (journal) async {
+            if (journal == null) {
+              throw Exception('Journal not found in repository: $journalUid');
+            }
+
+            final journalUrl = '${calendarPath}${journalUid}.ics';
+            final caldavJournal = CalDavJournalService(account: caldavTask.account);
+            final result = await caldavJournal.updateJournal(journal, journalUrl);
+            await result.when(
+              success: (_) async {
+                AppLogger.debug('SyncService: Successfully updated journal on server: $journalUid');
+              },
+              failure: (failure) async {
+                throw Exception('Failed to update journal: ${failure.message}');
+              },
+            );
+          },
+          failure: (failure) async {
+            AppLogger.warning('SyncService: Could not find journal $journalUid for update');
+            throw Exception('Journal not found for update: ${failure.message}');
+          },
+        );
+        break;
+
+      case SyncOperation.deleteJournal:
+        final journalUid = item.data['journalUid'] as String?;
+        final calendarPath = item.data['calendarPath'] as String?;
+
+        if (journalUid == null || calendarPath == null) {
+          AppLogger.warning('SyncService: Missing journalUid or calendarPath for journal deletion');
+          throw Exception('Missing required data for journal deletion');
+        }
+
+        final journalUrl = '${calendarPath}${journalUid}.ics';
+        final caldavJournal = CalDavJournalService(account: caldavTask.account);
+        final result = await caldavJournal.deleteJournal(journalUrl);
+        await result.when(
+          success: (_) async {
+            AppLogger.debug('SyncService: Successfully deleted journal from server: $journalUid');
+          },
+          failure: (failure) async {
+            throw Exception('Failed to delete journal: ${failure.message}');
           },
         );
         break;
