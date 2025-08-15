@@ -448,10 +448,11 @@ class FileUploadQueueService {
       // Create S3 service
       final s3Service = S3StorageService(account: account);
       
-      // Generate S3 key
+      // Generate S3 key with unique filename to prevent conflicts
       final userPrefix = s3Service.getUserPrefix();
       final sanitizedFileName = _sanitizeFileName(offlineFile.fileName);
-      final s3Key = '$userPrefix${offlineFile.taskUid}/$sanitizedFileName';
+      final uniqueFileName = generateUniqueFileName(sanitizedFileName, offlineFile.id);
+      final s3Key = '$userPrefix${offlineFile.taskUid}/$uniqueFileName';
       AppLogger.debug('FQS._uploadFile: bucket=shared s3Key=$s3Key contentType=${offlineFile.contentType}');
       
       // Upload to S3 with encryption
@@ -480,6 +481,29 @@ class FileUploadQueueService {
         stackTrace: stackTrace,
       ));
     }
+  }
+
+  /// Generate a unique filename to prevent S3 key conflicts
+  /// Uses the offline file ID to ensure uniqueness while keeping the original filename readable
+  String generateUniqueFileName(String originalFileName, String offlineFileId) {
+    // Extract file extension
+    final lastDotIndex = originalFileName.lastIndexOf('.');
+    String nameWithoutExtension;
+    String extension;
+    
+    if (lastDotIndex > 0) {
+      nameWithoutExtension = originalFileName.substring(0, lastDotIndex);
+      extension = originalFileName.substring(lastDotIndex);
+    } else {
+      nameWithoutExtension = originalFileName;
+      extension = '';
+    }
+    
+    // Use first 8 characters of offline file ID as unique suffix
+    final uniqueSuffix = offlineFileId.substring(0, 8);
+    
+    // Combine: original_name_uuid.ext
+    return '${nameWithoutExtension}_$uniqueSuffix$extension';
   }
 
   /// Update task validator with S3 info
@@ -598,85 +622,7 @@ class FileUploadQueueService {
       return null;
     }
   }
-
-  /// Update journal attachments with S3 info
-  // TODO: remove unused legacy helper once references are fully migrated
-  Journal? _updateJournalAttachmentsWithS3Info(Journal journal, OfflineFile offlineFile, Map<String, String> s3Info) {
-    try {
-      if (journal.attachments.isEmpty || journal.attachments == '[]') {
-        return null;
-      }
-      final decoded = jsonDecode(journal.attachments);
-      if (decoded is! List) {
-        return null;
-      }
-      bool changed = false;
-      final updated = decoded.map<Map<String, dynamic>>((att) {
-        if (att is Map<String, dynamic>) {
-          final uri = att['uri'] as String?;
-          if (uri == offlineFile.id) {
-            changed = true;
-            return {
-              ...att,
-              's3Key': s3Info['s3Key'],
-              's3Url': s3Info['s3Url'],
-              'status': 'uploaded',
-              'createdAt': att['createdAt'] ?? DateTime.now().toIso8601String(),
-            };
-          }
-        }
-        return att is Map<String, dynamic> ? att : <String, dynamic>{};
-      }).toList();
-      if (!changed) return null;
-      return journal.copyWith(
-        attachments: jsonEncode(updated),
-        lastModified: DateTime.now(),
-      );
-    } catch (e, st) {
-      AppLogger.error('FileUploadQueueService: Failed to update journal attachments with S3 info', e, st);
-      return null;
-    }
-  }
-
-  /// Update journal media attachments with S3 info
-  // TODO: remove unused legacy helper once references are fully migrated
-  Journal? _updateJournalMediaAttachmentsWithS3Info(Journal journal, OfflineFile offlineFile, Map<String, String> s3Info) {
-    try {
-      if (journal.mediaAttachments.isEmpty || journal.mediaAttachments == '[]') {
-        return null;
-      }
-      final decoded = jsonDecode(journal.mediaAttachments);
-      if (decoded is! List) {
-        return null;
-      }
-      bool changed = false;
-      final updated = decoded.map<Map<String, dynamic>>((att) {
-        if (att is Map<String, dynamic>) {
-          final uri = att['uri'] as String?;
-          if (uri == offlineFile.id) {
-            changed = true;
-            return {
-              ...att,
-              's3Key': s3Info['s3Key'],
-              's3Url': s3Info['s3Url'],
-              'status': 'uploaded',
-              'uploadedAt': att['uploadedAt'] ?? DateTime.now().toIso8601String(),
-            };
-          }
-        }
-        return att is Map<String, dynamic> ? att : <String, dynamic>{};
-      }).toList();
-      if (!changed) return null;
-      return journal.copyWith(
-        mediaAttachments: jsonEncode(updated),
-        lastModified: DateTime.now(),
-      );
-    } catch (e, st) {
-      AppLogger.error('FileUploadQueueService: Failed to update journal mediaAttachments with S3 info', e, st);
-      return null;
-    }
-  }
-
+ 
   /// Get queue status
   Future<Result<Map<String, dynamic>>> getQueueStatus() async {
     try {
