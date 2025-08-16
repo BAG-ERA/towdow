@@ -1,10 +1,11 @@
 // VJOURNAL parser for CalDAV operations
 // Centralizes all VJOURNAL serialization and parsing logic including attendee and attachments handling
 
-import 'dart:convert';
 import '../../../core/logger.dart';
 import '../../models/journal.dart';
 import '../../models/attendee.dart';
+import '../../models/attachment.dart';
+import 'attachment_parser.dart';
 
 class VJournalParser {
   /// Convert FlowIt Journal to iCalendar VJOURNAL format - RFC 5545
@@ -40,15 +41,16 @@ class VJournalParser {
     }
 
     // Attachments (RFC 5545 ATTACH with FlowIt extensions)
-    final attachments = _parseAttachments(journal.attachments);
-    for (final attachment in attachments) {
-      vcal.writeln(_serializeAttachment(attachment));
+    final allAttachments = AttachmentParser.parseAttachmentsFromJson(journal.attachments);
+    final mediaAttachments = AttachmentParser.parseAttachmentsFromJson(journal.mediaAttachments);
+    
+    // Serialize all attachments using unified parser
+    for (final attachment in allAttachments) {
+      vcal.writeln(AttachmentParser.serializeAttachment(attachment));
     }
-
-    // Media Attachments
-    final mediaAttachments = _parseAttachments(journal.mediaAttachments);
-    for (final media in mediaAttachments) {
-      vcal.writeln(_serializeMediaAttachment(media));
+    
+    for (final attachment in mediaAttachments) {
+      vcal.writeln(AttachmentParser.serializeAttachment(attachment));
     }
 
     // FlowIt-specific extensions
@@ -73,8 +75,8 @@ class VJournalParser {
       DateTime? created, lastModified;
       List<String> categories = [];
       List<Attendee> attendees = [];
-      List<Map<String, dynamic>> attachments = [];
-      List<Map<String, dynamic>> mediaAttachments = [];
+      List<Attachment> attachments = [];
+      List<Attachment> mediaAttachments = [];
 
       for (final line in lines) {
         if (line.startsWith('UID:')) {
@@ -105,10 +107,9 @@ class VJournalParser {
             }
           }
         } else if (line.startsWith('ATTACH:') || line.startsWith('ATTACH;')) {
-          final attachment = _parseAttachment(line);
+          final attachment = AttachmentParser.parseAttachment(line);
           if (attachment != null) {
-            final attachType = attachment['attachType'] as String?;
-            if (attachType == 'media') {
+            if (attachment.type == AttachmentType.media) {
               mediaAttachments.add(attachment);
             } else {
               attachments.add(attachment);
@@ -127,8 +128,8 @@ class VJournalParser {
           dtstamp: DateTime.now(),
           organizer: organizer,
           categoryIds: categories,
-          attachments: _serializeAttachments(attachments),
-          mediaAttachments: _serializeAttachments(mediaAttachments),
+          attachments: AttachmentParser.serializeAttachmentsToJson(attachments),
+          mediaAttachments: AttachmentParser.serializeAttachmentsToJson(mediaAttachments),
           attendees: attendees,
         );
       }
@@ -295,100 +296,7 @@ class VJournalParser {
     }
   }
 
-  static Map<String, dynamic>? _parseAttachment(String line) {
-    try {
-      final colonIndex = line.indexOf(':');
-      if (colonIndex == -1) return null;
-      final parametersPart = line.substring(0, colonIndex);
-      final valuePart = line.substring(colonIndex + 1);
-      final uri = valuePart.trim();
-      if (uri.isEmpty) return null;
-      final parameters = <String, String>{};
-      if (parametersPart.contains(';')) {
-        final paramList = parametersPart.split(';').skip(1);
-        for (final param in paramList) {
-          final equalIndex = param.indexOf('=');
-          if (equalIndex > 0) {
-            final key = param.substring(0, equalIndex).trim().toUpperCase();
-            final value = param.substring(equalIndex + 1).trim();
-            parameters[key] = _unescapeCalendarText(value.replaceAll('"', ''));
-          }
-        }
-      }
-      final attachment = <String, dynamic>{'uri': uri};
-      if (parameters['FILENAME'] != null) attachment['filename'] = parameters['FILENAME'];
-      if (parameters['FMTTYPE'] != null) attachment['fmttype'] = parameters['FMTTYPE'];
-      if (parameters['SIZE'] != null) {
-        final size = int.tryParse(parameters['SIZE']!);
-        if (size != null) attachment['size'] = size;
-      }
-      if (parameters['X-FLOWIT-ATTACHTYPE'] != null) attachment['attachType'] = parameters['X-FLOWIT-ATTACHTYPE'];
-      if (parameters['X-FLOWIT-AESKEY'] != null) attachment['aesKey'] = parameters['X-FLOWIT-AESKEY'];
-      if (parameters['X-FLOWIT-MEDIATYPE'] != null) attachment['mediaType'] = parameters['X-FLOWIT-MEDIATYPE'];
-      return attachment;
-    } catch (e) {
-      AppLogger.error('VJournalParser: Failed to parse attachment line: $line', e, StackTrace.current);
-      return null;
-    }
-  }
 
-  static String _serializeAttachment(Map<String, dynamic> attachment) {
-    final parameters = <String>[];
-    final uri = attachment['uri'] as String? ?? '';
-    final attachType = attachment['attachType'] as String?;
-    if (attachType != null) parameters.add('X-FLOWIT-ATTACHTYPE=$attachType');
-    final aesKey = attachment['aesKey'] as String?;
-    if (aesKey != null) parameters.add('X-FLOWIT-AESKEY=$aesKey');
-    final filename = attachment['filename'] as String?;
-    if (filename != null) parameters.add('FILENAME=${_escapeCalendarText(filename)}');
-    final fmttype = attachment['fmttype'] as String?;
-    if (fmttype != null) parameters.add('FMTTYPE=$fmttype');
-    final size = attachment['size'] as int?;
-    if (size != null) parameters.add('SIZE=$size');
-    final paramString = parameters.isNotEmpty ? ';${parameters.join(';')}' : '';
-    return 'ATTACH$paramString:$uri';
-  }
-
-  static String _serializeMediaAttachment(Map<String, dynamic> attachment) {
-    final parameters = <String>[];
-    final uri = attachment['uri'] as String? ?? '';
-    parameters.add('X-FLOWIT-ATTACHTYPE=media');
-    final aesKey = attachment['aesKey'] as String?;
-    if (aesKey != null) parameters.add('X-FLOWIT-AESKEY=$aesKey');
-    final mediaType = attachment['mediaType'] as String?;
-    if (mediaType != null) parameters.add('X-FLOWIT-MEDIATYPE=$mediaType');
-    final filename = attachment['filename'] as String?;
-    if (filename != null) parameters.add('FILENAME=${_escapeCalendarText(filename)}');
-    final fmttype = attachment['fmttype'] as String?;
-    if (fmttype != null) parameters.add('FMTTYPE=$fmttype');
-    final size = attachment['size'] as int?;
-    if (size != null) parameters.add('SIZE=$size');
-    final paramString = parameters.isNotEmpty ? ';${parameters.join(';')}' : '';
-    return 'ATTACH$paramString:$uri';
-  }
-
-  static List<Map<String, dynamic>> _parseAttachments(String attachmentsJson) {
-    try {
-      if (attachmentsJson.isEmpty || attachmentsJson == '[]') return [];
-      final decoded = jsonDecode(attachmentsJson);
-      if (decoded is List) {
-        return decoded.map<Map<String, dynamic>>((a) => a is Map<String, dynamic> ? a : <String, dynamic>{}).toList();
-      }
-      return [];
-    } catch (e) {
-      AppLogger.error('VJournalParser: Failed to parse attachments JSON', e, StackTrace.current);
-      return [];
-    }
-  }
-
-  static String _serializeAttachments(List<Map<String, dynamic>> attachments) {
-    try {
-      return jsonEncode(attachments);
-    } catch (e) {
-      AppLogger.error('VJournalParser: Failed to serialize attachments', e, StackTrace.current);
-      return '[]';
-    }
-  }
 }
 
 
