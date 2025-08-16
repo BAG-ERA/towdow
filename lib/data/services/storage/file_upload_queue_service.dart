@@ -17,6 +17,7 @@ import 'offline_file_service.dart';
 import 's3_storage_service.dart';
 import '../sync/connection_monitor_service.dart';
 import '../sync/sync_service.dart';
+import '../validator_service.dart';
 // validator_service is no longer used here after generic VObjectService update
 import '../vobject_service.dart';
 
@@ -513,24 +514,78 @@ class FileUploadQueueService {
       AppLogger.debug('FileUploadQueueService: OfflineFile ID: ${offlineFile.id}, ValidatorId: ${offlineFile.validatorId}');
       AppLogger.debug('FileUploadQueueService: S3 Info: $s3Info');
       
-      final service = _vobjectService ?? VObjectService(taskRepository: _taskRepository, journalRepository: _journalRepository!);
-      final updateRes = await service.updateWithS3Info(offlineFile, s3Info);
-      await updateRes.when(
-        success: (info) async {
-          if (!info.updated) return;
-          if (info.type == VObjectType.task) {
-            await _syncService.queueSyncOperation(
-              SyncOperation.update,
-              offlineFile.taskUid,
-              {
-                'taskUid': offlineFile.taskUid,
-                'calendarPath': info.projectPath,
+      // Get the task from repository
+      final taskResult = await _taskRepository.getById(offlineFile.taskUid);
+      await taskResult.when(
+        success: (task) async {
+          if (task == null) {
+            AppLogger.error('FileUploadQueueService: Task not found for uid: ${offlineFile.taskUid}');
+            return;
+          }
+          
+          AppLogger.debug('FileUploadQueueService: Found task, current attachments: ${task.attachments}');
+          AppLogger.debug('FileUploadQueueService: Found task, current mediaAttachments: ${task.mediaAttachments}');
+          
+          Task? updatedTask;
+          
+          if (offlineFile.validatorId != null) {
+            // Update validator
+            AppLogger.debug('FileUploadQueueService: Updating validator ${offlineFile.validatorId}');
+            final validatorLists = ValidatorService.parseValidators(task.flowitValidator);
+            final updateData = {
+              'type': 'update_file_s3',
+              'offlineFileId': offlineFile.id,
+              's3Key': s3Info['s3Key'],
+              's3Url': s3Info['s3Url'],
+              'status': 'uploaded',
+              'removeOfflineRef': true,
+            };
+            final updatedValidatorLists = ValidatorService.updateValidatorState(
+              validatorLists,
+              offlineFile.validatorId!,
+              updateData,
+            );
+            final newValidatorString = ValidatorService.serializeValidators(updatedValidatorLists);
+            updatedTask = task.copyWith(
+              flowitValidator: newValidatorString,
+              lastModified: DateTime.now(),
+            );
+            AppLogger.debug('FileUploadQueueService: Validator updated successfully');
+          } else {
+            // Update regular attachments
+            AppLogger.debug('FileUploadQueueService: Updating regular attachments');
+            updatedTask = _updateTaskAttachmentsWithS3Info(task, offlineFile, s3Info);
+            if (updatedTask == null) {
+              updatedTask = _updateTaskMediaAttachmentsWithS3Info(task, offlineFile, s3Info);
+            }
+          }
+          
+          if (updatedTask != null) {
+            AppLogger.info('FileUploadQueueService: Saving updated task');
+            final saveResult = await _taskRepository.save(updatedTask);
+            await saveResult.when(
+              success: (_) async {
+                AppLogger.info('FileUploadQueueService: Task updated with S3 info successfully');
+                // Queue sync operation
+                await _syncService.queueSyncOperation(
+                  SyncOperation.update,
+                  updatedTask!.uid,
+                  {
+                    'taskUid': updatedTask.uid,
+                    'calendarPath': updatedTask.projectPath,
+                  },
+                );
+              },
+              failure: (f) async {
+                AppLogger.error('FileUploadQueueService: Failed to save updated task: ${f.message}');
               },
             );
+          } else {
+            AppLogger.warning('FileUploadQueueService: No updates made to task');
           }
         },
         failure: (f) async {
-          AppLogger.error('FileUploadQueueService: VObject update failed: ${f.message}');
+          AppLogger.error('FileUploadQueueService: Failed to get task: ${f.message}');
         },
       );
     } catch (e, stackTrace) {

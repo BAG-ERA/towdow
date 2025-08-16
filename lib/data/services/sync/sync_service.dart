@@ -1440,7 +1440,7 @@ class SyncService implements SyncCommander {
               await _processSyncQueueItem(item, caldavTask);
               // Remove from queue on success
               await _localStorage.delete(syncQueueBoxName, item.id);
-              AppLogger.debug('🔄 SyncService: Successfully processed and removed queue item ${item.id}');
+              AppLogger.debug('🔄 SyncService: Successfully processed and removed queue item ${item.  id}');
             } catch (e) {
               AppLogger.error('SyncService: Failed to process queue item ${item.id}', e, StackTrace.current);
               AppLogger.error('SyncService: Failed to process queue item data : ${item.data}');

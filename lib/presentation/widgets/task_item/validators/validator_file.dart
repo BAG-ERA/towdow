@@ -300,7 +300,7 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
           fileId: fileId,
           fileName: fileName,
           validatorId: validatorId,
-          s3Key: s3Key, // Optional for offline files
+          s3Key: s3Key ?? '', // Provide empty string if s3Key is null
         );
 
     if (downloadResult == null) {

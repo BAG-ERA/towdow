@@ -75,106 +75,131 @@ class VObjectService {
   Future<Result<VObjectUpdateResult>> updateWithS3Info(OfflineFile offlineFile, Map<String, String> s3Info) async {
     try {
       final uid = offlineFile.taskUid; // vobject uid (task or journal)
+      
       final objRes = await getByUid(uid);
       final vobj = await objRes.when(success: (o) async => o, failure: (_) async => null);
       if (vobj == null) {
-        AppLogger.error('VObjectService: VObject not found for uid=$uid');
-        return Result.success(VObjectUpdateResult(updated: false, uid: uid));
+        AppLogger.error('VObjectService.updateWithS3Info: VObject not found for uid: $uid');
+        return Result.failure(Failure(
+          message: 'VObject not found for uid: $uid',
+          exception: Exception('VObject not found'),
+        ));
       }
 
       if (vobj.type == VObjectType.task) {
-        final task = vobj.task!;
-        Task updatedTask = task;
-        bool hasUpdates = false;
-
-        if (offlineFile.validatorId != null) {
-          final validatorLists = ValidatorService.parseValidators(task.flowitValidator);
-          final updateData = {
-            'type': 'update_file_s3',
-            'offlineFileId': offlineFile.id,
-            's3Key': s3Info['s3Key'],
-            's3Url': s3Info['s3Url'],
-            'status': 'uploaded',
-            'removeOfflineRef': true,
-          };
-          final updatedValidatorLists = ValidatorService.updateValidatorState(
-            validatorLists,
-            offlineFile.validatorId!,
-            updateData,
-          );
-          final newValidatorString = ValidatorService.serializeValidators(updatedValidatorLists);
-          updatedTask = updatedTask.copyWith(
-            flowitValidator: newValidatorString,
-            lastModified: DateTime.now(),
-          );
-          hasUpdates = true;
-        } else {
-          final a1 = _updateAttachmentsJson(updatedTask.attachments, offlineFile.id, s3Info);
-          if (a1 != null) {
-            updatedTask = updatedTask.copyWith(attachments: a1, lastModified: DateTime.now());
-            hasUpdates = true;
-          } else {
-            final a2 = _updateAttachmentsJson(updatedTask.mediaAttachments, offlineFile.id, s3Info);
-            if (a2 != null) {
-              updatedTask = updatedTask.copyWith(mediaAttachments: a2, lastModified: DateTime.now());
-              hasUpdates = true;
-            }
-          }
-        }
-
-        if (!hasUpdates) {
-          return Result.success(VObjectUpdateResult(updated: false, uid: uid, type: VObjectType.task, projectPath: task.projectPath));
-        }
-
-        final saveRes = await _taskRepository.save(updatedTask);
-        return await saveRes.when(
-          success: (_) async => Result.success(VObjectUpdateResult(updated: true, uid: uid, type: VObjectType.task, projectPath: updatedTask.projectPath)),
-          failure: (f) async => Result.failure(f),
-        );
-      }
-
-      // Journal
-      final journal = vobj.journal!;
-      bool changed = false;
-      final j1 = _updateAttachmentsJson(journal.attachments, offlineFile.id, s3Info);
-      String attachments = journal.attachments;
-      String mediaAttachments = journal.mediaAttachments;
-      if (j1 != null) {
-        attachments = j1;
-        changed = true;
+        return await _updateTaskWithS3Info(vobj.task!, offlineFile, s3Info);
+      } else if (vobj.type == VObjectType.journal) {
+        return await _updateJournalWithS3Info(vobj.journal!, offlineFile, s3Info);
       } else {
-        final j2 = _updateAttachmentsJson(journal.mediaAttachments, offlineFile.id, s3Info);
-        if (j2 != null) {
-          mediaAttachments = j2;
-          changed = true;
-        }
+        AppLogger.error('VObjectService.updateWithS3Info: Unknown VObject type for uid: $uid');
+        return Result.failure(Failure(
+          message: 'Unknown VObject type for uid: $uid',
+          exception: Exception('Unknown VObject type'),
+        ));
       }
+    } catch (e, stackTrace) {
+      AppLogger.error('VObjectService.updateWithS3Info: Exception during update', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Exception during S3 info update: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
 
-      if (!changed) {
-        return Result.success(VObjectUpdateResult(updated: false, uid: uid, type: VObjectType.journal, projectPath: journal.projectPath));
-      }
+  Future<Result<VObjectUpdateResult>> _updateTaskWithS3Info(Task task, OfflineFile offlineFile, Map<String, String> s3Info) async {
+    Task updatedTask = task;
+    bool hasUpdates = false;
 
-      final updatedJournal = journal.copyWith(
-        attachments: attachments,
-        mediaAttachments: mediaAttachments,
+    if (offlineFile.validatorId != null) {
+      final validatorLists = ValidatorService.parseValidators(task.flowitValidator);
+      final updateData = {
+        'type': 'update_file_s3',
+        'offlineFileId': offlineFile.id,
+        's3Key': s3Info['s3Key'],
+        's3Url': s3Info['s3Url'],
+        'status': 'uploaded',
+        'removeOfflineRef': true,
+      };
+      final updatedValidatorLists = ValidatorService.updateValidatorState(
+        validatorLists,
+        offlineFile.validatorId!,
+        updateData,
+      );
+      final newValidatorString = ValidatorService.serializeValidators(updatedValidatorLists);
+      updatedTask = updatedTask.copyWith(
+        flowitValidator: newValidatorString,
         lastModified: DateTime.now(),
       );
-      final saveRes = await _journalRepository.save(updatedJournal);
-      return await saveRes.when(
-        success: (_) async => Result.success(VObjectUpdateResult(updated: true, uid: uid, type: VObjectType.journal, projectPath: updatedJournal.projectPath)),
-        failure: (f) async => Result.failure(f),
-      );
-    } catch (e, st) {
-      AppLogger.error('VObjectService: updateWithS3Info failed', e, st);
-      return Result.failure(Failure(message: 'updateWithS3Info failed: $e', exception: e is Exception ? e : Exception('$e'), stackTrace: st));
+      hasUpdates = true;
+    } else {
+      final a1 = _updateAttachmentsJson(updatedTask.attachments, offlineFile.id, s3Info);
+      if (a1 != null) {
+        updatedTask = updatedTask.copyWith(attachments: a1, lastModified: DateTime.now());
+        hasUpdates = true;
+      } else {
+        final a2 = _updateAttachmentsJson(updatedTask.mediaAttachments, offlineFile.id, s3Info);
+        if (a2 != null) {
+          updatedTask = updatedTask.copyWith(mediaAttachments: a2, lastModified: DateTime.now());
+          hasUpdates = true;
+        }
+      }
     }
+
+    if (!hasUpdates) {
+      return Result.success(VObjectUpdateResult(updated: false, uid: task.uid, type: VObjectType.task, projectPath: task.projectPath));
+    }
+
+    final saveRes = await _taskRepository.save(updatedTask);
+    return await saveRes.when(
+      success: (_) async => Result.success(VObjectUpdateResult(updated: true, uid: task.uid, type: VObjectType.task, projectPath: updatedTask.projectPath)),
+      failure: (f) async => Result.failure(f),
+    );
+  }
+
+  Future<Result<VObjectUpdateResult>> _updateJournalWithS3Info(Journal journal, OfflineFile offlineFile, Map<String, String> s3Info) async {
+    bool changed = false;
+    final j1 = _updateAttachmentsJson(journal.attachments, offlineFile.id, s3Info);
+    String attachments = journal.attachments;
+    String mediaAttachments = journal.mediaAttachments;
+    if (j1 != null) {
+      attachments = j1;
+      changed = true;
+    } else {
+      final j2 = _updateAttachmentsJson(journal.mediaAttachments, offlineFile.id, s3Info);
+      if (j2 != null) {
+        mediaAttachments = j2;
+        changed = true;
+      }
+    }
+
+    if (!changed) {
+      return Result.success(VObjectUpdateResult(updated: false, uid: journal.uid, type: VObjectType.journal, projectPath: journal.projectPath));
+    }
+
+    final updatedJournal = journal.copyWith(
+      attachments: attachments,
+      mediaAttachments: mediaAttachments,
+      lastModified: DateTime.now(),
+    );
+    final saveRes = await _journalRepository.save(updatedJournal);
+    return await saveRes.when(
+      success: (_) async => Result.success(VObjectUpdateResult(updated: true, uid: journal.uid, type: VObjectType.journal, projectPath: updatedJournal.projectPath)),
+      failure: (f) async => Result.failure(f),
+    );
   }
 
   String? _updateAttachmentsJson(String jsonList, String offlineId, Map<String, String> s3Info) {
     try {
-      if (jsonList.isEmpty || jsonList == '[]') return null;
+      if (jsonList.isEmpty || jsonList == '[]') {
+        return null;
+      }
+      
       final decoded = jsonDecode(jsonList);
-      if (decoded is! List) return null;
+      if (decoded is! List) {
+        return null;
+      }
+      
       bool changed = false;
       final updated = decoded.map<Map<String, dynamic>>((att) {
         if (att is Map<String, dynamic>) {
@@ -186,15 +211,20 @@ class VObjectService {
               's3Key': s3Info['s3Key'],
               's3Url': s3Info['s3Url'],
               'status': 'uploaded',
-              'uploadedAt': att['uploadedAt'] ?? DateTime.now().toIso8601String(),
+              'createdAt': att['createdAt'] ?? DateTime.now().toIso8601String(),
             };
           }
         }
         return att is Map<String, dynamic> ? att : <String, dynamic>{};
       }).toList();
-      if (!changed) return null;
+      
+      if (!changed) {
+        return null;
+      }
+      
       return jsonEncode(updated);
-    } catch (_) {
+    } catch (e, stackTrace) {
+      AppLogger.error('VObjectService._updateAttachmentsJson: Exception during update', e, stackTrace);
       return null;
     }
   }

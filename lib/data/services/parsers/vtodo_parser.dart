@@ -452,11 +452,22 @@ class VTODOParser {
     if (size != null) {
       parameters.add('SIZE=$size');
     }
+    final s3Key = attachment['s3Key'] as String?;
+    if (s3Key != null) {
+      parameters.add('X-FLOWIT-S3KEY=$s3Key');
+    }
+
+    final s3Url = attachment['s3Url'] as String?;
+    if (s3Url != null) {
+      parameters.add('X-FLOWIT-S3URL=$s3Url');
+    }
     
     // Build the ATTACH line
     final paramString = parameters.isNotEmpty ? ';${parameters.join(';')}' : '';
     return 'ATTACH$paramString:$uri';
   }
+
+  
   
   /// Serialize a media attachment object to RFC 5545 ATTACH line with FlowIt media extensions
   static String _serializeMediaAttachment(Map<String, dynamic> attachment) {

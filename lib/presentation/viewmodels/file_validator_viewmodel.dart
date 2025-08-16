@@ -244,7 +244,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
     required String fileId,
     required String fileName,
     required String validatorId,
-    String? s3Key,
+    required String s3Key,
   }) async {
     state = state.copyWith(
       isDownloading: true,
@@ -266,13 +266,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
           return data;
         },
         failure: (failure) async {
-          // If local file not found, try to download from S3
-          if (s3Key != null) {
-            AppLogger.debug('FileValidatorViewModel: Local file not found, trying S3 download');
-            return await _downloadFromS3(s3Key, validatorId);
-          } else {
-            throw Exception('File not available locally and no S3 key provided');
-          }
+          throw Exception('File not available locally and no S3 key provided');
         },
       );
 
