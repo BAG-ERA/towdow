@@ -9,9 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/attachment.dart';
 import '../../../data/providers/providers_project.dart';
 import '../../../data/providers/providers_viewmodels.dart';
-import '../../viewmodels/task_media_attachment_viewmodel.dart';
+import '../../viewmodels/attachment_viewmodel.dart';
 import '../utils/image_thumbnail.dart';
 import '../utils/full_screen_image_viewer.dart';
 import '../../../core/logger.dart';
@@ -61,11 +62,12 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
       error: (error, stack) => widget.task, // Use prop on error
     );
 
-    // Watch the attachment view model state
-    final mediaAttachmentState = ref.watch(taskMediaAttachmentViewModelProvider(currentTask.uid));
+    // Watch the unified attachment view model state
+    final mediaAttachmentState = ref.watch(unifiedAttachmentViewModelProvider);
     
-    // Parse media attachments from the current task
-    final mediaAttachments = _parseMediaAttachments(currentTask.mediaAttachments);
+    // Parse media attachments from the current task using the unified viewmodel
+    final allAttachments = ref.read(unifiedAttachmentViewModelProvider.notifier).parseAttachments(currentTask.attachments);
+    final mediaAttachments = allAttachments.where((attachment) => attachment.type == AttachmentType.media).toList();
 
     // Don't show anything if no media attachments
     if (mediaAttachments.isEmpty) {
@@ -150,7 +152,7 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
                 ),
                 IconButton(
                   onPressed: () {
-                    ref.read(taskMediaAttachmentViewModelProvider(currentTask.uid).notifier).clearMessages();
+                    ref.read(unifiedAttachmentViewModelProvider.notifier).clearMessages();
                   },
                   icon: const Icon(Icons.close, size: 16),
                   padding: EdgeInsets.zero,
@@ -192,7 +194,7 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
                 ),
                 IconButton(
                   onPressed: () {
-                    ref.read(taskMediaAttachmentViewModelProvider(currentTask.uid).notifier).clearMessages();
+                    ref.read(unifiedAttachmentViewModelProvider.notifier).clearMessages();
                   },
                   icon: const Icon(Icons.close, size: 16),
                   padding: EdgeInsets.zero,
@@ -209,10 +211,10 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
     );
   }
 
-  Widget _buildMediaAttachmentItem(Map<String, dynamic> mediaAttachment, TaskMediaAttachmentState mediaAttachmentState) {
-    final fileSize = mediaAttachment['size'] as int;
-    final fileId = mediaAttachment['uri'] as String;
-    final fileStatus = mediaAttachment['status'] as String? ?? 'uploaded';
+  Widget _buildMediaAttachmentItem(Attachment mediaAttachment, UnifiedAttachmentState mediaAttachmentState) {
+    final fileSize = mediaAttachment.size;
+    final fileId = mediaAttachment.uri;
+    final fileStatus = mediaAttachment.status;
     
     final isDownloadingThis = mediaAttachmentState.isDownloading && 
                              mediaAttachmentState.downloadingFileId == fileId;
@@ -241,16 +243,16 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        mediaAttachment['filename'] as String? ?? 'Unknown file',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: Theme.of(context).colorScheme.onSurface,
+                                              child: Text(
+                          mediaAttachment.filename,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
                     ),
                   ],
                 ),
@@ -305,24 +307,32 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
     );
   }
 
-  Widget _buildMediaThumbnail(Map<String, dynamic> mediaAttachment, String fileId) {
-    final fileName = mediaAttachment['filename'] as String;
-    final mediaType = mediaAttachment['mediaType'] as String;
+  Widget _buildMediaThumbnail(Attachment mediaAttachment, String fileId) {
+    final fileName = mediaAttachment.filename;
+    final mediaType = mediaAttachment.mediaType?.name ?? 'unknown';
     
     if (mediaType == 'image') {
       // Use reusable ImageThumbnail component
       return ImageThumbnail(
         fileId: fileId,
         fileName: fileName,
-        file: mediaAttachment,
+        file: {
+          'uri': mediaAttachment.uri,
+          'filename': mediaAttachment.filename,
+          'size': mediaAttachment.size,
+          'status': mediaAttachment.status,
+          's3Key': mediaAttachment.s3Key,
+          'aesKey': mediaAttachment.aesKey,
+          'mediaType': mediaAttachment.mediaType?.name,
+        },
         taskUid: widget.task.uid,
         isLarge: false,
         onTap: () => _showFullScreenImage(mediaAttachment),
-        onLoadImageData: () => ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier)
-            .getImageData(
+        onLoadImageData: () => ref.read(unifiedAttachmentViewModelProvider.notifier)
+            .downloadAttachment(
               fileId: fileId,
-              fileName: fileName,
-              s3Key: mediaAttachment['s3Key'] as String?,
+              aesKey: mediaAttachment.aesKey,
+              s3Key: mediaAttachment.s3Key,
             ),
       );
     }
@@ -349,20 +359,20 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
     );
   }
 
-  Future<void> _downloadMediaFile(Map<String, dynamic> mediaAttachment) async {
-    final fileId = mediaAttachment['uri'] as String;
-    final fileName = mediaAttachment['filename'] as String;
-    final s3Key = mediaAttachment['s3Key'] as String?;
+  Future<void> _downloadMediaFile(Attachment mediaAttachment) async {
+    final fileId = mediaAttachment.uri;
+    final fileName = mediaAttachment.filename;
+    final s3Key = mediaAttachment.s3Key;
 
     AppLogger.debug('TaskMediaAttachmentList: Starting download for media file $fileId ($fileName)');
 
     Uint8List? downloadResult;
     try {
-      // Call ViewModel to handle download and get file bytes
-      downloadResult = await ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier)
-          .downloadMediaFileBytes(
+      // Call unified ViewModel to handle download and get file bytes
+      downloadResult = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+          .downloadAttachment(
             fileId: fileId,
-            fileName: fileName,
+            aesKey: mediaAttachment.aesKey,
             s3Key: s3Key,
           );
 
@@ -399,16 +409,16 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
     }
   }
 
-  Future<void> _showFullScreenImage(Map<String, dynamic> mediaAttachment) async {
-    final fileId = mediaAttachment['uri'] as String;
-    final fileName = mediaAttachment['filename'] as String;
-    final s3Key = mediaAttachment['s3Key'] as String?;
+  Future<void> _showFullScreenImage(Attachment mediaAttachment) async {
+    final fileId = mediaAttachment.uri;
+    final fileName = mediaAttachment.filename;
+    final s3Key = mediaAttachment.s3Key;
 
-    // Use ViewModel to get image data
-    final imageData = await ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier)
-        .getImageData(
+    // Use unified ViewModel to get image data
+    final imageData = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+        .downloadAttachment(
           fileId: fileId,
-          fileName: fileName,
+          aesKey: mediaAttachment.aesKey,
           s3Key: s3Key,
         );
 
@@ -457,9 +467,9 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
 
     if (confirmed != true) return;
 
-    // Call ViewModel to handle media file removal
-    final success = await ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier)
-        .removeMediaFile(
+    // Call unified ViewModel to handle media file removal
+    final success = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+        .removeTaskAttachment(
           taskUid: widget.task.uid,
           fileId: fileId,
         );

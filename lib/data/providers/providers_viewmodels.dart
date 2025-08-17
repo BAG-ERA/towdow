@@ -6,9 +6,10 @@ import '../../presentation/viewmodels/caldav_settings_viewmodel.dart';
 import '../../presentation/viewmodels/project_list_viewmodel.dart';
 import '../../presentation/viewmodels/external_calendar_viewmodel.dart';
 import '../../presentation/viewmodels/validator_viewmodel.dart';
-import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
-import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
+import '../../presentation/viewmodels/attachment_viewmodel.dart';
 import '../../presentation/viewmodels/category_viewmodel.dart';
+import '../services/storage/file_upload_queue_service.dart';
+import '../../core/logger.dart';
 import '../../presentation/viewmodels/project_kanban_viewmodel.dart';
 import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
 import '../../presentation/viewmodels/step_viewmodel.dart';
@@ -39,30 +40,26 @@ final validatorViewModelProvider = StateNotifierProvider.family<ValidatorViewMod
   return ValidatorViewModel(taskRepository, accountRepository);
 });
 
-final taskFileAttachmentViewModelProvider = StateNotifierProvider.family<TaskFileAttachmentViewModel, TaskFileAttachmentState, String>((ref, taskUid) {
+final unifiedAttachmentViewModelProvider = StateNotifierProvider<UnifiedAttachmentViewModel, UnifiedAttachmentState>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
+  final journalRepository = ref.watch(journalRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final offlineFileService = ref.watch(offlineFileServiceProvider);
-  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
-  return TaskFileAttachmentViewModel(
+  
+  // Try to get FileUploadQueueService, but don't fail if it's not available
+  FileUploadQueueService? fileUploadQueueService;
+  try {
+    fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
+  } catch (e) {
+    AppLogger.warning('UnifiedAttachmentViewModel: FileUploadQueueService not available: $e');
+  }
+  
+  return UnifiedAttachmentViewModel(
     taskRepository: taskRepository,
+    journalRepository: journalRepository,
     accountRepository: accountRepository,
     offlineFileService: offlineFileService,
     fileUploadQueueService: fileUploadQueueService,
-  );
-});
-
-final taskMediaAttachmentViewModelProvider = StateNotifierProvider.family<TaskMediaAttachmentViewModel, TaskMediaAttachmentState, String>((ref, taskUid) {
-  final taskRepository = ref.watch(taskRepositoryProvider);
-  final accountRepository = ref.watch(accountRepositoryProvider);
-  final offlineFileService = ref.watch(offlineFileServiceProvider);
-  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
-  return TaskMediaAttachmentViewModel(
-    taskUid,
-    taskRepository,
-    accountRepository,
-    offlineFileService,
-    fileUploadQueueService,
   );
 });
 

@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../../core/logger.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/attachment.dart';
 import 'chips/attendee_chip.dart';
 import 'chips/category_chip.dart';
 import '../utils/enhanced_text_field.dart';
@@ -260,13 +261,14 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
         return;
       }
 
-      // Upload media file using TaskMediaAttachmentViewModel
-      final success = await ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier)
-          .uploadMediaFile(
+      // Upload media file using unified attachment viewmodel
+      final success = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+          .uploadTaskAttachment(
         taskUid: widget.task.uid,
         fileName: fileName,
         fileData: fileBytes,
         contentType: _getContentType(fileName),
+        type: AttachmentType.media,
       );
 
       if (mounted && success) {
@@ -331,13 +333,14 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
         return;
       }
 
-      // Upload file using TaskFileAttachmentViewModel
-      final success = await ref.read(taskFileAttachmentViewModelProvider(widget.task.uid).notifier)
-          .uploadFile(
+      // Upload file using unified attachment viewmodel
+      final success = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+          .uploadTaskAttachment(
         taskUid: widget.task.uid,
         fileName: fileName,
         fileData: fileBytes,
         contentType: _getContentType(fileName),
+        type: AttachmentType.file,
       );
 
       if (mounted && success) {

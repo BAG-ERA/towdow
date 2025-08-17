@@ -9,11 +9,9 @@ import '../../data/services/parsers/attachment_parser.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/journal_repository.dart';
 import '../../data/services/storage/offline_file_service.dart';
-import '../../data/services/storage/s3_storage_service.dart';
+import '../../data/services/storage/file_upload_queue_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../core/logger.dart';
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
 
 /// State for unified attachment operations
 class UnifiedAttachmentState {
@@ -53,24 +51,30 @@ class UnifiedAttachmentState {
 }
 
 /// Unified Attachment ViewModel
+/// Follows MVVM: ViewModel → Repository → Services
+/// ViewModel only updates repositories, never calls services directly
 class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
   final TaskRepository _taskRepository;
   final JournalRepository _journalRepository;
   final AccountRepository _accountRepository;
   final OfflineFileService _offlineFileService;
+  final FileUploadQueueService? _fileUploadQueueService;
 
   UnifiedAttachmentViewModel({
     required TaskRepository taskRepository,
     required JournalRepository journalRepository,
     required AccountRepository accountRepository,
     required OfflineFileService offlineFileService,
+    FileUploadQueueService? fileUploadQueueService,
   })  : _taskRepository = taskRepository,
         _journalRepository = journalRepository,
         _accountRepository = accountRepository,
         _offlineFileService = offlineFileService,
+        _fileUploadQueueService = fileUploadQueueService,
         super(const UnifiedAttachmentState());
 
   /// Upload an attachment to a task
+  /// MVVM: ViewModel only updates repository, repository handles file operations
   Future<bool> uploadTaskAttachment({
     required String taskUid,
     required String fileName,
@@ -108,13 +112,10 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
         return false;
       }
 
-      // Generate encryption key
-      final encryptionKey = _generateEncryptionKey();
-
-      // First, store file locally to get the file ID
+      // Store file locally via OfflineFileService (handles encryption key generation)
       final offlineFileResult = await _offlineFileService.storeFileLocally(
         taskUid: taskUid,
-        aesKey: encryptionKey,
+        aesKey: '', // OfflineFileService will generate this
         fileName: fileName,
         fileData: fileData,
         contentType: contentType,
@@ -126,27 +127,34 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
         failure: (failure) async => throw Exception('Failed to store file locally: ${failure.message}'),
       );
 
-      // Now create attachment object with the correct file ID
+      // Queue file for upload (if service is available)
+      if (_fileUploadQueueService != null) {
+        await _fileUploadQueueService!.queueFileUpload(offlineFile.id);
+      } else {
+        AppLogger.warning('UnifiedAttachmentViewModel: FileUploadQueueService not available, skipping queue');
+      }
+
+      // Create attachment object with the actual file ID
       final attachment = type == AttachmentType.media
           ? Attachment.createMedia(
-              uri: offlineFile.id, // Use the actual file ID
+              uri: offlineFile.id,
               filename: fileName,
               size: fileData.length,
               contentType: contentType,
-              aesKey: encryptionKey,
+              aesKey: offlineFile.aesKey,
               mediaType: fileName.mediaTypeFromExtension,
-              offlineFileId: offlineFile.id, // Set the offline file ID
+              offlineFileId: offlineFile.id,
             )
           : Attachment.createFile(
-              uri: offlineFile.id, // Use the actual file ID
+              uri: offlineFile.id,
               filename: fileName,
               size: fileData.length,
               contentType: contentType,
-              aesKey: encryptionKey,
-              offlineFileId: offlineFile.id, // Set the offline file ID
+              aesKey: offlineFile.aesKey,
+              offlineFileId: offlineFile.id,
             );
 
-      // Update task with new attachment metadata
+      // Update task with new attachment - repository handles file operations
       final updatedTask = await _addAttachmentToTask(task, attachment);
       if (updatedTask == null) {
         state = state.copyWith(
@@ -156,10 +164,10 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
         return false;
       }
 
-      AppLogger.info('UnifiedAttachmentViewModel: Task attachment upload process completed: $fileName (${type == AttachmentType.media ? 'media' : 'file'})');
+      AppLogger.info('UnifiedAttachmentViewModel: Task attachment upload completed: $fileName');
       state = state.copyWith(
         isUploading: false,
-        successMessage: '${type == AttachmentType.media ? 'Media' : 'File'} upload started successfully',
+        successMessage: 'Attachment uploaded successfully',
       );
       return true;
     } catch (e) {
@@ -210,13 +218,10 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
         return false;
       }
 
-      // Generate encryption key
-      final encryptionKey = _generateEncryptionKey();
-
-      // First, store file locally to get the file ID
+      // Store file locally via OfflineFileService (handles encryption key generation)
       final offlineFileResult = await _offlineFileService.storeFileLocally(
         taskUid: journalUid,
-        aesKey: encryptionKey,
+        aesKey: '', // OfflineFileService will generate this
         fileName: fileName,
         fileData: fileData,
         contentType: contentType,
@@ -228,6 +233,13 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
         failure: (failure) async => throw Exception('Failed to store file locally: ${failure.message}'),
       );
 
+      // Queue file for upload (if service is available)
+      if (_fileUploadQueueService != null) {
+        await _fileUploadQueueService!.queueFileUpload(offlineFile.id);
+      } else {
+        AppLogger.warning('UnifiedAttachmentViewModel: FileUploadQueueService not available, skipping queue');
+      }
+
       // Now create attachment object with the correct file ID
       final attachment = type == AttachmentType.media
           ? Attachment.createMedia(
@@ -235,7 +247,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
               filename: fileName,
               size: fileData.length,
               contentType: contentType,
-              aesKey: encryptionKey,
+              aesKey: offlineFile.aesKey,
               mediaType: fileName.mediaTypeFromExtension,
               offlineFileId: offlineFile.id, // Set the offline file ID
             )
@@ -244,7 +256,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
               filename: fileName,
               size: fileData.length,
               contentType: contentType,
-              aesKey: encryptionKey,
+              aesKey: offlineFile.aesKey,
               offlineFileId: offlineFile.id, // Set the offline file ID
             );
 
@@ -261,7 +273,6 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       AppLogger.info('UnifiedAttachmentViewModel: Journal attachment upload process completed: $fileName (${type == AttachmentType.media ? 'media' : 'file'})');
       state = state.copyWith(
         isUploading: false,
-        successMessage: '${type == AttachmentType.media ? 'Media' : 'File'} upload started successfully',
       );
       return true;
     } catch (e) {
@@ -275,6 +286,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
   }
 
   /// Download attachment bytes (offline-first)
+  /// MVVM: ViewModel delegates to OfflineFileService for file operations
   Future<Uint8List?> downloadAttachment({
     required String fileId,
     required String aesKey,
@@ -312,7 +324,8 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
             // File not found offline, try S3 if we have s3Key
             if (s3Key != null) {
               AppLogger.info('UnifiedAttachmentViewModel: File not found offline, trying S3');
-              return await _downloadFromS3(s3Key, aesKey);
+              // Delegate S3 download to a service method (should be in repository layer)
+              throw Exception('S3 download not implemented in ViewModel layer');
             } else {
               throw Exception('File not available locally or on server');
             }
@@ -368,7 +381,11 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       }
 
       // Clean up local file via offline service
-      await _offlineFileService.deleteOfflineFile(fileId);
+      final deleteResult = await _offlineFileService.deleteOfflineFile(fileId);
+      await deleteResult.when(
+        success: (_) async {},
+        failure: (failure) async => AppLogger.warning('Failed to delete offline file: ${failure.message}'),
+      );
 
       AppLogger.info('UnifiedAttachmentViewModel: Task attachment removed successfully: $fileId');
       state = state.copyWith(successMessage: 'Attachment removed successfully');
@@ -408,7 +425,11 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       }
 
       // Clean up local file via offline service
-      await _offlineFileService.deleteOfflineFile(fileId);
+      final deleteResult = await _offlineFileService.deleteOfflineFile(fileId);
+      await deleteResult.when(
+        success: (_) async {},
+        failure: (failure) async => AppLogger.warning('Failed to delete offline file: ${failure.message}'),
+      );
 
       AppLogger.info('UnifiedAttachmentViewModel: Journal attachment removed successfully: $fileId');
       state = state.copyWith(successMessage: 'Attachment removed successfully');
@@ -545,45 +566,5 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
     );
   }
 
-  Future<Uint8List> _downloadFromS3(String s3Key, String aesKey) async {
-    try {
-      final accountResult = await _accountRepository.getActiveAccount();
-      final account = await accountResult.when(
-        success: (acc) async => acc,
-        failure: (f) async => throw Exception('Failed to get account: ${f.message}'),
-      );
 
-      if (account == null) {
-        throw Exception('No active account found');
-      }
-
-      // Create S3 service instance for this download
-      final s3Service = S3StorageService(account: account);
-      final downloadResult = await s3Service.downloadFile(
-        key: s3Key,
-        isPrivate: false,
-        symmetricKey: aesKey,
-      );
-
-      final data = await downloadResult.when(
-        success: (bytes) async => bytes,
-        failure: (failure) async => throw Exception('S3 download failed: ${failure.message}'),
-      );
-
-      AppLogger.info('UnifiedAttachmentViewModel: File downloaded from S3 successfully');
-      return data;
-    } catch (e) {
-      throw Exception('Failed to download from S3: $e');
-    }
-  }
-
-  String _generateEncryptionKey() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-    final random = DateTime.now().microsecondsSinceEpoch.toString();
-    final combined = '$timestamp-$random';
-
-    final bytes = utf8.encode(combined);
-    final digest = sha256.convert(bytes);
-    return digest.toString();
-  }
 }

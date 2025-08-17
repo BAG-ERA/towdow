@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../core/logger.dart';
 import '../../../data/models/task.dart';
+import '../../../data/models/attachment.dart';
 import '../../../data/providers/providers_project.dart';
 import '../../../data/providers/providers_viewmodels.dart';
 
@@ -46,11 +47,11 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
       error: (error, stack) => widget.task, // Use prop on error
     );
 
-    // Watch the attachment view model state
-    final attachmentState = ref.watch(taskFileAttachmentViewModelProvider(currentTask.uid));
+    // Watch the unified attachment view model state
+    final attachmentState = ref.watch(unifiedAttachmentViewModelProvider);
 
-    // Parse attachments from the current task
-    final attachments = _parseAttachments(currentTask.attachments);
+    // Parse attachments from the current task using the unified viewmodel
+    final attachments = ref.read(unifiedAttachmentViewModelProvider.notifier).parseAttachments(currentTask.attachments);
 
     if (attachments.isEmpty && !attachmentState.isUploading) {
       return const SizedBox.shrink();
@@ -132,7 +133,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
                 ),
                 IconButton(
                   onPressed: () {
-                    ref.read(taskFileAttachmentViewModelProvider(currentTask.uid).notifier).clearMessages();
+                    ref.read(unifiedAttachmentViewModelProvider.notifier).clearMessages();
                   },
                   icon: const Icon(Icons.close, size: 16),
                   padding: EdgeInsets.zero,
@@ -172,7 +173,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
                 ),
                 IconButton(
                   onPressed: () {
-                    ref.read(taskFileAttachmentViewModelProvider(currentTask.uid).notifier).clearMessages();
+                    ref.read(unifiedAttachmentViewModelProvider.notifier).clearMessages();
                   },
                   icon: const Icon(Icons.close, size: 16),
                   padding: EdgeInsets.zero,
@@ -189,12 +190,12 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
     );
   }
 
-  Widget _buildAttachmentTile(Map<String, dynamic> attachment) {
-    final fileId = attachment['uri'] as String;
-    final fileName = attachment['filename'] as String? ?? 'Unknown file';
-    final fileSize = attachment['size'] as int? ?? 0;
-    final status = attachment['status'] as String? ?? 'local';
-    final s3Key = attachment['s3Key'] as String?;
+  Widget _buildAttachmentTile(Attachment attachment) {
+    final fileId = attachment.uri;
+    final fileName = attachment.filename;
+    final fileSize = attachment.size;
+    final status = attachment.status;
+    final s3Key = attachment.s3Key;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
@@ -349,13 +350,14 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
         return;
       }
 
-      // Call ViewModel to handle upload
-      final success = await ref.read(taskFileAttachmentViewModelProvider(widget.task.uid).notifier)
-          .uploadFile(
+      // Call unified ViewModel to handle upload
+      final success = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+          .uploadTaskAttachment(
             taskUid: widget.task.uid,
             fileName: fileName,
             fileData: fileBytes,
             contentType: _getContentType(fileName),
+            type: AttachmentType.file,
           );
 
       // If upload succeeded, the task will be automatically updated via the reactive stream
@@ -368,11 +370,11 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
     }
   }
 
-  Future<void> _downloadFile(Map<String, dynamic> attachment) async {
-    final fileId = attachment['uri'] as String;
-    final fileName = attachment['filename'] as String? ?? 'download';
-    final s3Key = attachment['s3Key'] as String?;
-    final encryptionKey = attachment['aesKey'] as String?;
+  Future<void> _downloadFile(Attachment attachment) async {
+    final fileId = attachment.uri;
+    final fileName = attachment.filename;
+    final s3Key = attachment.s3Key;
+    final encryptionKey = attachment.aesKey;
 
     AppLogger.debug('TaskFileAttachmentList: Starting download for file $fileId ($fileName)');
 
@@ -384,13 +386,11 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
 
     Uint8List? downloadResult;
     try {
-      // Call ViewModel to handle download and get file bytes
-      downloadResult = await ref.read(taskFileAttachmentViewModelProvider(widget.task.uid).notifier)
-          .downloadFileBytes(
+      // Call unified ViewModel to handle download and get file bytes
+      downloadResult = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+          .downloadAttachment(
             fileId: fileId,
-            fileName: fileName,
-            taskUid: widget.task.uid,
-            encryptionKey: encryptionKey,
+            aesKey: encryptionKey,
             s3Key: s3Key,
           );
 
@@ -453,9 +453,9 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
 
     if (confirmed != true) return;
 
-    // Call ViewModel to handle file removal
-    final success = await ref.read(taskFileAttachmentViewModelProvider(widget.task.uid).notifier)
-        .removeFile(
+    // Call unified ViewModel to handle file removal
+    final success = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+        .removeTaskAttachment(
           taskUid: widget.task.uid,
           fileId: fileId,
         );
@@ -593,25 +593,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
-  List<Map<String, dynamic>> _parseAttachments(String attachmentsJson) {
-    try {
-      if (attachmentsJson.isEmpty || attachmentsJson == '[]') {
-        return [];
-      }
-      
-      final decoded = jsonDecode(attachmentsJson);
-      if (decoded is List) {
-        return decoded.map<Map<String, dynamic>>((attachment) {
-          return attachment is Map<String, dynamic> ? attachment : <String, dynamic>{};
-        }).toList();
-      }
-      
-      return [];
-    } catch (e) {
-      AppLogger.error('TaskFileAttachmentList: Failed to parse attachments JSON', e, StackTrace.current);
-      return [];
-    }
-  }
+
 
   void _showSuccessSnackbar(String message) {
     if (mounted) {
