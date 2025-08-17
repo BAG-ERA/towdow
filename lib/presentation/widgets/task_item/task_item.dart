@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/task.dart';
 import '../../../data/services/validator_service.dart';
 import '../../../data/providers/providers_viewmodels.dart';
+import '../../../data/providers/providers_project.dart';
 import 'task_item_titlebar.dart';
 import 'task_item_description.dart';
 import 'task_item_validatorlist.dart';
@@ -51,11 +52,6 @@ class _TaskItemState extends ConsumerState<TaskItem> {
   void initState() {
     super.initState();
     widget.controller?._attach(this);
-    
-    // Set the selected task in the TaskViewModel to watch for updates
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(taskViewModelProvider.notifier).selectTask(widget.task);
-    });
   }
 
   @override
@@ -82,13 +78,23 @@ class _TaskItemState extends ConsumerState<TaskItem> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch the TaskViewModel state to get the latest task data
-    final taskState = ref.watch(taskViewModelProvider);
+    // Watch the reactive task data from the repository
+    final taskListAsync = ref.watch(taskListProvider);
     
-    // Use the selected task from the ViewModel if it matches our task, otherwise use the prop
-    final currentTask = (taskState.selectedTask?.uid == widget.task.uid) 
-        ? taskState.selectedTask! 
-        : widget.task;
+    // Find the current task in the reactive data
+    final currentTask = taskListAsync.when(
+      data: (tasks) {
+        // Find the task with matching UID in the reactive data
+        final updatedTask = tasks.firstWhere(
+          (task) => task.uid == widget.task.uid,
+          orElse: () => widget.task, // Fallback to prop if not found
+        );
+        return updatedTask;
+      },
+      loading: () => widget.task, // Use prop while loading
+      error: (error, stack) => widget.task, // Use prop on error
+    );
+    
     final isCompleted = currentTask.status == 'COMPLETED';
 
     return Container(
@@ -112,7 +118,7 @@ class _TaskItemState extends ConsumerState<TaskItem> {
               task: currentTask,
               isExpanded: _isExpanded,
               isCompleted: isCompleted,
-              onToggleComplete: () => _handleTaskCompletion(),
+              onToggleComplete: () => _handleTaskCompletion(currentTask),
               onToggleExpanded: () async {
                 if (!_isExpanded) {
                   final sourceContext = _cardKey.currentContext;
@@ -168,11 +174,7 @@ class _TaskItemState extends ConsumerState<TaskItem> {
     );
   }
 
-  void _handleTaskCompletion() {
-    // Get the current task data from the reactive provider
-    final taskState = ref.read(taskViewModelProvider);
-    final currentTask = taskState.selectedTask ?? widget.task;
-    
+  void _handleTaskCompletion(Task currentTask) {
     // Check if task has validators and if they're completed
     final validators = ValidatorService.parseValidators(currentTask.flowitValidator);
     

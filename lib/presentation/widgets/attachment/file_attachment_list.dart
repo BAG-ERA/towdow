@@ -1,18 +1,16 @@
-// Task file attachment list widget
-// Displays file attachments for tasks with upload, download, and delete functionality
-// Uses TaskFileAttachmentViewModel following MVVM architecture
+// Task file attachment list component
+// Displays file attachments for a task and handles file operations
 
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:file_picker/file_picker.dart';
-import '../../../data/models/task.dart';
-import '../../viewmodels/task_file_attachment_viewmodel.dart';
-import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
-import 'dart:convert';
+import '../../../data/models/task.dart';
+import '../../../data/providers/providers_project.dart';
+import '../../../data/providers/providers_viewmodels.dart';
 
 class TaskFileAttachmentList extends ConsumerStatefulWidget {
   final Task task;
@@ -29,145 +27,194 @@ class TaskFileAttachmentList extends ConsumerStatefulWidget {
 }
 
 class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList> {
-  bool _hasShownMessage = false;
-  bool _isExpanded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Expand by default if there's only one attachment
-    final attachments = _parseAttachments(widget.task.attachments);
-    _isExpanded = attachments.length <= 1;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final attachmentState = ref.watch(taskFileAttachmentViewModelProvider(widget.task.uid));
-    final attachments = _parseAttachments(widget.task.attachments);
+    // Watch the reactive task data from the repository
+    final taskListAsync = ref.watch(taskListProvider);
     
-    // Show error/success messages (prevent loop with flag)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_hasShownMessage) {
-        if (attachmentState.error != null) {
-          _showErrorSnackbar(attachmentState.error!);
-          ref.read(taskFileAttachmentViewModelProvider(widget.task.uid).notifier).clearMessages();
-          _hasShownMessage = true;
-        } else if (attachmentState.successMessage != null) {
-          _showSuccessSnackbar(attachmentState.successMessage!);
-          ref.read(taskFileAttachmentViewModelProvider(widget.task.uid).notifier).clearMessages();
-          _hasShownMessage = true;
-        }
-      }
-    });
-    
-    // Reset flag when messages are cleared
-    if (attachmentState.error == null && attachmentState.successMessage == null) {
-      _hasShownMessage = false;
-    }
-    
-    // Don't show anything if no attachments and no upload in progress
+    // Find the current task in the reactive data
+    final currentTask = taskListAsync.when(
+      data: (tasks) {
+        // Find the task with matching UID in the reactive data
+        final updatedTask = tasks.firstWhere(
+          (task) => task.uid == widget.task.uid,
+          orElse: () => widget.task, // Fallback to prop if not found
+        );
+        return updatedTask;
+      },
+      loading: () => widget.task, // Use prop while loading
+      error: (error, stack) => widget.task, // Use prop on error
+    );
+
+    // Watch the attachment view model state
+    final attachmentState = ref.watch(taskFileAttachmentViewModelProvider(currentTask.uid));
+
+    // Parse attachments from the current task
+    final attachments = _parseAttachments(currentTask.attachments);
+
     if (attachments.isEmpty && !attachmentState.isUploading) {
       return const SizedBox.shrink();
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
-        
-        // Section header with expand/collapse
-        GestureDetector(
-          onTap: attachments.isNotEmpty ? () => setState(() => _isExpanded = !_isExpanded) : null,
-          child: Row(
-            children: [
-              Icon(
-                Icons.attach_file,
-                size: 14,
-                color: Theme.of(context).colorScheme.secondary,
+        Row(
+          children: [
+            Icon(
+              Icons.attach_file,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Files',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
-              const SizedBox(width: 4),
-              Text(
-                'Attachments',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
-              if (attachments.isNotEmpty) ...[
-                Text(
-                  ' (${attachments.length})',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
-                ),
-              ],
-              Expanded(
-                child: GestureDetector(
-                  onTap: attachments.isNotEmpty ? () => setState(() => _isExpanded = !_isExpanded) : null,
-                  child: Container(
-                    height: 24,
-                    color: Colors.transparent,
+            ),
+            const Spacer(),
+            if (attachmentState.isUploading)
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ),
-              
-              // Expand/collapse indicator (only show if there are attachments)
-              if (attachments.isNotEmpty) ...[
-                Icon(
-                  _isExpanded ? Icons.expand_less : Icons.expand_more,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            if (!attachmentState.isUploading)
+              IconButton(
+                onPressed: _uploadFile,
+                icon: const Icon(Icons.add, size: 16),
+                tooltip: 'Add file',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 24,
+                  minHeight: 24,
                 ),
-              ],
-            ],
-          ),
+              ),
+          ],
         ),
-        
-        // File list (only show if expanded or if there's only one item)
-        if (_isExpanded || attachments.length <= 1) ...[
+        if (attachments.isNotEmpty) ...[
           const SizedBox(height: 4),
-          ...attachments.asMap().entries.map((entry) {
-            final index = entry.key;
-            final attachment = entry.value;
-            return Padding(
-              padding: EdgeInsets.only(bottom: index < attachments.length - 1 ? 8 : 0),
-              child: _buildFileItem(attachment, attachmentState),
-            );
-          }),
+          ...attachments.map((attachment) => _buildAttachmentTile(attachment)),
+        ],
+        if (attachmentState.error != null) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    attachmentState.error!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    ref.read(taskFileAttachmentViewModelProvider(currentTask.uid).notifier).clearMessages();
+                  },
+                  icon: const Icon(Icons.close, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (attachmentState.successMessage != null) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    attachmentState.successMessage!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    ref.read(taskFileAttachmentViewModelProvider(currentTask.uid).notifier).clearMessages();
+                  },
+                  icon: const Icon(Icons.close, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ],
     );
   }
 
-  Widget _buildFileItem(Map<String, dynamic> attachment, TaskFileAttachmentState attachmentState) {
+  Widget _buildAttachmentTile(Map<String, dynamic> attachment) {
+    final fileId = attachment['uri'] as String;
     final fileName = attachment['filename'] as String? ?? 'Unknown file';
     final fileSize = attachment['size'] as int? ?? 0;
-    final createdAt = attachment['createdAt'] as String?;
-    final fileId = attachment['uri'] as String;
-    final fileStatus = attachment['status'] as String? ?? 'uploaded';
-    // Note: s3Key and aesKey available if needed for debugging
-    
-    final isDownloadingThis = attachmentState.isDownloading && 
-                             attachmentState.downloadingFileId == fileId;
-    
+    final status = attachment['status'] as String? ?? 'local';
+    final s3Key = attachment['s3Key'] as String?;
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          width: 1,
         ),
-        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           Icon(
             _getFileIcon(fileName),
             size: 20,
-            color: Theme.of(context).colorScheme.primary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,49 +222,52 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
                 Text(
                   fileName,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
                 Row(
                   children: [
                     Text(
                       _formatFileSize(fileSize),
                       style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        fontSize: 10,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                       ),
                     ),
-                    Text(
-                      ' • ',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                    ),
-                    Text(
-                      _getStatusText(fileStatus),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: _getStatusColor(fileStatus, context),
-                        fontWeight: fileStatus == 'local' ? FontWeight.w500 : FontWeight.normal,
-                      ),
-                    ),
-                    if (createdAt != null && fileStatus == 'uploaded') ...[
-                      Text(
-                        ' • ',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    if (status == 'local') ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.tertiaryContainer,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: Text(
+                          'Local',
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: Theme.of(context).colorScheme.onTertiaryContainer,
+                          ),
                         ),
                       ),
-                      Text(
-                        _formatUploadDate(createdAt),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ] else if (s3Key != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: Text(
+                          'Cloud',
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
                         ),
                       ),
                     ],
@@ -226,43 +276,41 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          
-          // Action buttons
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Download button
-              IconButton(
-                onPressed: isDownloadingThis ? null : () => _downloadFile(attachment),
-                icon: isDownloadingThis
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.download, size: 16),
-                 tooltip: AppLocalizations.of(context)!.download,
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(32, 32),
-                  padding: EdgeInsets.zero,
-                ),
-              ),
-              
-              // Delete button (only if we can edit tasks)
-              if (widget.onTaskUpdated != null) ...[
-                IconButton(
-                  onPressed: () => _removeFile(fileId),
-                  icon: const Icon(Icons.delete_outline, size: 16),
-                  tooltip: AppLocalizations.of(context)!.remove,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(32, 32),
-                    padding: EdgeInsets.zero,
-                    foregroundColor: Theme.of(context).colorScheme.error,
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'download':
+                  _downloadFile(attachment);
+                  break;
+                case 'remove':
+                  _removeFile(fileId);
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              if (s3Key != null)
+                const PopupMenuItem(
+                  value: 'download',
+                  child: Row(
+                    children: [
+                      Icon(Icons.download, size: 16),
+                      SizedBox(width: 8),
+                      Text('Download'),
+                    ],
                   ),
                 ),
-              ],
+              const PopupMenuItem(
+                value: 'remove',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, size: 16),
+                    SizedBox(width: 8),
+                    Text('Remove'),
+                  ],
+                ),
+              ),
             ],
+            child: const Icon(Icons.more_vert, size: 16),
           ),
         ],
       ),
@@ -310,10 +358,9 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
             contentType: _getContentType(fileName),
           );
 
-      // If upload succeeded, notify parent to refresh task data
-      if (success && widget.onTaskUpdated != null) {
-        // Refresh the task data from repository to get updated attachments
-        _refreshTaskData();
+      // If upload succeeded, the task will be automatically updated via the reactive stream
+      if (success) {
+        _showSuccessSnackbar('File uploaded successfully');
       }
 
     } catch (e) {
@@ -413,20 +460,9 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
           fileId: fileId,
         );
 
-    // If removal succeeded, notify parent to refresh task data
-    if (success && widget.onTaskUpdated != null) {
-      _refreshTaskData();
-    }
-  }
-
-  void _refreshTaskData() {
-    // Trigger a refresh of the task data
-    // This is a simple approach - in a more sophisticated implementation,
-    // we might use a more reactive approach
-    if (widget.onTaskUpdated != null) {
-      // The parent will refresh when onTaskUpdated is called
-      // For now, we just trigger a rebuild
-      setState(() {});
+    // If removal succeeded, the task will be automatically updated via the reactive stream
+    if (success) {
+      _showSuccessSnackbar('File removed successfully');
     }
   }
 
@@ -500,12 +536,51 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
         return 'image/png';
       case 'gif':
         return 'image/gif';
-      case 'txt':
-        return 'text/plain';
+      case 'bmp':
+        return 'image/bmp';
+      case 'svg':
+        return 'image/svg+xml';
+      case 'webp':
+        return 'image/webp';
+      case 'ico':
+        return 'image/x-icon';
+      case 'tiff':
+      case 'tif':
+        return 'image/tiff';
       case 'mp4':
         return 'video/mp4';
+      case 'avi':
+        return 'video/x-msvideo';
+      case 'mov':
+        return 'video/quicktime';
+      case 'webm':
+        return 'video/webm';
+      case 'm4v':
+        return 'video/x-m4v';
+      case '3gp':
+        return 'video/3gpp';
+      case 'flv':
+        return 'video/x-flv';
       case 'mp3':
         return 'audio/mpeg';
+      case 'wav':
+        return 'audio/wav';
+      case 'flac':
+        return 'audio/flac';
+      case 'ogg':
+        return 'audio/ogg';
+      case 'm4a':
+        return 'audio/mp4';
+      case 'zip':
+        return 'application/zip';
+      case 'rar':
+        return 'application/vnd.rar';
+      case '7z':
+        return 'application/x-7z-compressed';
+      case 'txt':
+        return 'text/plain';
+      case 'md':
+        return 'text/markdown';
       default:
         return 'application/octet-stream';
     }
@@ -516,56 +591,6 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-  }
-
-  String _formatUploadDate(String isoDate) {
-    try {
-      final date = DateTime.parse(isoDate);
-      final now = DateTime.now();
-      final difference = now.difference(date);
-      
-      if (difference.inDays > 0) {
-        return '${difference.inDays}d ago';
-      } else if (difference.inHours > 0) {
-        return '${difference.inHours}h ago';
-      } else if (difference.inMinutes > 0) {
-        return '${difference.inMinutes}m ago';
-      } else {
-        return 'Just now';
-      }
-    } catch (e) {
-      return 'Unknown';
-    }
-  }
-
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'local':
-        return 'Local (will upload)';
-      case 'uploading':
-        return 'Uploading...';
-      case 'uploaded':
-        return 'Uploaded';
-      case 'failed':
-        return 'Upload failed';
-      default:
-        return 'Unknown';
-    }
-  }
-
-  Color _getStatusColor(String status, BuildContext context) {
-    switch (status) {
-      case 'local':
-        return Theme.of(context).colorScheme.primary;
-      case 'uploading':
-        return Theme.of(context).colorScheme.secondary;
-      case 'uploaded':
-        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
-      case 'failed':
-        return Theme.of(context).colorScheme.error;
-      default:
-        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
-    }
   }
 
   List<Map<String, dynamic>> _parseAttachments(String attachmentsJson) {
@@ -611,4 +636,4 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
       );
     }
   }
-} 
+}

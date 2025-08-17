@@ -9,7 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../data/models/task.dart';
-import '../../../data/providers/providers.dart';
+import '../../../data/providers/providers_project.dart';
+import '../../../data/providers/providers_viewmodels.dart';
 import '../../viewmodels/task_media_attachment_viewmodel.dart';
 import '../utils/image_thumbnail.dart';
 import '../utils/full_screen_image_viewer.dart';
@@ -43,28 +44,28 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
 
   @override
   Widget build(BuildContext context) {
-    final mediaAttachmentState = ref.watch(taskMediaAttachmentViewModelProvider(widget.task.uid));
-    final mediaAttachments = _parseMediaAttachments(widget.task.mediaAttachments);
+    // Watch the reactive task data from the repository
+    final taskListAsync = ref.watch(taskListProvider);
     
-    // Show error/success messages (prevent loop with flag)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_hasShownMessage) {
-        if (mediaAttachmentState.error != null) {
-          _showErrorSnackbar(mediaAttachmentState.error!);
-          ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier).clearMessages();
-          _hasShownMessage = true;
-        } else if (mediaAttachmentState.successMessage != null) {
-          _showSuccessSnackbar(mediaAttachmentState.successMessage!);
-          ref.read(taskMediaAttachmentViewModelProvider(widget.task.uid).notifier).clearMessages();
-          _hasShownMessage = true;
-        }
-      }
-    });
+    // Find the current task in the reactive data
+    final currentTask = taskListAsync.when(
+      data: (tasks) {
+        // Find the task with matching UID in the reactive data
+        final updatedTask = tasks.firstWhere(
+          (task) => task.uid == widget.task.uid,
+          orElse: () => widget.task, // Fallback to prop if not found
+        );
+        return updatedTask;
+      },
+      loading: () => widget.task, // Use prop while loading
+      error: (error, stack) => widget.task, // Use prop on error
+    );
+
+    // Watch the attachment view model state
+    final mediaAttachmentState = ref.watch(taskMediaAttachmentViewModelProvider(currentTask.uid));
     
-    // Reset flag when messages are cleared
-    if (mediaAttachmentState.error == null && mediaAttachmentState.successMessage == null) {
-      _hasShownMessage = false;
-    }
+    // Parse media attachments from the current task
+    final mediaAttachments = _parseMediaAttachments(currentTask.mediaAttachments);
 
     // Don't show anything if no media attachments
     if (mediaAttachments.isEmpty) {
@@ -76,62 +77,132 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
       children: [
         const SizedBox(height: 8),
         
-        // Media attachments header with expand/collapse
-        GestureDetector(
-          onTap: () => setState(() => _isExpanded = !_isExpanded),
-          child: Row(
-            children: [
-              Icon(
-                Icons.perm_media,
-                size: 14,
-                color: Theme.of(context).colorScheme.secondary,
+        // Media attachments header
+        Row(
+          children: [
+            Icon(
+              Icons.perm_media,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              mediaAttachments.length == 1 ? 'Media' : 'Media Files',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
-              const SizedBox(width: 4),
-              Text(
-                mediaAttachments.length == 1 ? 'Media' : 'Media Files',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
+            ),
+            Text(
+              ' (${mediaAttachments.length})',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
-              Text(
-                ' (${mediaAttachments.length})',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _isExpanded = !_isExpanded),
-                  child: Container(
-                    height: 24,
-                    color: Colors.transparent,
-                  ),
-                ),
-              ),
-              
-              // Expand/collapse indicator
-              Icon(
-                _isExpanded ? Icons.expand_less : Icons.expand_more,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
         
-        // Media attachments grid (only show if expanded or if there's only one item)
-        if (_isExpanded || mediaAttachments.length <= 1) ...[
+        // Media attachments grid
+        const SizedBox(height: 4),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 1,
+          ),
+          itemCount: mediaAttachments.length,
+          itemBuilder: (context, index) {
+            final attachment = mediaAttachments[index];
+            return _buildMediaAttachmentItem(attachment, mediaAttachmentState);
+          },
+        ),
+        
+        // Error message
+        if (mediaAttachmentState.error != null) ...[
           const SizedBox(height: 4),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: mediaAttachments.asMap().entries.map((entry) {
-              final mediaAttachment = entry.value;
-              return _buildMediaAttachmentItem(mediaAttachment, mediaAttachmentState);
-            }).toList(),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    mediaAttachmentState.error!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    ref.read(taskMediaAttachmentViewModelProvider(currentTask.uid).notifier).clearMessages();
+                  },
+                  icon: const Icon(Icons.close, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        
+        // Success message
+        if (mediaAttachmentState.successMessage != null) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    mediaAttachmentState.successMessage!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    ref.read(taskMediaAttachmentViewModelProvider(currentTask.uid).notifier).clearMessages();
+                  },
+                  icon: const Icon(Icons.close, size: 16),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ],

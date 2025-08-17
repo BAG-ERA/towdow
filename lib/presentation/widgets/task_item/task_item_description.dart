@@ -12,8 +12,8 @@ import '../../../data/models/task.dart';
 import 'chips/attendee_chip.dart';
 import 'chips/category_chip.dart';
 import '../utils/enhanced_text_field.dart';
-import 'task_file_attachment_list.dart';
-import 'task_media_attachment_list.dart';
+import '../attachment/file_attachment_list.dart';
+import '../attachment/media_attachment_list.dart';
 import '../../../data/providers/providers.dart';
 
 class TaskItemDescription extends ConsumerStatefulWidget {

@@ -154,13 +154,6 @@ class TaskFileAttachmentViewModel extends StateNotifier<TaskFileAttachmentState>
       // Queue file for upload
       await _fileUploadQueueService.queueFileUpload(fileId);
 
-      // Sync is now handled by repository
-
-      state = state.copyWith(
-        isUploading: false,
-        successMessage: 'File attached successfully',
-      );
-
       AppLogger.info('TaskFileAttachmentViewModel: File attachment completed for $fileName');
       return true;
     } catch (e, stackTrace) {
