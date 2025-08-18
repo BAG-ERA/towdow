@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/logger.dart';
+import '../../viewmodels/media_validator_viewmodel.dart';
 
 /// Reusable image thumbnail widget
 class ImageThumbnail extends ConsumerStatefulWidget {
@@ -45,7 +46,32 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
 
   Future<void> _loadImageData() async {
     try {
-      final imageData = await widget.onLoadImageData();
+      // Try to load thumbnail first for faster display
+      Uint8List? imageData;
+      
+      // Check if we have a media validator viewmodel available (for thumbnails)
+      if (widget.taskUid.isNotEmpty) {
+        try {
+          // Try to get thumbnail data first
+          final thumbnailData = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
+              .getThumbnailData(
+                fileId: widget.fileId,
+                fileName: widget.fileName,
+              );
+          
+          if (thumbnailData != null) {
+            imageData = thumbnailData;
+            AppLogger.debug('ImageThumbnail: Using thumbnail for ${widget.fileName}');
+          }
+        } catch (e) {
+          AppLogger.debug('ImageThumbnail: Failed to get thumbnail, falling back to full image: $e');
+        }
+      }
+      
+      // If no thumbnail available, load full image
+      if (imageData == null) {
+        imageData = await widget.onLoadImageData();
+      }
 
       if (mounted) {
         if (imageData != null) {

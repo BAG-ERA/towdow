@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/journal.dart';
+import '../../../data/models/attachment.dart';
 import '../../../data/providers/providers_viewmodels.dart';
 import '../../widgets/utils/editable_title.dart';
 import '../../widgets/utils/enhanced_text_field.dart';
@@ -280,12 +281,13 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
         } catch (_) {}
       }
       if (bytes == null) return;
-      final ok = await ref.read(journalFileAttachmentViewModelProvider(widget.journal.uid).notifier)
-          .uploadFile(
+      final ok = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+          .uploadJournalAttachment(
         journalUid: widget.journal.uid,
         fileName: fileName,
         fileData: bytes,
         contentType: _guessContentType(fileName),
+        type: AttachmentType.file,
       );
       if (ok && mounted) {
         // Keep editing; autosave already queued via repo save
@@ -311,12 +313,13 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
         } catch (_) {}
       }
       if (bytes == null) return;
-      final ok = await ref.read(journalMediaAttachmentViewModelProvider(widget.journal.uid).notifier)
-          .uploadMediaFile(
+      final ok = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+          .uploadJournalAttachment(
         journalUid: widget.journal.uid,
         fileName: fileName,
         fileData: bytes,
         contentType: _guessContentType(fileName),
+        type: AttachmentType.media,
       );
       if (ok && mounted) {}
     } catch (_) {}
@@ -429,14 +432,14 @@ class _AttachmentRow extends ConsumerWidget {
               fileName: fileName,
               file: data,
               taskUid: uid, // Using uid as taskUid for journal context
-              isLarge: false,
-              onTap: () => _showFullScreenImage(context, ref, fileId, fileName, s3Key),
-              onLoadImageData: () => ref.read(journalMediaAttachmentViewModelProvider(uid).notifier)
-                  .getImageData(
+              onTap: () => _showFullScreenImage(context, ref, fileId, fileName, s3Key, aesKey),
+              onLoadImageData: () => ref.read(unifiedAttachmentViewModelProvider.notifier)
+                  .downloadAttachment(
                     fileId: fileId,
-                    fileName: fileName,
+                    aesKey: aesKey,
                     s3Key: s3Key.isEmpty ? null : s3Key,
                   ),
+              isLarge: false,
             )
           else
             // Show icon for non-image media files
@@ -528,12 +531,11 @@ class _AttachmentRow extends ConsumerWidget {
 
     Uint8List? bytes;
     try {
-      bytes = await ref.read(journalMediaAttachmentViewModelProvider(uid).notifier)
-          .downloadMediaFileBytes(
+      bytes = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+          .downloadAttachment(
             fileId: fileId,
-            fileName: fileName,
-            s3Key: s3Key.isEmpty ? null : s3Key,
             aesKey: aesKey,
+            s3Key: s3Key.isEmpty ? null : s3Key,
           );
 
       if (bytes == null) {
@@ -585,12 +587,11 @@ class _AttachmentRow extends ConsumerWidget {
 
     Uint8List? bytes;
     try {
-      bytes = await ref.read(journalFileAttachmentViewModelProvider(uid).notifier)
-          .downloadFileBytes(
+      bytes = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+          .downloadAttachment(
             fileId: fileId,
-            fileName: fileName,
-            s3Key: s3Key.isEmpty ? null : s3Key,
             aesKey: aesKey,
+            s3Key: s3Key.isEmpty ? null : s3Key,
           );
 
       if (bytes == null) {
@@ -629,11 +630,11 @@ class _AttachmentRow extends ConsumerWidget {
     }
   }
 
-  Future<void> _showFullScreenImage(BuildContext context, WidgetRef ref, String fileId, String fileName, String s3Key) async {
-    final imageData = await ref.read(journalMediaAttachmentViewModelProvider(uid).notifier)
-        .getImageData(
+  Future<void> _showFullScreenImage(BuildContext context, WidgetRef ref, String fileId, String fileName, String s3Key, String aesKey) async {
+    final imageData = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+        .downloadAttachment(
           fileId: fileId,
-          fileName: fileName,
+          aesKey: aesKey,
           s3Key: s3Key.isEmpty ? null : s3Key,
         );
 

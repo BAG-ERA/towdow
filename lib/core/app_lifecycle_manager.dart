@@ -8,6 +8,7 @@ import '../data/services/sync/sync_service.dart';
 import '../data/services/sync/sync_orchestrator_service.dart';
 import '../data/services/integration/external_caldav_calendar/external_sync_service.dart';
 import '../data/services/storage/file_upload_queue_service.dart';
+import '../data/services/storage/media_cleanup_service.dart';
 import '../data/services/sync/connection_monitor_service.dart';
 import '../data/services/user/user_sync_service.dart';
 import '../data/repositories/account_repository.dart';
@@ -34,6 +35,7 @@ class AppLifecycleManager {
   CalDAVMonitor? _caldavMonitor;
   ExternalCalendarSyncService? _externalSyncService;
   FileUploadQueueService? _fileUploadQueueService;
+  MediaCleanupService? _mediaCleanupService;
   ConnectionMonitorService? _connectionMonitorService;
   UserSyncService? _userSyncService;
   AccountRepository? _accountRepository;
@@ -62,6 +64,7 @@ class AppLifecycleManager {
     required CalDAVMonitor caldavMonitor,
     required ExternalCalendarSyncService externalSyncService,
     required FileUploadQueueService fileUploadQueueService,
+    required MediaCleanupService mediaCleanupService,
     required ConnectionMonitorService connectionMonitorService,
     required UserSyncService userSyncService,
     required AccountRepository accountRepository,
@@ -75,6 +78,7 @@ class AppLifecycleManager {
       _caldavMonitor = caldavMonitor;
       _externalSyncService = externalSyncService;
       _fileUploadQueueService = fileUploadQueueService;
+      _mediaCleanupService = mediaCleanupService;
       _connectionMonitorService = connectionMonitorService;
       _userSyncService = userSyncService;
       _accountRepository = accountRepository;
@@ -117,6 +121,13 @@ class AppLifecycleManager {
                       AppLogger.info('AppLifecycleManager: No active account - file upload queue not started');
                     },
                   );
+                }
+
+                // Start media cleanup service (always enabled for local file management)
+                if (_mediaCleanupService != null) {
+                  AppLogger.debug('AppLifecycleManager: Starting MediaCleanupService (offline-only mode)');
+                  _mediaCleanupService!.startCleanupService();
+                  AppLogger.info('AppLifecycleManager: MediaCleanupService started (offline-only mode)');
                 }
 
                 if (_connectionMonitorService != null) {
@@ -222,6 +233,13 @@ class AppLifecycleManager {
             AppLogger.info('AppLifecycleManager: No active account - file upload queue not started');
           },
         );
+      }
+
+      // Start media cleanup service (always enabled for local file management)
+      if (_mediaCleanupService != null) {
+        AppLogger.debug('AppLifecycleManager: Starting MediaCleanupService');
+        _mediaCleanupService!.startCleanupService();
+        AppLogger.info('AppLifecycleManager: MediaCleanupService started successfully');
       }
 
       // Start user sync service (cloud only)

@@ -9,6 +9,7 @@ import '../services/workflow_service.dart';
 import '../services/status_service.dart';
 import '../services/storage/file_upload_queue_service.dart';
 import '../services/storage/offline_file_service.dart';
+import '../services/storage/media_cleanup_service.dart';
 import '../services/storage/s3_storage_service.dart';
 import '../services/vobject_service.dart';
 import '../services/sync/connection_monitor_service.dart';
@@ -55,6 +56,11 @@ final offlineFileServiceProvider = Provider<OfflineFileService>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
   final encryptionService = ref.watch(encryptionServiceProvider);
   return OfflineFileService(storageService, encryptionService);
+});
+
+final mediaCleanupServiceProvider = Provider<MediaCleanupService>((ref) {
+  final offlineFileService = ref.watch(offlineFileServiceProvider);
+  return MediaCleanupService(offlineFileService);
 });
 
 final fileUploadQueueServiceProvider = Provider<FileUploadQueueService>((ref) {

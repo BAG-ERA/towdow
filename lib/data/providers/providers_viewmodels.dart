@@ -15,8 +15,7 @@ import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
 import '../../presentation/viewmodels/step_viewmodel.dart';
 import '../../presentation/viewmodels/project_notes_viewmodel.dart';
 import '../../presentation/viewmodels/note_viewmodel.dart';
-import '../../presentation/viewmodels/journal_file_attachment_viewmodel.dart';
-import '../../presentation/viewmodels/journal_media_attachment_viewmodel.dart';
+
 import '../../data/models/journal.dart';
 import 'providers_repositories.dart';
 import 'providers_services_core.dart';
@@ -158,25 +157,6 @@ final noteViewModelProvider = StateNotifierProvider.family<NoteViewModel, NoteSt
   );
   
   return NoteViewModel(journal, journalRepository);
-});
-
-// Journal attachment ViewModels
-final journalFileAttachmentViewModelProvider = StateNotifierProvider.family<JournalFileAttachmentViewModel, JournalFileAttachmentState, String>((ref, journalUid) {
-  return JournalFileAttachmentViewModel(
-    journalRepository: ref.watch(journalRepositoryProvider),
-    accountRepository: ref.watch(accountRepositoryProvider),
-    offlineFileService: ref.watch(offlineFileServiceProvider),
-    fileUploadQueueService: ref.watch(fileUploadQueueServiceProvider),
-  );
-});
-
-final journalMediaAttachmentViewModelProvider = StateNotifierProvider.family<JournalMediaAttachmentViewModel, JournalMediaAttachmentState, String>((ref, journalUid) {
-  return JournalMediaAttachmentViewModel(
-    journalRepository: ref.watch(journalRepositoryProvider),
-    accountRepository: ref.watch(accountRepositoryProvider),
-    offlineFileService: ref.watch(offlineFileServiceProvider),
-    fileUploadQueueService: ref.watch(fileUploadQueueServiceProvider),
-  );
 });
 
 

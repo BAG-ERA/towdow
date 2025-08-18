@@ -3,8 +3,10 @@
 
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:image/image.dart' as img;
 import '../../models/offline_file.dart';
 import 'local_storage_service.dart';
 import 'encryption_service.dart';
@@ -366,6 +368,212 @@ class OfflineFileService {
     }
   }
 
+  /// Generate thumbnail for image files and store locally
+  Future<Result<String?>> generateThumbnail(String fileId) async {
+    try {
+      final fileResult = await getOfflineFile(fileId);
+      return await fileResult.when(
+        success: (offlineFile) async {
+          if (offlineFile == null) {
+            return Result.failure(Failure(message: 'File not found'));
+          }
+
+          // Only generate thumbnails for image files
+          if (!_isImageFile(offlineFile.fileName)) {
+            return const Result.success(null);
+          }
+
+          // Check if thumbnail already exists
+          if (offlineFile.thumbnailPath != null) {
+            final thumbnailFile = File(offlineFile.thumbnailPath!);
+            if (await thumbnailFile.exists()) {
+              return Result.success(offlineFile.thumbnailPath);
+            }
+          }
+
+          // Read the original image
+          final imageData = await readLocalFile(fileId);
+          final imageBytes = await imageData.when(
+            success: (data) async => data,
+            failure: (failure) async => throw Exception(failure.message),
+          );
+
+          // Decode and resize image
+          final image = img.decodeImage(imageBytes);
+          if (image == null) {
+            return Result.failure(Failure(message: 'Failed to decode image'));
+          }
+
+          // Create thumbnail (max 200x200 pixels)
+          final thumbnail = img.copyResize(image, width: 200, height: 200, interpolation: img.Interpolation.linear);
+
+          // Encode thumbnail
+          final thumbnailBytes = img.encodeJpg(thumbnail, quality: 85);
+
+          // Get app documents directory
+          final appDocDir = await getApplicationDocumentsDirectory();
+          final thumbnailsDir = Directory('${appDocDir.path}/$_fileDirectoryName/thumbnails');
+          
+          // Create thumbnails directory if it doesn't exist
+          if (!await thumbnailsDir.exists()) {
+            await thumbnailsDir.create(recursive: true);
+          }
+
+          // Create thumbnail file path
+          final thumbnailPath = '${thumbnailsDir.path}/${fileId}_thumb.jpg';
+
+          // Write thumbnail to file
+          final thumbnailFile = File(thumbnailPath);
+          await thumbnailFile.writeAsBytes(thumbnailBytes);
+
+          // Update offline file with thumbnail path
+          final updatedFile = offlineFile.copyWith(thumbnailPath: thumbnailPath);
+          await _localStorage.put(
+            LocalStorageService.offlineFilesBoxName,
+            fileId,
+            updatedFile,
+          );
+
+          AppLogger.info('OfflineFileService: Generated thumbnail for ${offlineFile.fileName}');
+          return Result.success(thumbnailPath);
+        },
+        failure: (failure) => Result.failure(failure),
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('OfflineFileService: Failed to generate thumbnail', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to generate thumbnail: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Get thumbnail data for a file
+  Future<Result<Uint8List?>> getThumbnail(String fileId) async {
+    try {
+      final fileResult = await getOfflineFile(fileId);
+      return await fileResult.when(
+        success: (offlineFile) async {
+          if (offlineFile == null || offlineFile.thumbnailPath == null) {
+            return const Result.success(null);
+          }
+
+          final thumbnailFile = File(offlineFile.thumbnailPath!);
+          if (!await thumbnailFile.exists()) {
+            // Try to regenerate thumbnail
+            final generateResult = await generateThumbnail(fileId);
+            return await generateResult.when(
+              success: (thumbnailPath) async {
+                if (thumbnailPath == null) {
+                  return const Result.success(null);
+                }
+                final newThumbnailFile = File(thumbnailPath);
+                if (await newThumbnailFile.exists()) {
+                  final thumbnailData = await newThumbnailFile.readAsBytes();
+                  return Result.success(thumbnailData);
+                }
+                return const Result.success(null);
+              },
+              failure: (failure) => Result.failure(failure),
+            );
+          }
+
+          final thumbnailData = await thumbnailFile.readAsBytes();
+          return Result.success(thumbnailData);
+        },
+        failure: (failure) => Result.failure(failure),
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('OfflineFileService: Failed to get thumbnail', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to get thumbnail: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Update last accessed time for a file (for retention policy)
+  Future<Result<void>> updateLastAccessed(String fileId) async {
+    try {
+      final fileResult = await getOfflineFile(fileId);
+      return await fileResult.when(
+        success: (offlineFile) async {
+          if (offlineFile == null) {
+            return Result.failure(Failure(message: 'File not found'));
+          }
+
+          final updatedFile = offlineFile.copyWith(lastAccessed: DateTime.now());
+          return await _localStorage.put(
+            LocalStorageService.offlineFilesBoxName,
+            fileId,
+            updatedFile,
+          );
+        },
+        failure: (failure) => Result.failure(failure),
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('OfflineFileService: Failed to update last accessed time', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to update last accessed time: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Clean up expired files (older than 30 days since last access)
+  Future<Result<void>> cleanupExpiredFiles() async {
+    try {
+      const retentionDays = 30;
+      final cutoffDate = DateTime.now().subtract(Duration(days: retentionDays));
+      
+      final result = await _localStorage.getAll<OfflineFile>(
+        LocalStorageService.offlineFilesBoxName,
+      );
+      
+      return await result.when(
+        success: (files) async {
+          final expiredFiles = files.where((file) {
+            // Use lastAccessed if available, otherwise use createdAt
+            final lastAccess = file.lastAccessed ?? file.createdAt;
+            return lastAccess.isBefore(cutoffDate);
+          }).toList();
+          
+          int deletedCount = 0;
+          for (final file in expiredFiles) {
+            final deleteResult = await deleteOfflineFile(file.id);
+            deleteResult.when(
+              success: (_) => deletedCount++,
+              failure: (failure) => AppLogger.warning('OfflineFileService: Failed to delete expired file ${file.fileName}: ${failure.message}'),
+            );
+          }
+          
+          if (deletedCount > 0) {
+            AppLogger.info('OfflineFileService: Cleaned up $deletedCount expired files (older than $retentionDays days)');
+          }
+          
+          return const Result.success(null);
+        },
+        failure: (failure) => Result.failure(failure),
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('OfflineFileService: Failed to cleanup expired files', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to cleanup expired files: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+  /// Check if file is an image based on file extension
+  bool _isImageFile(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'tif'].contains(extension);
+  }
+
   /// Sanitize filename to avoid filesystem issues
   String _sanitizeFileName(String fileName) {
     // Replace problematic characters for filesystem
@@ -375,4 +583,4 @@ class OfflineFileService {
         .replaceAll(RegExp(r'\.+$'), '')
         .trim();
   }
-} 
+}

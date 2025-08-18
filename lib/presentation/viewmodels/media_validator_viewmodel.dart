@@ -509,6 +509,15 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
         success: (data) async {
           if (data.isNotEmpty) {
             _imageCache[fileId] = data; // Cache the data
+            
+            // Update last accessed time for retention policy
+            await _offlineFileService.updateLastAccessed(fileId);
+            
+            // Generate thumbnail for image files
+            if (_isImageFile(fileName)) {
+              await _offlineFileService.generateThumbnail(fileId);
+            }
+            
             return data;
           } else {
             // If local file is empty or null, try to download from S3
@@ -533,6 +542,43 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
       AppLogger.debug('MediaValidatorViewModel: Error loading image data: $e');
       return null;
     }
+  }
+
+  /// Get thumbnail data for display (faster loading)
+  Future<Uint8List?> getThumbnailData({
+    required String fileId,
+    required String fileName,
+  }) async {
+    try {
+      // Only get thumbnails for image files
+      if (!_isImageFile(fileName)) {
+        return null;
+      }
+
+      final thumbnailResult = await _offlineFileService.getThumbnail(fileId);
+      return await thumbnailResult.when(
+        success: (thumbnailData) async {
+          if (thumbnailData != null) {
+            // Update last accessed time for retention policy
+            await _offlineFileService.updateLastAccessed(fileId);
+          }
+          return thumbnailData;
+        },
+        failure: (failure) async {
+          AppLogger.debug('MediaValidatorViewModel: Failed to get thumbnail for $fileId: ${failure.message}');
+          return null;
+        },
+      );
+    } catch (e) {
+      AppLogger.debug('MediaValidatorViewModel: Error loading thumbnail data: $e');
+      return null;
+    }
+  }
+
+  /// Check if file is an image based on file extension
+  bool _isImageFile(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'tif'].contains(extension);
   }
 
   /// Download image from S3 and cache it locally for future use

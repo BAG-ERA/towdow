@@ -49,11 +49,14 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
     );
   } catch (_) {}
 
+  final mediaCleanupService = ref.watch(mediaCleanupServiceProvider);
+
   final result = await lifecycleManager.initialize(
     syncService: syncService,
     caldavMonitor: caldavMonitor,
     externalSyncService: externalSyncService,
     fileUploadQueueService: fileUploadQueueService,
+    mediaCleanupService: mediaCleanupService,
     connectionMonitorService: connectionMonitorService,
     userSyncService: userSyncService,
     accountRepository: accountRepository,
