@@ -16,6 +16,7 @@ import '../../widgets/utils/buttons/create_workflow_button.dart';
 import '../../widgets/navbar/workflow_popup_menu.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
 import '../../../core/theme/chart_theme_usage.dart';
+import '../../widgets/utils/voice_feedback_button.dart';
 
 class WorkflowListScreen extends ConsumerStatefulWidget {
   const WorkflowListScreen({super.key});
@@ -63,6 +64,9 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
               elevation: 0,
               backgroundColor: Theme.of(context).colorScheme.surface,
               surfaceTintColor: Colors.transparent,
+              actions: [
+                const VoiceFeedbackButton(),
+              ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(80),
                 child: StyledTabBar(
@@ -91,7 +95,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   }
 
   Widget _buildCreateWorkflowButton(BuildContext context) {
-    return CreateWorkflowButton.prominent(
+    return CreateWorkflowButton.compact(
       onWorkflowCreated: () {
         ref.read(workflowListViewModelProvider.notifier).refresh();
       },
@@ -128,57 +132,71 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          for (final group in ref.read(workflowListViewModelProvider.notifier).filteredDomainGroups)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          Builder(
+            builder: (context) {
+              final state = ref.watch(workflowListViewModelProvider);
+              final viewModel = ref.read(workflowListViewModelProvider.notifier);
+              final groups = viewModel.filteredDomainGroups;
+              
+              return Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: InkWell(
-                      onTap: () => ref.read(workflowListViewModelProvider.notifier).toggleDomainExpansion(group.domain),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                group.domain,
-                                style: context.domainNameStyle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                  for (final group in groups)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: InkWell(
+                              onTap: () => group.isExpanded 
+                                  ? viewModel.collapseDomain(group.domain)
+                                  : viewModel.expandDomain(group.domain),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                child: Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        group.domain,
+                                        style: context.domainNameStyle,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Icon(
+                                      group.isExpanded
+                                          ? Icons.expand_less_rounded
+                                          : Icons.expand_more_rounded,
+                                      size: 20,
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            Icon(
-                              ref.read(workflowListViewModelProvider.notifier).isDomainExpanded(group.domain)
-                                  ? Icons.expand_less_rounded
-                                  : Icons.expand_more_rounded,
-                              size: 20,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                          ),
+                          if (group.isExpanded) ...[
+                            const SizedBox(height: 8),
+                            ProjectsTable(
+                              state: state,
+                              projectsOverride: group.projects,
+                              onProjectTap: _navigateToWorkflow,
+                              onProjectAction: _handleWorkflowAction,
+                              onSortChanged: (sortType) {
+                                ref.read(workflowListViewModelProvider.notifier).setSortBy(sortType);
+                              },
+                              menuBuilder: (context, ref, project) => WorkflowPopupMenu.getMenuItems(context, ref, project: project),
                             ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
-                  ),
-                  if (ref.read(workflowListViewModelProvider.notifier).isDomainExpanded(group.domain)) ...[
-                    const SizedBox(height: 8),
-                    ProjectsTable(
-                      state: state,
-                      projectsOverride: group.projects,
-                      onProjectTap: _navigateToWorkflow,
-                      onProjectAction: _handleWorkflowAction,
-                      onSortChanged: (sortType) {
-                        ref.read(workflowListViewModelProvider.notifier).setSortBy(sortType);
-                      },
-                      menuBuilder: (context, ref, project) => WorkflowPopupMenu.getMenuItems(context, ref, project: project),
-                    ),
-                  ],
                 ],
-              ),
-            ),
+              );
+            },
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: _WorkflowsExplanationHeader(),

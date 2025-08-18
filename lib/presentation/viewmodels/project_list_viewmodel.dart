@@ -937,19 +937,28 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   }
 
   /// Toggle domain expansion state
-  void toggleDomainExpansion(String domain) {
+  void expandDomain(String domain) {
     // Check if still mounted before updating state
     if (mounted) {
       final newExpandedState = Map<String, bool>.from(state.domainExpandedState);
-      newExpandedState[domain] = !(newExpandedState[domain] ?? false);
+      newExpandedState[domain] = true;
+      state = state.copyWith(domainExpandedState: newExpandedState);
+    }
+  }
+
+  void collapseDomain(String domain) {
+    // Check if still mounted before updating state
+    if (mounted) {
+      final newExpandedState = Map<String, bool>.from(state.domainExpandedState);
+      newExpandedState[domain] = false;
       state = state.copyWith(domainExpandedState: newExpandedState);
     }
   }
 
   /// Get domain expansion state
   bool isDomainExpanded(String domain) {
-    // Default to expanded when no explicit state is stored
-    return state.domainExpandedState[domain] ?? true;
+    // Default to collapsed when no explicit state is stored
+    return state.domainExpandedState[domain] ?? false;
   }
 
   /// Assign domain to project

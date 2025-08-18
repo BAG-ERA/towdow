@@ -18,6 +18,7 @@ import '../../widgets/project-list/projects_table.dart';
 import '../../widgets/utils/buttons/create_project_button.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
 import '../../widgets/utils/popup/project_sharing_dialog.dart';
+import '../../widgets/utils/voice_feedback_button.dart';
 
 class ProjectsListScreen extends ConsumerStatefulWidget {
   const ProjectsListScreen({super.key});
@@ -65,7 +66,10 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Colors.transparent,
-          bottom: PreferredSize(
+        actions: [
+          const VoiceFeedbackButton(),
+        ],
+        bottom: PreferredSize(
           preferredSize: const Size.fromHeight(80),
           child: StyledTabBar(
             items: [
@@ -94,7 +98,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
 
 
   Widget _buildCreateProjectButton() {
-    return CreateProjectButton.prominent(
+    return CreateProjectButton.compact(
       onProjectCreated: (projectName) {
         ref.read(projectListViewModelProvider.notifier).refresh();
       },
@@ -150,12 +154,22 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          for (final group in ref.read(projectListViewModelProvider.notifier).filteredDomainGroups)
-            _DomainTableSection(
-              title: group.domain,
-              projects: group.projects,
-              isExpanded: ref.read(projectListViewModelProvider.notifier).isDomainExpanded(group.domain),
-              onToggle: () => ref.read(projectListViewModelProvider.notifier).toggleDomainExpansion(group.domain),
+          Builder(
+            builder: (context) {
+              final state = ref.watch(projectListViewModelProvider);
+              final viewModel = ref.read(projectListViewModelProvider.notifier);
+              final groups = viewModel.filteredDomainGroups;
+              
+              return Column(
+                children: [
+                  for (final group in groups)
+                    _DomainTableSection(
+                      title: group.domain,
+                      projects: group.projects,
+                      isExpanded: group.isExpanded,
+                      onToggle: () => group.isExpanded 
+                          ? viewModel.collapseDomain(group.domain)
+                          : viewModel.expandDomain(group.domain),
               buildTable: (projects) => ProjectsTable(
                 state: state,
                 projectsOverride: projects,
@@ -165,7 +179,11 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
                   ref.read(projectListViewModelProvider.notifier).setSortBy(sortType);
                 },
               ),
-            ),
+                ),
+                ],
+              );
+            },
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: _ProjectsExplanationHeader(),
@@ -361,7 +379,7 @@ class _DomainTableSection extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
-                    Expanded(
+                    Flexible(
                       child: Text(
                         title,
                         style: context.domainNameStyle,

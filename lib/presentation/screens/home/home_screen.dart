@@ -15,6 +15,7 @@ import '../../../data/models/calendar_event.dart';
 import '../../../data/services/sync/sync_service.dart';
 import '../../providers/home_providers.dart';
 import '../../../core/theme/chart_theme_usage.dart';
+import '../../widgets/utils/voice_feedback_button.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -56,46 +57,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Colors.transparent,
         actions: [
-          // Sync status indicator
-          Consumer(
-            builder: (context, ref, child) {
-              final syncStatus = ref.watch(currentSyncStatusProvider);
-              switch (syncStatus) {
-                case SyncStatus.syncing:
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  );
-                case SyncStatus.error:
-                  return IconButton(
-                    icon: const Icon(Icons.sync_problem_rounded, color: Colors.red),
-                    onPressed: () {
-                      // Sync error - no action needed
-                    },
-                  );
-                case SyncStatus.offline:
-                  return IconButton(
-                    icon: const Icon(Icons.cloud_off_rounded, color: Colors.orange),
-                    onPressed: () {
-                      // Offline - no action needed
-                    },
-                  );
-                case SyncStatus.idle:
-                  return IconButton(
-                    icon: const Icon(Icons.sync_rounded),
-                    onPressed: () {
-                      // Idle - no action needed
-                    },
-                  );
-              }
-            },
-          ),
+          const VoiceFeedbackButton(),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
@@ -441,6 +403,13 @@ class _TaskListTab extends ConsumerWidget {
                                                         ),
                                                         overflow: TextOverflow.ellipsis,
                                                       ),
+                                                    // Navigation icon to indicate clickable project title
+                                                    if (calendar != null)
+                                                      Icon(
+                                                        Icons.open_in_new_rounded,
+                                                        size: 16,
+                                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                                                      ),
                                                   ],
                                                 ),
                                               ),
@@ -469,12 +438,6 @@ class _TaskListTab extends ConsumerWidget {
                                           task: task,
                                           onToggleComplete: () async {
                                             await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
-                                            ref.invalidate(taskListProvider);
-                                            ref.invalidate(todayTasksProvider);
-                                            ref.invalidate(soonTasksProvider);
-                                            ref.invalidate(nextWeekTasksProvider);
-                                            ref.invalidate(laterTasksProvider);
-                                            ref.invalidate(anytimeTasksProvider);
                                           },
                                           onTaskUpdated: (updatedTask) async {
                                             await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);

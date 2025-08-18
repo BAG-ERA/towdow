@@ -28,6 +28,7 @@ import '../../widgets/project_detail/project_infos_widget.dart';
 import '../../widgets/project_detail/project_warnings_banner.dart';
 import '../../widgets/project_detail/project_notes_quick_panel.dart';
 import '../../widgets/project_detail/project_note_view.dart';
+import '../../widgets/utils/voice_feedback_button.dart';
 
 // ViewModel provider for a specific project
 final projectDetailViewModelProvider = StateNotifierProvider.family<ProjectDetailViewModel, ProjectDetailState, String>((ref, projectPath) {
@@ -663,8 +664,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          // Voice feedback button on the left
+          const VoiceFeedbackButton(),
+          // Spacer to push project actions to the right
+          const Spacer(),
           projectAsync.when(
             data: (project) => project != null
                 ? _buildProjectActionButton(context, project)
@@ -751,7 +755,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       0 => ProjectTaskListView(
         projectPath: widget.projectPath,
         tasksAsync: tasksAsync,
-        onTasksRefresh: () => _refreshProjectTasks(ref),
       ),
       1 => _buildTimingView(context, ref, tasksAsync),
       2 => _buildAttendeeView(context, ref, tasksAsync),
@@ -760,7 +763,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       _ => ProjectTaskListView(
         projectPath: widget.projectPath,
         tasksAsync: tasksAsync,
-        onTasksRefresh: () => _refreshProjectTasks(ref),
       ),
     };
   }
@@ -891,20 +893,19 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
         await taskViewModel.toggleTaskCompletion(task);
         
-        // Refresh the tasks list
-        _refreshProjectTasks(ref);
+        // Task updates handled by repository streams - no manual refresh needed
       },
       onTaskUpdated: (task) async {
         await ref.read(taskViewModelProvider.notifier).updateTask(task);
-        _refreshProjectTasks(ref);
+        
+        // Task updates handled by repository streams - no manual refresh needed
       },
       onTaskDeleted: (task) async {
         // Handle task deletion
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
         await taskViewModel.deleteTask(task.uid);
         
-        // Refresh the tasks list
-        _refreshProjectTasks(ref);
+        // Task deletion handled by repository streams - no manual refresh needed
       },
     );
   }
@@ -957,7 +958,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         projectPath: widget.projectPath,
       );
       
-      ref.invalidate(projectTasksProvider(widget.projectPath));
+      // Task creation handled by repository streams - no manual invalidation needed
     }
   }
 
@@ -1054,17 +1055,19 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
         await taskViewModel.toggleTaskCompletion(task);
         
-        // Refresh the tasks list
-        _refreshProjectTasks(ref);
+        // Task updates handled by repository streams - no manual refresh needed
       },
       onTaskUpdated: (task) async {
         await ref.read(taskViewModelProvider.notifier).updateTask(task);
-        _refreshProjectTasks(ref);
+        
+        // Task updates handled by repository streams - no manual refresh needed
       },
         onTaskMoved: (task, columnId) async {
           final res = await ref.read(projectDetailViewModelProvider(widget.projectPath).notifier)
               .handleAttendeeTaskMove(task, columnId);
-          res.when(success: (_) => _refreshProjectTasks(ref), failure: (_) {});
+          res.when(success: (_) {
+            // Task moves handled by repository streams - no manual refresh needed
+          }, failure: (_) {});
         },
     );
   }
@@ -1126,7 +1129,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         projectPath: widget.projectPath,
       );
       
-      ref.invalidate(projectTasksProvider(widget.projectPath));
+      // Task creation handled by repository streams - no manual invalidation needed
     }
   }
 
@@ -1137,7 +1140,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     return ProjectKanbanView(
       projectPath: widget.projectPath,
       tasksAsync: tasksAsync,
-      onTasksRefresh: () => _refreshProjectTasks(ref),
+      onTasksRefresh: () {
+        // Task updates are handled automatically by repository streams
+      },
     );
   }
 
@@ -1183,20 +1188,19 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           final taskViewModel = ref.read(taskViewModelProvider.notifier);
           await taskViewModel.toggleTaskCompletion(task);
           
-          // Refresh the tasks list
-          _refreshProjectTasks(ref);
+          // Task updates handled by repository streams - no manual refresh needed
         },
         onTaskUpdated: (task) async {
           await ref.read(taskViewModelProvider.notifier).updateTask(task);
-          _refreshProjectTasks(ref);
+          
+          // Task updates handled by repository streams - no manual refresh needed
         },
         onTaskDeleted: (task) async {
           // Handle task deletion
           final taskViewModel = ref.read(taskViewModelProvider.notifier);
           await taskViewModel.deleteTask(task.uid);
           
-          // Refresh the tasks list
-          _refreshProjectTasks(ref);
+          // Task deletion handled by repository streams - no manual refresh needed
         },
       ),
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -1204,10 +1208,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
   }
 
-  void _refreshProjectTasks(WidgetRef ref) {
-    // Refresh the project tasks list
-    ref.invalidate(projectTasksProvider(widget.projectPath));
-  }
+  // Task updates are handled automatically by repository streams
 
   
 
