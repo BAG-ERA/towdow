@@ -56,46 +56,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Colors.transparent,
         actions: [
-          // Sync status indicator
-          Consumer(
-            builder: (context, ref, child) {
-              final syncStatus = ref.watch(currentSyncStatusProvider);
-              switch (syncStatus) {
-                case SyncStatus.syncing:
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  );
-                case SyncStatus.error:
-                  return IconButton(
-                    icon: const Icon(Icons.sync_problem_rounded, color: Colors.red),
-                    onPressed: () {
-                      // Sync error - no action needed
-                    },
-                  );
-                case SyncStatus.offline:
-                  return IconButton(
-                    icon: const Icon(Icons.cloud_off_rounded, color: Colors.orange),
-                    onPressed: () {
-                      // Offline - no action needed
-                    },
-                  );
-                case SyncStatus.idle:
-                  return IconButton(
-                    icon: const Icon(Icons.sync_rounded),
-                    onPressed: () {
-                      // Idle - no action needed
-                    },
-                  );
-              }
-            },
-          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
