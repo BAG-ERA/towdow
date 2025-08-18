@@ -7,16 +7,18 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/offline_file.dart';
 import 'local_storage_service.dart';
+import 'encryption_service.dart';
 import '../../../core/result.dart';
 import '../../../core/logger.dart';
 
 /// Service for managing offline files and upload queue
 class OfflineFileService {
   final LocalStorageService _localStorage;
+  final EncryptionService _encryptionService;
   static const String _fileDirectoryName = 'offline_files';
   static const int _maxRetryCount = 3;
   
-  OfflineFileService(this._localStorage);
+  OfflineFileService(this._localStorage, this._encryptionService);
 
   /// Store a file locally for offline access
   Future<Result<OfflineFile>> storeFileLocally({
@@ -33,6 +35,12 @@ class OfflineFileService {
       // Create unique file ID
       const uuid = Uuid();
       final fileId = uuid.v4();
+      
+      // Generate AES key if not provided
+      final finalAesKey = aesKey.isEmpty ? _encryptionService.generateEncryptionKey() : aesKey;
+      if (aesKey.isEmpty) {
+        AppLogger.debug('OfflineFileService: Generated new AES key for file: $fileName');
+      }
       
       // Get app documents directory
       final appDocDir = await getApplicationDocumentsDirectory();
@@ -55,7 +63,7 @@ class OfflineFileService {
       final offlineFile = OfflineFile(
         id: fileId,
         taskUid: taskUid,
-        aesKey: aesKey,
+        aesKey: finalAesKey,
         fileName: fileName,
         localPath: localPath,
         fileSize: fileData.length,

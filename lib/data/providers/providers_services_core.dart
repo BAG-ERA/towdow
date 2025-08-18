@@ -35,6 +35,7 @@ import '../services/domain_service.dart' as caldav_domain;
 // import '../../core/app_lifecycle_manager.dart';
 import '../../core/logger.dart';
 import '../services/sync/sync_commander_provider.dart';
+import '../services/storage/encryption_service.dart';
 
 /// Feature flag: whether file features (S3, file/media validators, attachments)
 /// are enabled for the current active account. Disabled for `providerType == 'custom'`.
@@ -46,9 +47,14 @@ final fileFeaturesEnabledProvider = Provider<bool>((ref) {
   );
 });
 
+final encryptionServiceProvider = Provider<EncryptionService>((ref) {
+  return EncryptionService();
+});
+
 final offlineFileServiceProvider = Provider<OfflineFileService>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
-  return OfflineFileService(storageService);
+  final encryptionService = ref.watch(encryptionServiceProvider);
+  return OfflineFileService(storageService, encryptionService);
 });
 
 final fileUploadQueueServiceProvider = Provider<FileUploadQueueService>((ref) {

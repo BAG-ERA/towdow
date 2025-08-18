@@ -115,7 +115,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       // Store file locally via OfflineFileService (handles encryption key generation)
       final offlineFileResult = await _offlineFileService.storeFileLocally(
         taskUid: taskUid,
-        aesKey: '', // OfflineFileService will generate this
+        aesKey: '', // OfflineFileService will generate AES key if empty
         fileName: fileName,
         fileData: fileData,
         contentType: contentType,
@@ -165,10 +165,6 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       }
 
       AppLogger.info('UnifiedAttachmentViewModel: Task attachment upload completed: $fileName');
-      state = state.copyWith(
-        isUploading: false,
-        successMessage: 'Attachment uploaded successfully',
-      );
       return true;
     } catch (e) {
       AppLogger.error('UnifiedAttachmentViewModel: Task attachment upload failed', e);
@@ -221,7 +217,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       // Store file locally via OfflineFileService (handles encryption key generation)
       final offlineFileResult = await _offlineFileService.storeFileLocally(
         taskUid: journalUid,
-        aesKey: '', // OfflineFileService will generate this
+        aesKey: '', // OfflineFileService will generate AES key if empty
         fileName: fileName,
         fileData: fileData,
         contentType: contentType,
