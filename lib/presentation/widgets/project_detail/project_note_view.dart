@@ -19,6 +19,8 @@ import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../utils/image_thumbnail.dart';
 import '../utils/full_screen_image_viewer.dart';
+import '../attachment/journal_file_attachment_list.dart';
+import '../attachment/journal_media_attachment_list.dart';
 
 class ProjectNoteView extends ConsumerStatefulWidget {
   final Journal journal;
@@ -229,18 +231,18 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
             },
             onSubmitted: (_) => _scheduleAutosave(noteVm, immediate: true),
           ),
-          if (_isEditingDesc && fileFeaturesEnabled) ...[
+          if (_isEditingDesc) ...[
             const SizedBox(height: 8),
             Row(
               children: [
                 IconButton(
-                  onPressed: _pickAndAttachFile,
+                  onPressed: () => _pickAndAttachFile(),
                   icon: const Icon(Icons.attach_file, size: 16),
                   tooltip: 'Attach file',
                   style: IconButton.styleFrom(minimumSize: const Size(32, 32), padding: EdgeInsets.zero),
                 ),
                 IconButton(
-                  onPressed: _pickAndAttachMedia,
+                  onPressed: () => _pickAndAttachMedia(),
                   icon: const Icon(Icons.perm_media, size: 16),
                   tooltip: 'Attach media',
                   style: IconButton.styleFrom(minimumSize: const Size(32, 32), padding: EdgeInsets.zero),
@@ -256,9 +258,23 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
             )
           ],
 
-          // Attachments list (files + media) below description
-          const SizedBox(height: 8),
-          _buildAttachmentsList(context),
+          // File Attachments
+          JournalFileAttachmentList(
+            journal: widget.journal,
+            onJournalUpdated: (updatedJournal) {
+              // The journal provider will automatically update the UI
+              // when the repository is updated
+            },
+          ),
+          
+          // Media Attachments
+          JournalMediaAttachmentList(
+            journal: widget.journal,
+            onJournalUpdated: (updatedJournal) {
+              // The journal provider will automatically update the UI
+              // when the repository is updated
+            },
+          ),
         ],
       ),
     );
@@ -354,341 +370,6 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
     }
   }
 
-  Widget _buildAttachmentsList(BuildContext context) {
-    final journalAsync = ref.watch(noteViewModelProvider(widget.journal.uid));
-    final j = journalAsync.journal;
-    final files = _decodeList(j.attachments);
-    final media = _decodeList(j.mediaAttachments);
-    final combined = [
-      ...files.map((m) => {...m, 'kind': 'file'}),
-      ...media.map((m) => {...m, 'kind': 'media'}),
-    ];
-    if (combined.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Attachments', style: Theme.of(context).textTheme.labelMedium),
-        const SizedBox(height: 6),
-        ...combined.map((att) => _AttachmentRow(
-              uid: j.uid,
-              data: att,
-            )),
-      ],
-    );
-  }
-
-  List<Map<String, dynamic>> _decodeList(String jsonList) {
-    try {
-      if (jsonList.isEmpty || jsonList == '[]') return [];
-      final decoded = jsonDecode(jsonList);
-      if (decoded is List) {
-        return decoded.map<Map<String, dynamic>>((a) => a is Map<String, dynamic> ? a : <String, dynamic>{}).toList();
-      }
-      return [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-}
-
-class _AttachmentRow extends ConsumerWidget {
-  final String uid;
-  final Map<String, dynamic> data;
-  const _AttachmentRow({required this.uid, required this.data});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final fileName = (data['filename'] ?? data['name'] ?? '').toString();
-    final status = (data['status'] ?? '').toString();
-    final kind = (data['kind'] ?? '').toString();
-    final s3Key = (data['s3Key'] ?? '').toString();
-    final fileId = (data['uri'] ?? '').toString();
-    final aesKey = (data['aesKey'] ?? '').toString();
-
-    // Handle media attachments with ImageThumbnail
-    if (kind == 'media') {
-      return _buildMediaAttachment(context, ref, fileName, status, s3Key, fileId, aesKey);
-    }
-
-    // Handle file attachments
-    return _buildFileAttachment(context, ref, fileName, status, s3Key, fileId, aesKey);
-  }
-
-  Widget _buildMediaAttachment(BuildContext context, WidgetRef ref, String fileName, String status, String s3Key, String fileId, String aesKey) {
-    // Check if it's an image based on file extension
-    final isImage = _isImageFile(fileName);
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          if (isImage)
-            // Use ImageThumbnail for image files
-            ImageThumbnail(
-              fileId: fileId,
-              fileName: fileName,
-              file: data,
-              taskUid: uid, // Using uid as taskUid for journal context
-              onTap: () => _showFullScreenImage(context, ref, fileId, fileName, s3Key, aesKey),
-              onLoadImageData: () => ref.read(unifiedAttachmentViewModelProvider.notifier)
-                  .downloadAttachment(
-                    fileId: fileId,
-                    aesKey: aesKey,
-                    s3Key: s3Key.isEmpty ? null : s3Key,
-                  ),
-            )
-          else
-            // Show icon for non-image media files
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                  width: 1,
-                ),
-              ),
-              child: Icon(
-                _getMediaIcon(fileName),
-                size: 24,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              fileName.isEmpty ? '(media)' : fileName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (status == 'local')
-            const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.download, size: 16),
-              tooltip: 'Download',
-              onPressed: () => _downloadMediaFile(context, ref, fileId, fileName, s3Key, aesKey),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFileAttachment(BuildContext context, WidgetRef ref, String fileName, String status, String s3Key, String fileId, String aesKey) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Icon(Icons.attach_file, size: 16, color: Theme.of(context).colorScheme.secondary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              fileName.isEmpty ? '(attachment)' : fileName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (status == 'local')
-            const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.download, size: 16),
-              tooltip: 'Download',
-              onPressed: () => _downloadFile(context, ref, fileId, fileName, s3Key, aesKey),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _downloadMediaFile(BuildContext context, WidgetRef ref, String fileId, String fileName, String s3Key, String aesKey) async {
-    AppLogger.debug('ProjectNoteView: Starting download for media file $fileId ($fileName)');
-
-    if (aesKey.isEmpty) {
-      AppLogger.error('ProjectNoteView: Missing encryption key for media file $fileId');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Missing encryption key')),
-      );
-      return;
-    }
-
-    Uint8List? bytes;
-    try {
-      bytes = await ref.read(unifiedAttachmentViewModelProvider.notifier)
-          .downloadAttachment(
-            fileId: fileId,
-            aesKey: aesKey,
-            s3Key: s3Key.isEmpty ? null : s3Key,
-          );
-
-      if (bytes == null) {
-        AppLogger.error('ProjectNoteView: Download returned null for media file $fileId');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Download failed')),
-        );
-        return;
-      }
-
-      AppLogger.debug('ProjectNoteView: Media download successful, got ${bytes.length} bytes');
-    } catch (e, stackTrace) {
-      AppLogger.error('ProjectNoteView: Download failed for media file $fileId', e, stackTrace);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download failed: $e')),
-      );
-      return;
-    }
-
-    final savePath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save Media File',
-      fileName: fileName,
-      type: FileType.any,
-    );
-
-    if (savePath != null) {
-      try {
-        final saveFile = File(savePath);
-        await saveFile.writeAsBytes(bytes);
-      } catch (e) {
-        AppLogger.error('ProjectNoteView: Failed to save media file', e);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save file: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _downloadFile(BuildContext context, WidgetRef ref, String fileId, String fileName, String s3Key, String aesKey) async {
-    AppLogger.debug('ProjectNoteView: Starting download for file $fileId ($fileName)');
-
-    if (aesKey.isEmpty) {
-      AppLogger.error('ProjectNoteView: Missing encryption key for file $fileId');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Missing encryption key')),
-      );
-      return;
-    }
-
-    Uint8List? bytes;
-    try {
-      bytes = await ref.read(unifiedAttachmentViewModelProvider.notifier)
-          .downloadAttachment(
-            fileId: fileId,
-            aesKey: aesKey,
-            s3Key: s3Key.isEmpty ? null : s3Key,
-          );
-
-      if (bytes == null) {
-        AppLogger.error('ProjectNoteView: Download returned null for file $fileId');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Download failed')),
-        );
-        return;
-      }
-
-      AppLogger.debug('ProjectNoteView: File download successful, got ${bytes.length} bytes');
-    } catch (e, stackTrace) {
-      AppLogger.error('ProjectNoteView: Download failed for file $fileId', e, stackTrace);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download failed: $e')),
-      );
-      return;
-    }
-
-    final savePath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save File',
-      fileName: fileName,
-      type: FileType.any,
-    );
-
-    if (savePath != null) {
-      try {
-        final saveFile = File(savePath);
-        await saveFile.writeAsBytes(bytes);
-      } catch (e) {
-        AppLogger.error('ProjectNoteView: Failed to save file', e);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save file: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _showFullScreenImage(BuildContext context, WidgetRef ref, String fileId, String fileName, String s3Key, String aesKey) async {
-    final imageData = await ref.read(unifiedAttachmentViewModelProvider.notifier)
-        .downloadAttachment(
-          fileId: fileId,
-          aesKey: aesKey,
-          s3Key: s3Key.isEmpty ? null : s3Key,
-        );
-
-    if (imageData == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to load image')),
-      );
-      return;
-    }
-
-    if (context.mounted) {
-      showFullScreenImageViewer(
-        context: context,
-        imageData: imageData,
-        fileName: fileName,
-        onDownload: () {
-          Navigator.of(context).pop();
-          _downloadMediaFile(context, ref, fileId, fileName, s3Key, data['aesKey'] ?? '');
-        },
-      );
-    }
-  }
-
-  bool _isImageFile(String fileName) {
-    final extension = fileName.split('.').last.toLowerCase();
-    return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'tif'].contains(extension);
-  }
-
-  IconData _getMediaIcon(String fileName) {
-    final extension = fileName.split('.').last.toLowerCase();
-    switch (extension) {
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-      case 'bmp':
-      case 'svg':
-      case 'webp':
-      case 'tiff':
-      case 'tif':
-        return Icons.image;
-      case 'mp4':
-      case 'avi':
-      case 'mov':
-      case 'wmv':
-      case 'flv':
-      case 'webm':
-      case 'mkv':
-      case '3gp':
-      case 'm4v':
-        return Icons.video_file;
-      default:
-        return Icons.perm_media;
-    }
-  }
 }
 
 

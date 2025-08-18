@@ -19,6 +19,11 @@ class NoteViewModel extends StateNotifier<NoteState> {
 
   NoteViewModel(Journal journal, this._journalRepository) : super(NoteState(journal: journal));
 
+  /// Update the journal data from the repository
+  void updateJournal(Journal journal) {
+    state = state.copyWith(journal: journal);
+  }
+
   Future<void> updateSummary(String value) async {
     final updatedJournal = state.journal.copyWith(summary: value, lastModified: DateTime.now());
     state = state.copyWith(journal: updatedJournal);

@@ -39,7 +39,11 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
   @override
   void initState() {
     super.initState();
-    _loadImageData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadImageData();
+      }
+    });
   }
 
   Future<void> _loadImageData() async {
@@ -101,7 +105,7 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        width: double.infinity,
+        key: ValueKey('image_thumbnail_${widget.fileId}'),
         height: 120,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(6),
@@ -135,10 +139,12 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
     if (_hasError || _imageData == null) {
       return Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Icon(
-          Icons.image,
-          size: 24,
-          color: Theme.of(context).colorScheme.primary,
+        child: Center(
+          child: Icon(
+            Icons.image,
+            size: 24,
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
       );
     }
@@ -149,10 +155,12 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
       errorBuilder: (context, error, stackTrace) {
         return Container(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: Icon(
-            Icons.broken_image,
-            size: 24,
-            color: Theme.of(context).colorScheme.error,
+          child: Center(
+            child: Icon(
+              Icons.broken_image,
+              size: 24,
+              color: Theme.of(context).colorScheme.error,
+            ),
           ),
         );
       },

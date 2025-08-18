@@ -13,6 +13,7 @@ import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../viewmodels/media_validator_viewmodel.dart';
 import '../../../../core/logger.dart';
 import '../../utils/full_screen_image_viewer.dart';
+import '../../utils/image_thumbnail.dart';
 
 class ValidatorMedia extends ConsumerStatefulWidget {
   final Map<String, dynamic> validator;
@@ -625,14 +626,23 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
     final extension = fileName.split('.').last.toLowerCase();
     
     if (_isImageType(extension)) {
-      // Display actual image thumbnail using a separate method that doesn't interfere with global state
-      return _ImageThumbnail(
+      // Use the main ImageThumbnail widget for consistency
+      return ImageThumbnail(
         fileId: fileId,
         fileName: fileName,
         file: file,
-        validatorId: validatorId,
         taskUid: widget.taskUid,
-        onTap: (imageData) => _showFullScreenImageWithData(file, validatorId, imageData),
+        onTap: () => _showFullScreenImageWithData(file, validatorId, null),
+        onLoadImageData: () async {
+          final s3Key = file['s3Key'] as String?;
+          return await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
+              .getImageData(
+                fileId: fileId,
+                fileName: fileName,
+                validatorId: validatorId,
+                s3Key: s3Key,
+              );
+        },
       );
     }
     
@@ -821,160 +831,4 @@ class _CameraScreenState extends State<_CameraScreen> {
   }
 }
 
-/// Separate widget for image thumbnails to avoid state conflicts
-class _ImageThumbnail extends ConsumerStatefulWidget {
-  final String fileId;
-  final String fileName;
-  final Map<String, dynamic> file;
-  final String validatorId;
-  final String taskUid;
-  final Function(Uint8List? imageData) onTap;
-
-  const _ImageThumbnail({
-    required this.fileId,
-    required this.fileName,
-    required this.file,
-    required this.validatorId,
-    required this.taskUid,
-    required this.onTap,
-  });
-
-  @override
-  ConsumerState<_ImageThumbnail> createState() => _ImageThumbnailState();
-}
-
-class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
-  Uint8List? _imageData;
-  bool _isLoading = true;
-  bool _hasError = false;
-  String? _currentFileId; // Track the current file ID to avoid unnecessary reloads
-
-  @override
-  void initState() {
-    super.initState();
-    _loadImageData();
-  }
-
-  @override
-  void didUpdateWidget(_ImageThumbnail oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Only reload if the fileId has changed
-    if (oldWidget.fileId != widget.fileId) {
-      _loadImageData();
-    }
-  }
-
-  Future<void> _loadImageData() async {
-    // Don't reload if we already have data for this file
-    if (_currentFileId == widget.fileId && _imageData != null) {
-      return;
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
-
-    try {
-      // Use ViewModel to get image data (now cached)
-      final s3Key = widget.file['s3Key'] as String?;
-      final imageData = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
-          .getImageData(
-            fileId: widget.fileId,
-            fileName: widget.fileName,
-            validatorId: widget.validatorId,
-            s3Key: s3Key,
-          );
-
-      if (mounted) {
-        setState(() {
-          _currentFileId = widget.fileId;
-          if (imageData != null) {
-            _imageData = imageData;
-            _isLoading = false;
-            _hasError = false;
-          } else {
-            _isLoading = false;
-            _hasError = true;
-          }
-        });
-      }
-    } catch (e) {
-      AppLogger.debug('_ImageThumbnail: Error loading image data: $e');
-      if (mounted) {
-        setState(() {
-          _currentFileId = widget.fileId;
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
-    }
-  }
-
-
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => widget.onTap(_imageData),
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-            width: 1,
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(5),
-          child: _buildContent(context),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContent(BuildContext context) {
-    if (_isLoading) {
-      return Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: const Center(
-          child: SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
-    }
-
-    if (_hasError || _imageData == null) {
-      return Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Icon(
-          Icons.image,
-          size: 24,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-      );
-    }
-
-    return Image.memory(
-      _imageData!,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: Icon(
-            Icons.broken_image,
-            size: 24,
-            color: Theme.of(context).colorScheme.error,
-          ),
-        );
-      },
-    );
-  }
-} 
+ 

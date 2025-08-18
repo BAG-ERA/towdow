@@ -347,8 +347,48 @@ class FileUploadQueueService {
                 s3Url: s3Info['s3Url'],
               );
               
-              // Update task validator with S3 info
-              await _updateTaskValidatorWithS3Info(offlineFile, s3Info);
+              // Update VObject (task or journal) with S3 info using VObjectService
+              if (_vobjectService != null) {
+                final updateResult = await _vobjectService!.updateWithS3Info(offlineFile, s3Info);
+                await updateResult.when(
+                  success: (result) async {
+                    if (result.updated && result.projectPath != null) {
+                      // Queue sync operation for the updated VObject
+                      final syncData = <String, dynamic>{
+                        'calendarPath': result.projectPath,
+                      };
+                      
+                      // Add appropriate UID field based on type
+                      if (result.type == VObjectType.task) {
+                        syncData['taskUid'] = result.uid;
+                        await _syncService.queueSyncOperation(
+                          SyncOperation.update,
+                          result.uid,
+                          syncData,
+                        );
+                      } else if (result.type == VObjectType.journal) {
+                        syncData['journalUid'] = result.uid;
+                        await _syncService.queueSyncOperation(
+                          SyncOperation.updateJournal,
+                          result.uid,
+                          syncData,
+                        );
+                      }
+                      
+                      AppLogger.info('FileUploadQueueService: Successfully updated ${result.type} with S3 info: ${result.uid}');
+                    } else {
+                      AppLogger.warning('FileUploadQueueService: No updates made to VObject: ${result.uid}');
+                    }
+                  },
+                  failure: (failure) async {
+                    AppLogger.error('FileUploadQueueService: Failed to update VObject with S3 info: ${failure.message}');
+                  },
+                );
+              } else {
+                AppLogger.warning('FileUploadQueueService: VObjectService not available, falling back to legacy task update');
+                // Fallback to legacy method for backward compatibility
+                await _updateTaskValidatorWithS3Info(offlineFile, s3Info);
+              }
               
               // Remove from queue
               await removeFromQueue(queueItem.offlineFileId);

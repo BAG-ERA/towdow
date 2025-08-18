@@ -549,8 +549,12 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       success: (journal) {
         if (journal == null) return null;
 
-        // For attachments, allow if user is organizer or attendee
-        if (journal.organizer != currentUserEmail &&
+        // For journal attachments, be more permissive - allow if:
+        // 1. User is organizer, OR
+        // 2. User is attendee, OR  
+        // 3. No organizer is set (default case for project notes)
+        if (journal.organizer != null && 
+            journal.organizer != currentUserEmail &&
             !journal.attendees.any((a) => a.email == currentUserEmail)) {
           return null;
         }

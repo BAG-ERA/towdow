@@ -156,7 +156,18 @@ final noteViewModelProvider = StateNotifierProvider.family<NoteViewModel, NoteSt
     projectPath: '',
   );
   
-  return NoteViewModel(journal, journalRepository);
+  final viewModel = NoteViewModel(journal, journalRepository);
+  
+  // Update the viewmodel when the journal changes
+  ref.listen<AsyncValue<Journal?>>(journalProvider(journalUid), (previous, next) {
+    next.whenData((journal) {
+      if (journal != null) {
+        viewModel.updateJournal(journal);
+      }
+    });
+  });
+  
+  return viewModel;
 });
 
 
