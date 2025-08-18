@@ -55,32 +55,42 @@ class KanbanBoard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return SizedBox(
       height: height ?? MediaQuery.of(context).size.height * 0.7,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.all(16),
-        itemCount: columns.length + (hiddenColumnsButton != null ? 1 : 0),
-        separatorBuilder: (context, index) => const SizedBox(width: 16),
-        itemBuilder: (context, index) {
-          // If this is the last item and we have a hidden columns button, show it
-          if (hiddenColumnsButton != null && index == columns.length) {
-            return SizedBox(
-              width: 200,
-              child: hiddenColumnsButton!,
-            );
-          }
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = constraints.maxWidth;
+          const targetColumnWidth = 360.0;
           
-          final column = columns[index];
-          return SizedBox(
-            width: 300,
-            child: KanbanColumnWidget(
-              column: column,
-              onTaskMoved: onTaskMoved,
-              onTaskTap: onTaskTap,
-              onTaskToggle: onTaskToggle,
-              onTaskUpdated: onTaskUpdated,
-              onTaskDeleted: onTaskDeleted,
-              onColumnHide: onColumnHide,
-            ),
+          // Take the maximum between 420px and available width
+          final actualColumnWidth = targetColumnWidth < availableWidth ? targetColumnWidth : availableWidth;
+          
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.all(16),
+            itemCount: columns.length + (hiddenColumnsButton != null ? 1 : 0),
+            separatorBuilder: (context, index) => const SizedBox(width: 16),
+            itemBuilder: (context, index) {
+              // If this is the last item and we have a hidden columns button, show it
+              if (hiddenColumnsButton != null && index == columns.length) {
+                return SizedBox(
+                  width: 200,
+                  child: hiddenColumnsButton!,
+                );
+              }
+              
+              final column = columns[index];
+              return SizedBox(
+                width: actualColumnWidth,
+                child: KanbanColumnWidget(
+                  column: column,
+                  onTaskMoved: onTaskMoved,
+                  onTaskTap: onTaskTap,
+                  onTaskToggle: onTaskToggle,
+                  onTaskUpdated: onTaskUpdated,
+                  onTaskDeleted: onTaskDeleted,
+                  onColumnHide: onColumnHide,
+                ),
+              );
+            },
           );
         },
       ),
