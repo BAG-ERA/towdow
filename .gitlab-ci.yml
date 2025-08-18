@@ -23,7 +23,7 @@ update_version:
     # Strip leading v from tags like v1.2.3
     - TAG="${CI_COMMIT_TAG#v}"
     # Overwrite pubspec.yaml version
-    - yq -i -y ".version = \"${TAG}\"" pubspec.yaml
+    - yq e -i ".version = \"${TAG}\"" pubspec.yaml
     - echo "Updated pubspec.yaml version to ${TAG}"
     - cat pubspec.yaml | grep "version:"
   artifacts:
