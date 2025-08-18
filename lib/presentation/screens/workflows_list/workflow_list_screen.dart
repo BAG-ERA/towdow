@@ -91,7 +91,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   }
 
   Widget _buildCreateWorkflowButton(BuildContext context) {
-    return CreateWorkflowButton.prominent(
+    return CreateWorkflowButton.compact(
       onWorkflowCreated: () {
         ref.read(workflowListViewModelProvider.notifier).refresh();
       },
