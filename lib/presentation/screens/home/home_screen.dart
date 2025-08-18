@@ -441,6 +441,13 @@ class _TaskListTab extends ConsumerWidget {
                                                         ),
                                                         overflow: TextOverflow.ellipsis,
                                                       ),
+                                                    // Navigation icon to indicate clickable project title
+                                                    if (calendar != null)
+                                                      Icon(
+                                                        Icons.open_in_new_rounded,
+                                                        size: 16,
+                                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                                                      ),
                                                   ],
                                                 ),
                                               ),
