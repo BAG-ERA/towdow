@@ -49,16 +49,12 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
           _showErrorSnackbar(mediaValidatorState.error!);
           ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier).clearMessages();
           _hasShownMessage = true;
-        } else if (mediaValidatorState.successMessage != null) {
-          _showSuccessSnackbar(mediaValidatorState.successMessage!);
-          ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier).clearMessages();
-          _hasShownMessage = true;
         }
       }
     });
     
     // Reset flag when messages are cleared
-    if (mediaValidatorState.error == null && mediaValidatorState.successMessage == null) {
+    if (mediaValidatorState.error == null) {
       _hasShownMessage = false;
     }
     
@@ -453,7 +449,6 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
         // Actually write the file to the chosen location
         final saveFile = File(savePath);
         await saveFile.writeAsBytes(downloadResult);
-        _showSuccessSnackbar('Media file saved successfully');
       } catch (e) {
         AppLogger.error('ValidatorMedia: Failed to save file', e);
         _showErrorSnackbar('Failed to save file: $e');
@@ -616,11 +611,7 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
     }
   }
 
-  void _showSuccessSnackbar(String message) {
-    if (mounted) {
-      AppLogger.info('ValidatorMedia: $message');
-    }
-  }
+
 
   void _showErrorSnackbar(String message) {
     if (mounted) {

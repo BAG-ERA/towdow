@@ -21,7 +21,6 @@ class UnifiedAttachmentState {
   final bool isDownloading;
   final String? downloadingFileId;
   final String? error;
-  final String? successMessage;
   final Set<String> uploadingFileIds; // Track multiple uploads
 
   const UnifiedAttachmentState({
@@ -29,7 +28,6 @@ class UnifiedAttachmentState {
     this.isDownloading = false,
     this.downloadingFileId,
     this.error,
-    this.successMessage,
     this.uploadingFileIds = const {},
   });
 
@@ -38,7 +36,6 @@ class UnifiedAttachmentState {
     bool? isDownloading,
     String? downloadingFileId,
     String? error,
-    String? successMessage,
     Set<String>? uploadingFileIds,
   }) {
     return UnifiedAttachmentState(
@@ -46,13 +43,12 @@ class UnifiedAttachmentState {
       isDownloading: isDownloading ?? this.isDownloading,
       downloadingFileId: downloadingFileId ?? this.downloadingFileId,
       error: error,
-      successMessage: successMessage,
       uploadingFileIds: uploadingFileIds ?? this.uploadingFileIds,
     );
   }
 
   UnifiedAttachmentState clearMessages() {
-    return copyWith(error: null, successMessage: null);
+    return copyWith(error: null);
   }
 }
 
@@ -127,7 +123,6 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
         state = state.copyWith(
           uploadingFileIds: newUploadingIds,
           isUploading: newUploadingIds.isNotEmpty,
-          successMessage: 'File uploaded successfully: ${status.fileName}',
         );
         break;
         
@@ -375,7 +370,6 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       state = state.copyWith(
         isDownloading: false,
         downloadingFileId: null,
-        successMessage: 'File downloaded successfully',
       );
       return result;
     } catch (e) {
@@ -424,7 +418,6 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       );
 
       AppLogger.info('UnifiedAttachmentViewModel: Task attachment removed successfully: $fileId');
-      state = state.copyWith(successMessage: 'Attachment removed successfully');
       return true;
     } catch (e) {
       AppLogger.error('UnifiedAttachmentViewModel: Remove task attachment failed', e);
@@ -468,7 +461,6 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       );
 
       AppLogger.info('UnifiedAttachmentViewModel: Journal attachment removed successfully: $fileId');
-      state = state.copyWith(successMessage: 'Attachment removed successfully');
       return true;
     } catch (e) {
       AppLogger.error('UnifiedAttachmentViewModel: Remove journal attachment failed', e);

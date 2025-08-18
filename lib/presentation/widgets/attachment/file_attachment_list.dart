@@ -142,46 +142,6 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
             ),
           ),
         ],
-        if (attachmentState.successMessage != null) ...[
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    attachmentState.successMessage!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    ref.read(unifiedAttachmentViewModelProvider.notifier).clearMessages();
-                  },
-                  icon: const Icon(Icons.close, size: 16),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 24,
-                    minHeight: 24,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
     );
   }

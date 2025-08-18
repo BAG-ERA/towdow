@@ -46,16 +46,12 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
           _showErrorSnackbar(fileValidatorState.error!);
           ref.read(fileValidatorViewModelProvider(widget.taskUid).notifier).clearMessages();
           _hasShownMessage = true;
-        } else if (fileValidatorState.successMessage != null) {
-          _showSuccessSnackbar(fileValidatorState.successMessage!);
-          ref.read(fileValidatorViewModelProvider(widget.taskUid).notifier).clearMessages();
-          _hasShownMessage = true;
         }
       }
     });
     
     // Reset flag when messages are cleared
-    if (fileValidatorState.error == null && fileValidatorState.successMessage == null) {
+    if (fileValidatorState.error == null) {
       _hasShownMessage = false;
     }
     
@@ -320,7 +316,6 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
         // Actually write the file to the chosen location
         final saveFile = File(savePath);
         await saveFile.writeAsBytes(downloadResult);
-        _showSuccessSnackbar('File saved successfully');
       } catch (e) {
         AppLogger.error('ValidatorFile: Failed to save file', e);
         _showErrorSnackbar('Failed to save file: $e');
@@ -653,12 +648,6 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
         return Theme.of(context).colorScheme.error;
       default:
         return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
-    }
-  }
-
-  void _showSuccessSnackbar(String message) {
-    if (mounted) {
-      AppLogger.info('ValidatorFile: $message');
     }
   }
 

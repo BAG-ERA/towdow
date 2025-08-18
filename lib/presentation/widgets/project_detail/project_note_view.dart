@@ -563,9 +563,6 @@ class _AttachmentRow extends ConsumerWidget {
       try {
         final saveFile = File(savePath);
         await saveFile.writeAsBytes(bytes);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Media file saved successfully')),
-        );
       } catch (e) {
         AppLogger.error('ProjectNoteView: Failed to save media file', e);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -623,9 +620,6 @@ class _AttachmentRow extends ConsumerWidget {
       try {
         final saveFile = File(savePath);
         await saveFile.writeAsBytes(bytes);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('File saved successfully')),
-        );
       } catch (e) {
         AppLogger.error('ProjectNoteView: Failed to save file', e);
         ScaffoldMessenger.of(context).showSnackBar(

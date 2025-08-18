@@ -2,7 +2,6 @@
 // Reuses components from media validator but adapts for task media attachments
 // Follows MVVM architecture - UI logic delegated to TaskMediaAttachmentViewModel
 
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -12,6 +11,7 @@ import '../../../data/models/task.dart';
 import '../../../data/models/attachment.dart';
 import '../../../data/providers/providers_project.dart';
 import '../../../data/providers/providers_viewmodels.dart';
+
 import '../../viewmodels/attachment_viewmodel.dart';
 import '../utils/image_thumbnail.dart';
 import '../utils/full_screen_image_viewer.dart';
@@ -32,16 +32,8 @@ class TaskMediaAttachmentList extends ConsumerStatefulWidget {
 }
 
 class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentList> {
-  bool _hasShownMessage = false;
-  bool _isExpanded = false;
 
-  @override
-  void initState() {
-    super.initState();
-    // Expand by default if there's only one media attachment
-    final mediaAttachments = _parseMediaAttachments(widget.task.mediaAttachments);
-    _isExpanded = mediaAttachments.length <= 1;
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -65,9 +57,23 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
     // Watch the unified attachment view model state
     final mediaAttachmentState = ref.watch(unifiedAttachmentViewModelProvider);
     
-    // Parse media attachments from the current task using the unified viewmodel
+    // Parse media attachments from the current task using both unified and legacy approaches
     final allAttachments = ref.read(unifiedAttachmentViewModelProvider.notifier).parseAttachments(currentTask.attachments);
-    final mediaAttachments = allAttachments.where((attachment) => attachment.type == AttachmentType.media).toList();
+    final unifiedMediaAttachments = allAttachments.where((attachment) => attachment.type == AttachmentType.media).toList();
+    
+    // Also check legacy mediaAttachments field for backward compatibility
+    final legacyMediaAttachments = ref.read(unifiedAttachmentViewModelProvider.notifier).parseAttachments(currentTask.mediaAttachments);
+    
+    // Combine both sources, avoiding duplicates
+    final mediaAttachments = <Attachment>[];
+    final seenUris = <String>{};
+    
+    for (final attachment in [...unifiedMediaAttachments, ...legacyMediaAttachments]) {
+      if (!seenUris.contains(attachment.uri)) {
+        mediaAttachments.add(attachment);
+        seenUris.add(attachment.uri);
+      }
+    }
 
     // Don't show anything if no media attachments
     if (mediaAttachments.isEmpty) {
@@ -165,56 +171,12 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
             ),
           ),
         ],
-        
-        // Success message
-        if (mediaAttachmentState.successMessage != null) ...[
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    mediaAttachmentState.successMessage!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    ref.read(unifiedAttachmentViewModelProvider.notifier).clearMessages();
-                  },
-                  icon: const Icon(Icons.close, size: 16),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 24,
-                    minHeight: 24,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
     );
   }
 
   Widget _buildMediaAttachmentItem(Attachment mediaAttachment, UnifiedAttachmentState mediaAttachmentState) {
-    final fileSize = mediaAttachment.size;
     final fileId = mediaAttachment.uri;
-    final fileStatus = mediaAttachment.status;
     
     final isDownloadingThis = mediaAttachmentState.isDownloading && 
                              mediaAttachmentState.downloadingFileId == fileId;
@@ -257,22 +219,10 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
                   ],
                 ),
                 
-                // Status and actions
+                // Actions
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Expanded(
-                      child: Text(
-                        _getStatusText(fileStatus),
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: _getStatusColor(fileStatus, context),
-                          fontWeight: fileStatus == 'local' ? FontWeight.w500 : FontWeight.normal,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    
                     // Download button
                     GestureDetector(
                       onTap: isDownloadingThis ? null : () => _downloadMediaFile(mediaAttachment),
@@ -514,75 +464,5 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
     }
   }
 
-  String _formatFileSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-  }
 
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'local':
-        return 'Local';
-      case 'uploading':
-        return 'Uploading...';
-      case 'uploaded':
-        return 'Uploaded';
-      case 'failed':
-        return 'Failed';
-      default:
-        return 'Unknown';
-    }
-  }
-
-  Color _getStatusColor(String status, BuildContext context) {
-    switch (status) {
-      case 'local':
-        return Theme.of(context).colorScheme.primary;
-      case 'uploading':
-        return Theme.of(context).colorScheme.secondary;
-      case 'uploaded':
-        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
-      case 'failed':
-        return Theme.of(context).colorScheme.error;
-      default:
-        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
-    }
-  }
-
-  void _showSuccessSnackbar(String message) {
-    if (mounted) {
-      // Success message - no notification needed
-      AppLogger.info('TaskMediaAttachmentList: $message');
-    }
-  }
-
-  void _showErrorSnackbar(String message) {
-    if (mounted) {
-      // Error message - no notification needed
-      AppLogger.error('TaskMediaAttachmentList: $message');
-    }
-  }
-
-  /// Parse media attachments JSON array
-  List<Map<String, dynamic>> _parseMediaAttachments(String mediaAttachmentsJson) {
-    try {
-      if (mediaAttachmentsJson.isEmpty || mediaAttachmentsJson == '[]') {
-        return [];
-      }
-      
-      final decoded = jsonDecode(mediaAttachmentsJson);
-      if (decoded is List) {
-        return decoded.map<Map<String, dynamic>>((attachment) {
-          return attachment is Map<String, dynamic> ? attachment : <String, dynamic>{};
-        }).toList();
-      }
-      
-      return [];
-    } catch (e) {
-      AppLogger.error('TaskMediaAttachmentList: Failed to parse media attachments JSON', e);
-      return [];
-    }
-  }
 } 

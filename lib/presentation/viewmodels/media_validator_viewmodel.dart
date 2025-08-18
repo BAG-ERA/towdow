@@ -20,14 +20,12 @@ class MediaValidatorState {
   final bool isDownloading;
   final String? downloadingFileId;
   final String? error;
-  final String? successMessage;
 
   const MediaValidatorState({
     this.isUploading = false,
     this.isDownloading = false,
     this.downloadingFileId,
     this.error,
-    this.successMessage,
   });
 
   MediaValidatorState copyWith({
@@ -35,19 +33,17 @@ class MediaValidatorState {
     bool? isDownloading,
     String? downloadingFileId,
     String? error,
-    String? successMessage,
   }) {
     return MediaValidatorState(
       isUploading: isUploading ?? this.isUploading,
       isDownloading: isDownloading ?? this.isDownloading,
       downloadingFileId: downloadingFileId ?? this.downloadingFileId,
       error: error ?? this.error,
-      successMessage: successMessage ?? this.successMessage,
     );
   }
 
   MediaValidatorState clearMessages() {
-    return copyWith(error: null, successMessage: null);
+    return copyWith(error: null);
   }
 }
 
@@ -218,7 +214,6 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
 
           state = state.copyWith(
             isUploading: false,
-            successMessage: 'Media file added successfully (will upload when online)',
           );
           return true;
         },
@@ -260,7 +255,6 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
           state = state.copyWith(
             isDownloading: false,
             downloadingFileId: null,
-            successMessage: 'Media file ready for download',
           );
           return data;
         },
@@ -314,7 +308,6 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
         state = state.copyWith(
           isDownloading: false,
           downloadingFileId: null,
-          successMessage: 'Media file downloaded from server',
         );
         return data;
       },
@@ -381,7 +374,6 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
             state = state.copyWith(
               isDownloading: false,
               downloadingFileId: null,
-              successMessage: 'Media file downloaded to: $finalPath',
             );
             
             return finalPath;
@@ -477,7 +469,7 @@ class MediaValidatorViewModel extends StateNotifier<MediaValidatorState> {
         },
       );
 
-      state = state.copyWith(successMessage: 'Media file removed successfully');
+
       return true;
     } catch (e) {
       AppLogger.error('MediaValidatorViewModel: Remove media file failed', e);

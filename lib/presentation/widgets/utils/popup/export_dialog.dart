@@ -126,7 +126,6 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _showSuccessMessage();
               },
               child: Text(AppLocalizations.of(context)!.done),
             ),
@@ -189,12 +188,6 @@ class _ExportDialogState extends ConsumerState<ExportDialog> {
         _errorMessage = 'Unexpected error: $e';
         _isExporting = false;
       });
-    }
-  }
-
-  void _showSuccessMessage() {
-    if (context.mounted) {
-      // Export completed successfully - no notification needed
     }
   }
 } 
