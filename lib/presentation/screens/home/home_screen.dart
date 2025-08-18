@@ -469,12 +469,6 @@ class _TaskListTab extends ConsumerWidget {
                                           task: task,
                                           onToggleComplete: () async {
                                             await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
-                                            ref.invalidate(taskListProvider);
-                                            ref.invalidate(todayTasksProvider);
-                                            ref.invalidate(soonTasksProvider);
-                                            ref.invalidate(nextWeekTasksProvider);
-                                            ref.invalidate(laterTasksProvider);
-                                            ref.invalidate(anytimeTasksProvider);
                                           },
                                           onTaskUpdated: (updatedTask) async {
                                             await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
