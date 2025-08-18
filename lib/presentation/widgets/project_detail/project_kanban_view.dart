@@ -164,6 +164,7 @@ class ProjectKanbanView extends ConsumerWidget {
               ),
             )
           : null,
+      onAddCategory: () => _showCreateCategoryDialog(context, ref),
       onTaskTap: (task) {
         // Navigate to task detail
       },
@@ -441,6 +442,107 @@ class ProjectKanbanView extends ConsumerWidget {
             child: Text(AppLocalizations.of(context)!.close),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Show dialog to create a new category
+  Future<void> _showCreateCategoryDialog(BuildContext context, WidgetRef ref) async {
+    final nameController = TextEditingController();
+    Color selectedColor = Theme.of(context).colorScheme.primary;
+    
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(AppLocalizations.of(context)!.createNewCategory),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: AppLocalizations.of(context)!.categoryName,
+                    hintText: 'e.g., Urgent, In Progress, Review',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  AppLocalizations.of(context)!.colorLabel,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    Colors.red,
+                    Colors.orange,
+                    Colors.yellow,
+                    Colors.green,
+                    Colors.blue,
+                    Colors.purple,
+                    Colors.pink,
+                    Colors.grey,
+                  ].map((color) => GestureDetector(
+                    onTap: () {
+                      setDialogState(() {
+                        selectedColor = color;
+                      });
+                    },
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: selectedColor == color 
+                              ? Theme.of(context).colorScheme.onSurface 
+                              : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                      child: selectedColor == color
+                          ? Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 16,
+                            )
+                          : null,
+                    ),
+                  )).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(AppLocalizations.of(context)!.cancel),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final name = nameController.text.trim();
+                if (name.isNotEmpty) {
+                  final categoryViewModel = ref.read(projectCategoryViewModelProvider(projectPath).notifier);
+                  await categoryViewModel.createCategory(
+                    name: name,
+                    color: selectedColor,
+                    projectPath: projectPath,
+                  );
+                  onTasksRefresh?.call();
+                  Navigator.of(context).pop(true);
+                }
+              },
+              child: Text(AppLocalizations.of(context)!.create),
+            ),
+          ],
+        ),
       ),
     );
   }

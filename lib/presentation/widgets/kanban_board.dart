@@ -37,6 +37,7 @@ class KanbanBoard extends ConsumerWidget {
   final Function(String)? onColumnHide;
   final double? height;
   final Widget? hiddenColumnsButton;
+  final VoidCallback? onAddCategory;
 
   const KanbanBoard({
     super.key,
@@ -49,48 +50,119 @@ class KanbanBoard extends ConsumerWidget {
     this.onColumnHide,
     this.height,
     this.hiddenColumnsButton,
+    this.onAddCategory,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scrollController = ScrollController();
+    
     return SizedBox(
       height: height ?? MediaQuery.of(context).size.height * 0.7,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final availableWidth = constraints.maxWidth;
           const targetColumnWidth = 360.0;
+          const columnSpacing = 16.0;
           
-          // Take the maximum between 420px and available width
-          final actualColumnWidth = targetColumnWidth < availableWidth ? targetColumnWidth : availableWidth;
+          // Calculate total width needed for all columns
+          final totalColumns = columns.length + (hiddenColumnsButton != null ? 1 : 0) + (onAddCategory != null ? 1 : 0);
+          final totalSpacing = (totalColumns - 1) * columnSpacing;
+          final totalWidth = (totalColumns * targetColumnWidth) + totalSpacing;
           
-          return ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.all(16),
-            itemCount: columns.length + (hiddenColumnsButton != null ? 1 : 0),
-            separatorBuilder: (context, index) => const SizedBox(width: 16),
-            itemBuilder: (context, index) {
-              // If this is the last item and we have a hidden columns button, show it
-              if (hiddenColumnsButton != null && index == columns.length) {
-                return SizedBox(
-                  width: 200,
-                  child: hiddenColumnsButton!,
-                );
-              }
-              
-              final column = columns[index];
-              return SizedBox(
-                width: actualColumnWidth,
-                child: KanbanColumnWidget(
-                  column: column,
-                  onTaskMoved: onTaskMoved,
-                  onTaskTap: onTaskTap,
-                  onTaskToggle: onTaskToggle,
-                  onTaskUpdated: onTaskUpdated,
-                  onTaskDeleted: onTaskDeleted,
-                  onColumnHide: onColumnHide,
+          return ScrollbarTheme(
+            data: ScrollbarThemeData(
+              thumbColor: MaterialStateProperty.resolveWith((states) {
+                final base = Theme.of(context).colorScheme.onSurface;
+                if (states.contains(MaterialState.dragged)) {
+                  return base.withOpacity(0.55);
+                }
+                if (states.contains(MaterialState.hovered)) {
+                  return base.withOpacity(0.28);
+                }
+                return base.withOpacity(0.06);
+              }),
+              trackColor: MaterialStateProperty.resolveWith((states) {
+                final base = Theme.of(context).colorScheme.onSurface;
+                if (states.contains(MaterialState.dragged)) {
+                  return base.withOpacity(0.18);
+                }
+                if (states.contains(MaterialState.hovered)) {
+                  return base.withOpacity(0.10);
+                }
+                return base.withOpacity(0.03);
+              }),
+              trackBorderColor: MaterialStateProperty.all(Colors.transparent),
+              thickness: MaterialStateProperty.all(8.0),
+              radius: const Radius.circular(4.0),
+            ),
+            child: Scrollbar(
+              thumbVisibility: true,
+              trackVisibility: true,
+              thickness: 8.0,
+              radius: const Radius.circular(4.0),
+              controller: scrollController,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                controller: scrollController,
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: totalWidth),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ...columns.map((column) => Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: SizedBox(
+                          width: targetColumnWidth,
+                          child: KanbanColumnWidget(
+                            column: column,
+                            onTaskMoved: onTaskMoved,
+                            onTaskTap: onTaskTap,
+                            onTaskToggle: onTaskToggle,
+                            onTaskUpdated: onTaskUpdated,
+                            onTaskDeleted: onTaskDeleted,
+                            onColumnHide: onColumnHide,
+                          ),
+                        ),
+                      )),
+                      if (hiddenColumnsButton != null) ...[
+                        const SizedBox(width: 16),
+                        SizedBox(
+                          width: 200,
+                          child: hiddenColumnsButton!,
+                        ),
+                      ],
+                      if (onAddCategory != null) ...[
+                        const SizedBox(width: 16),
+                        Container(
+                          width: 60,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                              width: 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: onAddCategory,
+                              borderRadius: BorderRadius.circular(12),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.add,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              );
-            },
+              ),
+            ),
           );
         },
       ),
