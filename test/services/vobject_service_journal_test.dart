@@ -46,8 +46,9 @@ void main() {
         taskUid: journalUid, // This is the journal UID
         fileName: 'document.pdf',
         aesKey: 'test-key',
+        localPath: '/tmp/test.pdf',
+        fileSize: 1234,
         contentType: 'application/pdf',
-        size: 1234,
         status: OfflineFileStatus.local,
         createdAt: DateTime.now(),
         validatorId: null,
@@ -72,7 +73,7 @@ void main() {
       final result = await vobjectService.updateWithS3Info(offlineFile, s3Info);
 
       // Assert
-      expect(result.isSuccess, true);
+      expect(result, isA<Success<VObjectUpdateResult>>());
       
       final updateResult = result.when(
         success: (result) => result,
@@ -84,9 +85,6 @@ void main() {
       expect(updateResult.type, VObjectType.journal);
       expect(updateResult.projectPath, '/calendars/test-project/');
 
-      // Verify that the journal was saved with updated attachments
-      verify(mockJournalRepository.save(any)).called(1);
-      
       // Verify the saved journal has S3 info in attachments
       final savedJournal = verify(mockJournalRepository.save(captureAny)).captured.first as Journal;
       expect(savedJournal.attachments, contains(s3Key));
@@ -102,8 +100,9 @@ void main() {
         taskUid: journalUid,
         fileName: 'document.pdf',
         aesKey: 'test-key',
+        localPath: '/tmp/test.pdf',
+        fileSize: 1234,
         contentType: 'application/pdf',
-        size: 1234,
         status: OfflineFileStatus.local,
         createdAt: DateTime.now(),
         validatorId: null,
@@ -125,7 +124,7 @@ void main() {
       final result = await vobjectService.updateWithS3Info(offlineFile, s3Info);
 
       // Assert
-      expect(result.isFailure, true);
+      expect(result, isA<Error<VObjectUpdateResult>>());
       
       final failure = result.when(
         success: (result) => throw Exception('Expected failure but got success'),
@@ -153,8 +152,9 @@ void main() {
         taskUid: journalUid,
         fileName: 'document.pdf',
         aesKey: 'test-key',
+        localPath: '/tmp/test.pdf',
+        fileSize: 1234,
         contentType: 'application/pdf',
-        size: 1234,
         status: OfflineFileStatus.local,
         createdAt: DateTime.now(),
         validatorId: null,
@@ -176,7 +176,7 @@ void main() {
       final result = await vobjectService.updateWithS3Info(offlineFile, s3Info);
 
       // Assert
-      expect(result.isSuccess, true);
+      expect(result, isA<Success<VObjectUpdateResult>>());
       
       final updateResult = result.when(
         success: (result) => result,
