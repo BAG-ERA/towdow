@@ -1,6 +1,8 @@
 ﻿// Task repository interface and local implementation
 // Follows repository pattern for task data access
 
+import 'package:towdow_app/data/models/task_helpers.dart';
+
 import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../models/task.dart';

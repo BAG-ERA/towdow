@@ -41,6 +41,20 @@ class TaskViewModel extends StateNotifier<TaskViewModelState> {
 
   TaskViewModel(this._taskRepository, this._accountRepository) : super(TaskViewModelState());
 
+  /// Update the selected task when reactive data changes
+  /// This method is called by the provider when the task repository emits new data
+  void updateSelectedTask(Task? newTask) {
+    if (newTask != null && state.selectedTask?.uid == newTask.uid) {
+      AppLogger.debug('TaskViewModel: Updating selected task data for ${newTask.uid}');
+      state = state.copyWith(selectedTask: newTask);
+    }
+  }
+
+  /// Set the selected task to watch for updates
+  void selectTask(Task task) {
+    state = state.copyWith(selectedTask: task);
+  }
+
   // Create a new task
   Future<void> createTask({
     required String summary,

@@ -172,6 +172,18 @@ final projectStepsProvider = StreamProvider.family<List<ProjectStep>, String>((r
 // Project task search
 final projectSearchQueryProvider = StateProvider.family<String, String>((ref, projectPath) => '');
 
+// Reactive task provider that watches individual tasks by UID
+final taskProvider = StreamProvider.family<Task?, String>((ref, taskUid) {
+  final taskRepository = ref.watch(taskRepositoryProvider);
+  return taskRepository.watchTasks().map((tasks) {
+    try {
+      return tasks.firstWhere((task) => task.uid == taskUid);
+    } catch (e) {
+      return null;
+    }
+  });
+});
+
 final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, projectPath) {
   final projectTasksAsync = ref.watch(projectTasksProvider(projectPath));
   final searchQuery = ref.watch(projectSearchQueryProvider(projectPath));

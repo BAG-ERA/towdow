@@ -9,7 +9,9 @@ import '../services/workflow_service.dart';
 import '../services/status_service.dart';
 import '../services/storage/file_upload_queue_service.dart';
 import '../services/storage/offline_file_service.dart';
+import '../services/storage/media_cleanup_service.dart';
 import '../services/storage/s3_storage_service.dart';
+import '../services/vobject_service.dart';
 import '../services/sync/connection_monitor_service.dart';
 import '../services/sync/sync_orchestrator_service.dart';
 import '../services/sync/sync_service.dart';
@@ -34,6 +36,7 @@ import '../services/domain_service.dart' as caldav_domain;
 // import '../../core/app_lifecycle_manager.dart';
 import '../../core/logger.dart';
 import '../services/sync/sync_commander_provider.dart';
+import '../services/storage/encryption_service.dart';
 
 /// Feature flag: whether file features (S3, file/media validators, attachments)
 /// are enabled for the current active account. Disabled for `providerType == 'custom'`.
@@ -45,19 +48,42 @@ final fileFeaturesEnabledProvider = Provider<bool>((ref) {
   );
 });
 
+final encryptionServiceProvider = Provider<EncryptionService>((ref) {
+  return EncryptionService();
+});
+
 final offlineFileServiceProvider = Provider<OfflineFileService>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
-  return OfflineFileService(storageService);
+  final encryptionService = ref.watch(encryptionServiceProvider);
+  return OfflineFileService(storageService, encryptionService);
+});
+
+final mediaCleanupServiceProvider = Provider<MediaCleanupService>((ref) {
+  final offlineFileService = ref.watch(offlineFileServiceProvider);
+  return MediaCleanupService(offlineFileService);
 });
 
 final fileUploadQueueServiceProvider = Provider<FileUploadQueueService>((ref) {
-  return FileUploadQueueService(
+  final service = FileUploadQueueService(
     localStorage: ref.watch(localStorageServiceProvider),
     offlineFileService: ref.watch(offlineFileServiceProvider),
     accountRepository: ref.watch(accountRepositoryProvider),
     connectionMonitorService: ref.watch(connectionMonitorServiceProvider),
     taskRepository: ref.watch(taskRepositoryProvider),
+    journalRepository: ref.watch(journalRepositoryProvider),
     syncService: ref.watch(syncServiceProvider),
+  );
+  // Inject generic VObjectService so upload pipeline is type-agnostic
+  try {
+    service.setVObjectService(ref.watch(vobjectServiceProvider));
+  } catch (_) {}
+  return service;
+});
+
+final vobjectServiceProvider = Provider<VObjectService>((ref) {
+  return VObjectService(
+    taskRepository: ref.watch(taskRepositoryProvider),
+    journalRepository: ref.watch(journalRepositoryProvider),
   );
 });
 
@@ -204,6 +230,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final categoryRepository = ref.watch(categoryRepositoryProvider);
   final userRepository = ref.watch(userRepositoryProvider);
+  final journalRepository = ref.watch(journalRepositoryProvider);
   final localStorage = ref.watch(localStorageServiceProvider);
   final syncService = SyncService(
     taskRepository: taskRepository,
@@ -211,6 +238,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     calendarRepository: calendarRepository,
     categoryRepository: categoryRepository,
     userRepository: userRepository,
+    journalRepository: journalRepository,
     localStorage: localStorage,
   );
   // Best-effort injection without importing LocalTaskRepository type
@@ -219,6 +247,8 @@ final syncServiceProvider = Provider<SyncService>((ref) {
     // dynamic call; will no-op if method not present
     // ignore: avoid_dynamic_calls
     (taskRepository as dynamic).setSyncService(syncService);
+    // ignore: avoid_dynamic_calls
+    (journalRepository as dynamic).setSyncService(syncService);
   } catch (_) {}
   return syncService;
 });

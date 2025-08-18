@@ -9,6 +9,7 @@ import 'package:towdow_app/data/repositories/account_repository.dart';
 import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
+import 'package:towdow_app/data/repositories/journal_repository.dart';
 import 'package:towdow_app/data/models/task.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
 import 'package:towdow_app/core/result.dart';
@@ -34,6 +35,7 @@ void main() {
     late CalendarRepository calendarRepository;
     late CategoryRepository categoryRepository;
     late UserRepository userRepository;
+    late JournalRepository journalRepository;
     late SyncService syncService;
     late Directory tempDir;
 
@@ -106,6 +108,7 @@ void main() {
       userRepository = LocalUserRepository(storageService);
       calendarRepository = LocalCalendarRepository(storageService, accountRepository, userRepository);
       categoryRepository = CategoryRepository(calendarRepository, accountRepository);
+      journalRepository = LocalJournalRepository(storageService);
       
       syncService = SyncService(
         taskRepository: taskRepository,
@@ -113,6 +116,7 @@ void main() {
         calendarRepository: calendarRepository,
         categoryRepository: categoryRepository,
         userRepository: userRepository,
+        journalRepository: journalRepository,
         localStorage: storageService,
       );
     });
@@ -318,6 +322,7 @@ void main() {
           calendarRepository: errorCalendarRepository,
           categoryRepository: errorCategoryRepository,
           userRepository: userRepository,
+          journalRepository: journalRepository,
           localStorage: errorStorageService,
         );
 

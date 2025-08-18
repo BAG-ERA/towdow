@@ -27,6 +27,7 @@ void main() {
     late MockCalendarRepository mockCalendarRepo;
     late MockCategoryRepository mockCategoryRepo;
     late MockUserRepository mockUserRepo;
+    late MockJournalRepository mockJournalRepo;
     late MockLocalStorageService mockStorage;
 
     late SyncService syncService;
@@ -48,6 +49,7 @@ void main() {
       mockCalendarRepo = MockCalendarRepository();
       mockCategoryRepo = MockCategoryRepository();
       mockUserRepo = MockUserRepository();
+      mockJournalRepo = MockJournalRepository();
       mockStorage = MockLocalStorageService();
 
       // Provide factories that return our fakes
@@ -105,6 +107,7 @@ void main() {
         calendarRepository: mockCalendarRepo,
         categoryRepository: mockCategoryRepo,
         userRepository: mockUserRepo,
+        journalRepository: mockJournalRepo,
         localStorage: mockStorage,
       );
     });

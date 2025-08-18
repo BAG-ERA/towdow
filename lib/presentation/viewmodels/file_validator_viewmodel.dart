@@ -20,14 +20,12 @@ class FileValidatorState {
   final bool isDownloading;
   final String? downloadingFileId;
   final String? error;
-  final String? successMessage;
 
   const FileValidatorState({
     this.isUploading = false,
     this.isDownloading = false,
     this.downloadingFileId,
     this.error,
-    this.successMessage,
   });
 
   FileValidatorState copyWith({
@@ -35,19 +33,17 @@ class FileValidatorState {
     bool? isDownloading,
     String? downloadingFileId,
     String? error,
-    String? successMessage,
   }) {
     return FileValidatorState(
       isUploading: isUploading ?? this.isUploading,
       isDownloading: isDownloading ?? this.isDownloading,
       downloadingFileId: downloadingFileId ?? this.downloadingFileId,
       error: error ?? this.error,
-      successMessage: successMessage ?? this.successMessage,
     );
   }
 
   FileValidatorState clearMessages() {
-    return copyWith(error: null, successMessage: null);
+    return copyWith(error: null);
   }
 }
 
@@ -219,7 +215,6 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
 
           state = state.copyWith(
             isUploading: false,
-            successMessage: 'File added successfully (will upload when online)',
           );
           return true;
         },
@@ -244,7 +239,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
     required String fileId,
     required String fileName,
     required String validatorId,
-    String? s3Key,
+    required String s3Key,
   }) async {
     state = state.copyWith(
       isDownloading: true,
@@ -261,18 +256,11 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
           state = state.copyWith(
             isDownloading: false,
             downloadingFileId: null,
-            successMessage: 'File ready for download',
           );
           return data;
         },
         failure: (failure) async {
-          // If local file not found, try to download from S3
-          if (s3Key != null) {
-            AppLogger.debug('FileValidatorViewModel: Local file not found, trying S3 download');
-            return await _downloadFromS3(s3Key, validatorId);
-          } else {
-            throw Exception('File not available locally and no S3 key provided');
-          }
+          throw Exception('File not available locally and no S3 key provided');
         },
       );
 
@@ -315,7 +303,6 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
         state = state.copyWith(
           isDownloading: false,
           downloadingFileId: null,
-          successMessage: 'File downloaded from server',
         );
         return data;
       },
@@ -382,7 +369,6 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
             state = state.copyWith(
               isDownloading: false,
               downloadingFileId: null,
-              successMessage: 'File downloaded to: $finalPath',
             );
             
             return finalPath;
@@ -478,7 +464,7 @@ class FileValidatorViewModel extends StateNotifier<FileValidatorState> {
         },
       );
 
-      state = state.copyWith(successMessage: 'File removed successfully');
+
       return true;
     } catch (e) {
       AppLogger.error('FileValidatorViewModel: Remove file failed', e);

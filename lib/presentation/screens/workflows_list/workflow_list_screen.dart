@@ -128,7 +128,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          for (final group in state.domainGroups)
+          for (final group in ref.read(workflowListViewModelProvider.notifier).filteredDomainGroups)
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Column(

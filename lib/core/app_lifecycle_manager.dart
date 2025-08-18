@@ -8,6 +8,7 @@ import '../data/services/sync/sync_service.dart';
 import '../data/services/sync/sync_orchestrator_service.dart';
 import '../data/services/integration/external_caldav_calendar/external_sync_service.dart';
 import '../data/services/storage/file_upload_queue_service.dart';
+import '../data/services/storage/media_cleanup_service.dart';
 import '../data/services/sync/connection_monitor_service.dart';
 import '../data/services/user/user_sync_service.dart';
 import '../data/repositories/account_repository.dart';
@@ -34,6 +35,7 @@ class AppLifecycleManager {
   CalDAVMonitor? _caldavMonitor;
   ExternalCalendarSyncService? _externalSyncService;
   FileUploadQueueService? _fileUploadQueueService;
+  MediaCleanupService? _mediaCleanupService;
   ConnectionMonitorService? _connectionMonitorService;
   UserSyncService? _userSyncService;
   AccountRepository? _accountRepository;
@@ -45,6 +47,10 @@ class AppLifecycleManager {
   // Timers and subscriptions
   Timer? _backgroundSyncTimer;
   StreamSubscription<FlowItAppState>? _lifecycleSubscription;
+  
+  // Cooldown control to prevent overly frequent health-check syncs
+  DateTime? _lastHealthCheckSyncAt;
+  static const Duration _healthCheckCooldown = Duration(minutes: 3);
 
   // Getters
   FlowItAppState get state => _state;
@@ -58,6 +64,7 @@ class AppLifecycleManager {
     required CalDAVMonitor caldavMonitor,
     required ExternalCalendarSyncService externalSyncService,
     required FileUploadQueueService fileUploadQueueService,
+    required MediaCleanupService mediaCleanupService,
     required ConnectionMonitorService connectionMonitorService,
     required UserSyncService userSyncService,
     required AccountRepository accountRepository,
@@ -71,6 +78,7 @@ class AppLifecycleManager {
       _caldavMonitor = caldavMonitor;
       _externalSyncService = externalSyncService;
       _fileUploadQueueService = fileUploadQueueService;
+      _mediaCleanupService = mediaCleanupService;
       _connectionMonitorService = connectionMonitorService;
       _userSyncService = userSyncService;
       _accountRepository = accountRepository;
@@ -113,6 +121,13 @@ class AppLifecycleManager {
                       AppLogger.info('AppLifecycleManager: No active account - file upload queue not started');
                     },
                   );
+                }
+
+                // Start media cleanup service (always enabled for local file management)
+                if (_mediaCleanupService != null) {
+                  AppLogger.debug('AppLifecycleManager: Starting MediaCleanupService (offline-only mode)');
+                  _mediaCleanupService!.startCleanupService();
+                  AppLogger.info('AppLifecycleManager: MediaCleanupService started (offline-only mode)');
                 }
 
                 if (_connectionMonitorService != null) {
@@ -218,6 +233,13 @@ class AppLifecycleManager {
             AppLogger.info('AppLifecycleManager: No active account - file upload queue not started');
           },
         );
+      }
+
+      // Start media cleanup service (always enabled for local file management)
+      if (_mediaCleanupService != null) {
+        AppLogger.debug('AppLifecycleManager: Starting MediaCleanupService');
+        _mediaCleanupService!.startCleanupService();
+        AppLogger.info('AppLifecycleManager: MediaCleanupService started successfully');
       }
 
       // Start user sync service (cloud only)
@@ -393,10 +415,16 @@ class AppLifecycleManager {
       // Ensure services are still running
       _ensureServicesRunning();
       
-      // Trigger immediate sync to get latest data
+      // Optional immediate sync is gated by cooldown; avoid double-trigger with _ensureServicesRunning
       if (_syncService != null) {
-        // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Triggering sync on app resume');
-        _syncService!.syncAllActiveCaldav();
+        final lastSync = _syncService!.lastSyncTime ?? _lastHealthCheckSyncAt;
+        final shouldSync = lastSync == null || DateTime.now().difference(lastSync) > _healthCheckCooldown;
+        if (shouldSync) {
+          _lastHealthCheckSyncAt = DateTime.now();
+          _syncService!.syncAllActiveCaldav();
+        } else {
+          AppLogger.debug('AppLifecycleManager: Skipping immediate resume sync due to cooldown');
+        }
       }
       
       // Update shared projects when app resumes
@@ -471,8 +499,15 @@ class AppLifecycleManager {
           success: (account) {
             if (account != null && _syncService != null) {
               // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account available, ensuring sync service is initialized');
-              // Services should be running, trigger a health check sync
-              _syncService!.syncAllActiveCaldav();
+              // Services should be running, trigger a health check sync (cooldown guarded)
+              final lastSync = _syncService!.lastSyncTime ?? _lastHealthCheckSyncAt;
+              final shouldSync = lastSync == null || DateTime.now().difference(lastSync) > _healthCheckCooldown;
+              if (shouldSync) {
+                _lastHealthCheckSyncAt = DateTime.now();
+                _syncService!.syncAllActiveCaldav();
+              } else {
+                AppLogger.debug('AppLifecycleManager: Skipping health-check sync due to cooldown');
+              }
             }
           },
           failure: (failure) {

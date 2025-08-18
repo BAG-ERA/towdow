@@ -7,15 +7,19 @@ import 'package:uuid/uuid.dart';
 import '../../../core/result.dart';
 import '../../../core/logger.dart';
 import '../../models/offline_file.dart';
+import '../../models/journal.dart';
 import '../../models/task.dart';
 import '../../repositories/account_repository.dart';
 import '../../repositories/task_repository.dart';
+import '../../repositories/journal_repository.dart';
 import 'local_storage_service.dart';
 import 'offline_file_service.dart';
 import 's3_storage_service.dart';
 import '../sync/connection_monitor_service.dart';
 import '../sync/sync_service.dart';
 import '../validator_service.dart';
+// validator_service is no longer used here after generic VObjectService update
+import '../vobject_service.dart';
 
 /// Upload status types
 enum UploadStatusType {
@@ -49,7 +53,9 @@ class FileUploadQueueService {
   final AccountRepository _accountRepository;
   final ConnectionMonitorService _connectionMonitorService;
   final TaskRepository _taskRepository;
+  final JournalRepository? _journalRepository; // optional injection
   final SyncService _syncService;
+  VObjectService? _vobjectService;
 
   // Queue processing
   Timer? _queueTimer;
@@ -69,13 +75,19 @@ class FileUploadQueueService {
     required AccountRepository accountRepository,
     required ConnectionMonitorService connectionMonitorService,
     required TaskRepository taskRepository,
+    JournalRepository? journalRepository,
     required SyncService syncService,
   })  : _localStorage = localStorage,
         _offlineFileService = offlineFileService,
         _accountRepository = accountRepository,
         _connectionMonitorService = connectionMonitorService,
         _taskRepository = taskRepository,
+        _journalRepository = journalRepository,
         _syncService = syncService;
+
+  void setVObjectService(VObjectService service) {
+    _vobjectService = service;
+  }
 
   /// Stream for upload status updates
   Stream<FileUploadStatus> get statusStream => _statusController.stream;
@@ -335,8 +347,48 @@ class FileUploadQueueService {
                 s3Url: s3Info['s3Url'],
               );
               
-              // Update task validator with S3 info
-              await _updateTaskValidatorWithS3Info(offlineFile, s3Info);
+              // Update VObject (task or journal) with S3 info using VObjectService
+              if (_vobjectService != null) {
+                final updateResult = await _vobjectService!.updateWithS3Info(offlineFile, s3Info);
+                await updateResult.when(
+                  success: (result) async {
+                    if (result.updated && result.projectPath != null) {
+                      // Queue sync operation for the updated VObject
+                      final syncData = <String, dynamic>{
+                        'calendarPath': result.projectPath,
+                      };
+                      
+                      // Add appropriate UID field based on type
+                      if (result.type == VObjectType.task) {
+                        syncData['taskUid'] = result.uid;
+                        await _syncService.queueSyncOperation(
+                          SyncOperation.update,
+                          result.uid,
+                          syncData,
+                        );
+                      } else if (result.type == VObjectType.journal) {
+                        syncData['journalUid'] = result.uid;
+                        await _syncService.queueSyncOperation(
+                          SyncOperation.updateJournal,
+                          result.uid,
+                          syncData,
+                        );
+                      }
+                      
+                      AppLogger.info('FileUploadQueueService: Successfully updated ${result.type} with S3 info: ${result.uid}');
+                    } else {
+                      AppLogger.warning('FileUploadQueueService: No updates made to VObject: ${result.uid}');
+                    }
+                  },
+                  failure: (failure) async {
+                    AppLogger.error('FileUploadQueueService: Failed to update VObject with S3 info: ${failure.message}');
+                  },
+                );
+              } else {
+                AppLogger.warning('FileUploadQueueService: VObjectService not available, falling back to legacy task update');
+                // Fallback to legacy method for backward compatibility
+                await _updateTaskValidatorWithS3Info(offlineFile, s3Info);
+              }
               
               // Remove from queue
               await removeFromQueue(queueItem.offlineFileId);
@@ -437,10 +489,11 @@ class FileUploadQueueService {
       // Create S3 service
       final s3Service = S3StorageService(account: account);
       
-      // Generate S3 key
+      // Generate S3 key with unique filename to prevent conflicts
       final userPrefix = s3Service.getUserPrefix();
       final sanitizedFileName = _sanitizeFileName(offlineFile.fileName);
-      final s3Key = '$userPrefix${offlineFile.taskUid}/$sanitizedFileName';
+      final uniqueFileName = generateUniqueFileName(sanitizedFileName, offlineFile.id);
+      final s3Key = '$userPrefix${offlineFile.taskUid}/$uniqueFileName';
       AppLogger.debug('FQS._uploadFile: bucket=shared s3Key=$s3Key contentType=${offlineFile.contentType}');
       
       // Upload to S3 with encryption
@@ -471,6 +524,29 @@ class FileUploadQueueService {
     }
   }
 
+  /// Generate a unique filename to prevent S3 key conflicts
+  /// Uses the offline file ID to ensure uniqueness while keeping the original filename readable
+  String generateUniqueFileName(String originalFileName, String offlineFileId) {
+    // Extract file extension
+    final lastDotIndex = originalFileName.lastIndexOf('.');
+    String nameWithoutExtension;
+    String extension;
+    
+    if (lastDotIndex > 0) {
+      nameWithoutExtension = originalFileName.substring(0, lastDotIndex);
+      extension = originalFileName.substring(lastDotIndex);
+    } else {
+      nameWithoutExtension = originalFileName;
+      extension = '';
+    }
+    
+    // Use first 8 characters of offline file ID as unique suffix
+    final uniqueSuffix = offlineFileId.substring(0, 8);
+    
+    // Combine: original_name_uuid.ext
+    return '${nameWithoutExtension}_$uniqueSuffix$extension';
+  }
+
   /// Update task validator with S3 info
   Future<void> _updateTaskValidatorWithS3Info(OfflineFile offlineFile, Map<String, String> s3Info) async {
     try {
@@ -483,22 +559,19 @@ class FileUploadQueueService {
       await taskResult.when(
         success: (task) async {
           if (task == null) {
-            AppLogger.error('FileUploadQueueService: Task not found: ${offlineFile.taskUid}');
+            AppLogger.error('FileUploadQueueService: Task not found for uid: ${offlineFile.taskUid}');
             return;
           }
           
-          AppLogger.debug('FileUploadQueueService: Found task: ${task.uid}');
-          AppLogger.debug('FileUploadQueueService: Current validator data: ${task.flowitValidator}');
+          AppLogger.debug('FileUploadQueueService: Found task, current attachments: ${task.attachments}');
+          AppLogger.debug('FileUploadQueueService: Found task, current mediaAttachments: ${task.mediaAttachments}');
           
-          // Update validator state only if this file belongs to a validator
-          Task updatedTask = task;
-          bool hasUpdates = false;
+          Task? updatedTask;
+          
           if (offlineFile.validatorId != null) {
-            // Parse current validators
+            // Update validator
+            AppLogger.debug('FileUploadQueueService: Updating validator ${offlineFile.validatorId}');
             final validatorLists = ValidatorService.parseValidators(task.flowitValidator);
-            AppLogger.debug('FileUploadQueueService: Parsed validators: $validatorLists');
-            
-            // Update the file validator with S3 info
             final updateData = {
               'type': 'update_file_s3',
               'offlineFileId': offlineFile.id,
@@ -507,73 +580,52 @@ class FileUploadQueueService {
               'status': 'uploaded',
               'removeOfflineRef': true,
             };
-            AppLogger.debug('FileUploadQueueService: Update data: $updateData');
-            
             final updatedValidatorLists = ValidatorService.updateValidatorState(
               validatorLists,
               offlineFile.validatorId!,
               updateData,
             );
-            AppLogger.debug('FileUploadQueueService: Updated validators: $updatedValidatorLists');
-            
-            // Update task with new validator data
             final newValidatorString = ValidatorService.serializeValidators(updatedValidatorLists);
-            AppLogger.debug('FileUploadQueueService: New validator string: $newValidatorString');
-            
             updatedTask = task.copyWith(
               flowitValidator: newValidatorString,
               lastModified: DateTime.now(),
             );
-            hasUpdates = true;
+            AppLogger.debug('FileUploadQueueService: Validator updated successfully');
           } else {
-            // No validatorId means this is a task attachment or media attachment
-            // Try to update attachments first
-            final attachmentsUpdated = _updateTaskAttachmentsWithS3Info(updatedTask, offlineFile, s3Info);
-            if (attachmentsUpdated != null) {
-              updatedTask = attachmentsUpdated;
-              hasUpdates = true;
-            } else {
-              // Try media attachments
-              final mediaUpdated = _updateTaskMediaAttachmentsWithS3Info(updatedTask, offlineFile, s3Info);
-              if (mediaUpdated != null) {
-                updatedTask = mediaUpdated;
-                hasUpdates = true;
-              }
+            // Update regular attachments
+            AppLogger.debug('FileUploadQueueService: Updating regular attachments');
+            updatedTask = _updateTaskAttachmentsWithS3Info(task, offlineFile, s3Info);
+            if (updatedTask == null) {
+              updatedTask = _updateTaskMediaAttachmentsWithS3Info(task, offlineFile, s3Info);
             }
           }
           
-          if (hasUpdates) {
-            AppLogger.debug('FileUploadQueueService: Saving updated task...');
-            
-            // Save updated task
+          if (updatedTask != null) {
+            AppLogger.info('FileUploadQueueService: Saving updated task');
             final saveResult = await _taskRepository.save(updatedTask);
             await saveResult.when(
               success: (_) async {
-                AppLogger.info('FileUploadQueueService: Task updated with S3 info for ${offlineFile.taskUid}');
-                
-                // Queue sync operation to push changes to server
-                AppLogger.debug('FileUploadQueueService: Queuing sync operation...');
+                AppLogger.info('FileUploadQueueService: Task updated with S3 info successfully');
+                // Queue sync operation
                 await _syncService.queueSyncOperation(
                   SyncOperation.update,
-                  offlineFile.taskUid,
+                  updatedTask!.uid,
                   {
-                    'taskUid': offlineFile.taskUid,
-                    'calendarPath': task.projectPath,
+                    'taskUid': updatedTask.uid,
+                    'calendarPath': updatedTask.projectPath,
                   },
                 );
-                
-                AppLogger.info('FileUploadQueueService: Sync operation queued for ${offlineFile.taskUid}');
               },
-              failure: (failure) async {
-                AppLogger.error('FileUploadQueueService: Failed to save updated task: ${failure.message}');
+              failure: (f) async {
+                AppLogger.error('FileUploadQueueService: Failed to save updated task: ${f.message}');
               },
             );
           } else {
-            AppLogger.warning('FileUploadQueueService: No matching attachment found to update for offline file ${offlineFile.id}');
+            AppLogger.warning('FileUploadQueueService: No updates made to task');
           }
         },
-        failure: (failure) async {
-          AppLogger.error('FileUploadQueueService: Failed to get task ${offlineFile.taskUid}: ${failure.message}');
+        failure: (f) async {
+          AppLogger.error('FileUploadQueueService: Failed to get task: ${f.message}');
         },
       );
     } catch (e, stackTrace) {
@@ -583,6 +635,8 @@ class FileUploadQueueService {
 
   /// Update task attachments (non-validator) with S3 info
   /// Returns updated Task if an attachment was updated, otherwise null
+  // Legacy helpers retained for reference; no longer used after VObjectService update
+  // TODO: remove unused legacy helper once references are fully migrated
   Task? _updateTaskAttachmentsWithS3Info(Task task, OfflineFile offlineFile, Map<String, String> s3Info) {
     try {
       if (task.attachments.isEmpty || task.attachments == '[]') {
@@ -624,6 +678,7 @@ class FileUploadQueueService {
 
   /// Update task mediaAttachments (non-validator) with S3 info
   /// Returns updated Task if a media attachment was updated, otherwise null
+  // TODO: remove unused legacy helper once references are fully migrated
   Task? _updateTaskMediaAttachmentsWithS3Info(Task task, OfflineFile offlineFile, Map<String, String> s3Info) {
     try {
       if (task.mediaAttachments.isEmpty || task.mediaAttachments == '[]') {
@@ -662,7 +717,7 @@ class FileUploadQueueService {
       return null;
     }
   }
-
+ 
   /// Get queue status
   Future<Result<Map<String, dynamic>>> getQueueStatus() async {
     try {

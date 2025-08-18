@@ -2,10 +2,8 @@
 // Vérifie chaque étape du processus depuis la suppression UI jusqu'à la sync serveur
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/material.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import 'package:riverpod/riverpod.dart';
 import 'package:towdow_app/core/logger.dart';
 import 'package:towdow_app/core/result.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
@@ -16,6 +14,7 @@ import 'package:towdow_app/data/repositories/calendar_repository.dart';
 import 'package:towdow_app/data/repositories/task_repository.dart';
 import 'package:towdow_app/data/repositories/category_repository.dart';
 import 'package:towdow_app/data/repositories/user_repository.dart';
+import 'package:towdow_app/data/repositories/journal_repository.dart';
 import 'package:towdow_app/data/services/storage/local_storage_service.dart';
 import 'package:towdow_app/data/services/sync/sync_service.dart';
 import 'package:towdow_app/presentation/viewmodels/task_viewmodel.dart';
@@ -28,6 +27,7 @@ import 'sync_delete_flow_test.mocks.dart';
   CalendarRepository,
   CategoryRepository,
   UserRepository,
+  JournalRepository,
   LocalStorageService,
   SyncService,
 ])
@@ -41,6 +41,7 @@ void main() {
     late MockCategoryRepository mockCategoryRepository;
     late MockLocalStorageService mockLocalStorage;
     late MockUserRepository mockUserRepository;
+    late MockJournalRepository mockJournalRepository;
 
     setUp(() {
       mockTaskRepository = MockTaskRepository();
@@ -49,6 +50,7 @@ void main() {
       mockCategoryRepository = MockCategoryRepository();
       mockLocalStorage = MockLocalStorageService();
       mockUserRepository = MockUserRepository();
+      mockJournalRepository = MockJournalRepository();
 
       syncService = SyncService(
         taskRepository: mockTaskRepository,
@@ -56,6 +58,7 @@ void main() {
         calendarRepository: mockCalendarRepository,
         categoryRepository: mockCategoryRepository,
         userRepository: mockUserRepository,
+        journalRepository: mockJournalRepository,
         localStorage: mockLocalStorage,
       );
       taskViewModel = TaskViewModel(mockTaskRepository, mockAccountRepository);

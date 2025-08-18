@@ -3,12 +3,15 @@
 // Maintains backward compatibility with legacy validator format
 
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/logger.dart';
+import 'storage/encryption_service.dart';
 
 /// Service for managing validator logic
 class ValidatorService {
+  
+  // Static instance of EncryptionService for key generation
+  static final EncryptionService _encryptionService = EncryptionService();
   
   /// Parse validator JSON from task.flowitValidator field
   /// Returns list of validator lists (new format) or empty list
@@ -258,9 +261,8 @@ class ValidatorService {
     bool required = true,
   }) {
     const uuid = Uuid();
-    // Generate encryption key directly without EncryptionService dependency
-    // S3StorageService now handles the actual encryption/decryption
-    final encryptionKey = _generateEncryptionKey();
+    // Generate encryption key using EncryptionService for secure file encryption
+    final encryptionKey = _encryptionService.generateEncryptionKey();
     return {
       'id': uuid.v4(),
       'type': 'file',
@@ -278,9 +280,8 @@ class ValidatorService {
     bool required = true,
   }) {
     const uuid = Uuid();
-    // Generate encryption key directly without EncryptionService dependency
-    // S3StorageService now handles the actual encryption/decryption
-    final encryptionKey = _generateEncryptionKey();
+    // Generate encryption key using EncryptionService for secure media encryption
+    final encryptionKey = _encryptionService.generateEncryptionKey();
     return {
       'id': uuid.v4(),
       'type': 'media',
@@ -292,19 +293,6 @@ class ValidatorService {
     };
   }
 
-  /// Generate a unique encryption key for file validator
-  /// Returns a cryptographically secure random key
-  static String _generateEncryptionKey() {
-    const uuid = Uuid();
-    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-    final combined = '${uuid.v4()}-$timestamp';
-    
-    // Create a hash for additional security
-    final bytes = utf8.encode(combined);
-    final digest = sha256.convert(bytes);
-    return digest.toString();
-  }
-  
   /// Private helper methods
   static Map<String, dynamic> _migrateFormQuestion(Map<String, dynamic> question) {
     final type = question['questiontype'] as String?;

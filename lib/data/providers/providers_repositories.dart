@@ -2,6 +2,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/task_repository.dart';
+import '../repositories/journal_repository.dart';
 import '../repositories/calendar_repository.dart';
 import '../services/sync/sync_commander_provider.dart';
 // Avoid importing sync here to prevent provider cycles. The calendar repository
@@ -22,6 +23,11 @@ import 'providers_services_core.dart';
 final taskRepositoryProvider = Provider<TaskRepository>((ref) {
   final storageService = ref.watch(localStorageServiceProvider);
   return LocalTaskRepository(storageService);
+});
+
+final journalRepositoryProvider = Provider<JournalRepository>((ref) {
+  final storageService = ref.watch(localStorageServiceProvider);
+  return LocalJournalRepository(storageService);
 });
 
 final calendarRepositoryProvider = Provider<CalendarRepository>((ref) {

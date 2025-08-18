@@ -6,6 +6,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/logger.dart';
+import '../../viewmodels/media_validator_viewmodel.dart';
+import '../../viewmodels/attachment_viewmodel.dart';
+import '../../../data/providers/providers_viewmodels.dart';
 
 /// Reusable image thumbnail widget
 class ImageThumbnail extends ConsumerStatefulWidget {
@@ -14,7 +17,6 @@ class ImageThumbnail extends ConsumerStatefulWidget {
   final Map<String, dynamic> file;
   final String taskUid;
   final VoidCallback onTap;
-  final bool isLarge;
   final Future<Uint8List?> Function() onLoadImageData;
 
   const ImageThumbnail({
@@ -25,7 +27,6 @@ class ImageThumbnail extends ConsumerStatefulWidget {
     required this.taskUid,
     required this.onTap,
     required this.onLoadImageData,
-    this.isLarge = false,
   });
 
   @override
@@ -40,12 +41,41 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
   @override
   void initState() {
     super.initState();
-    _loadImageData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadImageData();
+      }
+    });
   }
 
   Future<void> _loadImageData() async {
     try {
-      final imageData = await widget.onLoadImageData();
+      // Try to load thumbnail first for faster display
+      Uint8List? imageData;
+      
+      // Check if we have a media validator viewmodel available (for thumbnails)
+      if (widget.taskUid.isNotEmpty) {
+        try {
+          // Try to get thumbnail data first
+          final thumbnailData = await ref.read(mediaValidatorViewModelProvider(widget.taskUid).notifier)
+              .getThumbnailData(
+                fileId: widget.fileId,
+                fileName: widget.fileName,
+              );
+          
+          if (thumbnailData != null) {
+            imageData = thumbnailData;
+            AppLogger.debug('ImageThumbnail: Using thumbnail for ${widget.fileName}');
+          }
+        } catch (e) {
+          AppLogger.debug('ImageThumbnail: Failed to get thumbnail, falling back to full image: $e');
+        }
+      }
+      
+      // If no thumbnail available, load full image
+      if (imageData == null) {
+        imageData = await widget.onLoadImageData();
+      }
 
       if (mounted) {
         if (imageData != null) {
@@ -77,29 +107,17 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        width: widget.isLarge ? double.infinity : 48,
-        height: widget.isLarge ? 120 : 48,
+        key: ValueKey('image_thumbnail_${widget.fileId}'),
+        height: 120,
         decoration: BoxDecoration(
-          borderRadius: widget.isLarge 
-              ? const BorderRadius.only(
-                  topLeft: Radius.circular(7),
-                  topRight: Radius.circular(7),
-                )
-              : BorderRadius.circular(6),
-          border: widget.isLarge 
-              ? null 
-              : Border.all(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                  width: 1,
-                ),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+            width: 1,
+          ),
         ),
         child: ClipRRect(
-          borderRadius: widget.isLarge 
-              ? const BorderRadius.only(
-                  topLeft: Radius.circular(7),
-                  topRight: Radius.circular(7),
-                )
-              : BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(5),
           child: _buildContent(context),
         ),
       ),
@@ -107,7 +125,11 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
   }
 
   Widget _buildContent(BuildContext context) {
-    if (_isLoading) {
+    // Watch the unified attachment viewmodel state for download status
+    final attachmentState = ref.watch(unifiedAttachmentViewModelProvider);
+    final isDownloading = attachmentState.isDownloading && attachmentState.downloadingFileId == widget.fileId;
+    
+    if (_isLoading || isDownloading) {
       return Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: const Center(
@@ -123,10 +145,12 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
     if (_hasError || _imageData == null) {
       return Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Icon(
-          Icons.image,
-          size: 24,
-          color: Theme.of(context).colorScheme.primary,
+        child: Center(
+          child: Icon(
+            Icons.image,
+            size: 24,
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
       );
     }
@@ -137,10 +161,12 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
       errorBuilder: (context, error, stackTrace) {
         return Container(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: Icon(
-            Icons.broken_image,
-            size: 24,
-            color: Theme.of(context).colorScheme.error,
+          child: Center(
+            child: Icon(
+              Icons.broken_image,
+              size: 24,
+              color: Theme.of(context).colorScheme.error,
+            ),
           ),
         );
       },

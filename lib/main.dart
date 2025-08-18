@@ -21,6 +21,7 @@ import 'data/models/calendar_event.dart';
 import 'data/models/offline_file.dart';
 import 'data/models/validator.dart';
 import 'data/models/category.dart';
+import 'data/models/journal.dart';
 import 'data/services/user/user_preferences_queue_service.dart';
 
 // Import services and providers
@@ -72,6 +73,8 @@ void main() async {
   
   // Register Category adapter
   Hive.registerAdapter(CategoryAdapter());
+  // Register Journal adapter
+  Hive.registerAdapter(JournalAdapter());
   
   // Register User Preferences Queue adapters
   Hive.registerAdapter(UserPreferencesOperationAdapter());

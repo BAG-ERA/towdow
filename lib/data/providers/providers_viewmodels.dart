@@ -6,12 +6,17 @@ import '../../presentation/viewmodels/caldav_settings_viewmodel.dart';
 import '../../presentation/viewmodels/project_list_viewmodel.dart';
 import '../../presentation/viewmodels/external_calendar_viewmodel.dart';
 import '../../presentation/viewmodels/validator_viewmodel.dart';
-import '../../presentation/viewmodels/task_file_attachment_viewmodel.dart';
-import '../../presentation/viewmodels/task_media_attachment_viewmodel.dart';
+import '../../presentation/viewmodels/attachment_viewmodel.dart';
 import '../../presentation/viewmodels/category_viewmodel.dart';
+import '../services/storage/file_upload_queue_service.dart';
+import '../../core/logger.dart';
 import '../../presentation/viewmodels/project_kanban_viewmodel.dart';
 import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
 import '../../presentation/viewmodels/step_viewmodel.dart';
+import '../../presentation/viewmodels/project_notes_viewmodel.dart';
+import '../../presentation/viewmodels/note_viewmodel.dart';
+
+import '../../data/models/journal.dart';
 import 'providers_repositories.dart';
 import 'providers_services_core.dart';
 // import '../../presentation/viewmodels/caldav_management_viewmodel.dart';
@@ -34,30 +39,26 @@ final validatorViewModelProvider = StateNotifierProvider.family<ValidatorViewMod
   return ValidatorViewModel(taskRepository, accountRepository);
 });
 
-final taskFileAttachmentViewModelProvider = StateNotifierProvider.family<TaskFileAttachmentViewModel, TaskFileAttachmentState, String>((ref, taskUid) {
+final unifiedAttachmentViewModelProvider = StateNotifierProvider<UnifiedAttachmentViewModel, UnifiedAttachmentState>((ref) {
   final taskRepository = ref.watch(taskRepositoryProvider);
+  final journalRepository = ref.watch(journalRepositoryProvider);
   final accountRepository = ref.watch(accountRepositoryProvider);
   final offlineFileService = ref.watch(offlineFileServiceProvider);
-  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
-  return TaskFileAttachmentViewModel(
+  
+  // Try to get FileUploadQueueService, but don't fail if it's not available
+  FileUploadQueueService? fileUploadQueueService;
+  try {
+    fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
+  } catch (e) {
+    AppLogger.warning('UnifiedAttachmentViewModel: FileUploadQueueService not available: $e');
+  }
+  
+  return UnifiedAttachmentViewModel(
     taskRepository: taskRepository,
+    journalRepository: journalRepository,
     accountRepository: accountRepository,
     offlineFileService: offlineFileService,
     fileUploadQueueService: fileUploadQueueService,
-  );
-});
-
-final taskMediaAttachmentViewModelProvider = StateNotifierProvider.family<TaskMediaAttachmentViewModel, TaskMediaAttachmentState, String>((ref, taskUid) {
-  final taskRepository = ref.watch(taskRepositoryProvider);
-  final accountRepository = ref.watch(accountRepositoryProvider);
-  final offlineFileService = ref.watch(offlineFileServiceProvider);
-  final fileUploadQueueService = ref.watch(fileUploadQueueServiceProvider);
-  return TaskMediaAttachmentViewModel(
-    taskUid,
-    taskRepository,
-    accountRepository,
-    offlineFileService,
-    fileUploadQueueService,
   );
 });
 
@@ -120,6 +121,53 @@ final externalCalendarViewModelProvider = StateNotifierProvider<ExternalCalendar
     ref.watch(externalEventRepositoryProvider),
     ref.watch(externalCalendarSyncServiceProvider),
   );
+});
+
+// Notes (journals)
+final projectNotesViewModelProvider = StateNotifierProvider.family<ProjectNotesViewModel, ProjectNotesState, String>((ref, projectPath) {
+  final repo = ref.watch(journalRepositoryProvider);
+  return ProjectNotesViewModel(projectPath: projectPath, journalRepository: repo);
+});
+
+// Reactive journal provider that watches the repository for changes
+final journalProvider = StreamProvider.family<Journal?, String>((ref, journalUid) {
+  final journalRepository = ref.watch(journalRepositoryProvider);
+  return journalRepository.watchJournals().map((journals) {
+    try {
+      return journals.firstWhere((journal) => journal.uid == journalUid);
+    } catch (e) {
+      return null;
+    }
+  });
+});
+
+final noteViewModelProvider = StateNotifierProvider.family<NoteViewModel, NoteState, String>((ref, journalUid) {
+  final journalRepository = ref.watch(journalRepositoryProvider);
+  final journalAsync = ref.watch(journalProvider(journalUid));
+  
+  // Get the current journal or create a placeholder
+  final journal = journalAsync.value ?? Journal(
+    uid: journalUid,
+    summary: '',
+    description: '',
+    lastModified: DateTime.now(),
+    created: DateTime.now(),
+    dtstamp: DateTime.now(),
+    projectPath: '',
+  );
+  
+  final viewModel = NoteViewModel(journal, journalRepository);
+  
+  // Update the viewmodel when the journal changes
+  ref.listen<AsyncValue<Journal?>>(journalProvider(journalUid), (previous, next) {
+    next.whenData((journal) {
+      if (journal != null) {
+        viewModel.updateJournal(journal);
+      }
+    });
+  });
+  
+  return viewModel;
 });
 
 

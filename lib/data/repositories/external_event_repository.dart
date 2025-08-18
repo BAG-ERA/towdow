@@ -138,6 +138,24 @@ class LocalExternalEventRepository implements ExternalEventRepository {
         ? '${event.uid}_${event.recurrenceId}'
         : event.uid;
     
+    // Avoid unnecessary writes when ETag hasn't changed
+    final existingResult = await _storageService.get<CalendarEvent>(_boxName, storageKey);
+    final shouldSkip = existingResult.when(
+      success: (existing) {
+        if (existing == null) return false;
+        // If both have ETag and they match, skip save
+        if (existing.etag != null && event.etag != null && existing.etag == event.etag) {
+          return true;
+        }
+        return false;
+      },
+      failure: (_) => false,
+    );
+    if (shouldSkip) {
+      AppLogger.debug('LocalExternalEventRepository: Skipping save for "${event.summary}" (UID: ${event.uid}) - ETag unchanged (${event.etag})');
+      return const Result.success(null);
+    }
+    
     AppLogger.debug('LocalExternalEventRepository: Saving event "${event.summary}" (UID: ${event.uid}, storage key: $storageKey) from calendar ${event.sourceCalendarUid} in account ${event.accountId}');
     return await _storageService.put(_boxName, storageKey, event);
   }

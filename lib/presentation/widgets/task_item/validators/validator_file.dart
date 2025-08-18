@@ -46,16 +46,12 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
           _showErrorSnackbar(fileValidatorState.error!);
           ref.read(fileValidatorViewModelProvider(widget.taskUid).notifier).clearMessages();
           _hasShownMessage = true;
-        } else if (fileValidatorState.successMessage != null) {
-          _showSuccessSnackbar(fileValidatorState.successMessage!);
-          ref.read(fileValidatorViewModelProvider(widget.taskUid).notifier).clearMessages();
-          _hasShownMessage = true;
         }
       }
     });
     
     // Reset flag when messages are cleared
-    if (fileValidatorState.error == null && fileValidatorState.successMessage == null) {
+    if (fileValidatorState.error == null) {
       _hasShownMessage = false;
     }
     
@@ -300,7 +296,7 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
           fileId: fileId,
           fileName: fileName,
           validatorId: validatorId,
-          s3Key: s3Key, // Optional for offline files
+          s3Key: s3Key ?? '', // Provide empty string if s3Key is null
         );
 
     if (downloadResult == null) {
@@ -308,16 +304,22 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
       return;
     }
 
-    // Show file picker dialog to choose save location with bytes for Android/iOS
+    // Show file picker dialog to choose save location
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Save File',
       fileName: fileName,
       type: FileType.any,
-      bytes: downloadResult, // Provide bytes for Android/iOS compatibility
     );
 
     if (savePath != null) {
-      _showSuccessSnackbar('File saved successfully');
+      try {
+        // Actually write the file to the chosen location
+        final saveFile = File(savePath);
+        await saveFile.writeAsBytes(downloadResult);
+      } catch (e) {
+        AppLogger.error('ValidatorFile: Failed to save file', e);
+        _showErrorSnackbar('Failed to save file: $e');
+      }
     }
   }
 
@@ -646,12 +648,6 @@ class _ValidatorFileState extends ConsumerState<ValidatorFile> {
         return Theme.of(context).colorScheme.error;
       default:
         return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6);
-    }
-  }
-
-  void _showSuccessSnackbar(String message) {
-    if (mounted) {
-      AppLogger.info('ValidatorFile: $message');
     }
   }
 
