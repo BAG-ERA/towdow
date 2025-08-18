@@ -14,6 +14,7 @@ import '../data/services/user/user_sync_service.dart';
 import '../data/repositories/account_repository.dart';
 import 'logger.dart';
 import 'result.dart';
+import 'update/gitlab_update_service.dart';
 
 enum FlowItAppState {
   initial,
@@ -443,6 +444,9 @@ class AppLifecycleManager {
           AppLogger.warning('AppLifecycleManager: Error updating shared projects on app resume: $e');
         });
       }
+      
+      // Check for app updates when app resumes
+      GitLabUpdateService().checkAndPromptIfNeeded();
     }
   }
 

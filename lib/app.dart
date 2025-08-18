@@ -18,6 +18,7 @@ import 'presentation/widgets/adaptive_app_layout.dart';
 import 'presentation/providers/home_providers.dart';
 import 'data/providers/providers.dart';
 import 'core/theme/chart_theme.dart';
+import 'core/update/gitlab_update_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 
@@ -193,11 +194,25 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class FlowItApp extends ConsumerWidget {
+class FlowItApp extends ConsumerStatefulWidget {
   const FlowItApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FlowItApp> createState() => _FlowItAppState();
+}
+
+class _FlowItAppState extends ConsumerState<FlowItApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Kick the update check right after first frame, using global navigator
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      GitLabUpdateService().checkAndPromptIfNeeded(); // no context needed
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Initialize AppLifecycleManager
     ref.watch(appLifecycleInitializationProvider);
     
