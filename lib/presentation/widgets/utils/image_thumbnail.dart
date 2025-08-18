@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/logger.dart';
 import '../../viewmodels/media_validator_viewmodel.dart';
+import '../../viewmodels/attachment_viewmodel.dart';
+import '../../../data/providers/providers_viewmodels.dart';
 
 /// Reusable image thumbnail widget
 class ImageThumbnail extends ConsumerStatefulWidget {
@@ -123,7 +125,11 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
   }
 
   Widget _buildContent(BuildContext context) {
-    if (_isLoading) {
+    // Watch the unified attachment viewmodel state for download status
+    final attachmentState = ref.watch(unifiedAttachmentViewModelProvider);
+    final isDownloading = attachmentState.isDownloading && attachmentState.downloadingFileId == widget.fileId;
+    
+    if (_isLoading || isDownloading) {
       return Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: const Center(
