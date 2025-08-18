@@ -15,7 +15,6 @@ class ImageThumbnail extends ConsumerStatefulWidget {
   final Map<String, dynamic> file;
   final String taskUid;
   final VoidCallback onTap;
-  final bool isLarge;
   final Future<Uint8List?> Function() onLoadImageData;
 
   const ImageThumbnail({
@@ -26,7 +25,6 @@ class ImageThumbnail extends ConsumerStatefulWidget {
     required this.taskUid,
     required this.onTap,
     required this.onLoadImageData,
-    this.isLarge = false,
   });
 
   @override
@@ -103,29 +101,17 @@ class _ImageThumbnailState extends ConsumerState<ImageThumbnail> {
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        width: widget.isLarge ? double.infinity : 48,
-        height: widget.isLarge ? 120 : 48,
+        width: double.infinity,
+        height: 120,
         decoration: BoxDecoration(
-          borderRadius: widget.isLarge 
-              ? const BorderRadius.only(
-                  topLeft: Radius.circular(7),
-                  topRight: Radius.circular(7),
-                )
-              : BorderRadius.circular(6),
-          border: widget.isLarge 
-              ? null 
-              : Border.all(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                  width: 1,
-                ),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+            width: 1,
+          ),
         ),
         child: ClipRRect(
-          borderRadius: widget.isLarge 
-              ? const BorderRadius.only(
-                  topLeft: Radius.circular(7),
-                  topRight: Radius.circular(7),
-                )
-              : BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(5),
           child: _buildContent(context),
         ),
       ),

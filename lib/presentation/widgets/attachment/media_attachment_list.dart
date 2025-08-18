@@ -276,7 +276,6 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
           'mediaType': mediaAttachment.mediaType?.name,
         },
         taskUid: widget.task.uid,
-        isLarge: false,
         onTap: () => _showFullScreenImage(mediaAttachment),
         onLoadImageData: () => ref.read(unifiedAttachmentViewModelProvider.notifier)
             .downloadAttachment(

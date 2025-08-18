@@ -439,7 +439,6 @@ class _AttachmentRow extends ConsumerWidget {
                     aesKey: aesKey,
                     s3Key: s3Key.isEmpty ? null : s3Key,
                   ),
-              isLarge: false,
             )
           else
             // Show icon for non-image media files

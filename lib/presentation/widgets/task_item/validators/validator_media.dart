@@ -633,7 +633,6 @@ class _ValidatorMediaState extends ConsumerState<ValidatorMedia> {
         validatorId: validatorId,
         taskUid: widget.taskUid,
         onTap: (imageData) => _showFullScreenImageWithData(file, validatorId, imageData),
-        isLarge: true,
       );
     }
     
@@ -830,7 +829,6 @@ class _ImageThumbnail extends ConsumerStatefulWidget {
   final String validatorId;
   final String taskUid;
   final Function(Uint8List? imageData) onTap;
-  final bool isLarge;
 
   const _ImageThumbnail({
     required this.fileId,
@@ -839,7 +837,6 @@ class _ImageThumbnail extends ConsumerStatefulWidget {
     required this.validatorId,
     required this.taskUid,
     required this.onTap,
-    this.isLarge = false,
   });
 
   @override
@@ -923,29 +920,17 @@ class _ImageThumbnailState extends ConsumerState<_ImageThumbnail> {
     return GestureDetector(
       onTap: () => widget.onTap(_imageData),
       child: Container(
-        width: widget.isLarge ? double.infinity : 48,
-        height: widget.isLarge ? 120 : 48,
+        width: 48,
+        height: 48,
         decoration: BoxDecoration(
-          borderRadius: widget.isLarge 
-              ? const BorderRadius.only(
-                  topLeft: Radius.circular(7),
-                  topRight: Radius.circular(7),
-                )
-              : BorderRadius.circular(6),
-          border: widget.isLarge 
-              ? null 
-              : Border.all(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                  width: 1,
-                ),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+            width: 1,
+          ),
         ),
         child: ClipRRect(
-          borderRadius: widget.isLarge 
-              ? const BorderRadius.only(
-                  topLeft: Radius.circular(7),
-                  topRight: Radius.circular(7),
-                )
-              : BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(5),
           child: _buildContent(context),
         ),
       ),
