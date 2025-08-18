@@ -324,8 +324,9 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
     required String aesKey,
     String? s3Key,
   }) async {
-    if (state.isDownloading) {
-      state = state.copyWith(error: 'Download already in progress');
+    // Only block if this specific file is already being downloaded
+    if (state.isDownloading && state.downloadingFileId == fileId) {
+      state = state.copyWith(error: 'Download already in progress for this file');
       return null;
     }
 
