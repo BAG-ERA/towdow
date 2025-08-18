@@ -554,10 +554,6 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
         stepId: stepId,
       ),
     );
-    if (result != null && mounted) {
-      widget.onTasksRefresh?.call();
-      ref.invalidate(projectTasksProvider(widget.projectPath));
-    }
   }
 
   Color _colorForStepStatus(BuildContext context, StepStatus status) {
