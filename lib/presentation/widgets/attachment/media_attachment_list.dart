@@ -378,14 +378,12 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
 
       if (downloadResult == null) {
         AppLogger.error('TaskMediaAttachmentList: Download returned null for media file $fileId');
-        _showErrorSnackbar('Download failed');
         return;
       }
 
       AppLogger.debug('TaskMediaAttachmentList: Download successful, got ${downloadResult.length} bytes');
     } catch (e, stackTrace) {
       AppLogger.error('TaskMediaAttachmentList: Download failed for media file $fileId', e, stackTrace);
-      _showErrorSnackbar('Download failed: $e');
       return;
     }
 
@@ -401,10 +399,8 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
         // Actually write the file to the chosen location
         final saveFile = File(savePath);
         await saveFile.writeAsBytes(downloadResult);
-        _showSuccessSnackbar('Media file saved successfully');
       } catch (e) {
         AppLogger.error('TaskMediaAttachmentList: Failed to save file', e);
-        _showErrorSnackbar('Failed to save file: $e');
       }
     }
   }
@@ -423,7 +419,6 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
         );
 
     if (imageData == null) {
-      _showErrorSnackbar('Failed to load image');
       return;
     }
 

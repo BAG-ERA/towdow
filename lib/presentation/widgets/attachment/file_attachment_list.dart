@@ -3,7 +3,6 @@
 
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -53,9 +52,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
     // Parse attachments from the current task using the unified viewmodel
     final attachments = ref.read(unifiedAttachmentViewModelProvider.notifier).parseAttachments(currentTask.attachments);
 
-    if (attachments.isEmpty && !attachmentState.isUploading) {
-      return const SizedBox.shrink();
-    }
+    // Always show the header and add button, even if there are no attachments
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,17 +86,16 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
                   ),
                 ),
               ),
-            if (!attachmentState.isUploading)
-              IconButton(
-                onPressed: _uploadFile,
-                icon: const Icon(Icons.add, size: 16),
-                tooltip: 'Add file',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 24,
-                  minHeight: 24,
-                ),
+            IconButton(
+              onPressed: _uploadFile,
+              icon: const Icon(Icons.add, size: 16),
+              tooltip: 'Add file',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 24,
+                minHeight: 24,
               ),
+            ),
           ],
         ),
         if (attachments.isNotEmpty) ...[
@@ -340,18 +336,18 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
           final fileObj = File(file.path!);
           fileBytes = await fileObj.readAsBytes();
         } catch (e) {
-          _showErrorSnackbar('Could not read file: $e');
+          // Error will be handled by the ViewModel state
           return;
         }
       }
 
       if (fileBytes == null) {
-        _showErrorSnackbar('Could not read file data');
+        // Error will be handled by the ViewModel state
         return;
       }
 
       // Call unified ViewModel to handle upload
-      final success = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+      await ref.read(unifiedAttachmentViewModelProvider.notifier)
           .uploadTaskAttachment(
             taskUid: widget.task.uid,
             fileName: fileName,
@@ -361,12 +357,9 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
           );
 
       // If upload succeeded, the task will be automatically updated via the reactive stream
-      if (success) {
-        _showSuccessSnackbar('File uploaded successfully');
-      }
 
     } catch (e) {
-      _showErrorSnackbar('Upload failed: $e');
+      // Error will be handled by the ViewModel state
     }
   }
 
@@ -378,11 +371,6 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
 
     AppLogger.debug('TaskFileAttachmentList: Starting download for file $fileId ($fileName)');
 
-    if (encryptionKey == null) {
-      AppLogger.error('TaskFileAttachmentList: Missing encryption key for file $fileId');
-      _showErrorSnackbar('Missing encryption key for file');
-      return;
-    }
 
     Uint8List? downloadResult;
     try {
@@ -396,14 +384,12 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
 
       if (downloadResult == null) {
         AppLogger.error('TaskFileAttachmentList: Download returned null for file $fileId');
-        _showErrorSnackbar('Download failed');
         return;
       }
 
       AppLogger.debug('TaskFileAttachmentList: Download successful, got ${downloadResult.length} bytes');
     } catch (e, stackTrace) {
       AppLogger.error('TaskFileAttachmentList: Download failed for file $fileId', e, stackTrace);
-      _showErrorSnackbar('Download failed: $e');
       return;
     }
 
@@ -418,11 +404,9 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
       try {
         // Actually write the file to the chosen location
         final saveFile = File(savePath);
-        await saveFile.writeAsBytes(downloadResult!);
-        _showSuccessSnackbar('File saved successfully');
+        await saveFile.writeAsBytes(downloadResult);
       } catch (e) {
         AppLogger.error('TaskFileAttachmentList: Failed to save file', e);
-        _showErrorSnackbar('Failed to save file: $e');
       }
     }
   }
@@ -454,16 +438,11 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
     if (confirmed != true) return;
 
     // Call unified ViewModel to handle file removal
-    final success = await ref.read(unifiedAttachmentViewModelProvider.notifier)
+    await ref.read(unifiedAttachmentViewModelProvider.notifier)
         .removeTaskAttachment(
           taskUid: widget.task.uid,
           fileId: fileId,
         );
-
-    // If removal succeeded, the task will be automatically updated via the reactive stream
-    if (success) {
-      _showSuccessSnackbar('File removed successfully');
-    }
   }
 
   IconData _getFileIcon(String fileName) {
@@ -591,31 +570,5 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-  }
-
-
-
-  void _showSuccessSnackbar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
-  }
-
-  void _showErrorSnackbar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
   }
 }

@@ -3,6 +3,7 @@
 // Provides a single interface for both file and media attachments
 
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/attachment.dart';
 import '../../data/services/parsers/attachment_parser.dart';
@@ -20,6 +21,7 @@ class UnifiedAttachmentState {
   final String? downloadingFileId;
   final String? error;
   final String? successMessage;
+  final Set<String> uploadingFileIds; // Track multiple uploads
 
   const UnifiedAttachmentState({
     this.isUploading = false,
@@ -27,6 +29,7 @@ class UnifiedAttachmentState {
     this.downloadingFileId,
     this.error,
     this.successMessage,
+    this.uploadingFileIds = const {},
   });
 
   UnifiedAttachmentState copyWith({
@@ -35,6 +38,7 @@ class UnifiedAttachmentState {
     String? downloadingFileId,
     String? error,
     String? successMessage,
+    Set<String>? uploadingFileIds,
   }) {
     return UnifiedAttachmentState(
       isUploading: isUploading ?? this.isUploading,
@@ -42,6 +46,7 @@ class UnifiedAttachmentState {
       downloadingFileId: downloadingFileId ?? this.downloadingFileId,
       error: error,
       successMessage: successMessage,
+      uploadingFileIds: uploadingFileIds ?? this.uploadingFileIds,
     );
   }
 
@@ -59,6 +64,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
   final AccountRepository _accountRepository;
   final OfflineFileService _offlineFileService;
   final FileUploadQueueService? _fileUploadQueueService;
+  StreamSubscription<FileUploadStatus>? _uploadStatusSubscription;
 
   UnifiedAttachmentViewModel({
     required TaskRepository taskRepository,
@@ -71,7 +77,76 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
         _accountRepository = accountRepository,
         _offlineFileService = offlineFileService,
         _fileUploadQueueService = fileUploadQueueService,
-        super(const UnifiedAttachmentState());
+        super(const UnifiedAttachmentState()) {
+    _setupUploadStatusListener();
+  }
+
+  /// Setup listener for upload status updates from FileUploadQueueService
+  void _setupUploadStatusListener() {
+    if (_fileUploadQueueService != null) {
+      _uploadStatusSubscription = _fileUploadQueueService.statusStream.listen(
+        (status) {
+          _handleUploadStatusUpdate(status);
+        },
+        onError: (error) {
+          AppLogger.error('UnifiedAttachmentViewModel: Upload status stream error', error);
+        },
+      );
+    }
+  }
+
+  /// Handle upload status updates from FileUploadQueueService
+  void _handleUploadStatusUpdate(FileUploadStatus status) {
+    AppLogger.debug('UnifiedAttachmentViewModel: Received upload status update: ${status.fileId} - ${status.status}');
+    
+    switch (status.status) {
+      case UploadStatusType.queued:
+        // Add to uploading set
+        final newUploadingIds = Set<String>.from(state.uploadingFileIds)..add(status.fileId);
+        state = state.copyWith(
+          uploadingFileIds: newUploadingIds,
+          isUploading: newUploadingIds.isNotEmpty,
+        );
+        break;
+        
+      case UploadStatusType.uploading:
+        // File is being uploaded, ensure it's in the set
+        if (!state.uploadingFileIds.contains(status.fileId)) {
+          final newUploadingIds = Set<String>.from(state.uploadingFileIds)..add(status.fileId);
+          state = state.copyWith(
+            uploadingFileIds: newUploadingIds,
+            isUploading: newUploadingIds.isNotEmpty,
+          );
+        }
+        break;
+        
+      case UploadStatusType.success:
+        // Remove from uploading set
+        final newUploadingIds = Set<String>.from(state.uploadingFileIds)..remove(status.fileId);
+        state = state.copyWith(
+          uploadingFileIds: newUploadingIds,
+          isUploading: newUploadingIds.isNotEmpty,
+          successMessage: 'File uploaded successfully: ${status.fileName}',
+        );
+        break;
+        
+      case UploadStatusType.failed:
+        // Remove from uploading set and show error
+        final newUploadingIds = Set<String>.from(state.uploadingFileIds)..remove(status.fileId);
+        state = state.copyWith(
+          uploadingFileIds: newUploadingIds,
+          isUploading: newUploadingIds.isNotEmpty,
+          error: 'Upload failed: ${status.fileName} - ${status.error ?? 'Unknown error'}',
+        );
+        break;
+    }
+  }
+
+  @override
+  void dispose() {
+    _uploadStatusSubscription?.cancel();
+    super.dispose();
+  }
 
   /// Upload an attachment to a task
   /// MVVM: ViewModel only updates repository, repository handles file operations
@@ -82,12 +157,8 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
     required String contentType,
     required AttachmentType type,
   }) async {
-    if (state.isUploading) {
-      state = state.copyWith(error: 'Upload already in progress');
-      return false;
-    }
-
-    state = state.copyWith(isUploading: true, error: null);
+    // Remove the blocking logic - allow multiple uploads
+    state = state.copyWith(error: null);
 
     try {
       AppLogger.info('UnifiedAttachmentViewModel: Starting task attachment upload for $fileName');
@@ -95,20 +166,14 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       // Get current user for permission check
       final currentUserEmail = await _getCurrentUserEmail();
       if (currentUserEmail == null) {
-        state = state.copyWith(
-          isUploading: false,
-          error: 'No active account found',
-        );
+        state = state.copyWith(error: 'No active account found');
         return false;
       }
 
       // Get task and check permissions
       final task = await _getTaskWithPermission(taskUid, currentUserEmail);
       if (task == null) {
-        state = state.copyWith(
-          isUploading: false,
-          error: 'Task not found or permission denied',
-        );
+        state = state.copyWith(error: 'Task not found or permission denied');
         return false;
       }
 
@@ -129,7 +194,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
 
       // Queue file for upload (if service is available)
       if (_fileUploadQueueService != null) {
-        await _fileUploadQueueService!.queueFileUpload(offlineFile.id);
+        await _fileUploadQueueService.queueFileUpload(offlineFile.id);
       } else {
         AppLogger.warning('UnifiedAttachmentViewModel: FileUploadQueueService not available, skipping queue');
       }
@@ -157,10 +222,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       // Update task with new attachment - repository handles file operations
       final updatedTask = await _addAttachmentToTask(task, attachment);
       if (updatedTask == null) {
-        state = state.copyWith(
-          isUploading: false,
-          error: 'Failed to update task with attachment',
-        );
+        state = state.copyWith(error: 'Failed to update task with attachment');
         return false;
       }
 
@@ -168,10 +230,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       return true;
     } catch (e) {
       AppLogger.error('UnifiedAttachmentViewModel: Task attachment upload failed', e);
-      state = state.copyWith(
-        isUploading: false,
-        error: 'Upload failed: $e',
-      );
+      state = state.copyWith(error: 'Upload failed: $e');
       return false;
     }
   }
@@ -184,12 +243,8 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
     required String contentType,
     required AttachmentType type,
   }) async {
-    if (state.isUploading) {
-      state = state.copyWith(error: 'Upload already in progress');
-      return false;
-    }
-
-    state = state.copyWith(isUploading: true, error: null);
+    // Remove the blocking logic - allow multiple uploads
+    state = state.copyWith(error: null);
 
     try {
       AppLogger.info('UnifiedAttachmentViewModel: Starting journal attachment upload for $fileName');
@@ -197,20 +252,14 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       // Get current user for permission check
       final currentUserEmail = await _getCurrentUserEmail();
       if (currentUserEmail == null) {
-        state = state.copyWith(
-          isUploading: false,
-          error: 'No active account found',
-        );
+        state = state.copyWith(error: 'No active account found');
         return false;
       }
 
       // Get journal and check permissions
       final journal = await _getJournalWithPermission(journalUid, currentUserEmail);
       if (journal == null) {
-        state = state.copyWith(
-          isUploading: false,
-          error: 'Journal not found or permission denied',
-        );
+        state = state.copyWith(error: 'Journal not found or permission denied');
         return false;
       }
 
@@ -231,7 +280,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
 
       // Queue file for upload (if service is available)
       if (_fileUploadQueueService != null) {
-        await _fileUploadQueueService!.queueFileUpload(offlineFile.id);
+        await _fileUploadQueueService.queueFileUpload(offlineFile.id);
       } else {
         AppLogger.warning('UnifiedAttachmentViewModel: FileUploadQueueService not available, skipping queue');
       }
@@ -259,24 +308,15 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       // Update journal with new attachment metadata
       final updatedJournal = await _addAttachmentToJournal(journal, attachment);
       if (updatedJournal == null) {
-        state = state.copyWith(
-          isUploading: false,
-          error: 'Failed to update journal with attachment',
-        );
+        state = state.copyWith(error: 'Failed to update journal with attachment');
         return false;
       }
 
       AppLogger.info('UnifiedAttachmentViewModel: Journal attachment upload process completed: $fileName (${type == AttachmentType.media ? 'media' : 'file'})');
-      state = state.copyWith(
-        isUploading: false,
-      );
       return true;
     } catch (e) {
       AppLogger.error('UnifiedAttachmentViewModel: Journal attachment upload failed', e);
-      state = state.copyWith(
-        isUploading: false,
-        error: 'Upload failed: $e',
-      );
+      state = state.copyWith(error: 'Upload failed: $e');
       return false;
     }
   }
@@ -456,16 +496,16 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
 
   Future<String?> _getCurrentUserEmail() async {
     final accountResult = await _accountRepository.getActiveAccount();
-    return await accountResult.when(
-      success: (account) async => account?.email ?? account?.username,
-      failure: (_) async => null,
+    return accountResult.when(
+      success: (account) => account?.email ?? account?.username,
+      failure: (_) => null,
     );
   }
 
-  Future<dynamic?> _getTaskWithPermission(String taskUid, String currentUserEmail) async {
+  Future<dynamic> _getTaskWithPermission(String taskUid, String currentUserEmail) async {
     final taskResult = await _taskRepository.getById(taskUid);
-    return await taskResult.when(
-      success: (task) async {
+    return taskResult.when(
+      success: (task) {
         if (task == null) return null;
 
         // For attachments, allow if user is organizer or attendee
@@ -476,14 +516,14 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
 
         return task;
       },
-      failure: (_) async => null,
+      failure: (_) => null,
     );
   }
 
-  Future<dynamic?> _getJournalWithPermission(String journalUid, String currentUserEmail) async {
+  Future<dynamic> _getJournalWithPermission(String journalUid, String currentUserEmail) async {
     final journalResult = await _journalRepository.getById(journalUid);
-    return await journalResult.when(
-      success: (journal) async {
+    return journalResult.when(
+      success: (journal) {
         if (journal == null) return null;
 
         // For attachments, allow if user is organizer or attendee
@@ -494,11 +534,11 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
 
         return journal;
       },
-      failure: (_) async => null,
+      failure: (_) => null,
     );
   }
 
-  Future<dynamic?> _addAttachmentToTask(dynamic task, Attachment attachment) async {
+  Future<dynamic> _addAttachmentToTask(dynamic task, Attachment attachment) async {
     final attachments = parseAttachments(task.attachments);
     attachments.add(attachment);
 
@@ -508,13 +548,13 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
     );
 
     final saveResult = await _taskRepository.save(updatedTask);
-    return await saveResult.when(
-      success: (_) async => updatedTask,
-      failure: (_) async => null,
+    return saveResult.when(
+      success: (_) => updatedTask,
+      failure: (_) => null,
     );
   }
 
-  Future<dynamic?> _addAttachmentToJournal(dynamic journal, Attachment attachment) async {
+  Future<dynamic> _addAttachmentToJournal(dynamic journal, Attachment attachment) async {
     final attachments = parseAttachments(journal.attachments);
     attachments.add(attachment);
 
@@ -524,13 +564,13 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
     );
 
     final saveResult = await _journalRepository.save(updatedJournal);
-    return await saveResult.when(
-      success: (_) async => updatedJournal,
-      failure: (_) async => null,
+    return saveResult.when(
+      success: (_) => updatedJournal,
+      failure: (_) => null,
     );
   }
 
-  Future<dynamic?> _removeAttachmentFromTask(dynamic task, String fileId) async {
+  Future<dynamic> _removeAttachmentFromTask(dynamic task, String fileId) async {
     final attachments = parseAttachments(task.attachments);
     attachments.removeWhere((attachment) => attachment.uri == fileId);
 
@@ -540,13 +580,13 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
     );
 
     final saveResult = await _taskRepository.save(updatedTask);
-    return await saveResult.when(
-      success: (_) async => updatedTask,
-      failure: (_) async => null,
+    return saveResult.when(
+      success: (_) => updatedTask,
+      failure: (_) => null,
     );
   }
 
-  Future<dynamic?> _removeAttachmentFromJournal(dynamic journal, String fileId) async {
+  Future<dynamic> _removeAttachmentFromJournal(dynamic journal, String fileId) async {
     final attachments = parseAttachments(journal.attachments);
     attachments.removeWhere((attachment) => attachment.uri == fileId);
 
@@ -556,9 +596,9 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
     );
 
     final saveResult = await _journalRepository.save(updatedJournal);
-    return await saveResult.when(
-      success: (_) async => updatedJournal,
-      failure: (_) async => null,
+    return saveResult.when(
+      success: (_) => updatedJournal,
+      failure: (_) => null,
     );
   }
 
