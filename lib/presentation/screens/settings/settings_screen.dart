@@ -15,6 +15,7 @@ import '../../widgets/utils/popup/import_dialog.dart';
 import '../../../data/services/sync/sync_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../viewmodels/appearance_settings_viewmodel.dart';
+import '../../widgets/utils/voice_feedback_button.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -33,6 +34,9 @@ class SettingsScreen extends ConsumerWidget {
               elevation: 0,
               backgroundColor: Theme.of(context).colorScheme.surface,
               surfaceTintColor: Colors.transparent,
+              actions: [
+                const VoiceFeedbackButton(),
+              ],
             )
           : null,
       body: ListView(

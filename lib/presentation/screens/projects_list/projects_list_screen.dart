@@ -18,6 +18,7 @@ import '../../widgets/project-list/projects_table.dart';
 import '../../widgets/utils/buttons/create_project_button.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
 import '../../widgets/utils/popup/project_sharing_dialog.dart';
+import '../../widgets/utils/voice_feedback_button.dart';
 
 class ProjectsListScreen extends ConsumerStatefulWidget {
   const ProjectsListScreen({super.key});
@@ -65,7 +66,10 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Colors.transparent,
-          bottom: PreferredSize(
+        actions: [
+          const VoiceFeedbackButton(),
+        ],
+        bottom: PreferredSize(
           preferredSize: const Size.fromHeight(80),
           child: StyledTabBar(
             items: [

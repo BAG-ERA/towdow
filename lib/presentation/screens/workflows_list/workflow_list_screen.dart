@@ -16,6 +16,7 @@ import '../../widgets/utils/buttons/create_workflow_button.dart';
 import '../../widgets/navbar/workflow_popup_menu.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
 import '../../../core/theme/chart_theme_usage.dart';
+import '../../widgets/utils/voice_feedback_button.dart';
 
 class WorkflowListScreen extends ConsumerStatefulWidget {
   const WorkflowListScreen({super.key});
@@ -63,6 +64,9 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
               elevation: 0,
               backgroundColor: Theme.of(context).colorScheme.surface,
               surfaceTintColor: Colors.transparent,
+              actions: [
+                const VoiceFeedbackButton(),
+              ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(80),
                 child: StyledTabBar(

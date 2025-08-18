@@ -15,6 +15,7 @@ import '../../../data/models/calendar_event.dart';
 import '../../../data/services/sync/sync_service.dart';
 import '../../providers/home_providers.dart';
 import '../../../core/theme/chart_theme_usage.dart';
+import '../../widgets/utils/voice_feedback_button.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -56,6 +57,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Colors.transparent,
         actions: [
+          const VoiceFeedbackButton(),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),

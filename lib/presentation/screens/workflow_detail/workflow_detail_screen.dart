@@ -18,6 +18,7 @@ import '../../widgets/project_detail/project_bottleneck_view.dart';
 // projectProvider removed; use calendarListProvider to read project state
 import '../../widgets/project_detail/project_warnings_banner.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
+import '../../widgets/utils/voice_feedback_button.dart';
 
 class WorkflowDetailScreen extends ConsumerStatefulWidget {
   final String workflowPath;
@@ -383,7 +384,9 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          // Left side empty to naturally push actions to the right
+          // Voice feedback button on the left
+          const VoiceFeedbackButton(),
+          // Spacer to push workflow actions to the right
           const Spacer(),
           projectAsync.when(
             data: (project) => project != null ? _buildWorkflowActions(context, project) : const SizedBox.shrink(),
