@@ -258,7 +258,12 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
 
   void _toggleExpanded() {
     final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
-    projectListViewModel.toggleDomainExpansion(widget.domain);
+    final isExpanded = projectListViewModel.isDomainExpanded(widget.domain);
+    if (isExpanded) {
+      projectListViewModel.collapseDomain(widget.domain);
+    } else {
+      projectListViewModel.expandDomain(widget.domain);
+    }
     
     // The build method will be called again due to the state change,
     // so we don't need to manually update the animation here

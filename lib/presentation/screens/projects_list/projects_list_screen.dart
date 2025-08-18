@@ -150,12 +150,22 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          for (final group in ref.read(projectListViewModelProvider.notifier).filteredDomainGroups)
-            _DomainTableSection(
-              title: group.domain,
-              projects: group.projects,
-              isExpanded: ref.read(projectListViewModelProvider.notifier).isDomainExpanded(group.domain),
-              onToggle: () => ref.read(projectListViewModelProvider.notifier).toggleDomainExpansion(group.domain),
+          Builder(
+            builder: (context) {
+              final state = ref.watch(projectListViewModelProvider);
+              final viewModel = ref.read(projectListViewModelProvider.notifier);
+              final groups = viewModel.filteredDomainGroups;
+              
+              return Column(
+                children: [
+                  for (final group in groups)
+                    _DomainTableSection(
+                      title: group.domain,
+                      projects: group.projects,
+                      isExpanded: group.isExpanded,
+                      onToggle: () => group.isExpanded 
+                          ? viewModel.collapseDomain(group.domain)
+                          : viewModel.expandDomain(group.domain),
               buildTable: (projects) => ProjectsTable(
                 state: state,
                 projectsOverride: projects,
@@ -165,7 +175,11 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
                   ref.read(projectListViewModelProvider.notifier).setSortBy(sortType);
                 },
               ),
-            ),
+                ),
+                ],
+              );
+            },
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: _ProjectsExplanationHeader(),
