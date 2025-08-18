@@ -153,7 +153,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
                                 padding: const EdgeInsets.symmetric(vertical: 8),
                                 child: Row(
                                   children: [
-                                    Expanded(
+                                    Flexible(
                                       child: Text(
                                         group.domain,
                                         style: context.domainNameStyle,

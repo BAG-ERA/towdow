@@ -113,34 +113,40 @@ class _ProjectsTableState extends ConsumerState<ProjectsTable> {
   Widget _buildMobileList(BuildContext context, WidgetRef ref) {
     final rows = widget.projectsOverride ?? widget.state.filteredProjects;
     final textStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500);
-    return Column(
-      children: [
-        for (final projectWithStats in rows)
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => widget.onProjectTap(projectWithStats.project),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        projectWithStats.project.displayName,
-                        overflow: TextOverflow.ellipsis,
-                        style: textStyle,
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ],
+    final rowWidgets = rows.map((projectWithStats) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => widget.onProjectTap(projectWithStats.project),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    projectWithStats.project.displayName,
+                    overflow: TextOverflow.ellipsis,
+                    style: textStyle,
+                  ),
                 ),
-              ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ],
             ),
           ),
-      ],
+        ),
+      );
+    }).toList();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: AddaptativeTableContainer(
+        rows: rowWidgets,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        showRowDividers: false,
+      ),
     );
   }
 

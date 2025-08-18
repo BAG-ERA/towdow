@@ -375,7 +375,7 @@ class _DomainTableSection extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
-                    Expanded(
+                    Flexible(
                       child: Text(
                         title,
                         style: context.domainNameStyle,
