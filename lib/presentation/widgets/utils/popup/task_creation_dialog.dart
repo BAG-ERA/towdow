@@ -84,10 +84,11 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         title: const Text('Create Task'),
         content: SizedBox(
           width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               // Keep dialog open checkbox at the top
               Row(
                 children: [
@@ -239,6 +240,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
             ],
           ),
         ),
+      ),
         actions: [
           TextButton(
             onPressed: isLoading ? null : () => Navigator.of(context).pop(),
