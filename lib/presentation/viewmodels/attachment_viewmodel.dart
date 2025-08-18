@@ -11,6 +11,7 @@ import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/journal_repository.dart';
 import '../../data/services/storage/offline_file_service.dart';
 import '../../data/services/storage/file_upload_queue_service.dart';
+import '../../data/services/storage/s3_storage_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../core/logger.dart';
 
@@ -360,8 +361,7 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
             // File not found offline, try S3 if we have s3Key
             if (s3Key != null) {
               AppLogger.info('UnifiedAttachmentViewModel: File not found offline, trying S3');
-              // Delegate S3 download to a service method (should be in repository layer)
-              throw Exception('S3 download not implemented in ViewModel layer');
+              return await _downloadFromS3(s3Key, aesKey);
             } else {
               throw Exception('File not available locally or on server');
             }
@@ -475,6 +475,36 @@ class UnifiedAttachmentViewModel extends StateNotifier<UnifiedAttachmentState> {
       state = state.copyWith(error: 'Remove failed: $e');
       return false;
     }
+  }
+
+  /// Download file from S3 (fallback when local file not available)
+  Future<Uint8List> _downloadFromS3(String s3Key, String aesKey) async {
+    // Get account for S3 service
+    final accountResult = await _accountRepository.getActiveAccount();
+    final account = await accountResult.when(
+      success: (acc) async => acc!,
+      failure: (_) async => throw Exception('No active account found'),
+    );
+
+    // Create S3 service and download file
+    final s3Service = S3StorageService(account: account);
+    
+    // Download from S3 with decryption
+    final downloadResult = await s3Service.downloadFile(
+      key: s3Key,
+      isPrivate: false, // Use shared bucket
+      symmetricKey: aesKey, // Use attachment's encryption key
+    );
+
+    return await downloadResult.when(
+      success: (data) async {
+        AppLogger.info('UnifiedAttachmentViewModel: Successfully downloaded file from S3, size: ${data.length} bytes');
+        return data;
+      },
+      failure: (failure) async {
+        throw Exception('S3 download failed: ${failure.message}');
+      },
+    );
   }
 
   /// Parse attachments from JSON string

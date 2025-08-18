@@ -64,17 +64,14 @@ class AttachmentParser {
   static Attachment? parseAttachment(String line) {
     try {
       // Split line into parameters and value parts
-      final colonIndex = line.indexOf(':');
+      // Use lastIndexOf to handle URLs with colons in parameters
+      final colonIndex = line.lastIndexOf(':');
       if (colonIndex == -1) return null;
       
       final parametersPart = line.substring(0, colonIndex);
       final valuePart = line.substring(colonIndex + 1);
       
-      // Extract URI from value part
-      final uri = valuePart.trim();
-      if (uri.isEmpty) return null;
-      
-      // Parse parameters
+      // Parse parameters first
       final parameters = <String, String>{};
       if (parametersPart.contains(';')) {
         final paramList = parametersPart.split(';').skip(1); // Skip 'ATTACH' part
@@ -107,6 +104,11 @@ class AttachmentParser {
       final aesKey = parameters['X-FLOWIT-AESKEY'] ?? '';
       final s3Key = parameters['X-FLOWIT-S3KEY'];
       final s3Url = parameters['X-FLOWIT-S3URL'];
+      
+      // Use S3 key as URI (file ID) if available, otherwise use value part
+      // This fixes the issue where the value part contains the full S3 URL instead of a file ID
+      final uri = s3Key ?? valuePart.trim();
+      if (uri.isEmpty) return null;
       
       return type == AttachmentType.media
           ? Attachment.createMedia(
