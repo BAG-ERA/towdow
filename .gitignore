@@ -47,6 +47,7 @@ test/integration/*.mocks.dart
 test/viewmodels/*.mocks.dart
 test/services/*.mocks.dart
 
+.flatpak-builder/
 
 # Symbolication related
 app.*.symbols
@@ -104,3 +105,8 @@ windows/flutter/generated_plugin_registrant.cc
 windows/flutter/generated_plugins.cmake
 test/services/*.mocks.dart
 test/viewmodels/*.mocks.dart
+app.towdow.TowDow.yml
+build-flatpak-manual.sh
+build-flatpak.sh
+flutter-sdk-3.32.6.json
+flutter-shared.sh.patch

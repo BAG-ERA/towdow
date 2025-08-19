@@ -1,0 +1,38 @@
+# flatpak-flutter.yml (put at repo root)
+app-id: app.towdow.TowDow
+branch: stable
+runtime: org.gnome.Platform
+runtime-version: "48"
+sdk: org.gnome.Sdk
+command: towdow_app   # must match the Linux binary name you produce
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --share=network
+
+modules:
+  - name: towdow
+    buildsystem: simple
+    build-commands:
+      - flutter --version
+      - flutter pub get
+      - flutter build linux --release
+      - install -Dm0755 build/linux/x64/release/bundle/towdow_app /app/bin/towdow_app
+      - install -Dm0644 linux/app.towdow.TowDow.desktop /app/share/applications/app.towdow.TowDow.desktop
+      - install -Dm0644 linux/app.towdow.TowDow.metainfo.xml /app/share/metainfo/app.towdow.TowDow.metainfo.xml
+      - install -Dm0644 linux/icons/hicolor/scalable/apps/app.towdow.TowDow.svg /app/share/icons/hicolor/scalable/apps/app.towdow.TowDow.svg
+    sources:
+      # Your app source pinned to a release tag
+      - type: git
+        url: https://gitlab.com/towdow/towdow-flutter.git
+        tag: 1.2.0
+        # if you want to build HEAD instead of a tag, replace `tag:` with `branch: main`
+
+      # Flutter SDK as a vendored source (crucial: dest: flutter)
+      - type: git
+        url: https://github.com/flutter/flutter.git
+        tag: 3.32.6
+        dest: flutter
