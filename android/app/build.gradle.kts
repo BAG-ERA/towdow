@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 // build.gradle.kts (Module: android/app)
 // Kotlin DSL signing + optional Gradle Play Publisher
 
@@ -5,6 +6,10 @@ import java.util.Properties
 import java.io.FileInputStream
 // Uncomment if you enable the Play Publisher plugin below
 // import com.github.triplet.gradle.androidpublisher.ReleaseStatus
+=======
+import java.util.Properties
+import java.io.FileInputStream
+>>>>>>> Stashed changes
 
 plugins {
     id("com.android.application")
@@ -16,6 +21,13 @@ plugins {
 }
 
 // Keystore: load from env in CI (preferred) or from local key.properties for manual builds
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+// Load keystore properties
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
@@ -35,7 +47,14 @@ android {
     kotlinOptions { jvmTarget = JavaVersion.VERSION_17.toString() }
 
     defaultConfig {
+<<<<<<< Updated upstream
         applicationId = "app.towdow" // TODO: MUST match the package created in Play Console
+=======
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        applicationId = "app.towdow"
+        // You can update the following values to match your application needs.
+        // For more information, see: https://flutter.dev/to/review-gradle-config.
+>>>>>>> Stashed changes
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -44,6 +63,7 @@ android {
 
     signingConfigs {
         create("release") {
+<<<<<<< Updated upstream
             val envKs = System.getenv("ANDROID_KEYSTORE")
             if (envKs != null) {
                 // CI path via env variables
@@ -58,10 +78,17 @@ android {
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
             }
+=======
+            keyAlias = keystoreProperties["keyAlias"] as String?
+            keyPassword = keystoreProperties["keyPassword"] as String?
+            storeFile = keystoreProperties["storeFile"]?.let { file(it) }
+            storePassword = keystoreProperties["storePassword"] as String?
+>>>>>>> Stashed changes
         }
     }
 
     buildTypes {
+<<<<<<< Updated upstream
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
@@ -73,6 +100,10 @@ android {
         }
         getByName("debug") {
             // default debug config
+=======
+        release {
+            signingConfig = signingConfigs.getByName("release")
+>>>>>>> Stashed changes
         }
     }
 }
