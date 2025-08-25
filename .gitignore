@@ -110,3 +110,6 @@ build-flatpak-manual.sh
 build-flatpak.sh
 flutter-sdk-3.32.6.json
 flutter-shared.sh.patch
+squashfs-root
+towdow_app-*.AppImage
+tow-dow-app_*_amd64.snap
