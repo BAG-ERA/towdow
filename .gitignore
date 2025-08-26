@@ -110,3 +110,5 @@ flutter-shared.sh.patch
 squashfs-root
 towdow_app-*.AppImage
 towdow_*_amd64.snap
+repo
+towdow*.flatpak
