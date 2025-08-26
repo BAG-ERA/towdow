@@ -1,6 +1,6 @@
 name: towdow
 base: core24
-version: '1.2.0'
+version: '0.0.0'
 summary: "Simple to-do for you. Powerful workflows for your team."
 description: |
   A clear task app that stays simple for individuals and scales to small and midsize teams with flexible workflows.
