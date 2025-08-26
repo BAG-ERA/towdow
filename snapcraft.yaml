@@ -1,6 +1,6 @@
-name: tow-dow-app
+name: towdow
 base: core24
-version: '0.0.0'
+version: '1.2.0'
 summary: "Simple to‑do for you. Powerful workflows for your team."
 description: |
   A clear task app that stays simple for individuals and scales to small and midsize teams with flexible workflows.
@@ -9,7 +9,7 @@ grade: stable
 confinement: strict
 
 apps:
-  tow-dow-app:
+  towdow:
     command: bin/launch
     extensions: [gnome]   # Good default for GTK/Flutter-Linux apps
     plugs:
@@ -32,9 +32,9 @@ parts:
     override-build: |
       set -eux
       # No 'craftctl default' needed if you operate from $CRAFT_PROJECT_DIR
-      cp "$CRAFT_PROJECT_DIR/towdow_app-0.0.0.AppImage" "$CRAFT_PART_BUILD/"
-      chmod +x "$CRAFT_PART_BUILD/towdow_app-0.0.0.AppImage"
-      (cd "$CRAFT_PART_BUILD" && ./towdow_app-0.0.0.AppImage --appimage-extract)
+      cp "$CRAFT_PROJECT_DIR/towdow_app-1.2.0.AppImage" "$CRAFT_PART_BUILD/"
+      chmod +x "$CRAFT_PART_BUILD/towdow_app-1.2.0.AppImage"
+      (cd "$CRAFT_PART_BUILD" && ./towdow_app-1.2.0.AppImage --appimage-extract)
       install -d "$CRAFT_PART_INSTALL/app" "$CRAFT_PART_INSTALL/bin" "$CRAFT_PART_INSTALL/meta/gui"
       cp -a "$CRAFT_PART_BUILD/squashfs-root/." "$CRAFT_PART_INSTALL/app/"
       install -Dm755 -t "$CRAFT_PART_INSTALL/bin" snap/local/launch
