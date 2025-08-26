@@ -1,7 +1,7 @@
 name: towdow
 base: core24
 version: '1.2.0'
-summary: "Simple to‑do for you. Powerful workflows for your team."
+summary: "Simple to-do for you. Powerful workflows for your team."
 description: |
   A clear task app that stays simple for individuals and scales to small and midsize teams with flexible workflows.
 
@@ -11,7 +11,8 @@ confinement: strict
 apps:
   towdow:
     command: bin/launch
-    extensions: [gnome]   # Good default for GTK/Flutter-Linux apps
+    desktop: meta/gui/towdow.desktop   # <— this makes the store expose “Open”
+    extensions: [gnome]
     plugs:
       - network
       - network-bind
@@ -22,8 +23,6 @@ apps:
       - opengl
       - audio-playback
       - home
-      # optional if you need access to USB/SD drives:
-      # - removable-media
 
 parts:
   appimage:
@@ -31,11 +30,18 @@ parts:
     source: .
     override-build: |
       set -eux
-      # No 'craftctl default' needed if you operate from $CRAFT_PROJECT_DIR
       cp "$CRAFT_PROJECT_DIR/towdow_app-1.2.0.AppImage" "$CRAFT_PART_BUILD/"
       chmod +x "$CRAFT_PART_BUILD/towdow_app-1.2.0.AppImage"
       (cd "$CRAFT_PART_BUILD" && ./towdow_app-1.2.0.AppImage --appimage-extract)
-      install -d "$CRAFT_PART_INSTALL/app" "$CRAFT_PART_INSTALL/bin" "$CRAFT_PART_INSTALL/meta/gui"
-      cp -a "$CRAFT_PART_BUILD/squashfs-root/." "$CRAFT_PART_INSTALL/app/"
-      install -Dm755 -t "$CRAFT_PART_INSTALL/bin" snap/local/launch
 
+      install -d "$CRAFT_PART_INSTALL/app" "$CRAFT_PART_INSTALL/bin" "$CRAFT_PART_INSTALL/meta/gui"
+
+      # App payload
+      cp -a "$CRAFT_PART_BUILD/squashfs-root/." "$CRAFT_PART_INSTALL/app/"
+
+      # Wrapper
+      install -Dm755 snap/local/launch "$CRAFT_PART_INSTALL/bin/launch"
+
+      # Desktop integration
+      install -Dm644 snap/local/towdow.desktop "$CRAFT_PART_INSTALL/meta/gui/towdow.desktop"
+      install -Dm644 snap/local/towdow.png     "$CRAFT_PART_INSTALL/meta/gui/towdow.png"
