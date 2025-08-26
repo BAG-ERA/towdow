@@ -40,7 +40,7 @@ modules:
 
     sources:
       - type: file
-        path: build/linux/x64/release/towdow_app-1.2.1.AppImage
+        path: ../../../build/linux/x64/release/towdow_app-1.2.1.AppImage
         dest-filename: towdow_app-1.2.1.AppImage
       - type: file
         path: data/app.towdow.TowDow.desktop
