@@ -40,11 +40,11 @@ modules:
 
     sources:
       - type: file
-        path: ../../../build/linux/x64/release/towdow_app-1.2.1.AppImage
+        path: build/linux/x64/release/towdow_app-1.2.1.AppImage
         dest-filename: towdow_app-1.2.1.AppImage
       - type: file
-        path: data/app.towdow.TowDow.desktop
+        path: CI_scripts/linux/flatpak/data/app.towdow.TowDow.desktop
         dest-filename: app.towdow.TowDow.desktop
       - type: dir
-        path: data/icons
+        path: CI_scripts/linux/flatpak/data/icons
         dest: icons
