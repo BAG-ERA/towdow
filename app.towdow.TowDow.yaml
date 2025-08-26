@@ -12,7 +12,6 @@ finish-args:
   - --socket=fallback-x11
   - --device=dri
   - --share=network
-  - --filesystem=home
   - --env=LD_LIBRARY_PATH=/app/towdow/lib
   - --env=FLUTTER_ICU_DATA_FILE=/app/towdow/data/icudtl.dat
 
