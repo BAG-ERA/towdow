@@ -30,9 +30,9 @@ parts:
     source: .
     override-build: |
       set -eux
-      cp "$CRAFT_PROJECT_DIR/towdow_app-1.2.0.AppImage" "$CRAFT_PART_BUILD/"
-      chmod +x "$CRAFT_PART_BUILD/towdow_app-1.2.0.AppImage"
-      (cd "$CRAFT_PART_BUILD" && ./towdow_app-1.2.0.AppImage --appimage-extract)
+      cp "$CRAFT_PROJECT_DIR/towdow_app-0.0.0.AppImage" "$CRAFT_PART_BUILD/"
+      chmod +x "$CRAFT_PART_BUILD/towdow_app-0.0.0.AppImage"
+      (cd "$CRAFT_PART_BUILD" && ./towdow_app-0.0.0.AppImage --appimage-extract)
 
       install -d "$CRAFT_PART_INSTALL/app" "$CRAFT_PART_INSTALL/bin" "$CRAFT_PART_INSTALL/meta/gui"
 
