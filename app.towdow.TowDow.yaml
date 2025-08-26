@@ -1,4 +1,4 @@
-app-id: app.towdow.app
+app-id: app.towdow.TowDow
 runtime: org.gnome.Platform
 runtime-version: '48'
 sdk: org.gnome.Sdk
@@ -33,18 +33,18 @@ modules:
       - ln -s /app/towdow/AppRun /app/bin/towdow_app
 
       # Desktop entry + icons (must match app-id)
-      - install -Dm644 app.towdow.app.desktop /app/share/applications/app.towdow.app.desktop
-      - install -Dm644 icons/hicolor/64x64/apps/app.towdow.app.png   /app/share/icons/hicolor/64x64/apps/app.towdow.app.png
-      - install -Dm644 icons/hicolor/128x128/apps/app.towdow.app.png /app/share/icons/hicolor/128x128/apps/app.towdow.app.png
-      - install -Dm644 icons/hicolor/256x256/apps/app.towdow.app.png /app/share/icons/hicolor/256x256/apps/app.towdow.app.png
+      - install -Dm644 app.towdow.TowDow.desktop /app/share/applications/app.towdow.TowDow.desktop
+      - install -Dm644 icons/hicolor/64x64/apps/app.towdow.TowDow.png   /app/share/icons/hicolor/64x64/apps/app.towdow.TowDow.png
+      - install -Dm644 icons/hicolor/128x128/apps/app.towdow.TowDow.png /app/share/icons/hicolor/128x128/apps/app.towdow.TowDow.png
+      - install -Dm644 icons/hicolor/256x256/apps/app.towdow.TowDow.png /app/share/icons/hicolor/256x256/apps/app.towdow.TowDow.png
 
     sources:
       - type: file
         path: build/linux/x64/release/towdow_app-1.2.1.AppImage
         dest-filename: towdow_app-1.2.1.AppImage
       - type: file
-        path: data/app.towdow.app.desktop
-        dest-filename: app.towdow.app.desktop
+        path: data/app.towdow.TowDow.desktop
+        dest-filename: app.towdow.TowDow.desktop
       - type: dir
         path: data/icons
         dest: icons
