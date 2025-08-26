@@ -11,9 +11,9 @@ variables:
   CUSTOM_IMAGE_TAG: "$FLUTTER_VERSION"
   ANDROID_TOOL_VERSION_X: "34"
   ANDROID_TOOL_VERSION: "${ANDROID_TOOL_VERSION_X}.0.0"
-  FLATPACK_RUNTIME_VERSION: "48"
-  FLATPACK_APP_ID: "app.towdow.TowDow"
-  FLATPACK_DEFAULT_BRANCH: "stable"
+  flatpak_RUNTIME_VERSION: "48"
+  flatpak_APP_ID: "app.towdow.TowDow"
+  flatpak_DEFAULT_BRANCH: "stable"
 
 update_version:
   stage: version
@@ -141,7 +141,7 @@ build_snapcraft:
     expire_in: 1 week
 
 
-build_flatpack:
+build_flatpak:
   stage: build
   image: debian:bookworm
   rules:
@@ -168,13 +168,13 @@ build_flatpack:
     - export XDG_DATA_HOME="$CI_PROJECT_DIR/.flatpak"
     - export XDG_CACHE_HOME="$CI_PROJECT_DIR/.flatpak-builder"
     - flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-    - flatpak --user install -y flathub org.gnome.Platform//$FLATPACK_RUNTIME_VERSION org.gnome.Sdk//$FLATPACK_RUNTIME_VERSION
+    - flatpak --user install -y flathub org.gnome.Platform//$flatpak_RUNTIME_VERSION org.gnome.Sdk//$flatpak_RUNTIME_VERSION
   script:
-    - echo "FLATPACK_JOB_ID=$CI_JOB_ID" > build.env
-    - flatpak-builder --repo=repo build-dir CI_scripts/linux/flatpack/app.towdow.TowDow.yaml  --force-clean --default-branch=$FLATPACK_DEFAULT_BRANCH
-    - flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak $FLATPACK_APP_ID $FLATPACK_DEFAULT_BRANCH
+    - echo "flatpak_JOB_ID=$CI_JOB_ID" > build.env
+    - flatpak-builder --repo=repo build-dir CI_scripts/linux/flatpak/app.towdow.TowDow.yaml  --force-clean --default-branch=$flatpak_DEFAULT_BRANCH
+    - flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak $flatpak_APP_ID $flatpak_DEFAULT_BRANCH
     - ostree --repo=repo refs
-    - ostree --repo=repo log $FLATPACK_APP_ID/$FLATPACK_DEFAULT_BRANCH | head -n 20
+    - ostree --repo=repo log $flatpak_APP_ID/$flatpak_DEFAULT_BRANCH | head -n 20
 
 
 
@@ -297,7 +297,7 @@ release:
       artifacts: true
     - job: build_snapcraft
       artifacts: true
-    - job: build_flatpack
+    - job: build_flatpak
       artifacts: true
     - job: prepare_release
       artifacts: true
@@ -315,8 +315,8 @@ release:
           url: "$CI_PROJECT_URL/-/jobs/$APPIMAGE_JOB_ID/artifacts/file/build/linux/x64/release/towdow_app-$CI_COMMIT_TAG.AppImage"
         - name: "Towdow Snapcraft"
           url: "$CI_PROJECT_URL/-/jobs/$SNAPCRAFT_JOB_ID/artifacts/file/towdow_$CI_COMMIT_TAG_amd64.snap"
-        - name: "Towdow Flatpack"
-          url: "$CI_PROJECT_URL/-/jobs/$FLATPACK_JOB_ID/artifacts/file/towdow.$CI_COMMIT_TAG.flatpak"
+        - name: "Towdow flatpak"
+          url: "$CI_PROJECT_URL/-/jobs/$flatpak_JOB_ID/artifacts/file/towdow.$CI_COMMIT_TAG.flatpak"
         - name: "Towdow Android APK"
           url: "$CI_PROJECT_URL/-/jobs/$ANDROID_JOB_ID/artifacts/file/build/app/outputs/flutter-apk/app-release-$CI_COMMIT_TAG.apk"
         - name: "Towdow Windows Installer"
