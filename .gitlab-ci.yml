@@ -118,6 +118,22 @@ build_appimage:
     reports:
       dotenv: build.env
 
+build_snapcraft:
+  stage: build
+  tags:
+    - lxd
+  needs:
+    - job: build_appimage
+      artifacts: true
+  script:
+    - snapcraft --version
+    - bash CI_scripts/linux/build_snapcraft_from_appimage.sh
+  artifacts:
+    when: always
+    paths:
+      - ./*.snap
+    expire_in: 1 week
+
 build_android:
   stage: build
   image: $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
