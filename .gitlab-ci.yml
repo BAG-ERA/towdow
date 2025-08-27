@@ -11,9 +11,7 @@ variables:
   CUSTOM_IMAGE_TAG: "$FLUTTER_VERSION"
   ANDROID_TOOL_VERSION_X: "34"
   ANDROID_TOOL_VERSION: "${ANDROID_TOOL_VERSION_X}.0.0"
-  flatpak_RUNTIME_VERSION: "48"
-  flatpak_APP_ID: "app.towdow.TowDow"
-  flatpak_DEFAULT_BRANCH: "stable"
+  FLATPAK_RUNTIME_VERSION: 48
 
 update_version:
   stage: version
@@ -143,7 +141,7 @@ build_snapcraft:
 
 build_flatpak:
   stage: build
-  image: debian:bookworm
+  image: "$CI_REGISTRY_IMAGE:${FLATPAK_RUNTIME_VERSION}"
   rules:
     - if: '$CI_COMMIT_TAG'
   needs:
@@ -162,21 +160,13 @@ build_flatpak:
       - towdow.flatpak
       - build-logs/
   before_script:
-    - apt-get update
-    - apt-get install -y flatpak flatpak-builder ostree ca-certificates xz-utils
-    - mkdir -p .flatpak .flatpak-builder build-dir repo export build-logs
     - export XDG_DATA_HOME="$CI_PROJECT_DIR/.flatpak"
     - export XDG_CACHE_HOME="$CI_PROJECT_DIR/.flatpak-builder"
-    - flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-    - flatpak --user install -y flathub org.gnome.Platform//$flatpak_RUNTIME_VERSION org.gnome.Sdk//$flatpak_RUNTIME_VERSION
   script:
     - echo "flatpak_JOB_ID=$CI_JOB_ID" > build.env
-    - flatpak-builder --repo=repo build-dir app.towdow.TowDow.yaml  --force-clean --default-branch=$flatpak_DEFAULT_BRANCH
-    - flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak $flatpak_APP_ID $flatpak_DEFAULT_BRANCH
+    - flatpak-builder --repo=repo build-dir app.towdow.TowDow.yaml  --force-clean --default-branch=stable
+    - flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak app.towdow.TowDow stable
     - ostree --repo=repo refs
-    - ostree --repo=repo log $flatpak_APP_ID/$flatpak_DEFAULT_BRANCH | head -n 20
-
-
 
 build_android:
   stage: build

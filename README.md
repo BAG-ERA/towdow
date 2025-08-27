@@ -23,7 +23,8 @@ These images will be created / updated automatically when a change is pushed to 
 
 If you want to manually build the image you can do this:
 
-### Linux
+### Android
+
 ```shell
 docker login registry.gitlab.com/towdow/towdow-flutter
 export FLUTTER_VERSION=3.32.5
@@ -35,6 +36,19 @@ docker build --build-arg FLUTTER_VERSION=${FLUTTER_VERSION} \
   -t registry.gitlab.com/towdow/towdow-flutter/flutter-build-env:${FLUTTER_VERSION} \
   -f CI_scripts/linux/Dockerfile .
 docker push registry.gitlab.com/towdow/towdow-flutter/flutter-build-env:${FLUTTER_VERSION}
+```
+
+### Linux
+
+#### flatpak image builder
+
+```shell
+export FLATPAK_RUNTIME_VERSION=48
+docker login registry.gitlab.com/towdow/towdow-flutter
+docker build --build-arg FLATPAK_RUNTIME_VERSION=${FLATPAK_RUNTIME_VERSION} \
+-t registry.gitlab.com/towdow/towdow-flutter/build-flatpak:${FLATPAK_RUNTIME_VERSION} \
+-f CI_scripts/linux/flatpak/Dockerfile .
+docker push registry.gitlab.com/towdow/towdow-flutter/build-flatpak:${FLATPAK_RUNTIME_VERSION}
 ```
 
 ### Windows
