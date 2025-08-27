@@ -11,8 +11,8 @@ variables:
   CUSTOM_IMAGE_TAG: "$FLUTTER_VERSION"
   ANDROID_TOOL_VERSION_X: "34"
   ANDROID_TOOL_VERSION: "${ANDROID_TOOL_VERSION_X}.0.0"
-  FLATPAK_RUNTIME_VERSION: 48
-
+  FLATPAK_RUNTIME_VERSION: "48"
+  FLATPAK_BUILD_IMAGE: "$CI_REGISTRY_IMAGE/build-flatpak"
 update_version:
   stage: version
   image: alpine:latest
@@ -141,7 +141,7 @@ build_snapcraft:
 
 build_flatpak:
   stage: build
-  image: "$CI_REGISTRY_IMAGE:${FLATPAK_RUNTIME_VERSION}"
+  image: "$FLATPAK_BUILD_IMAGE:${FLATPAK_RUNTIME_VERSION}"
   tags:
     - flatpak
   rules:
