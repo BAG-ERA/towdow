@@ -159,7 +159,7 @@ build_flatpak:
     expire_in: 2 weeks
     paths:
       - repo/
-      - towdow.flatpak
+      - towdow.$CI_COMMIT_TAG.flatpak
       - build-logs/
   before_script:
     - sed -i "s/0\.0\.0/${CI_COMMIT_TAG}/g" app.towdow.TowDow.yaml
