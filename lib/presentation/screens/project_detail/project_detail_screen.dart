@@ -68,6 +68,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   int _selectedTabIndex = 0;
   bool _showNotesPanel = false;
   Journal? _openedNote;
+  bool _isDetailColumnCollapsed = false; // New state variable for desktop layout
 
   @override
   void dispose() {
@@ -118,9 +119,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       body: Row(
         children: [
-          // Column 1: Title/Header area (fixed width) with full project info
-          Container(
-            width: 320,
+          // Column 1: Title/Header area (collapsible width) with full project info
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            width: _isDetailColumnCollapsed ? 60 : 320,
             child: Column(
               children: [
                 // Project title and full project info (scrollable to avoid overflow)
@@ -128,104 +131,114 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      SingleChildScrollView(
-                        child: _buildDesktopHeader(context, ref.watch(projectDetailViewModelProvider(widget.projectPath)), tasksAsync),
-                      ),
-                      // Animated note overlay (desktop)
-                      Positioned.fill(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 360),
-                          switchInCurve: Curves.easeOut,
-                          switchOutCurve: Curves.easeIn,
-                          transitionBuilder: (child, anim) {
-                            return FadeTransition(
-                              opacity: anim,
-                              child: SlideTransition(
-                                position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(anim),
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: _openedNote != null
-                              ? ProjectNoteView(
-                                  key: const ValueKey('note_open_desktop'),
-                                  journal: _openedNote!,
-                                  onSaved: () {
-                                    setState(() {
-                                      _openedNote = null;
-                                      _showNotesPanel = false;
-                                    });
-                                  },
-                                )
-                              : const SizedBox.shrink(key: ValueKey('note_closed_desktop')),
-                        ),
-                      ),
-                      // Animated quick panel (desktop)
-                      Positioned(
-                        left: 12,
-                        right: 12,
-                        bottom: 16,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
+                      _isDetailColumnCollapsed 
+                          ? _buildCollapsedHeader(context, ref.watch(projectDetailViewModelProvider(widget.projectPath)))
+                          : SingleChildScrollView(
+                              child: _buildDesktopHeader(context, ref.watch(projectDetailViewModelProvider(widget.projectPath)), tasksAsync),
+                            ),
+                      // Animated note overlay (desktop) - only show when not collapsed
+                      if (!_isDetailColumnCollapsed)
+                        Positioned.fill(
                           child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 360),
-                          switchInCurve: Curves.easeOut,
-                          switchOutCurve: Curves.easeIn,
-                          transitionBuilder: (child, anim) {
-                            return FadeTransition(
-                              opacity: anim,
-                              child: SizeTransition(
-                                sizeFactor: anim,
-                                axisAlignment: -1.0,
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: (_showNotesPanel && _openedNote == null)
-                              ? ProjectNotesQuickPanel(
-                                  key: const ValueKey('panel_open_desktop'),
-                                  projectPath: widget.projectPath,
-                                  onOpenNote: (j) => setState(() { _openedNote = j; _showNotesPanel = false; }),
-                                  onCreateNew: () => _createNewNote(),
-                                )
-                              : const SizedBox.shrink(key: ValueKey('panel_closed_desktop')),
+                            duration: const Duration(milliseconds: 360),
+                            switchInCurve: Curves.easeOut,
+                            switchOutCurve: Curves.easeIn,
+                            transitionBuilder: (child, anim) {
+                              return FadeTransition(
+                                opacity: anim,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(anim),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: _openedNote != null
+                                ? ProjectNoteView(
+                                    key: const ValueKey('note_open_desktop'),
+                                    journal: _openedNote!,
+                                    onSaved: () {
+                                      setState(() {
+                                        _openedNote = null;
+                                        _showNotesPanel = false;
+                                      });
+                                    },
+                                  )
+                                : const SizedBox.shrink(key: ValueKey('note_closed_desktop')),
+                          ),
                         ),
-                      ),
-                      ),
+                      // Animated quick panel (desktop) - only show when not collapsed
+                      if (!_isDetailColumnCollapsed)
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          bottom: 16,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 360),
+                            switchInCurve: Curves.easeOut,
+                            switchOutCurve: Curves.easeIn,
+                            transitionBuilder: (child, anim) {
+                              return FadeTransition(
+                                opacity: anim,
+                                child: SizeTransition(
+                                  sizeFactor: anim,
+                                  axisAlignment: -1.0,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: (_showNotesPanel && _openedNote == null)
+                                ? ProjectNotesQuickPanel(
+                                    key: const ValueKey('panel_open_desktop'),
+                                    projectPath: widget.projectPath,
+                                    onOpenNote: (j) => setState(() { _openedNote = j; _showNotesPanel = false; }),
+                                    onCreateNew: () => _createNewNote(),
+                                  )
+                                : const SizedBox.shrink(key: ValueKey('panel_closed_desktop')),
+                          ),
+                        ),
+                        ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  height: 56,
-                  width: double.infinity,
-                  child: Center(
-                    child: TextButton.icon(
-                      onPressed: () => setState(() {
-                        if (_openedNote != null) {
-                          _openedNote = null;
-                          _showNotesPanel = false;
-                        } else {
-                          _showNotesPanel = !_showNotesPanel;
-                        }
-                      }),
-                      icon: Icon(_openedNote != null
-                          ? Icons.close_rounded
-                          : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
-                      label: Text(
-                        _openedNote != null
-                            ? 'Close note'
-                            : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                // Notes button - only show when not collapsed
+                if (!_isDetailColumnCollapsed) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 56,
+                    width: double.infinity,
+                    child: Center(
+                      child: TextButton.icon(
+                        onPressed: () => setState(() {
+                          if (_openedNote != null) {
+                            _openedNote = null;
+                            _showNotesPanel = false;
+                          } else {
+                            _showNotesPanel = !_showNotesPanel;
+                          }
+                        }),
+                        icon: Icon(_openedNote != null
+                            ? Icons.close_rounded
+                            : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
+                        label: Text(
+                          _openedNote != null
+                              ? 'Close note'
+                              : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
           
-          // Gap between columns
-          const SizedBox(width: 48),
+          // Separator between columns
+          Container(
+            width: 1,
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          ),
           
           // Column 2: View content (expanded) with tabs and content
           Expanded(
@@ -283,6 +296,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     project: project,
                     tasksAsync: tasksAsync,
                     onProjectUpdated: _updateProject,
+                    onCollapse: () => setState(() => _isDetailColumnCollapsed = true),
                   )
                 : const SizedBox.shrink(),
             loading: () => Container(
@@ -325,6 +339,76 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCollapsedHeader(BuildContext context, ProjectDetailState vmState) {
+    return Container(
+      height: double.infinity,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => setState(() => _isDetailColumnCollapsed = false),
+          child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+          ),
+          child: Column(
+            children: [
+              // Vertical text with arrow icon
+              Column(
+                children: [
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    size: 24,
+                  ),
+                  const SizedBox(height: 8),
+                  RotatedBox(
+                    quarterTurns: 1,
+                    child: Text(
+                      'Show Project Detail',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              // Notes button when collapsed
+              if (!_showNotesPanel && _openedNote == null)
+                IconButton(
+                  onPressed: () => setState(() => _showNotesPanel = true),
+                  icon: const Icon(Icons.notes_rounded),
+                  tooltip: 'Show notes',
+                ),
+              if (_showNotesPanel || _openedNote != null)
+                IconButton(
+                  onPressed: () => setState(() {
+                    if (_openedNote != null) {
+                      _openedNote = null;
+                      _showNotesPanel = false;
+                    } else {
+                      _showNotesPanel = false;
+                    }
+                  }),
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: 'Close notes',
+                ),
+              // Expand button at bottom
+              IconButton(
+                onPressed: () => setState(() => _isDetailColumnCollapsed = false),
+                icon: const Icon(Icons.chevron_right_rounded),
+                tooltip: 'Expand project details',
+              ),
+            ],
+          ),
+        ),
+        ),
       ),
     );
   }
