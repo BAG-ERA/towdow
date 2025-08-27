@@ -32,6 +32,12 @@ class ExternalCalendarSyncService {
     AppLogger.info('ExternalCalendarSyncService: Starting background sync with interval: ${interval.inMinutes} minutes');
     
     _syncTimer?.cancel();
+    
+    // Trigger immediate sync on startup
+    if (!_syncRunning) {
+      syncAllAccounts();
+    }
+    
     _syncTimer = Timer.periodic(interval, (_) async {
       if (!_syncRunning) {
         await syncAllAccounts();
