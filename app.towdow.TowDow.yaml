@@ -20,8 +20,8 @@ modules:
     buildsystem: simple
     build-commands:
       # Extract AppImage
-      - chmod +x towdow_app-1.2.1.AppImage
-      - ./towdow_app-1.2.1.AppImage --appimage-extract
+      - chmod +x towdow_app.AppImage
+      - ./towdow_app.AppImage --appimage-extract
 
       # Install the WHOLE extracted tree to preserve relative paths
       - install -d /app/towdow
@@ -42,8 +42,8 @@ modules:
 
     sources:
       - type: file
-        path: build/linux/x64/release/towdow_app-1.2.1.AppImage
-        dest-filename: towdow_app-1.2.1.AppImage
+        path: build/linux/x64/release/towdow_app-0.0.0.AppImage
+        dest-filename: towdow_app.AppImage
       - type: file
         path: CI_scripts/linux/flatpak/data/app.towdow.TowDow.desktop
         dest-filename: app.towdow.TowDow.desktop
