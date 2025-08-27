@@ -5,6 +5,6 @@ Exec=towdow_app
 Icon=app.towdow.TowDow
 Terminal=false
 Type=Application
-Categories=Utility;Office;
+Categories=Utility
 Keywords=todo;tasks;workflow;kanban;
 StartupWMClass=Towdow
