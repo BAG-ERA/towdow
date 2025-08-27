@@ -6,6 +6,6 @@ flatpak-builder \
   --mirror-screenshots-url=https://dl.flathub.org/media/ \
   build-dir \
   app.towdow.TowDow.yaml || exit $?
-flatpak build build-dir appstreamcli validate /app/share/metainfo/app.towdow.TowDow.metainfo.xml  || exit $?
-flatpak build-update-repo --generate-static-deltas repo || exit $?
+# Finalize repo (appstream compose + deltas)
+flatpak build-update-repo --generate-static-deltas repo  || exit $?
 flatpak run --command=flatpak-builder-lint org.flatpak.Builder repo repo || exit $?
