@@ -4,21 +4,24 @@
 
     <name>TowDow</name>
     <summary>Tasks &amp; process management</summary>
+
     <description>
-        <p>TowDow helps you plan, track, and collaborate on tasks and flows.</p>
+        <p>TowDow is an open-source task and process manager that helps individuals and teams plan work, track progress, and collaborate on structured flows. It supports daily tasking as well as repeatable, multi-step processes, with a clean interface designed for focus.</p>
+        <p>Features include lists and sub-tasks, due dates, and collaboration-friendly flows.</p>
     </description>
 
     <launchable type="desktop-id">app.towdow.TowDow.desktop</launchable>
 
-    <!-- Flathub requires SPDX identifiers -->
+    <!-- SPDX licenses -->
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>AGPL-3.0-or-later</project_license>
 
-    <developer_name>BAG-ERA</developer_name>
+    <developer id="fr.bag-era">
+        <name>BAG-ERA</name>
+    </developer>
+
     <url type="homepage">https://towdow.app/</url>
     <url type="bugtracker">https://gitlab.com/towdow/towdow-flutter/-/issues</url>
-<!--    <url type="help">https://towdow.app/docs</url>-->
-<!--    <url type="donation">https://towdow.app/donate</url>-->
 
     <categories>
         <category>Utility</category>
@@ -32,18 +35,19 @@
         <keyword>project</keyword>
     </keywords>
 
-<!--    <screenshots>-->
-<!--        <screenshot type="default">-->
-<!--            <image>https://towdow.app/assets/screenshots/1.png</image>-->
-<!--            <caption>Organize tasks and flows</caption>-->
-<!--        </screenshot>-->
-<!--        <screenshot>-->
-<!--            <image>https://towdow.app/assets/screenshots/2.png</image>-->
-<!--            <caption>Collaborate with your team</caption>-->
-<!--        </screenshot>-->
-<!--    </screenshots>-->
+    <!-- Flathub expects at least one screenshot; HTTPS URL required -->
+    <screenshots>
+        <screenshot type="default">
+            <image>https://towdow.gitlab.io/screenshots/screenshot_tasks_demo1.png</image>
+            <caption>Organize tasks and flows</caption>
+        </screenshot>
+        <screenshot>
+            <image>https://towdow.gitlab.io/screenshots/screenshot_attendees.png</image>
+            <caption>Collaborate with your team</caption>
+        </screenshot>
+    </screenshots>
 
-    <!-- OARS 1.1 is expected on Flathub -->
+    <!-- OARS 1.1 -->
     <content_rating type="oars-1.1">
         <content_attribute id="violence-cartoon">none</content_attribute>
         <content_attribute id="violence-fantasy">none</content_attribute>
