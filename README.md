@@ -1,5 +1,26 @@
 # TowDow_app
 
+## manual releases
+
+So far only the web is deployed by the CI. The rest has to be done manually.
+
+### Windows
+
+Upload the MSI generated in the release (https://gitlab.com/towdow/towdow-flutter/-/releases/permalink/latest) to the Microsoft Store.
+
+### Flatpak
+
+### Snapcraft
+
+1. login ```snapcraft login``` (use login from vault _TowDow ubuntu / snapcraft_) 
+2. get the .snap file from release (https://gitlab.com/towdow/towdow-flutter/-/releases/permalink/latest)
+3. upload the snap file to the snapcraft store ```snapcraft upload --release=stable TowDow_app_X.Y.Y_amd64.snap```
+4. publish the snap ```snapcraft publish TowDow_app_X.Y.Y_amd64.snap --release=stable```
+
+### Android
+
+upload aab to the play store console to create a new release.
+
 ## local development
 
 ### Web
