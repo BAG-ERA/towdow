@@ -76,8 +76,16 @@ void main() {
     });
 
     tearDownAll(() async {
+      // Close all Hive boxes first to release file handles
+      await Hive.close();
+      
+      // Wait a bit for file handles to be fully released
+      await Future.delayed(const Duration(milliseconds: 500));
+      
       // Clean up temporary directory
-      await tempDir.delete(recursive: true);
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
     });
 
     test('clearAllData should clear all storage boxes including offline files and file upload queue', () async {

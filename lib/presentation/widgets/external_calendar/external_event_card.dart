@@ -15,12 +15,14 @@ class ExternalEventCard extends ConsumerWidget {
   final CalendarEvent event;
   final bool hideCalendarName;
   final bool isReduced;
+  final BorderRadius? borderRadius;
   
   const ExternalEventCard({
     super.key,
     required this.event,
     this.hideCalendarName = false,
     this.isReduced = false,
+    this.borderRadius,
   });
 
   @override
@@ -85,11 +87,10 @@ class ExternalEventCard extends ConsumerWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 500),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
         padding: EdgeInsets.all(hideCalendarName ? 8 : 12),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: borderRadius ?? BorderRadius.circular(8),
           border: Border(
             left: BorderSide(
               width: 4,
@@ -170,12 +171,11 @@ class ExternalEventCard extends ConsumerWidget {
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
           onTap: () => ExternalEventDetailsDialog.show(context, event: event),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
+            child: Container(
             padding: EdgeInsets.all(hideCalendarName ? 8 : 12),
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: borderRadius ?? BorderRadius.circular(8),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,11 +272,10 @@ class ExternalEventCard extends ConsumerWidget {
       child: GestureDetector(
         onTap: () => ExternalEventDetailsDialog.show(context, event: event),
         child: Container(
-          margin: const EdgeInsets.only(bottom: 6),
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: borderRadius ?? BorderRadius.circular(6),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,

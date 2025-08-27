@@ -267,10 +267,39 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
             ),
             
             // Events for this day
-            ...events.map((event) => ExternalEventCard(
-              event: event,
-              hideCalendarName: true,
-            )),
+            ...events.asMap().entries.map((entry) {
+              final index = entry.key;
+              final event = entry.value;
+              final isFirst = index == 0;
+              final isLast = index == events.length - 1;
+              
+              BorderRadius? borderRadius;
+              if (isFirst && isLast) {
+                // Single event - all corners rounded
+                borderRadius = BorderRadius.circular(8);
+              } else if (isFirst) {
+                // First event - top corners only
+                borderRadius = const BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(8),
+                );
+              } else if (isLast) {
+                // Last event - bottom corners only
+                borderRadius = const BorderRadius.only(
+                  bottomLeft: Radius.circular(8),
+                  bottomRight: Radius.circular(8),
+                );
+              } else {
+                borderRadius = BorderRadius.zero;
+              }
+              // Middle events - no corners (default)
+              
+              return ExternalEventCard(
+                event: event,
+                hideCalendarName: true,
+                borderRadius: borderRadius,
+              );
+            }),
           ],
         );
       }).toList(),
@@ -370,10 +399,38 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
                     ),
                     
                     // Events for this day
-                    ...events.map((event) => ExternalEventCard(
-                      event: event,
-                      hideCalendarName: true,
-                    )),
+                    ...events.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final event = entry.value;
+                      final isFirst = index == 0;
+                      final isLast = index == events.length - 1;
+                      
+                      BorderRadius? borderRadius;
+                      if (isFirst && isLast) {
+                        // Single event - all corners rounded
+                        borderRadius = BorderRadius.circular(8);
+                      } else if (isFirst) {
+                        // First event - top corners only
+                        borderRadius = const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          topRight: Radius.circular(8),
+                        );
+                      } else if (isLast) {
+                        // Last event - bottom corners only
+                        borderRadius = const BorderRadius.only(
+                          bottomLeft: Radius.circular(8),
+                          bottomRight: Radius.circular(8),
+                        );
+                      } else {
+                        borderRadius = BorderRadius.zero;
+                      }
+                      
+                      return ExternalEventCard(
+                        event: event,
+                        hideCalendarName: true,
+                        borderRadius: borderRadius,
+                      );
+                    }),
                   ],
                 );
               }).toList(),
