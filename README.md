@@ -38,7 +38,12 @@ When a specific runner is needed for a job, a tag is used to run the job by a ru
 The current status is:
 
 * **build for windows**: needs either a Windows pro computer to run Windows docker or a Windows PC to have a runner with a power shell. 
-The later option is currently used. To run the job the PC MUST be on and gitlab runner service MUST be active
+   The later option is currently used. To run the job the PC MUST be on and gitlab runner service MUST be active
+   To check the status of the pawer shell gitlab runner:
+   ```powershell
+   cd C:\GitLab-Runner
+   .\gitlab-runner.exe --debug run
+   ```
 * **Android**: no specific needed, apart from a more powerful computer than the VM hosting the default runners so a TAG is used and the PC MUST be up.
 * **Flatpak**: needs a privileged docker (one is configured on the default VM)
 * **Snapcraft**: needs lxd to runner, it was simpler to use a PC than to configure a gitlab runner to work with lxd.
