@@ -21,6 +21,30 @@ Upload the MSI generated in the release (https://gitlab.com/towdow/towdow-flutte
 
 upload aab to the play store console to create a new release.
 
+## CI and runners
+
+The CI is responsible for building and create a release of the app available here: https://gitlab.com/towdow/towdow-flutter/-/releases/latest.
+
+The CI is configured to run on gitlab runners.
+
+### runners
+
+Some specific configuration is needed for the runners. See the CI_scripts folder for more information.
+
+Some jobs require specific hardware or configuration to run. Such runners have been configured on the default runners VM. Some on different PCs.
+
+When a specific runner is needed for a job, a tag is used to run the job by a runner capable of running the job.
+
+The current status is:
+
+* **build for windows**: needs either a Windows pro computer to run Windows docker or a Windows PC to have a runner with a power shell. 
+The later option is currently used. To run the job the PC MUST be on and gitlab runner service MUST be active
+* **Android**: no specific needed, apart from a more powerful computer than the VM hosting the default runners so a TAG is used and the PC MUST be up.
+* **Flatpak**: needs a privileged docker (one is configured on the default VM)
+* **Snapcraft**: needs lxd to runner, it was simpler to use a PC than to configure a gitlab runner to work with lxd.
+* **Linux app image**: 
+
+
 ## local development
 
 ### Web
