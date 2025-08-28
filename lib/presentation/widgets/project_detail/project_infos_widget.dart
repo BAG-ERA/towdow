@@ -15,12 +15,14 @@ class ProjectInfosWidget extends ConsumerWidget {
   final TaskCalendar project;
   final AsyncValue<List<Task>> tasksAsync;
   final Function(TaskCalendar) onProjectUpdated;
+  final VoidCallback? onCollapse;
 
   const ProjectInfosWidget({
     super.key,
     required this.project,
     required this.tasksAsync,
     required this.onProjectUpdated,
+    this.onCollapse,
   });
 
   @override
@@ -40,22 +42,34 @@ class ProjectInfosWidget extends ConsumerWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Editable title (bigger and thinner) - only on desktop
+              // Editable title with collapse button (bigger and thinner) - only on desktop
               if (isDesktop) ...[
-                EditableTitle(
-                  title: project.displayName,
-                  onTitleUpdated: (newTitle) {
-                    final updatedProject = project.copyWith(
-                      displayName: newTitle,
-                      lastModified: DateTime.now(),
-                    );
-                    onProjectUpdated(updatedProject);
-                  },
-                  isInAppBar: false,
-                  textStyle: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w300,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: EditableTitle(
+                        title: project.displayName,
+                        onTitleUpdated: (newTitle) {
+                          final updatedProject = project.copyWith(
+                            displayName: newTitle,
+                            lastModified: DateTime.now(),
+                          );
+                          onProjectUpdated(updatedProject);
+                        },
+                        isInAppBar: false,
+                        textStyle: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w300,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    if (onCollapse != null)
+                      IconButton(
+                        onPressed: onCollapse,
+                        icon: const Icon(Icons.chevron_left_rounded),
+                        tooltip: 'Collapse project details',
+                      ),
+                  ],
                 ),
                 
                 const SizedBox(height: 8),
