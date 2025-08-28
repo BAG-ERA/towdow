@@ -187,10 +187,10 @@ build_android:
     - echo "storePassword=__key_pass__" > android/key.properties
     - echo "keyPassword=__key_pass__" >> android/key.properties
     - echo "keyAlias=upload" >> android/key.properties
-    - echo "storeFile=upload-keystore.jks" >> android/key.properties
+    - echo "storeFile=${CI_PROJECT_DIR}/upload-keystore.jks" >> android/key.properties
     - sed -i "s/__key_pass__/${KEY_PROPERTIES_PASSWORD}/g" android/key.properties
     - echo $JKS_BASE_64 > certfile_base64
-    - openssl enc -d -base64 -in certfile_base64 -out upload-keystore.jks
+    - openssl enc -d -base64 -in certfile_base64 -out ${CI_PROJECT_DIR}/upload-keystore.jks
     - flutter pub get
     - dart run build_runner build --delete-conflicting-outputs
     - flutter gen-l10n
