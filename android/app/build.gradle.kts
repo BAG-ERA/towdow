@@ -15,13 +15,6 @@ plugins {
     // id("com.github.triplet.play") version "3.12.1"
 }
 
-// Keystore: load from env in CI (preferred) or from local key.properties for manual builds
-val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("key.properties")
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
-}
-
 // Load keystore properties
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
