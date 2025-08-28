@@ -32,6 +32,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
   int _selectedTabIndex = 0;
   bool _showNotesPanel = false;
   Journal? _openedNote;
+  bool _isDetailColumnCollapsed = false; // New state for column collapse
 
   @override
   Widget build(BuildContext context) {
@@ -52,8 +53,10 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
   Widget _buildDesktopLayout(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
     return Row(
       children: [
-        SizedBox(
-          width: 320,
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+                      width: _isDetailColumnCollapsed ? 60 : 320,
           child: Column(
             children: [
               Expanded(
@@ -61,44 +64,13 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
                   clipBehavior: Clip.none,
                   children: [
                     SingleChildScrollView(
-                      child: _buildDesktopHeader(context, projectAsync, tasksAsync),
+                      child: _isDetailColumnCollapsed 
+                          ? _buildCollapsedHeader(context, projectAsync)
+                          : _buildDesktopHeader(context, projectAsync, tasksAsync),
                     ),
-                    // Animated note overlay (desktop)
-                    Positioned.fill(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 360),
-                        switchInCurve: Curves.easeOut,
-                        switchOutCurve: Curves.easeIn,
-                        transitionBuilder: (child, anim) {
-                          return FadeTransition(
-                            opacity: anim,
-                            child: SlideTransition(
-                              position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(anim),
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: _openedNote != null
-                            ? ProjectNoteView(
-                                key: const ValueKey('wf_note_open_desktop'),
-                                journal: _openedNote!,
-                                onSaved: () {
-                                  setState(() {
-                                    _openedNote = null;
-                                    _showNotesPanel = false;
-                                  });
-                                },
-                              )
-                            : const SizedBox.shrink(key: ValueKey('wf_note_closed_desktop')),
-                      ),
-                    ),
-                    // Animated quick panel (desktop)
-                    Positioned(
-                      left: 12,
-                      right: 12,
-                      bottom: 16,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
+                    // Animated note overlay (desktop) - only show when not collapsed
+                    if (!_isDetailColumnCollapsed)
+                      Positioned.fill(
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 360),
                           switchInCurve: Curves.easeOut,
@@ -106,55 +78,97 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
                           transitionBuilder: (child, anim) {
                             return FadeTransition(
                               opacity: anim,
-                              child: SizeTransition(
-                                sizeFactor: anim,
-                                axisAlignment: -1.0,
+                              child: SlideTransition(
+                                position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(anim),
                                 child: child,
                               ),
                             );
                           },
-                          child: (_showNotesPanel && _openedNote == null)
-                              ? ProjectNotesQuickPanel(
-                                  key: const ValueKey('wf_panel_open_desktop'),
-                                  projectPath: widget.workflowPath,
-                                  onOpenNote: (j) => setState(() { _openedNote = j; _showNotesPanel = false; }),
-                                  onCreateNew: () => _createNewNote(),
+                          child: _openedNote != null
+                              ? ProjectNoteView(
+                                  key: const ValueKey('wf_note_open_desktop'),
+                                  journal: _openedNote!,
+                                  onSaved: () {
+                                    setState(() {
+                                      _openedNote = null;
+                                      _showNotesPanel = false;
+                                    });
+                                  },
                                 )
-                              : const SizedBox.shrink(key: ValueKey('wf_panel_closed_desktop')),
+                              : const SizedBox.shrink(key: ValueKey('wf_note_closed_desktop')),
                         ),
                       ),
-                    ),
+                    // Animated quick panel (desktop) - only show when not collapsed
+                    if (!_isDetailColumnCollapsed)
+                      Positioned(
+                        left: 12,
+                        right: 12,
+                        bottom: 16,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 360),
+                            switchInCurve: Curves.easeOut,
+                            switchOutCurve: Curves.easeIn,
+                            transitionBuilder: (child, anim) {
+                              return FadeTransition(
+                                opacity: anim,
+                                child: SizeTransition(
+                                  sizeFactor: anim,
+                                  axisAlignment: -1.0,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: (_showNotesPanel && _openedNote == null)
+                                ? ProjectNotesQuickPanel(
+                                    key: const ValueKey('wf_panel_open_desktop'),
+                                    projectPath: widget.workflowPath,
+                                    onOpenNote: (j) => setState(() { _openedNote = j; _showNotesPanel = false; }),
+                                    onCreateNew: () => _createNewNote(),
+                                  )
+                                : const SizedBox.shrink(key: ValueKey('wf_panel_closed_desktop')),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Container(
-                height: 56,
-                width: double.infinity,
-                alignment: Alignment.center,
-                child: TextButton.icon(
-                  onPressed: () => setState(() {
-                    if (_openedNote != null) {
-                      _openedNote = null;
-                      _showNotesPanel = false;
-                    } else {
-                      _showNotesPanel = !_showNotesPanel;
-                    }
-                  }),
-                  icon: Icon(_openedNote != null
-                      ? Icons.close_rounded
-                      : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
-                  label: Text(
-                    _openedNote != null
-                        ? 'Close note'
-                        : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+              // Notes button - only show when not collapsed
+              if (!_isDetailColumnCollapsed) ...[
+                const SizedBox(height: 8),
+                Container(
+                  height: 56,
+                  width: double.infinity,
+                  alignment: Alignment.center,
+                  child: TextButton.icon(
+                    onPressed: () => setState(() {
+                      if (_openedNote != null) {
+                        _openedNote = null;
+                        _showNotesPanel = false;
+                      } else {
+                        _showNotesPanel = !_showNotesPanel;
+                      }
+                    }),
+                    icon: Icon(_openedNote != null
+                        ? Icons.close_rounded
+                        : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
+                    label: Text(
+                      _openedNote != null
+                          ? 'Close note'
+                          : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
-        const SizedBox(width: 48),
+        // Separator between columns
+        Container(
+          width: 1,
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+        ),
         Expanded(
           child: Column(
             children: [
@@ -510,6 +524,72 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
     return Row(children: buttons);
   }
 
+  Widget _buildCollapsedHeader(BuildContext context, AsyncValue<TaskCalendar?> projectAsync) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => setState(() => _isDetailColumnCollapsed = false),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+          ),
+          child: Column(
+        children: [
+          // Vertical text with arrow icon
+          Column(
+            children: [
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 4),
+              RotatedBox(
+                quarterTurns: 1,
+                child: Text(
+                  'Show Workflow Detail',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          // Notes button when collapsed
+          if (!_showNotesPanel && _openedNote == null)
+            IconButton(
+              onPressed: () => setState(() => _showNotesPanel = true),
+              icon: const Icon(Icons.notes_rounded),
+              tooltip: 'Show notes',
+            ),
+          if (_showNotesPanel || _openedNote != null)
+            IconButton(
+              onPressed: () => setState(() {
+                if (_openedNote != null) {
+                  _openedNote = null;
+                  _showNotesPanel = false;
+                } else {
+                  _showNotesPanel = false;
+                }
+              }),
+              icon: const Icon(Icons.close_rounded),
+              tooltip: 'Close notes',
+            ),
+          // Expand button at bottom
+          IconButton(
+            onPressed: () => setState(() => _isDetailColumnCollapsed = false),
+            icon: const Icon(Icons.chevron_right_rounded),
+            tooltip: 'Expand workflow details',
+          ),
+        ],
+      ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDesktopHeader(BuildContext context, AsyncValue<TaskCalendar?> projectAsync, AsyncValue<List<Task>> tasksAsync) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -518,7 +598,12 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
         children: [
           projectAsync.when(
             data: (project) => project != null
-                ? ProjectInfosWidget(project: project, tasksAsync: tasksAsync, onProjectUpdated: (_) {})
+                ? ProjectInfosWidget(
+                    project: project, 
+                    tasksAsync: tasksAsync, 
+                    onProjectUpdated: (_) {},
+                    onCollapse: () => setState(() => _isDetailColumnCollapsed = true),
+                  )
                 : const SizedBox.shrink(),
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),

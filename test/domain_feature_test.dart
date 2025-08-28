@@ -128,7 +128,10 @@ void main() {
         expect(testCalendars[2].belongsToDomain('no domain'), isTrue);
       });
 
-      test('withDomain creates calendar with new domain', () {
+      test('withDomain creates calendar with new domain', () async {
+        // Add a small delay to ensure timestamps are different
+        await Future.delayed(const Duration(milliseconds: 1));
+        
         final updated = testCalendars[2].withDomain('Finance');
         expect(updated.flowitDomain, equals('Finance'));
         expect(updated.path, equals(testCalendars[2].path)); // Other fields preserved
