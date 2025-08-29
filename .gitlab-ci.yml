@@ -11,7 +11,8 @@ variables:
   CUSTOM_IMAGE_TAG: "$FLUTTER_VERSION"
   ANDROID_TOOL_VERSION_X: "34"
   ANDROID_TOOL_VERSION: "${ANDROID_TOOL_VERSION_X}.0.0"
-
+  FLATPAK_RUNTIME_VERSION: "48"
+  FLATPAK_BUILD_IMAGE: "$CI_REGISTRY_IMAGE/build-flatpak"
 update_version:
   stage: version
   image: alpine:latest
@@ -106,10 +107,11 @@ build_appimage:
       artifacts: true
   rules:
     - if: '$CI_COMMIT_TAG'
-  script:
+  before_script:
     - echo "APPIMAGE_JOB_ID=$CI_JOB_ID" > build.env
     - echo "CI_PIPELINE_IID=$CI_PIPELINE_IID" >> build.env
     - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+  script:
     - bash CI_scripts/linux/build_app_image.sh $CI_COMMIT_TAG $CI_PIPELINE_IID "build/linux/x64/release/towdow_app-$CI_COMMIT_TAG.AppImage"
   artifacts:
     paths:
@@ -117,6 +119,64 @@ build_appimage:
     expire_in: 1 week
     reports:
       dotenv: build.env
+
+build_snapcraft:
+  stage: build
+  tags:
+    - snapcraft
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  needs:
+    - job: build_appimage
+      artifacts: true
+  before_script:
+    - echo "SNAPCRAFT_JOB_ID=$CI_JOB_ID" > build.env
+    - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+  script:
+    - snapcraft --version
+    - bash CI_scripts/linux/build_snapcraft_from_appimage.sh
+  artifacts:
+    when: always
+    paths:
+      - towdow_${CI_COMMIT_TAG}_amd64.snap
+    expire_in: 1 week
+    reports:
+      dotenv: build.env
+
+
+build_flatpak:
+  stage: build
+  image: "$FLATPAK_BUILD_IMAGE:${FLATPAK_RUNTIME_VERSION}"
+  tags:
+    - flatpak
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  needs:
+    - job: build_appimage
+      artifacts: true
+  cache:
+    key: flatpak-$CI_COMMIT_REF_SLUG
+    paths:
+      - .flatpak/
+      - .flatpak-builder/
+  artifacts:
+    when: always
+    expire_in: 2 weeks
+    paths:
+      - repo/
+      - towdow.$CI_COMMIT_TAG.flatpak
+      - build-logs/
+    reports:
+      dotenv: build.env
+  before_script:
+    - sed -i "s/0\.0\.0/${CI_COMMIT_TAG}/g" app.towdow.TowDow.yaml
+    - sed -i "s/0\.0\.0/${CI_COMMIT_TAG}/g" CI_scripts/linux/flatpak/data/app.towdow.TowDow.metainfo.xml
+    - echo "FLATPAK_JOB_ID=$CI_JOB_ID" > build.env
+    - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+  script:
+    - flatpak-builder --repo=repo build-dir app.towdow.TowDow.yaml  --force-clean --default-branch=stable
+    - flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak app.towdow.TowDow stable
+    - ostree --repo=repo refs
 
 build_android:
   stage: build
@@ -128,18 +188,31 @@ build_android:
       artifacts: true
   rules:
     - if: '$CI_COMMIT_TAG'
-  script:
+  before_script:
     - echo "ANDROID_JOB_ID=$CI_JOB_ID" > build.env
     - echo "CI_PIPELINE_IID=$CI_PIPELINE_IID" >> build.env
     - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+  script:
+    - KEY_PROPERTIES_PASSWORD=$(echo $KEY_PROPERTIES_PASSWORD_BASE64 | base64 -d)
+    - echo "storePassword=__key_pass__" > android/key.properties
+    - echo "keyPassword=__key_pass__" >> android/key.properties
+    - echo "keyAlias=upload" >> android/key.properties
+    - echo "storeFile=${CI_PROJECT_DIR}/upload-keystore.jks" >> android/key.properties
+    - sed -i "s/__key_pass__/${KEY_PROPERTIES_PASSWORD}/g" android/key.properties
+#    - echo $JKS_BASE_64 > certfile_base64
+#    - openssl enc -d -base64 -in certfile_base64 -out ${CI_PROJECT_DIR}/upload-keystore.jks
+    - echo -n ${JKS_BASE_64} | base64 -d > ${CI_PROJECT_DIR}/upload-keystore.jks
     - flutter pub get
     - dart run build_runner build --delete-conflicting-outputs
     - flutter gen-l10n
     - flutter build apk --release --build-name=$CI_COMMIT_TAG --build-number=$CI_PIPELINE_IID
     - mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/app-release-$CI_COMMIT_TAG.apk"
+    - flutter build appbundle --release --build-name=$CI_COMMIT_TAG --build-number=$CI_PIPELINE_IID
+    - mv build/app/outputs/bundle/release/app-release.aab "build/app/outputs/bundle/release/app-release-$CI_COMMIT_TAG.aab"
   artifacts:
     paths:
       - "build/app/outputs/flutter-apk/app-release-$CI_COMMIT_TAG.apk"
+      - "build/app/outputs/bundle/release/app-release-$CI_COMMIT_TAG.aab"
     expire_in: 1 week
     reports:
       dotenv: build.env
@@ -153,8 +226,9 @@ build_windows:
       artifacts: true
   rules:
     - if: '$CI_COMMIT_TAG'
-  script:
+  before_script:
     - echo "WINDOWS_JOB_ID=$env:CI_JOB_ID" > build.env
+  script:
     # prevent fatal: detected dubious ownership in repository at 'C:/flutter'
     - git config --global --add safe.directory C:/flutter
     - flutter pub get
@@ -206,10 +280,11 @@ build_web:
       artifacts: true
   rules:
     - if: '$CI_COMMIT_TAG'
-  script:
+  before_script:
     - echo "WEB_JOB_ID=$CI_JOB_ID" > build.env
     - echo "CI_PIPELINE_IID=$CI_PIPELINE_IID" >> build.env
     - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+  script:
     - flutter pub get
     - dart run build_runner build --delete-conflicting-outputs
     - flutter gen-l10n
@@ -235,6 +310,10 @@ release:
       artifacts: true
     - job: build_web
       artifacts: true
+    - job: build_snapcraft
+      artifacts: true
+    - job: build_flatpak
+      artifacts: true
     - job: prepare_release
       artifacts: true
   rules:
@@ -249,8 +328,14 @@ release:
       links:
         - name: "Towdow AppImage"
           url: "$CI_PROJECT_URL/-/jobs/$APPIMAGE_JOB_ID/artifacts/file/build/linux/x64/release/towdow_app-$CI_COMMIT_TAG.AppImage"
+        - name: "Towdow Snapcraft"
+          url: "$CI_PROJECT_URL/-/jobs/$SNAPCRAFT_JOB_ID/artifacts/file/towdow_${CI_COMMIT_TAG}_amd64.snap"
+        - name: "Towdow flatpak"
+          url: "$CI_PROJECT_URL/-/jobs/$FLATPAK_JOB_ID/artifacts/file/towdow.$CI_COMMIT_TAG.flatpak"
         - name: "Towdow Android APK"
           url: "$CI_PROJECT_URL/-/jobs/$ANDROID_JOB_ID/artifacts/file/build/app/outputs/flutter-apk/app-release-$CI_COMMIT_TAG.apk"
+        - name: "Towdow Android AAB"
+          url: "$CI_PROJECT_URL/-/jobs/$ANDROID_JOB_ID/artifacts/file/build/app/outputs/bundle/release/app-release-$CI_COMMIT_TAG.aab"
         - name: "Towdow Windows Installer"
           url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/installer/Release/TowdowApp-x86_64-$CI_COMMIT_TAG-Installer.exe"
         - name: "Towdow Windows zip"
@@ -287,3 +372,15 @@ deploy_web:
     - tar -zxf "build/web_${CI_COMMIT_TAG}.tar.gz"
     - scp -r build/web debian@web.towdow.app:flutter_web/build/
     - ssh debian@web.towdow.app "docker restart flutter-web"
+
+deploy_snapcraft:
+  stage: release
+  tags:
+    - snapcraft
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  before_script:
+    - export SNAPCRAFT_STORE_CREDENTIALS=${SNAPCRAFT_LOGIN}
+    - snapcraft whoami
+  script:
+    - snapcraft upload --release=stable towdow_${CI_COMMIT_TAG}_amd64.snap

@@ -1,5 +1,55 @@
 # TowDow_app
 
+## manual releases
+
+So far only the web is deployed by the CI. The rest has to be done manually.
+
+### Windows
+
+Upload the MSI generated in the release (https://gitlab.com/towdow/towdow-flutter/-/releases/permalink/latest) to the Microsoft Store.
+
+### Flatpak
+
+### Snapcraft
+
+1. login ```snapcraft login``` (use login from vault _TowDow ubuntu / snapcraft_) 
+2. get the .snap file from release (https://gitlab.com/towdow/towdow-flutter/-/releases/permalink/latest)
+3. upload the snap file to the snapcraft store ```snapcraft upload --release=stable TowDow_app_X.Y.Y_amd64.snap```
+4. publish the snap ```snapcraft publish TowDow_app_X.Y.Y_amd64.snap --release=stable```
+
+### Android
+
+upload aab to the play store console to create a new release.
+
+## CI and runners
+
+The CI is responsible for building and create a release of the app available here: https://gitlab.com/towdow/towdow-flutter/-/releases/latest.
+
+The CI is configured to run on gitlab runners.
+
+### runners
+
+Some specific configuration is needed for the runners. See the CI_scripts folder for more information.
+
+Some jobs require specific hardware or configuration to run. Such runners have been configured on the default runners VM. Some on different PCs.
+
+When a specific runner is needed for a job, a tag is used to run the job by a runner capable of running the job.
+
+The current status is:
+
+* **build for windows**: needs either a Windows pro computer to run Windows docker or a Windows PC to have a runner with a power shell. 
+   The later option is currently used. To run the job the PC MUST be on and gitlab runner service MUST be active
+   To check the status of the pawer shell gitlab runner:
+   ```powershell
+   cd C:\GitLab-Runner
+   .\gitlab-runner.exe --debug run
+   ```
+* **Android**: no specific needed, apart from a more powerful computer than the VM hosting the default runners so a TAG is used and the PC MUST be up.
+* **Flatpak**: needs a privileged docker (one is configured on the default VM)
+* **Snapcraft**: needs lxd to runner, it was simpler to use a PC than to configure a gitlab runner to work with lxd.
+* **Linux app image**: 
+
+
 ## local development
 
 ### Web
@@ -23,7 +73,8 @@ These images will be created / updated automatically when a change is pushed to 
 
 If you want to manually build the image you can do this:
 
-### Linux
+### Android
+
 ```shell
 docker login registry.gitlab.com/towdow/towdow-flutter
 export FLUTTER_VERSION=3.32.5
@@ -35,6 +86,29 @@ docker build --build-arg FLUTTER_VERSION=${FLUTTER_VERSION} \
   -t registry.gitlab.com/towdow/towdow-flutter/flutter-build-env:${FLUTTER_VERSION} \
   -f CI_scripts/linux/Dockerfile .
 docker push registry.gitlab.com/towdow/towdow-flutter/flutter-build-env:${FLUTTER_VERSION}
+```
+
+CI variables are encoded in base4 to allow to mask them in the CI logs. To encode theme here are the commands:
+1. ```KEY_PROPERTIES_PASSWORD```: CI variable containing upload password
+    ```shell
+    echo __PASS__ | base64
+    ```
+2. ```JKS_BASE_64```: CI variable containing the jks file
+    ```shell
+    echo $(openssl base64 -A -in upload-keystore.jks)
+    ```
+
+### Linux
+
+#### flatpak image builder
+
+```shell
+export FLATPAK_RUNTIME_VERSION=48
+docker login registry.gitlab.com/towdow/towdow-flutter
+docker build --build-arg FLATPAK_RUNTIME_VERSION=${FLATPAK_RUNTIME_VERSION} \
+-t registry.gitlab.com/towdow/towdow-flutter/build-flatpak:${FLATPAK_RUNTIME_VERSION} \
+-f CI_scripts/linux/flatpak/Dockerfile .
+docker push registry.gitlab.com/towdow/towdow-flutter/build-flatpak:${FLATPAK_RUNTIME_VERSION}
 ```
 
 ### Windows

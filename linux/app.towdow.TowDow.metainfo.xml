@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>app.towdow.TowDow</id>
+  <name>TowDow</name>
+  <summary>Monitor and manage your tasks and projects</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>SSPL-1.0</project_license>
+  <developer_name>TowDow</developer_name>
+  <url type="homepage">https://gettowdow.com</url>
+  <url type="bugtracker">https://gitlab.com/towdow/towdow-flutter/issues</url>
+  <launchable type="desktop-id">app.towdow.TowDow.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.2.0" date="2025-08-19">
+      <description><p>Initial Flathub release.</p></description>
+    </release>
+  </releases>
+  <screenshots/>
+  <categories>
+    <category>Utility</category>
+    <category>Productivity</category>
+  </categories>
+</component>

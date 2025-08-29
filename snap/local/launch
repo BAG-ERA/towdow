@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+# Use snap-friendly XDG dirs
+export XDG_CACHE_HOME="$SNAP_USER_COMMON/.cache"
+export XDG_CONFIG_HOME="$SNAP_USER_COMMON/.config"
+export XDG_DATA_HOME="$SNAP_USER_COMMON/.local/share"
+mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
+
+# Run the extracted AppImage
+exec "$SNAP/app/AppRun" "$@"

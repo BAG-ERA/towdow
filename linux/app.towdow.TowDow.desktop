@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=TowDow
+GenericName=Task Manager
+Comment=Monitor and manage your tasks and projects
+Exec=towdow_app
+Icon=app.towdow.TowDow
+Terminal=false
+Type=Application
+Categories=Utility;Productivity;
+StartupNotify=true

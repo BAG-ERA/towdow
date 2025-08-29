@@ -46,4 +46,4 @@ fi
 
 ls -l ${APPIMAGE_OUTPUT}
 
-echo "done"
+echo "built app version $1"

@@ -1,0 +1,47 @@
+name: towdow
+base: core24
+version: '0.0.0'
+summary: "Simple to-do for you. Powerful workflows for your team."
+description: |
+  A clear task app that stays simple for individuals and scales to small and midsize teams with flexible workflows.
+
+grade: stable
+confinement: strict
+
+apps:
+  towdow:
+    command: bin/launch
+    desktop: meta/gui/towdow.desktop   # <— this makes the store expose “Open”
+    extensions: [gnome]
+    plugs:
+      - network
+      - network-bind
+      - x11
+      - wayland
+      - desktop
+      - desktop-legacy
+      - opengl
+      - audio-playback
+      - home
+
+parts:
+  appimage:
+    plugin: dump
+    source: .
+    override-build: |
+      set -eux
+      cp "$CRAFT_PROJECT_DIR/towdow_app-0.0.0.AppImage" "$CRAFT_PART_BUILD/"
+      chmod +x "$CRAFT_PART_BUILD/towdow_app-0.0.0.AppImage"
+      (cd "$CRAFT_PART_BUILD" && ./towdow_app-0.0.0.AppImage --appimage-extract)
+
+      install -d "$CRAFT_PART_INSTALL/app" "$CRAFT_PART_INSTALL/bin" "$CRAFT_PART_INSTALL/meta/gui"
+
+      # App payload
+      cp -a "$CRAFT_PART_BUILD/squashfs-root/." "$CRAFT_PART_INSTALL/app/"
+
+      # Wrapper
+      install -Dm755 snap/local/launch "$CRAFT_PART_INSTALL/bin/launch"
+
+      # Desktop integration
+      install -Dm644 snap/local/towdow.desktop "$CRAFT_PART_INSTALL/meta/gui/towdow.desktop"
+      install -Dm644 snap/local/towdow.png     "$CRAFT_PART_INSTALL/meta/gui/towdow.png"
