@@ -88,6 +88,16 @@ docker build --build-arg FLUTTER_VERSION=${FLUTTER_VERSION} \
 docker push registry.gitlab.com/towdow/towdow-flutter/flutter-build-env:${FLUTTER_VERSION}
 ```
 
+CI variables are encoded in base4 to allow to mask them in the CI logs. To encode theme here are the commands:
+1. ```KEY_PROPERTIES_PASSWORD```: CI variable containing upload password
+    ```shell
+    echo __PASS__ | base64
+    ```
+2. ```JKS_BASE_64```: CI variable containing the jks file
+    ```shell
+    echo $(openssl base64 -A -in upload-keystore.jks)
+    ```
+
 ### Linux
 
 #### flatpak image builder

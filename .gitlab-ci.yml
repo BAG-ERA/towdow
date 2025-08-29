@@ -184,13 +184,15 @@ build_android:
     - echo "ANDROID_JOB_ID=$CI_JOB_ID" > build.env
     - echo "CI_PIPELINE_IID=$CI_PIPELINE_IID" >> build.env
     - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+    - KEY_PROPERTIES_PASSWORD=$(echo $KEY_PROPERTIES_PASSWORD_BASE64 | base64 -d)
     - echo "storePassword=__key_pass__" > android/key.properties
     - echo "keyPassword=__key_pass__" >> android/key.properties
     - echo "keyAlias=upload" >> android/key.properties
     - echo "storeFile=${CI_PROJECT_DIR}/upload-keystore.jks" >> android/key.properties
     - sed -i "s/__key_pass__/${KEY_PROPERTIES_PASSWORD}/g" android/key.properties
-    - echo $JKS_BASE_64 > certfile_base64
-    - openssl enc -d -base64 -in certfile_base64 -out ${CI_PROJECT_DIR}/upload-keystore.jks
+#    - echo $JKS_BASE_64 > certfile_base64
+#    - openssl enc -d -base64 -in certfile_base64 -out ${CI_PROJECT_DIR}/upload-keystore.jks
+    - echo -n ${JKS_BASE_64} | base64 -d > ${CI_PROJECT_DIR}/upload-keystore.jks
     - flutter pub get
     - dart run build_runner build --delete-conflicting-outputs
     - flutter gen-l10n
