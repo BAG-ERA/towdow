@@ -367,7 +367,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               Column(
                 children: [
                   Icon(
-                    Icons.chevron_right_rounded,
+                    Icons.keyboard_double_arrow_right,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     size: 24,
                   ),
@@ -405,12 +405,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   icon: const Icon(Icons.close_rounded),
                   tooltip: 'Close notes',
                 ),
-              // Expand button at bottom
-              IconButton(
-                onPressed: () => setState(() => _isDetailColumnCollapsed = false),
-                icon: const Icon(Icons.chevron_right_rounded),
-                tooltip: 'Expand project details',
-              ),
             ],
           ),
         ),
