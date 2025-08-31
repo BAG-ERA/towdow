@@ -15,10 +15,12 @@ class MainNavigation extends ConsumerWidget {
     super.key,
     required this.currentDestination,
     required this.isDesktop,
+    required this.onDetailPressed,
   });
 
   final AppDestination? currentDestination;
   final bool isDesktop;
+  final VoidCallback onDetailPressed;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -93,41 +95,11 @@ class MainNavigation extends ConsumerWidget {
                 ? Theme.of(context).colorScheme.secondaryContainer
                 : Colors.transparent,
             borderRadius: borderRadius,
-            child: ListTile(
-              leading: Icon(
-                item.icon,
-                color: selected
-                    ? Theme.of(context).colorScheme.onSecondaryContainer
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              title: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.label,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: selected
-                            ? Theme.of(context).colorScheme.onSecondaryContainer
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (item.showBadge == true)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              child: _HoverableNavItem(
+              item: item,
+              selected: selected,
+              borderRadius: borderRadius,
+              onDetailPressed: onDetailPressed,
               onTap: () {
                 context.go(item.route);
                 if (!isDesktop) {
@@ -135,10 +107,6 @@ class MainNavigation extends ConsumerWidget {
                   closeDrawer?.call();
                 }
               },
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: borderRadius,
-              ),
             ),
           ),
         );
@@ -146,10 +114,6 @@ class MainNavigation extends ConsumerWidget {
       ),
     );
   }
-
-
-
-
 } 
 
 class _NavItem {
@@ -166,6 +130,98 @@ class _NavItem {
   final String route;
   final bool Function(AppDestination?) isSelected;
   final bool? showBadge;
+}
+
+class _HoverableNavItem extends StatefulWidget {
+  const _HoverableNavItem({
+    required this.item,
+    required this.selected,
+    required this.borderRadius,
+    required this.onDetailPressed,
+    required this.onTap,
+  });
+
+  final _NavItem item;
+  final bool selected;
+  final BorderRadius borderRadius;
+  final VoidCallback onDetailPressed;
+  final VoidCallback onTap;
+
+  @override
+  State<_HoverableNavItem> createState() => _HoverableNavItemState();
+}
+
+class _HoverableNavItemState extends State<_HoverableNavItem> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: ListTile(
+        leading: Icon(
+          widget.item.icon,
+          color: widget.selected
+              ? Theme.of(context).colorScheme.onSecondaryContainer
+              : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                widget.item.label,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: widget.selected
+                      ? Theme.of(context).colorScheme.onSecondaryContainer
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: widget.selected ? FontWeight.w600 : FontWeight.normal,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (widget.item.showBadge == true)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        trailing: (widget.item.route == '/projects' || widget.item.route == '/workflows') && _isHovered
+            ? Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: widget.onDetailPressed,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: widget.selected
+                          ? Theme.of(context).colorScheme.onSecondaryContainer
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              )
+            : null,
+        onTap: widget.onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: widget.borderRadius,
+        ),
+      ),
+    );
+  }
 }
 
 
