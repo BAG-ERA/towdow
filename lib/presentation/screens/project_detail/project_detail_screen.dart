@@ -847,8 +847,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       0 => ProjectTaskListView(
         projectPath: widget.projectPath,
         tasksAsync: tasksAsync,
-        onTasksRefresh: () => _refreshProjectTasks(ref),
-        // If we have a pending task UID from deeplink, hint the list to focus it
         initialFocusedTaskUid: _pendingTaskUid,
       ),
       1 => _buildTimingView(context, ref, tasksAsync),
@@ -971,9 +969,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       },
       onTaskToggle: (task) async {
         // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
-          final project = ref.read(projectDetailViewModelProvider(widget.projectPath)).project.asData?.value;
-          final stepStatusRes = await ref.read(projectDetailViewModelProvider(widget.projectPath).notifier).getStepStatusForTask(task);
-          final step = stepStatusRes.when(success: (s) => s, failure: (_) => null);
+        final project = ref.read(projectDetailViewModelProvider(widget.projectPath)).project.asData?.value;
+        final stepStatusRes = await ref.read(projectDetailViewModelProvider(widget.projectPath).notifier).getStepStatusForTask(task);
+        final step = stepStatusRes.when(success: (s) => s, failure: (_) => null);
         final isFlow = project?.flowitAsFlow == true;
         final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
           final stepIsAvailable = step == StepStatus.available;
@@ -1143,9 +1141,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
       return KanbanBoard(
       columns: columns,
-      onTaskTap: (task) {
-        // Navigate to task detail
-      },
       onTaskToggle: (task) async {
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
         await taskViewModel.toggleTaskCompletion(task);

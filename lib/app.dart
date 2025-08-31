@@ -72,12 +72,12 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Redirect root path to nav on mobile, projects on desktop
       if (state.uri.path == '/') {
-        return isDesktop ? '/projects' : '/nav';
+        return isDesktop ? '/today' : '/nav';
       }
 
       // Redirect /nav away on desktop platforms
       if (isDesktop && state.uri.path == '/nav') {
-        return '/projects';
+        return '/today';
       }
       
       // Skip account check if already on connection screen
