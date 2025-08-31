@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'main_navigation.dart';
+import 'navigation_switcher.dart';
 import 'toolbar_widget.dart';
 import 'user_account_badge.dart';
 
@@ -49,7 +49,7 @@ class AppSidebar extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                MainNavigation(
+                NavigationSwitcher(
                   currentDestination: currentDestination,
                   isDesktop: isDesktop,
                 ),

@@ -23,6 +23,7 @@ class MainNavigation extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
+    
     // Compute notifications for Projects/Workflows tabs
     final calendarsAsync = ref.watch(activeCalendarListProvider);
     final hasProjectAck = calendarsAsync.maybeWhen(
@@ -75,8 +76,13 @@ class MainNavigation extends ConsumerWidget {
       ),
     ];
 
-    return Column(
-      children: items.map((item) {
+    return Center(
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const ClampingScrollPhysics(),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+        final item = items[index];
         final bool selected = item.isSelected(currentDestination);
         final borderRadius = isDesktop ? BorderRadius.circular(12) : BorderRadius.zero;
 
@@ -136,9 +142,14 @@ class MainNavigation extends ConsumerWidget {
             ),
           ),
         );
-      }).toList(),
+      },
+      ),
     );
   }
+
+
+
+
 } 
 
 class _NavItem {
@@ -156,3 +167,9 @@ class _NavItem {
   final bool Function(AppDestination?) isSelected;
   final bool? showBadge;
 }
+
+
+
+
+
+
