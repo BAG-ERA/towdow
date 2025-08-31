@@ -93,11 +93,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     projectAsync.whenData((project) {
       if (project != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          // Update mobile providers if on mobile
+          // Update mobile title provider if on mobile
           if (!isDesktop) {
             ref.read(mobileTitleProvider.notifier).state = project.displayName;
-            ref.read(mobileProjectProvider.notifier).state = project;
-            ref.read(mobileProjectUpdateProvider.notifier).state = _updateProject;
           }
           
           // Auto-acknowledge shared project when viewing project detail

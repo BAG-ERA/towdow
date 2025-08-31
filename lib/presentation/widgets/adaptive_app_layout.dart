@@ -6,23 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/logger.dart';
 import 'navbar/app_sidebar.dart';
 import 'navbar/project_popup_menu.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/providers/providers.dart';
-import 'utils/editable_title.dart';
 import 'utils/popup/move_to_domain_dialog.dart';
 import 'utils/popup/project_sharing_dialog.dart';
 
 // Provider for dynamic mobile title (used by detail screens)
 final mobileTitleProvider = StateProvider<String?>((ref) => null);
-
-// Providers for mobile project editing
-final mobileProjectProvider = StateProvider<TaskCalendar?>((ref) => null);
-final mobileProjectUpdateProvider = StateProvider<Function(TaskCalendar)?>(
-  (ref) => null,
-);
 
 // Provider for drawer control - allows navigation components to close drawer
 final drawerControllerProvider = StateProvider<VoidCallback?>((ref) => null);
@@ -206,33 +198,34 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     // Determine title for mobile based on route
     String title = 'FlowIt';
     bool isDetailScreen = false;
+    bool isListScreen = false;
     final location = GoRouterState.of(context).uri.path;
 
     if (location.startsWith('/settings')) {
       title = AppLocalizations.of(context)!.settings;
-      isDetailScreen = true;
+      isListScreen = true;
     } else if (location.startsWith('/project/')) {
       title = ref.watch(mobileTitleProvider) ?? AppLocalizations.of(context)!.projectDetails;
       isDetailScreen = true;
     } else if (location == '/projects') {
       title = AppLocalizations.of(context)!.allProjects;
-      isDetailScreen = true;
+      isListScreen = true;
     } else if (location.startsWith('/workflow/')) {
       title = ref.watch(mobileTitleProvider) ?? AppLocalizations.of(context)!.workflowDetails;
       isDetailScreen = true;
     } else if (location == '/workflows') {
       title = AppLocalizations.of(context)!.allWorkflows;
-      isDetailScreen = true;
+      isListScreen = true;
     } else if (location == '/' || location.startsWith('/today') || location.startsWith('/soon') ||
         location.startsWith('/next-week') || location.startsWith('/later') || location.startsWith('/anytime')) {
       title = AppLocalizations.of(context)!.myTasks;
-      isDetailScreen = true;
+      isListScreen = true;
     }
     return Scaffold(
       key: _scaffoldKey,
-      appBar: isDetailScreen ? AppBar(
+      appBar: (isDetailScreen || isListScreen) ? AppBar(
         title: location.startsWith('/project/') 
-            ? _buildMobileProjectTitle(ref)
+            ? Text(ref.watch(mobileTitleProvider) ?? AppLocalizations.of(context)!.projectDetails)
             : Text(title),
         centerTitle: false,
         scrolledUnderElevation: 0,
@@ -243,27 +236,26 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
           builder: (context) => IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () {
-              // Detail pages go back to their list; list/settings/my tasks go to nav
-              if (location.startsWith('/project/')) {
-                context.go('/projects');
-              } else if (location.startsWith('/workflow/')) {
-                context.go('/workflows');
-              } else {
+              if (isDetailScreen) {
+                // Detail pages go back to their list
+                if (location.startsWith('/project/')) {
+                  context.go('/projects');
+                } else if (location.startsWith('/workflow/')) {
+                  context.go('/workflows');
+                }
+              } else if (isListScreen) {
+                // List pages go to navigation
                 context.go('/nav');
               }
             },
-            tooltip: location.startsWith('/project/')
-                ? AppLocalizations.of(context)!.backToProjects
-                : location.startsWith('/workflow/')
-                    ? AppLocalizations.of(context)!.backToWorkflows
-                    : AppLocalizations.of(context)!.backToNavigation,
+            tooltip: isDetailScreen
+                ? (location.startsWith('/project/')
+                    ? AppLocalizations.of(context)!.backToProjects
+                    : AppLocalizations.of(context)!.backToWorkflows)
+                : AppLocalizations.of(context)!.backToNavigation,
           ),
         ),
-        actions: location.startsWith('/project/') 
-            ? [_buildMobileProjectMenu(context, ref)]
-            : null,
       ) : null,
-      drawer: _buildMobileDrawer(context),
       body: SafeArea(
         child: SlideTransition(
           position: _slideAnimation,
@@ -271,149 +263,5 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
         ),
       ),
     );
-  }
-
-  Widget _buildMobileDrawer(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: Drawer(
-        shape: const RoundedRectangleBorder(), // Remove rounded corners
-        child: SafeArea(
-          child: AppSidebar(currentDestination: widget.currentDestination),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMobileProjectTitle(WidgetRef ref) {
-    final project = ref.watch(mobileProjectProvider);
-    final updateCallback = ref.watch(mobileProjectUpdateProvider);
-    
-    if (project != null && updateCallback != null) {
-      return EditableTitle(
-        title: project.displayName,
-        onTitleUpdated: (newTitle) {
-          final updatedProject = project.copyWith(
-            displayName: newTitle,
-            lastModified: DateTime.now(),
-          );
-          updateCallback(updatedProject);
-        },
-        isInAppBar: true,
-      );
-    }
-    
-    // Fallback to regular title
-    final title = ref.watch(mobileTitleProvider) ?? AppLocalizations.of(context)!.projectDetails;
-    return Text(title);
-  }
-
-  Widget _buildMobileProjectMenu(BuildContext context, WidgetRef ref) {
-    final project = ref.watch(mobileProjectProvider);
-    
-    if (project == null) {
-      return const SizedBox.shrink();
-    }
-    
-    return ProjectPopupMenu(
-      onMenuAction: (action) => _handleMobileProjectMenuAction(context, ref, action),
-    );
-  }
-
-  void _handleMobileProjectMenuAction(BuildContext context, WidgetRef ref, String action) {
-    final project = ref.read(mobileProjectProvider);
-    if (project == null) return;
-
-    switch (action) {
-      case 'move_to_domain':
-        _showMoveToDomainDialog(context, project);
-        break;
-      case 'share_project':
-        _showProjectSharingDialog(context, project);
-        break;
-      case 'archive_project':
-        _handleArchiveProject(context, ref, project);
-        break;
-      case 'delete_project':
-        _showDeleteConfirmation(context, ref, project);
-        break;
-    }
-  }
-
-  void _showMoveToDomainDialog(BuildContext context, TaskCalendar project) {
-    // Import and use the existing dialog
-    showDialog(
-      context: context,
-      builder: (context) => MoveToDomainDialog(project: project),
-    );
-  }
-
-  void _showProjectSharingDialog(BuildContext context, TaskCalendar project) {
-    // Import and use the existing dialog
-    showDialog(
-      context: context,
-      builder: (context) => ProjectSharingDialog(project: project),
-    );
-  }
-
-  void _handleArchiveProject(BuildContext context, WidgetRef ref, TaskCalendar project) async {
-    try {
-      final statusService = ref.read(statusServiceProvider);
-      final result = await statusService.archiveCalendar(project.path);
-      
-      result.when(
-        success: (_) {
-        },
-        failure: (failure) {
-          AppLogger.error('Failed to archive project: ${failure.message}');
-        },
-      );
-    } catch (e) {
-      AppLogger.error('Failed to archive project: $e');
-    }
-  }
-
-  void _showDeleteConfirmation(BuildContext context, WidgetRef ref, TaskCalendar project) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Delete Project'),
-        content: Text(
-          'Are you sure you want to delete "${project.displayName}"? This action cannot be undone and will remove all associated tasks.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              _deleteProject(context, ref, project);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _deleteProject(BuildContext context, WidgetRef ref, TaskCalendar project) async {
-    try {
-      final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
-      await projectListViewModel.deleteProject(project.path);
-      
-      // Navigate away from project if currently viewing it
-      final currentRoute = GoRouterState.of(context).uri.path;
-      if (currentRoute == '/project/${Uri.encodeComponent(project.path)}') {
-        context.go('/');
-      }
-      
-    } catch (e) {
-      AppLogger.error('Failed to delete project: $e');
-    }
   }
 } 

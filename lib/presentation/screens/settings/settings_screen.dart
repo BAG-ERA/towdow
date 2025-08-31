@@ -15,30 +15,18 @@ import '../../widgets/utils/popup/import_dialog.dart';
 import '../../../data/services/sync/sync_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../viewmodels/appearance_settings_viewmodel.dart';
-import '../../widgets/utils/voice_feedback_button.dart';
+import '../../widgets/header_screen_widget.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
-    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
-
     return Scaffold(
-      appBar: isDesktop
-          ? AppBar(
-              title: Text(AppLocalizations.of(context)!.settings),
-              automaticallyImplyLeading: false,
-              scrolledUnderElevation: 0,
-              elevation: 0,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              surfaceTintColor: Colors.transparent,
-              actions: [
-                const VoiceFeedbackButton(),
-              ],
-            )
-          : null,
+      appBar: HeaderScreenWidget(
+        title: AppLocalizations.of(context)!.settings,
+        showVoiceFeedback: true,
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [

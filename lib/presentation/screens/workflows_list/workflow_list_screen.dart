@@ -16,7 +16,7 @@ import '../../widgets/utils/buttons/create_workflow_button.dart';
 import '../../widgets/navbar/workflow_popup_menu.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
 import '../../../core/theme/chart_theme_usage.dart';
-import '../../widgets/utils/voice_feedback_button.dart';
+import '../../widgets/header_screen_widget.dart';
 
 class WorkflowListScreen extends ConsumerStatefulWidget {
   const WorkflowListScreen({super.key});
@@ -54,38 +54,29 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workflowListViewModelProvider);
-    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
     return Scaffold(
-      appBar: isDesktop
-          ? AppBar(
-              title: Text(AppLocalizations.of(context)!.allWorkflows),
-              scrolledUnderElevation: 0,
-              elevation: 0,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              surfaceTintColor: Colors.transparent,
-              actions: [
-                const VoiceFeedbackButton(),
-              ],
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(80),
-                child: StyledTabBar(
-                  items: [
-                    StyledTabItem(label: AppLocalizations.of(context)!.ongoing),
-                    StyledTabItem(label: AppLocalizations.of(context)!.archived),
-                    StyledTabItem(label: AppLocalizations.of(context)!.all),
-                  ],
-                  selectedIndex: _selectedTabIndex,
-                  onTabSelected: (index) {
-                    setState(() {
-                      _selectedTabIndex = index;
-                    });
-                    _applyFilter();
-                  },
-                ),
-              ),
-            )
-          : null,
+      appBar: HeaderScreenWidget(
+        title: AppLocalizations.of(context)!.allWorkflows,
+        showVoiceFeedback: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(80),
+          child: StyledTabBar(
+            items: [
+              StyledTabItem(label: AppLocalizations.of(context)!.ongoing),
+              StyledTabItem(label: AppLocalizations.of(context)!.archived),
+              StyledTabItem(label: AppLocalizations.of(context)!.all),
+            ],
+            selectedIndex: _selectedTabIndex,
+            onTabSelected: (index) {
+              setState(() {
+                _selectedTabIndex = index;
+              });
+              _applyFilter();
+            },
+          ),
+        ),
+      ),
       body: _buildBody(state),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: SafeArea(

@@ -12,10 +12,9 @@ import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/calendar_event.dart';
-import '../../../data/services/sync/sync_service.dart';
 import '../../providers/home_providers.dart';
 import '../../../core/theme/chart_theme_usage.dart';
-import '../../widgets/utils/voice_feedback_button.dart';
+import '../../widgets/header_screen_widget.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -50,15 +49,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
     
     return Scaffold(
-      appBar: isDesktop ? AppBar(
-        title: Text(AppLocalizations.of(context)!.myTasks),
-        scrolledUnderElevation: 0,
-        elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        surfaceTintColor: Colors.transparent,
-        actions: [
-          const VoiceFeedbackButton(),
-        ],
+      appBar: HeaderScreenWidget(
+        title: AppLocalizations.of(context)!.myTasks,
+        showVoiceFeedback: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: StyledTabBar(
@@ -90,7 +83,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             },
           ),
         ),
-      ) : null,
+      ),
       body: Column(
         children: [
           // Mobile tabs - only show when no AppBar (mobile mode)

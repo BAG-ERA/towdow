@@ -18,7 +18,7 @@ import '../../widgets/project-list/projects_table.dart';
 import '../../widgets/utils/buttons/create_project_button.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
 import '../../widgets/utils/popup/project_sharing_dialog.dart';
-import '../../widgets/utils/voice_feedback_button.dart';
+import '../../widgets/header_screen_widget.dart';
 
 class ProjectsListScreen extends ConsumerStatefulWidget {
   const ProjectsListScreen({super.key});
@@ -57,18 +57,11 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   @override
   Widget build(BuildContext context) {
     final projectListState = ref.watch(projectListViewModelProvider);
-    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
     
     return Scaffold(
-      appBar: isDesktop ? AppBar(
-        title: Text(AppLocalizations.of(context)!.allProjects),
-        scrolledUnderElevation: 0,
-        elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        surfaceTintColor: Colors.transparent,
-        actions: [
-          const VoiceFeedbackButton(),
-        ],
+      appBar: HeaderScreenWidget(
+        title: AppLocalizations.of(context)!.allProjects,
+        showVoiceFeedback: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(80),
           child: StyledTabBar(
@@ -86,7 +79,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
             },
           ),
         ),
-      ) : null,
+      ),
       body: _buildBody(projectListState),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: SafeArea(
