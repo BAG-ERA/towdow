@@ -32,6 +32,8 @@ Name=${APP_NAME}
 Comment=The next big thing
 Icon=icon
 Categories=Utility
+Exec=AppRun %u
+MimeType=x-scheme-handler/towdow;
 " > ${APP_DIR}/towdow_app.desktop
 
 cp assets/icons/logo/Flow-it_Default.png ${APP_DIR}/icon.png

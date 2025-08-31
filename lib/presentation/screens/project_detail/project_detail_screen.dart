@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/kanban_board.dart';
@@ -69,6 +70,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   bool _showNotesPanel = false;
   Journal? _openedNote;
   bool _isDetailColumnCollapsed = false; // New state variable for desktop layout
+  String? _pendingTaskUid;
 
   @override
   void dispose() {
@@ -91,16 +93,20 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     projectAsync.whenData((project) {
       if (project != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          // Update mobile providers if on mobile
+          // Update mobile title provider if on mobile
           if (!isDesktop) {
             ref.read(mobileTitleProvider.notifier).state = project.displayName;
-            ref.read(mobileProjectProvider.notifier).state = project;
-            ref.read(mobileProjectUpdateProvider.notifier).state = _updateProject;
           }
           
           // Auto-acknowledge shared project when viewing project detail
           ref.read(projectDetailViewModelProvider(widget.projectPath).notifier)
               .acknowledgeSharedProjectIfNeeded(project);
+
+          // If a task query is present, scroll/focus once tasks are loaded
+          final taskUid = GoRouterState.of(context).uri.queryParameters['task'];
+          if (taskUid != null && taskUid.isNotEmpty) {
+            _pendingTaskUid = taskUid;
+          }
         });
       }
     });
@@ -839,6 +845,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       0 => ProjectTaskListView(
         projectPath: widget.projectPath,
         tasksAsync: tasksAsync,
+        initialFocusedTaskUid: _pendingTaskUid,
       ),
       1 => _buildTimingView(context, ref, tasksAsync),
       2 => _buildAttendeeView(context, ref, tasksAsync),
@@ -960,9 +967,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       },
       onTaskToggle: (task) async {
         // Enforce: in ONGOING workflows only tasks in AVAILABLE steps can be marked done
-          final project = ref.read(projectDetailViewModelProvider(widget.projectPath)).project.asData?.value;
-          final stepStatusRes = await ref.read(projectDetailViewModelProvider(widget.projectPath).notifier).getStepStatusForTask(task);
-          final step = stepStatusRes.when(success: (s) => s, failure: (_) => null);
+        final project = ref.read(projectDetailViewModelProvider(widget.projectPath)).project.asData?.value;
+        final stepStatusRes = await ref.read(projectDetailViewModelProvider(widget.projectPath).notifier).getStepStatusForTask(task);
+        final step = stepStatusRes.when(success: (s) => s, failure: (_) => null);
         final isFlow = project?.flowitAsFlow == true;
         final status = (project?.flowitStatus ?? 'ONGOING').toUpperCase();
           final stepIsAvailable = step == StepStatus.available;
@@ -1132,9 +1139,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
       return KanbanBoard(
       columns: columns,
-      onTaskTap: (task) {
-        // Navigate to task detail
-      },
       onTaskToggle: (task) async {
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
         await taskViewModel.toggleTaskCompletion(task);

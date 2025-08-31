@@ -61,6 +61,8 @@ dependencies:
   
   # Logging & Network
   logger: ^2.4.0
+  app_links: ^6.1.4
+  protocol_handler: ^0.2.0
   
   # Editor & Animation
   # appflowy_editor: ^5.1.0
@@ -175,3 +177,4 @@ msix_config:
   logo_path: assets/icons/logo/Flow-it_icon-Default.png
   capabilities: internetClient
   # msix_version is set with --version during build
+  protocol_activation: towdow

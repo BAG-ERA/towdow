@@ -20,6 +20,7 @@ class TaskItemController {
   
   void expand() => _state?.expandTask();
   void collapse() => _state?.collapseTask();
+  void highlight() => _state?.highlightTask();
 }
 
 class TaskItem extends ConsumerStatefulWidget {
@@ -73,6 +74,19 @@ class _TaskItemState extends ConsumerState<TaskItem> {
       setState(() {
         _isExpanded = false;
       });
+    }
+  }
+
+  void highlightTask() async {
+    // Ensure the task is visible and expanded for emphasis
+    expandTask();
+    final context = _cardKey.currentContext;
+    if (context != null) {
+      await Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 300),
+        alignment: 0.1,
+      );
     }
   }
 

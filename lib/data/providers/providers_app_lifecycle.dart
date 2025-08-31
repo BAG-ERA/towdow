@@ -6,6 +6,7 @@ import '../../core/logger.dart';
 import 'providers_services_core.dart';
 // caldav services are used indirectly via providers_services_core
 import 'providers_repositories.dart';
+import '../../presentation/viewmodels/commands/deep_link_commands.dart';
 
 final appLifecycleManagerProvider = Provider<AppLifecycleManager>((ref) {
   return AppLifecycleManager.instance;
@@ -68,6 +69,27 @@ final appLifecycleInitializationProvider = FutureProvider<void>((ref) async {
       throw Exception(failure.message);
     },
   );
+
+  // Deep link initialization (after services are ready enough for navigation)
+  final deepLinkService = ref.watch(deepLinkServiceProvider);
+  final command = HandleDeepLinkCommand(ref);
+
+  // Handle initial link
+  try {
+    final initial = await deepLinkService.getInitialLink();
+    if (initial != null) {
+      AppLogger.info('AppLifecycle: Handling initial deep link ${initial.kind.name}');
+      await command.handle(initial);
+    }
+  } catch (e) {
+    AppLogger.warning('AppLifecycle: initial deep link failed: $e');
+  }
+
+  // Subscribe to runtime links
+  deepLinkService.linkStream.listen((target) async {
+    AppLogger.info('AppLifecycle: Handling runtime deep link ${target.kind.name}');
+    await command.handle(target);
+  });
 });
 
 final appLifecycleStateProvider = StreamProvider<FlowItAppState>((ref) {

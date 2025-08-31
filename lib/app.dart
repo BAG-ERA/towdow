@@ -11,6 +11,7 @@ import 'presentation/screens/settings/settings_screen.dart';
 import 'presentation/screens/projects_list/projects_list_screen.dart';
 import 'presentation/screens/workflows_list/workflow_list_screen.dart';
 import 'presentation/screens/workflow_detail/workflow_detail_screen.dart';
+import 'presentation/screens/navigation/nav_screen.dart';
 
 import 'presentation/screens/project_detail/project_detail_screen.dart';
 import 'presentation/viewmodels/appearance_settings_viewmodel.dart';
@@ -51,18 +52,32 @@ final accountStatusNotifierProvider = Provider<AsyncValueNotifier<bool>>((ref) {
 });
 
 // GoRouter provider that's reactive to account changes
+bool _isDesktopPlatform() {
+  if (kIsWeb) return false;
+  return defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.linux ||
+      defaultTargetPlatform == TargetPlatform.macOS;
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final accountNotifier = ref.watch(accountStatusNotifierProvider);
   final sessionEpoch = ref.watch(sessionEpochProvider);
 
       return GoRouter(
     navigatorKey: globalNavigatorKey,
-    initialLocation: '/projects',
+    initialLocation: '/nav',
     refreshListenable: Listenable.merge([accountNotifier, ValueNotifier(sessionEpoch)]),
     redirect: (context, state) {
-      // Redirect root path to projects on first-run
+      final isDesktop = _isDesktopPlatform();
+
+      // Redirect root path to nav on mobile, projects on desktop
       if (state.uri.path == '/') {
-        return '/projects';
+        return isDesktop ? '/today' : '/nav';
+      }
+
+      // Redirect /nav away on desktop platforms
+      if (isDesktop && state.uri.path == '/nav') {
+        return '/today';
       }
       
       // Skip account check if already on connection screen
@@ -90,6 +105,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       );
     },
     routes: [
+      // Route outside the main shell for mobile navigation screen
+      GoRoute(
+        path: '/nav',
+        pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/nav', state: state, child: const NavScreen()),
+      ),
       // Main app shell with adaptive navigation
       ShellRoute(
         builder: (context, state, child) {
@@ -130,32 +150,34 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/',
-            pageBuilder: (context, state) => _buildPageForDesktop(child: const _AppShell()),
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/', state: state, child: const _AppShell()),
           ),
           GoRoute(
             path: '/today',
-            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 0)),
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/today', state: state, child: const _TaskViewShell(initialTab: 0)),
           ),
           GoRoute(
             path: '/soon',
-            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 1)),
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/soon', state: state, child: const _TaskViewShell(initialTab: 1)),
           ),
           GoRoute(
             path: '/next-week',
-            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 2)),
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/next-week', state: state, child: const _TaskViewShell(initialTab: 2)),
           ),
           GoRoute(
             path: '/later',
-            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 3)),
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/later', state: state, child: const _TaskViewShell(initialTab: 3)),
           ),
           GoRoute(
             path: '/anytime',
-            pageBuilder: (context, state) => _buildPageForDesktop(child: const _TaskViewShell(initialTab: 4)),
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/anytime', state: state, child: const _TaskViewShell(initialTab: 4)),
           ),
 
           GoRoute(
             path: '/project/:path',
-            pageBuilder: (context, state) => _buildPageForDesktop(
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(
+              path: '/project',
+              state: state,
               child: ProjectDetailScreen(
                 projectPath: Uri.decodeComponent(state.pathParameters['path']!),
               ),
@@ -163,20 +185,22 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/settings',
-            pageBuilder: (context, state) => _buildPageForDesktop(child: const SettingsScreen()),
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/settings', state: state, child: const SettingsScreen()),
           ),
           
           GoRoute(
             path: '/projects',
-            pageBuilder: (context, state) => _buildPageForDesktop(child: const ProjectsListScreen()),
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/projects', state: state, child: const ProjectsListScreen()),
           ),
            GoRoute(
              path: '/workflows',
-             pageBuilder: (context, state) => _buildPageForDesktop(child: const WorkflowListScreen()),
+             pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/workflows', state: state, child: const WorkflowListScreen()),
            ),
            GoRoute(
              path: '/workflow/:path',
-             pageBuilder: (context, state) => _buildPageForDesktop(
+             pageBuilder: (context, state) => _buildPageForPlatformRoute(
+               path: '/workflow',
+               state: state,
                child: WorkflowDetailScreen(
                  workflowPath: Uri.decodeComponent(state.pathParameters['path']!),
                ),
@@ -188,7 +212,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Routes outside the main shell
       GoRoute(
         path: '/connect',
-        pageBuilder: (context, state) => _buildPageForDesktop(child: const ConnectionScreen()),
+        pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/connect', state: state, child: const ConnectionScreen()),
       ),
     ],
   );
@@ -367,15 +391,50 @@ class _TaskViewShell extends ConsumerWidget {
   }
 } 
 
-// Returns a page without transitions on desktop platforms, default transitions elsewhere
-Page<dynamic> _buildPageForDesktop({required Widget child}) {
-  final isDesktop = !kIsWeb && (
-    defaultTargetPlatform == TargetPlatform.windows ||
-    defaultTargetPlatform == TargetPlatform.linux ||
-    defaultTargetPlatform == TargetPlatform.macOS
-  );
+// Returns a page with slide transitions on mobile, and no transitions on desktop
+Page<dynamic> _buildPageForPlatformRoute({required String path, required GoRouterState state, required Widget child}) {
+  final isDesktop = _isDesktopPlatform();
   if (isDesktop) {
     return NoTransitionPage(child: child);
   }
-  return MaterialPage(child: child);
+  // Determine direction based on route pairing
+  // - /nav -> list/screens: slide left
+  // - list/screens -> /nav: slide right
+  // - list -> detail: slide left
+  // - detail -> list: slide right
+  final location = state.uri.path;
+  final bool isDetail = location.startsWith('/project/') || location.startsWith('/workflow/');
+  final bool isList = location == '/projects' || location == '/workflows' ||
+      location == '/today' || location == '/soon' || location == '/anytime' ||
+      location == '/next-week' || location == '/later' || location == '/settings' || location == '/';
+  final bool goingToNav = path == '/nav';
+  final bool comingFromNav = location == '/nav';
+
+  // Default forward slide (left)
+  Offset begin = const Offset(1.0, 0.0);
+
+  if (goingToNav) {
+    // Any screen -> nav: slide right
+    begin = const Offset(-1.0, 0.0);
+  } else if (comingFromNav) {
+    // nav -> any screen: slide left
+    begin = const Offset(1.0, 0.0);
+  } else if (isDetail && isList) {
+    // list -> detail: left
+    begin = const Offset(1.0, 0.0);
+  } else if (!isDetail && (path == '/project' || path == '/workflow')) {
+    // list -> detail explicit: left
+    begin = const Offset(1.0, 0.0);
+  } else if (isDetail && (path == '/projects' || path == '/workflows' || path == '/today' || path == '/soon' || path == '/anytime' || path == '/next-week' || path == '/later' || path == '/settings')) {
+    // detail -> list/settings: right
+    begin = const Offset(-1.0, 0.0);
+  }
+
+  return CustomTransitionPage(
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+      return SlideTransition(position: Tween<Offset>(begin: begin, end: Offset.zero).animate(curved), child: child);
+    },
+  );
 }
