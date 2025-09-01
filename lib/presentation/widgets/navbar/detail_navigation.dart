@@ -160,8 +160,8 @@ class _ProjectListContentState extends ConsumerState<_ProjectListContent> {
                     Expanded(
                       child: Text(
                         widget.isWorkflowDetail 
-                            ? AppLocalizations.of(context)!.workflows 
-                            : AppLocalizations.of(context)!.projects,
+                            ? AppLocalizations.of(context)!.myWorkflows 
+                            : AppLocalizations.of(context)!.myProjects,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
