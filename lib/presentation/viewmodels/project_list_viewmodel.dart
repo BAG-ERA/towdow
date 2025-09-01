@@ -180,7 +180,7 @@ class ProjectListState {
       sortBy: sortBy ?? this.sortBy,
       sortDirection: sortDirection ?? this.sortDirection,
       searchQuery: searchQuery ?? this.searchQuery,
-      selectedDomain: selectedDomain ?? this.selectedDomain,
+      selectedDomain: selectedDomain, // Allow null to be set explicitly
       isDomainGroupingEnabled: isDomainGroupingEnabled ?? this.isDomainGroupingEnabled,
       domainExpandedState: domainExpandedState ?? this.domainExpandedState,
       totalProjects: totalProjects ?? this.totalProjects,
@@ -920,6 +920,14 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     // Check if still mounted before updating state
     if (mounted) {
       state = state.copyWith(selectedDomain: domain);
+    }
+  }
+
+  /// Set both domain and status filters at once
+  void setFilters(String? domain, ProjectFilter filter) {
+    // Check if still mounted before updating state
+    if (mounted) {
+      state = state.copyWith(selectedDomain: domain, filter: filter);
     }
   }
 

@@ -17,6 +17,7 @@ import '../../widgets/utils/popup/move_to_domain_dialog.dart';
 import '../../widgets/list_screen/list_screen_scaffold.dart';
 import '../../widgets/list_screen/list_screen_body.dart';
 import '../../widgets/list_screen/explanation_header.dart';
+import '../../../core/logger.dart';
 
 class WorkflowListScreen extends ConsumerStatefulWidget {
   const WorkflowListScreen({super.key});
@@ -42,19 +43,35 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
     final viewModel = ref.read(workflowListViewModelProvider.notifier);
     final state = ref.read(workflowListViewModelProvider);
     
-    // Apply domain filter based on selected tab
+    AppLogger.info('WorkflowListScreen: _applyFilter called with _selectedTabIndex: $_selectedTabIndex');
+    
+    // Determine domain filter
     String? selectedDomain;
     if (_selectedTabIndex == 0) {
+      AppLogger.info('WorkflowListScreen: Setting domain filter to null (All Domains)');
       selectedDomain = null;
     } else {
       final domains = state.availableDomains;
+      AppLogger.info('WorkflowListScreen: Available domains: $domains');
       if (_selectedTabIndex - 1 < domains.length) {
         selectedDomain = domains[_selectedTabIndex - 1];
+        AppLogger.info('WorkflowListScreen: Setting domain filter to: $selectedDomain');
+      } else {
+        AppLogger.error('WorkflowListScreen: Index out of bounds! _selectedTabIndex: $_selectedTabIndex, domains length: ${domains.length}');
       }
     }
     
+    // Determine status filter
+    final statusFilter = _showArchived ? ProjectFilter.completed : ProjectFilter.active;
+    AppLogger.info('WorkflowListScreen: Setting filter to: $statusFilter');
+    
     // Apply both filters at once to avoid state conflicts
-    viewModel.setFilters(selectedDomain, _showArchived ? ProjectFilter.completed : ProjectFilter.active);
+    viewModel.setFilters(selectedDomain, statusFilter);
+    
+    // Check the state after applying filters
+    final newState = ref.read(workflowListViewModelProvider);
+    AppLogger.info('WorkflowListScreen: After filter - selectedDomain: ${newState.selectedDomain}');
+    AppLogger.info('WorkflowListScreen: After filter - filteredProjects count: ${newState.filteredProjects.length}');
   }
 
   void _toggleArchived() {

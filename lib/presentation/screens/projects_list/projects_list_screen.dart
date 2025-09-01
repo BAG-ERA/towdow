@@ -47,30 +47,28 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     
     AppLogger.info('ProjectsListScreen: _applyFilter called with _selectedTabIndex: $_selectedTabIndex');
     
-    // Apply domain filter based on selected tab
+    // Determine domain filter
+    String? selectedDomain;
     if (_selectedTabIndex == 0) {
       AppLogger.info('ProjectsListScreen: Setting domain filter to null (All Domains)');
-      viewModel.setDomainFilter(null);
+      selectedDomain = null;
     } else {
       final domains = state.availableDomains;
       AppLogger.info('ProjectsListScreen: Available domains: $domains');
       if (_selectedTabIndex - 1 < domains.length) {
-        final selectedDomain = domains[_selectedTabIndex - 1];
+        selectedDomain = domains[_selectedTabIndex - 1];
         AppLogger.info('ProjectsListScreen: Setting domain filter to: $selectedDomain');
-        viewModel.setDomainFilter(selectedDomain);
       } else {
         AppLogger.error('ProjectsListScreen: Index out of bounds! _selectedTabIndex: $_selectedTabIndex, domains length: ${domains.length}');
       }
     }
     
-    // Apply archived filter
-    if (_showArchived) {
-      AppLogger.info('ProjectsListScreen: Setting filter to completed (archived)');
-      viewModel.setFilter(ProjectFilter.completed);
-    } else {
-      AppLogger.info('ProjectsListScreen: Setting filter to active (not archived)');
-      viewModel.setFilter(ProjectFilter.active);
-    }
+    // Determine status filter
+    final statusFilter = _showArchived ? ProjectFilter.completed : ProjectFilter.active;
+    AppLogger.info('ProjectsListScreen: Setting filter to: $statusFilter');
+    
+    // Apply both filters at once to avoid state conflicts
+    viewModel.setFilters(selectedDomain, statusFilter);
     
     // Check the state after applying filters
     final newState = ref.read(projectListViewModelProvider);
