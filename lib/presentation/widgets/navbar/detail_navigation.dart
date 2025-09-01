@@ -9,6 +9,7 @@ import '../../../core/logger.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
+import '../../viewmodels/project_list_viewmodel.dart';
 import '../adaptive_app_layout.dart';
 
 class DetailNavigation extends ConsumerWidget {
@@ -29,19 +30,26 @@ class DetailNavigation extends ConsumerWidget {
     final location = GoRouterState.of(context).uri.path;
     final isWorkflowDetail = location.startsWith('/workflow/');
     
-    final projectsAsync = ref.watch(projectListProvider);
+    // Use the appropriate ProjectListViewModel based on context
+    final projectListViewModel = ref.watch(
+      isWorkflowDetail ? workflowListViewModelProvider.notifier : projectListViewModelProvider.notifier
+    );
+    final projectListState = ref.watch(
+      isWorkflowDetail ? workflowListViewModelProvider : projectListViewModelProvider
+    );
     
-    return projectsAsync.when(
-      data: (projects) => _ProjectListContent(
-        projects: projects.cast<TaskCalendar>(),
-        isDesktop: isDesktop,
-        isWorkflowDetail: isWorkflowDetail,
-        onBackPressed: onBackPressed,
-      ),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stackTrace) => Center(
-        child: Text('Error loading projects: $error'),
-      ),
+    // Initialize the ViewModel if needed
+    if (projectListState.projects.isEmpty && !projectListState.isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        projectListViewModel.initialize();
+      });
+    }
+    
+    return _ProjectListContent(
+      state: projectListState,
+      isDesktop: isDesktop,
+      isWorkflowDetail: isWorkflowDetail,
+      onBackPressed: onBackPressed,
     );
   }
 
@@ -50,13 +58,13 @@ class DetailNavigation extends ConsumerWidget {
 
 class _ProjectListContent extends ConsumerStatefulWidget {
   const _ProjectListContent({
-    required this.projects,
+    required this.state,
     required this.isDesktop,
     required this.isWorkflowDetail,
     required this.onBackPressed,
   });
 
-  final List<TaskCalendar> projects;
+  final ProjectListState state;
   final bool isDesktop;
   final bool isWorkflowDetail;
   final VoidCallback onBackPressed;
@@ -79,57 +87,28 @@ class _ProjectListContentState extends ConsumerState<_ProjectListContent> {
   @override
   void didUpdateWidget(_ProjectListContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Only recalculate if projects actually changed
-    if (oldWidget.projects != widget.projects) {
+    // Only recalculate if state actually changed
+    if (oldWidget.state != widget.state) {
       _updateDomainGroups();
     }
   }
   
   void _updateDomainGroups() {
-    // Filter based on whether we're on workflow or project detail
-    final filteredProjects = widget.isWorkflowDetail 
-        ? widget.projects.where((p) => p.flowitAsFlow == true || p.flowitType.toUpperCase() == 'WORKFLOW').toList()
-        : widget.projects.where((p) => !(p.flowitAsFlow == true || p.flowitType.toUpperCase() == 'WORKFLOW')).toList();
-    
-    // Group projects by domain (including "No Domain" as a special domain)
+    // Use the ViewModel's domain groups instead of recalculating
     final domainGroups = <String, List<TaskCalendar>>{};
     
-    for (final project in filteredProjects) {
-      final domain = project.hasDomain ? project.flowitDomain! : 'No Domain';
-      domainGroups.putIfAbsent(domain, () => []).add(project);
+    // Convert ProjectWithStats to TaskCalendar and group by domain
+    for (final domainGroup in widget.state.domainGroups) {
+      final projects = domainGroup.projects.map((p) => p.project).toList();
+      domainGroups[domainGroup.domain] = projects;
     }
-    
-    // Get all available domains and sort them, ensuring "No Domain" appears first
-    final availableDomainsAsync = ref.read(availableDomainsProvider);
-    final allDomains = availableDomainsAsync.when(
-      data: (domains) => domains,
-      loading: () => domainGroups.keys.toList(),
-      error: (error, stackTrace) => domainGroups.keys.toList(),
-    );
-    
-    // Always start with the domains we actually have projects for
-    final domainsToShow = <String>{...domainGroups.keys};
-    
-    // Add any additional domains from the provider that we don't have projects for yet
-    for (final domain in allDomains) {
-      if (!domainsToShow.contains(domain)) {
-        domainsToShow.add(domain);
-      }
-    }
-    
-    // Sort domains with "No Domain" first, then alphabetically
-    final sortedDomains = domainsToShow.toList()..sort((a, b) {
-      if (a == 'No Domain') return -1;
-      if (b == 'No Domain') return 1;
-      return a.compareTo(b);
-    });
     
     _domainGroups = domainGroups;
-    _sortedDomains = sortedDomains;
+    _sortedDomains = widget.state.domainGroups.map((dg) => dg.domain).toList();
     
     // Debug logging to help troubleshoot
     AppLogger.info('Domain groups updated: ${domainGroups.keys.toList()}');
-    AppLogger.info('Sorted domains: $sortedDomains');
+    AppLogger.info('Sorted domains: $_sortedDomains');
     AppLogger.info('Projects without domain: ${domainGroups['No Domain']?.length ?? 0}');
   }
 
@@ -428,24 +407,8 @@ class _DomainHeader extends ConsumerWidget {
 
   /// Handle dropping a task onto this domain header
   void _handleTaskDrop(BuildContext context, WidgetRef ref, Task task) async {
-    if (projects.isEmpty) {
-      AppLogger.info('DomainHeader: No projects in domain $title to move task to');
-      return;
-    }
-
-    try {
-      AppLogger.info('DomainHeader: Task ${task.summary} dropped on domain $title');
-      
-      // Show dialog to select which project in this domain to move the task to
-      if (context.mounted) {
-        final selectedProject = await _showProjectSelectionDialog(context, projects, isWorkflowDetail);
-        if (selectedProject != null) {
-          await _moveTaskToProject(context, ref, task, selectedProject);
-        }
-      }
-    } catch (e) {
-      AppLogger.error('DomainHeader: Error handling task drop: $e');
-    }
+    // Do nothing when dropping on domain header
+    AppLogger.info('DomainHeader: Task ${task.summary} dropped on domain $title - no action taken');
   }
 
   /// Show dialog to select a project from the domain

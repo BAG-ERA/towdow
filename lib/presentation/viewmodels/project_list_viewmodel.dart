@@ -293,10 +293,10 @@ class ProjectListState {
         .toSet()
         .toList();
     
-    // Sort domains alphabetically, but put "No Domain" last
+    // Sort domains with "No Domain" first (only if it exists), then alphabetically
     domains.sort((a, b) {
-      if (a == 'No Domain') return 1;
-      if (b == 'No Domain') return -1;
+      if (a == 'No Domain') return -1; // "No Domain" comes first
+      if (b == 'No Domain') return 1;
       return a.toLowerCase().compareTo(b.toLowerCase());
     });
     
@@ -1174,10 +1174,10 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
     final domainGroups = <DomainGroup>[];
     final sortedDomains = groupedProjects.keys.toList();
     
-    // Sort domains alphabetically, but put "No Domain" last
+    // Sort domains with "No Domain" first (only if it exists), then alphabetically
     sortedDomains.sort((a, b) {
-      if (a == 'No Domain') return 1;
-      if (b == 'No Domain') return -1;
+      if (a == 'No Domain') return -1; // "No Domain" comes first
+      if (b == 'No Domain') return 1;
       return a.toLowerCase().compareTo(b.toLowerCase());
     });
     
