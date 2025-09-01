@@ -50,6 +50,13 @@ class DetailNavigation extends ConsumerWidget {
       });
     }
     
+    // Set filter to active to exclude archived projects
+    if (projectListState.filter != ProjectFilter.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        projectListViewModel.setFilter(ProjectFilter.active);
+      });
+    }
+    
     return _ProjectListContent(
       state: projectListState,
       isDesktop: isDesktop,
@@ -102,17 +109,22 @@ class _ProjectListContentState extends ConsumerState<_ProjectListContent> {
   }
   
   void _updateDomainGroups() {
-    // Use the ViewModel's domain groups instead of recalculating
+    // Use the ViewModel's filtered domain groups to exclude archived projects
     final domainGroups = <String, List<TaskCalendar>>{};
     
+    // Get the filtered domain groups from the ViewModel
+    final filteredDomainGroups = ref.read(
+      widget.isWorkflowDetail ? workflowListViewModelProvider.notifier : projectListViewModelProvider.notifier
+    ).filteredDomainGroups;
+    
     // Convert ProjectWithStats to TaskCalendar and group by domain
-    for (final domainGroup in widget.state.domainGroups) {
+    for (final domainGroup in filteredDomainGroups) {
       final projects = domainGroup.projects.map((p) => p.project).toList();
       domainGroups[domainGroup.domain] = projects;
     }
     
     _domainGroups = domainGroups;
-    _sortedDomains = widget.state.domainGroups.map((dg) => dg.domain).toList();
+    _sortedDomains = filteredDomainGroups.map((dg) => dg.domain).toList();
     
     // Debug logging to help troubleshoot
     AppLogger.info('Domain groups updated: ${domainGroups.keys.toList()}');
