@@ -1,0 +1,53 @@
+id: app.towdow.towdow_app
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.llvm19
+command: towdow_app
+finish-args:
+  # X11 + XShm access
+  - --share=ipc
+  - --socket=fallback-x11
+  # Wayland access
+  - --socket=wayland
+  # GPU acceleration if needed
+  - --device=dri
+  # Needs to talk to the network:
+  - --share=network
+  # Needs to save files locally
+  - --filesystem=xdg-documents
+modules:
+  - name: towdow_app
+    buildsystem: simple
+    build-options:
+      arch:
+        x86_64:
+          env:
+            BUNDLE_PATH: build/linux/x64/release/bundle
+        aarch64:
+          env:
+            BUNDLE_PATH: build/linux/arm64/release/bundle
+      append-path: /usr/lib/sdk/llvm19/bin:/run/build/towdow_app/flutter/bin
+      prepend-ld-library-path: /usr/lib/sdk/llvm19/lib
+      env:
+        PUB_CACHE: /run/build/towdow_app/.pub-cache
+    build-commands:
+      - flutter --version
+      - flutter pub get
+      - dart run build_runner build --delete-conflicting-outputs
+      - flutter gen-l10n
+      - flutter build linux --release
+      - install -D $BUNDLE_PATH/towdow_app /app/bin/towdow_app
+      - cp -r $BUNDLE_PATH/lib /app/bin/lib
+      - cp -r $BUNDLE_PATH/data /app/bin/data
+    sources:
+#      - type: git
+#        url: https://gitlab.com/towdow/towdow-flutter.git
+      - type: dir
+        paht: .
+      - type: git
+        url: https://github.com/flutter/flutter.git
+#        tag: 3.35.2
+        tag: 3.32.7
+        dest: flutter
