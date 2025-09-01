@@ -50,6 +50,8 @@
   "noneFound": "No {what} found",
   "projectsExplainer": "Projects group tasks and help you keep them organized. Click on CREATE NEW PROJECT to get started.",
   "workflowsExplainer": "Workflows define steps to move tasks through. Click on CREATE NEW WORKFLOW to get started.",
+  "projectsListExplainer": "Projects are conventional containers that group related tasks. \nUse them to organize work like app development, event planning, or any multi-step initiative. \nThis table lets you browse, sort, and manage your projects at a glance.",
+  "workflowsListExplainer": "Workflows define steps to move tasks through. \nUse them to standardize progress across tasks and teams. \nThis table lets you browse, sort, and manage your workflows at a glance.",
   "deleteProject": "Delete Project",
   "areYouSureDelete": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
   "projectPathCopied": "Project path copied to clipboard",

@@ -87,7 +87,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     final projectListState = ref.watch(projectListViewModelProvider);
     
     final domains = projectListState.availableDomains;
-    final domainTabs = ['All Domains', ...domains];
+    final domainTabs = [AppLocalizations.of(context)!.all, ...domains];
     
     return ListScreenScaffold(
       title: AppLocalizations.of(context)!.allProjects,
@@ -134,9 +134,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
         },
       ),
       explanationHeader: ExplanationHeader(
-        text: 'Projects are conventional containers that group related tasks. \n'
-            'Use them to organize work like app development, event planning, or any multi-step initiative. \n'
-            'This table lets you browse, sort, and manage your projects at a glance.',
+        text: AppLocalizations.of(context)!.projectsListExplainer,
       ),
     );
   }

@@ -85,7 +85,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
     final state = ref.watch(workflowListViewModelProvider);
     
     final domains = state.availableDomains;
-    final domainTabs = ['All Domains', ...domains];
+    final domainTabs = [AppLocalizations.of(context)!.all, ...domains];
 
     return ListScreenScaffold(
       title: AppLocalizations.of(context)!.allWorkflows,
@@ -133,9 +133,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
         menuBuilder: (context, ref, project) => WorkflowPopupMenu.getMenuItems(context, ref, project: project),
       ),
       explanationHeader: ExplanationHeader(
-        text: 'Workflows define steps to move tasks through. \n'
-            'Use them to standardize progress across tasks and teams. \n'
-            'This table lets you browse, sort, and manage your workflows at a glance.',
+        text: AppLocalizations.of(context)!.workflowsListExplainer,
       ),
     );
   }
