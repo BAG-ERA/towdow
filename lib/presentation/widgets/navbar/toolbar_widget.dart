@@ -8,7 +8,9 @@ import '../../../data/providers/providers.dart';
 import '../utils/buttons/create_project_or_domain_button.dart';
 
 class ToolbarWidget extends ConsumerWidget {
-  const ToolbarWidget({super.key});
+  const ToolbarWidget({super.key, this.isIconOnly = false});
+
+  final bool isIconOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

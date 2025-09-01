@@ -14,10 +14,12 @@ class DetailNavigation extends ConsumerWidget {
     super.key,
     required this.isDesktop,
     required this.onBackPressed,
+    this.isIconOnly = false,
   });
 
   final bool isDesktop;
   final VoidCallback onBackPressed;
+  final bool isIconOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -2,24 +2,26 @@
 // Switches between different navigation types based on current route:
 // - MainNavigation: for general screens
 // - DetailNavigation: for project/workflow detail screens
-// - SettingsNavigation: for settings screens
+// - SettingsNavigation: removed
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'main_navigation.dart';
 import 'detail_navigation.dart';
-import 'settings_navigation.dart';
+// settings_navigation removed
 
 class NavigationSwitcher extends ConsumerStatefulWidget {
   const NavigationSwitcher({
     super.key,
     required this.currentDestination,
     required this.isDesktop,
+    this.isIconOnly = false,
   });
 
   final dynamic currentDestination;
   final bool isDesktop;
+  final bool isIconOnly;
 
   @override
   ConsumerState<NavigationSwitcher> createState() => _NavigationSwitcherState();
@@ -34,12 +36,10 @@ class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
     super.didChangeDependencies();
     final location = GoRouterState.of(context).uri.path;
     
-    // Determine navigation type based on route
+    // Determine navigation type based on route (settings removed)
     NavigationType newNavigationType;
     if (location.startsWith('/project/') || location.startsWith('/workflow/')) {
       newNavigationType = NavigationType.detail;
-    } else if (location.startsWith('/settings')) {
-      newNavigationType = NavigationType.settings;
     } else {
       newNavigationType = NavigationType.main;
     }
@@ -76,12 +76,7 @@ class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
         navigationContent = DetailNavigation(
           isDesktop: widget.isDesktop,
           onBackPressed: _goBackToMain,
-        );
-        break;
-      case NavigationType.settings:
-        navigationContent = SettingsNavigation(
-          isDesktop: widget.isDesktop,
-          onBackPressed: _goBackToMain,
+          isIconOnly: widget.isIconOnly,
         );
         break;
       case NavigationType.main:
@@ -89,6 +84,7 @@ class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
           currentDestination: widget.currentDestination,
           isDesktop: widget.isDesktop,
           onDetailPressed: _goToDetail,
+          isIconOnly: widget.isIconOnly,
         );
         break;
     }
@@ -131,5 +127,4 @@ class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
 enum NavigationType {
   main,
   detail,
-  settings,
 }

@@ -16,11 +16,13 @@ class MainNavigation extends ConsumerWidget {
     required this.currentDestination,
     required this.isDesktop,
     required this.onDetailPressed,
+    this.isIconOnly = false,
   });
 
   final AppDestination? currentDestination;
   final bool isDesktop;
   final VoidCallback onDetailPressed;
+  final bool isIconOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -107,6 +109,7 @@ class MainNavigation extends ConsumerWidget {
                   closeDrawer?.call();
                 }
               },
+              isIconOnly: isIconOnly,
             ),
           ),
         );
@@ -139,6 +142,7 @@ class _HoverableNavItem extends StatefulWidget {
     required this.borderRadius,
     required this.onDetailPressed,
     required this.onTap,
+    this.isIconOnly = false,
   });
 
   final _NavItem item;
@@ -146,6 +150,7 @@ class _HoverableNavItem extends StatefulWidget {
   final BorderRadius borderRadius;
   final VoidCallback onDetailPressed;
   final VoidCallback onTap;
+  final bool isIconOnly;
 
   @override
   State<_HoverableNavItem> createState() => _HoverableNavItemState();
@@ -167,7 +172,7 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
               ? Theme.of(context).colorScheme.onSecondaryContainer
               : Theme.of(context).colorScheme.onSurfaceVariant,
         ),
-        title: Row(
+        title: widget.isIconOnly ? null : Row(
           children: [
             Expanded(
               child: Text(
@@ -195,7 +200,7 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
               ),
           ],
         ),
-        trailing: (widget.item.route == '/projects' || widget.item.route == '/workflows') && _isHovered
+        trailing: widget.isIconOnly ? null : ((widget.item.route == '/projects' || widget.item.route == '/workflows') && _isHovered
             ? Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -213,9 +218,11 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
                   ),
                 ),
               )
-            : null,
+            : null),
         onTap: widget.onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        contentPadding: widget.isIconOnly ? const EdgeInsets.symmetric(horizontal: 16, vertical: 8) : const EdgeInsets.symmetric(horizontal: 16),
+        minLeadingWidth: widget.isIconOnly ? 0 : null,
+        visualDensity: widget.isIconOnly ? VisualDensity.compact : VisualDensity.standard,
         shape: RoundedRectangleBorder(
           borderRadius: widget.borderRadius,
         ),
