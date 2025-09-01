@@ -100,6 +100,7 @@ class StyledTabBar extends StatelessWidget {
                       
                       return SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(), // Better mobile scrolling
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: List.generate(items.length, (index) {
@@ -117,6 +118,7 @@ class StyledTabBar extends StatelessWidget {
                   )
                 : SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(), // Better mobile scrolling
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: List.generate(items.length, (index) {
