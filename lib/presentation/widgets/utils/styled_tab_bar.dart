@@ -27,6 +27,7 @@ class StyledTabBar extends StatelessWidget {
   final Duration animationDuration;
   final EdgeInsets? tabPadding; // Made nullable to enable responsive padding
   final bool enableResponsiveMode;
+  final bool enableShrink;
 
   const StyledTabBar({
     super.key,
@@ -38,6 +39,7 @@ class StyledTabBar extends StatelessWidget {
     this.animationDuration = const Duration(milliseconds: 200),
     this.tabPadding, // No default value - will be calculated responsively
     this.enableResponsiveMode = true,
+    this.enableShrink = true,
   });
 
   /// Gets responsive padding based on screen size
@@ -94,10 +96,11 @@ class StyledTabBar extends StatelessWidget {
                 ? LayoutBuilder(
                     builder: (context, constraints) {
                       final availableWidth = constraints.maxWidth - 8.0; // Account for container padding
-                      final shouldUseCompactMode = _shouldUseCompactMode(context, availableWidth);
+                      final shouldUseCompactMode = enableShrink && _shouldUseCompactMode(context, availableWidth);
                       
                       return SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(), // Better mobile scrolling
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: List.generate(items.length, (index) {
@@ -115,6 +118,7 @@ class StyledTabBar extends StatelessWidget {
                   )
                 : SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(), // Better mobile scrolling
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: List.generate(items.length, (index) {
@@ -136,7 +140,7 @@ class StyledTabBar extends StatelessWidget {
 
   /// Determines if compact mode should be used based on available width
   bool _shouldUseCompactMode(BuildContext context, double availableWidth) {
-    if (!enableResponsiveMode) return false;
+    if (!enableResponsiveMode || !enableShrink) return false;
     
     final responsiveTabPadding = _getResponsiveTabPadding(context);
     

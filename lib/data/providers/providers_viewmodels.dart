@@ -101,17 +101,15 @@ final projectSharingViewModelProvider = StateNotifierProvider<ProjectSharingView
 final projectListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final taskRepository = ref.watch(taskRepositoryProvider);
-  final accountRepository = ref.watch(accountRepositoryProvider);
   final userRepository = ref.watch(userRepositoryProvider);
-  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository, workflowsMode: false);
+  return ProjectListViewModel(calendarRepository, taskRepository, userRepository, workflowsMode: false);
 });
 
 final workflowListViewModelProvider = StateNotifierProvider<ProjectListViewModel, ProjectListState>((ref) {
   final calendarRepository = ref.watch(calendarRepositoryProvider);
   final taskRepository = ref.watch(taskRepositoryProvider);
-  final accountRepository = ref.watch(accountRepositoryProvider);
   final userRepository = ref.watch(userRepositoryProvider);
-  return ProjectListViewModel(calendarRepository, taskRepository, accountRepository, userRepository, workflowsMode: true);
+  return ProjectListViewModel(calendarRepository, taskRepository, userRepository, workflowsMode: true);
 });
 
 final externalCalendarViewModelProvider = StateNotifierProvider<ExternalCalendarViewModel, ExternalCalendarState>((ref) {
