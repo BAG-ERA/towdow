@@ -45,23 +45,37 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     final viewModel = ref.read(projectListViewModelProvider.notifier);
     final state = ref.read(projectListViewModelProvider);
     
+    AppLogger.info('ProjectsListScreen: _applyFilter called with _selectedTabIndex: $_selectedTabIndex');
+    
     // Apply domain filter based on selected tab
     if (_selectedTabIndex == 0) {
+      AppLogger.info('ProjectsListScreen: Setting domain filter to null (All Domains)');
       viewModel.setDomainFilter(null);
     } else {
       final domains = state.availableDomains;
+      AppLogger.info('ProjectsListScreen: Available domains: $domains');
       if (_selectedTabIndex - 1 < domains.length) {
         final selectedDomain = domains[_selectedTabIndex - 1];
+        AppLogger.info('ProjectsListScreen: Setting domain filter to: $selectedDomain');
         viewModel.setDomainFilter(selectedDomain);
+      } else {
+        AppLogger.error('ProjectsListScreen: Index out of bounds! _selectedTabIndex: $_selectedTabIndex, domains length: ${domains.length}');
       }
     }
     
     // Apply archived filter
     if (_showArchived) {
+      AppLogger.info('ProjectsListScreen: Setting filter to completed (archived)');
       viewModel.setFilter(ProjectFilter.completed);
     } else {
+      AppLogger.info('ProjectsListScreen: Setting filter to active (not archived)');
       viewModel.setFilter(ProjectFilter.active);
     }
+    
+    // Check the state after applying filters
+    final newState = ref.read(projectListViewModelProvider);
+    AppLogger.info('ProjectsListScreen: After filter - selectedDomain: ${newState.selectedDomain}');
+    AppLogger.info('ProjectsListScreen: After filter - filteredProjects count: ${newState.filteredProjects.length}');
   }
 
   void _toggleArchived() {
@@ -90,6 +104,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
       onToggleArchived: _toggleArchived,
       body: _buildBody(),
       floatingActionButton: _buildCreateProjectButton(),
+      contentType: 'projects',
     );
   }
 

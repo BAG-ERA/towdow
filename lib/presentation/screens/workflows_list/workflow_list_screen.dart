@@ -43,22 +43,18 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
     final state = ref.read(workflowListViewModelProvider);
     
     // Apply domain filter based on selected tab
+    String? selectedDomain;
     if (_selectedTabIndex == 0) {
-      viewModel.setDomainFilter(null);
+      selectedDomain = null;
     } else {
       final domains = state.availableDomains;
       if (_selectedTabIndex - 1 < domains.length) {
-        final selectedDomain = domains[_selectedTabIndex - 1];
-        viewModel.setDomainFilter(selectedDomain);
+        selectedDomain = domains[_selectedTabIndex - 1];
       }
     }
     
-    // Apply archived filter
-    if (_showArchived) {
-      viewModel.setFilter(ProjectFilter.completed);
-    } else {
-      viewModel.setFilter(ProjectFilter.active);
-    }
+    // Apply both filters at once to avoid state conflicts
+    viewModel.setFilters(selectedDomain, _showArchived ? ProjectFilter.completed : ProjectFilter.active);
   }
 
   void _toggleArchived() {
@@ -87,6 +83,7 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
       onToggleArchived: _toggleArchived,
       body: _buildBody(),
       floatingActionButton: _buildCreateWorkflowButton(context),
+      contentType: 'workflows',
     );
   }
 
