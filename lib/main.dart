@@ -26,6 +26,7 @@ import 'data/services/user/user_preferences_queue_service.dart';
 
 // Import services and providers
 import 'core/logger.dart';
+import 'core/result.dart';
 import 'data/services/storage/local_storage_service.dart';
 import 'data/providers/providers.dart';
 

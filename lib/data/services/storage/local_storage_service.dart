@@ -1,7 +1,7 @@
 // Local storage service using Hive for offline-first data persistence
 // Provides generic CRUD operations for all FlowIt models
 
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../core/result.dart';

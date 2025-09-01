@@ -9,7 +9,7 @@ part 'validator.g.dart';
 
 @HiveType(typeId: 7)
 @freezed
-class FormQuestion with _$FormQuestion {
+abstract class FormQuestion with _$FormQuestion {
   const factory FormQuestion({
     @HiveField(0) required String questionId,
     @HiveField(1) required FormQuestionType questionType,

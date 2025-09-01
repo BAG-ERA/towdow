@@ -9,7 +9,7 @@ part 'caldav_account.g.dart';
 
 @HiveType(typeId: 1)
 @freezed
-class CaldavAccount with _$CaldavAccount {
+abstract class CaldavAccount with _$CaldavAccount {
   const factory CaldavAccount({
     @HiveField(0) required String id,
     @HiveField(1) required String providerType, // towdow_cloud, google, nextcloud, custom

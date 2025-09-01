@@ -131,7 +131,7 @@ enum CalendarUserType {
 /// Attendee model representing a participant in a task or project
 @HiveType(typeId: 5)
 @freezed
-class Attendee with _$Attendee {
+abstract class Attendee with _$Attendee {
   const factory Attendee({
     /// Email address (URI) - mandatory field
     @HiveField(0) required String email,

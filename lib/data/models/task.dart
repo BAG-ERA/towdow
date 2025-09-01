@@ -10,7 +10,7 @@ part 'task.g.dart';
 
 @HiveType(typeId: 6)
 @freezed
-class Task with _$Task {
+abstract class Task with _$Task {
   const factory Task({
     @HiveField(0) required String uid,
     @HiveField(1) required String summary,

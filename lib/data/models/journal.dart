@@ -11,7 +11,7 @@ part 'journal.g.dart';
 
 @HiveType(typeId: 23)
 @freezed
-class Journal with _$Journal {
+abstract class Journal with _$Journal {
   const factory Journal({
     @HiveField(0) required String uid,
     @HiveField(1) required String summary,

@@ -10,7 +10,7 @@ part 'external_calendar.g.dart';
 
 @HiveType(typeId: 30)
 @freezed
-class ExternalCalendar with _$ExternalCalendar {
+abstract class ExternalCalendar with _$ExternalCalendar {
   const factory ExternalCalendar({
     // CalDAV server properties
     @HiveField(0) required String path,

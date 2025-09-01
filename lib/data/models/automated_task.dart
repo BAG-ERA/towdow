@@ -10,7 +10,7 @@ part 'automated_task.g.dart';
 
 @HiveType(typeId: 9)
 @freezed
-class AutomatedTask with _$AutomatedTask {
+abstract class AutomatedTask with _$AutomatedTask {
   const factory AutomatedTask({
     @HiveField(0) required String uid,
     @HiveField(1) required String summary,

@@ -10,7 +10,7 @@ part 'kanban.g.dart';
 
 @HiveType(typeId: 12)
 @freezed
-class Kanban with _$Kanban {
+abstract class Kanban with _$Kanban {
   const factory Kanban({
     @HiveField(0) required String title,
     @HiveField(1) @Default([]) List<String> orderedList, // List of category IDs in order

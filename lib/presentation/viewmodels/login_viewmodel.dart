@@ -17,6 +17,7 @@ import 'package:openid_client/openid_client_io.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/logger.dart';
+import '../../core/result.dart';
 
 import '../../data/models/caldav_account.dart';
 import '../../data/services/integration/external_caldav_calendar/external_sync_service.dart';

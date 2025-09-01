@@ -9,7 +9,7 @@ part 'requirement.g.dart';
 
 @HiveType(typeId: 51)
 @freezed
-class Requirement with _$Requirement {
+abstract class Requirement with _$Requirement {
   const factory Requirement({
     @HiveField(0) required String id,
     @HiveField(1) required String name,

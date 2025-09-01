@@ -126,7 +126,7 @@ class ExportImportService {
     
     // Add calendar file to archive
     final fileName = '${calendar.displayName.replaceAll(RegExp(r'[^\w\s-]'), '_')}.ics';
-    final archiveFile = ArchiveFile(fileName, calendarContent.length, calendarContent);
+    final archiveFile = ArchiveFile(fileName, calendarContent.length, calendarContent.codeUnits);
     archive.addFile(archiveFile);
   }
 

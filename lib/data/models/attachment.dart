@@ -35,7 +35,7 @@ enum MediaType {
 /// Unified Attachment model
 @HiveType(typeId: 32)
 @freezed
-class Attachment with _$Attachment {
+abstract class Attachment with _$Attachment {
   const factory Attachment({
     @HiveField(0) required String uri,
     @HiveField(1) required String filename,

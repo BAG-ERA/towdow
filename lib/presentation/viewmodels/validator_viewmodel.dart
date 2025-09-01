@@ -7,6 +7,7 @@ import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/services/validator_service.dart';
 import '../../core/logger.dart';
+import '../../core/result.dart';
 import './commands/validator_commands.dart';
 
 /// Validator ViewModel State

@@ -9,16 +9,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'task.dart';
 import 'attendee.dart';
 import 'category.dart';
-  import 'requirement.dart';
+import 'requirement.dart';
 import 'step.dart';
 import '../providers/providers.dart';
+import '../../core/result.dart';
 
 part 'task_calendar.freezed.dart';
 part 'task_calendar.g.dart';
 
 @HiveType(typeId: 10)
 @freezed
-class TaskCalendar with _$TaskCalendar {
+abstract class TaskCalendar with _$TaskCalendar {
   const factory TaskCalendar({
     // CalDAV server properties
     @HiveField(0) required String path,

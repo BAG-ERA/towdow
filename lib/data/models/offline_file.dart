@@ -23,7 +23,7 @@ enum OfflineFileStatus {
 /// Offline file model for local storage and upload queue
 @HiveType(typeId: 21)
 @freezed
-class OfflineFile with _$OfflineFile {
+abstract class OfflineFile with _$OfflineFile {
   const factory OfflineFile({
     @HiveField(0) required String id,
     @HiveField(1) required String taskUid,
@@ -53,7 +53,7 @@ class OfflineFile with _$OfflineFile {
 /// Upload queue item for managing file uploads
 @HiveType(typeId: 22)
 @freezed
-class FileUploadQueueItem with _$FileUploadQueueItem {
+abstract class FileUploadQueueItem with _$FileUploadQueueItem {
   const factory FileUploadQueueItem({
     @HiveField(0) required String id,
     @HiveField(1) required String offlineFileId,

@@ -8,7 +8,7 @@ part 'user.g.dart';
 
 /// Current user response model from /current_user endpoint
 @freezed
-class CurrentUser with _$CurrentUser {
+abstract class CurrentUser with _$CurrentUser {
   const factory CurrentUser({
     required String email,
     required String name,
@@ -22,7 +22,7 @@ class CurrentUser with _$CurrentUser {
 
 /// User information model from /user/{email} endpoint
 @freezed
-class UserInfo with _$UserInfo {
+abstract class UserInfo with _$UserInfo {
   const factory UserInfo({
     required int id,
     required bool isGuest,

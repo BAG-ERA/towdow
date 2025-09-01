@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logger.dart';
+import '../../../../core/result.dart';
 import '../../../../data/providers/providers.dart';
 import '../enhanced_text_field.dart';
 

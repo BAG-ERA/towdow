@@ -24,6 +24,7 @@ import '../../data/repositories/user_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/providers/providers.dart';
 import '../viewmodels/commands/status_commands.dart';
+import '../../core/result.dart';
 
 // CalDAV Management state for calendar discovery and selection
 class CalDAVManagementState {

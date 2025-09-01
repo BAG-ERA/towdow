@@ -11,7 +11,7 @@ part 'calendar_event.g.dart';
 
 @HiveType(typeId: 31)
 @freezed
-class CalendarEvent with _$CalendarEvent {
+abstract class CalendarEvent with _$CalendarEvent {
   const factory CalendarEvent({
     // Basic event properties (RFC 5545)
     @HiveField(0) required String uid,

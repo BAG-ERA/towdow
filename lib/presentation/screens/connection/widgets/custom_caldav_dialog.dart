@@ -10,6 +10,7 @@ import '../../../../data/services/caldav/caldav_discovery_service.dart';
 import '../../../../data/providers/providers.dart';
 import 'package:uuid/uuid.dart';
 import '../../../widgets/utils/enhanced_text_field.dart';
+import '../../../../core/result.dart';
 
 class CustomCaldavDialog extends ConsumerStatefulWidget {
   const CustomCaldavDialog({super.key});

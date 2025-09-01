@@ -10,6 +10,7 @@ import '../utils/enhanced_text_field.dart';
 import '../utils/popup/project_sharing_dialog.dart';
 import '../../../data/models/task.dart';
 import '../../../data/repositories/account_repository.dart';
+import '../../../core/result.dart';
 
 class ProjectInfosWidget extends ConsumerWidget {
   final TaskCalendar project;

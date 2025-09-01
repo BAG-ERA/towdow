@@ -7,6 +7,7 @@ import '../../data/models/shared_project_member.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../core/logger.dart';
+import '../../core/result.dart';
 
 // Project Sharing ViewModel State
 class ProjectSharingState {

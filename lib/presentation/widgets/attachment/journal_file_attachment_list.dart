@@ -2,15 +2,14 @@
 // Displays file attachments for a journal and handles file operations
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../core/logger.dart';
+import '../../../core/result.dart';
 import '../../../data/models/journal.dart';
 import '../../../data/models/attachment.dart';
 import '../../../data/providers/providers.dart';
-import '../../../data/providers/providers_viewmodels.dart';
 
 class JournalFileAttachmentList extends ConsumerStatefulWidget {
   final Journal journal;

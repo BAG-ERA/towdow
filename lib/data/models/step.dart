@@ -51,7 +51,7 @@ StepStatus stepStatusFromString(String value) {
 
 @HiveType(typeId: 51)
 @freezed
-class ProjectStep with _$ProjectStep {
+abstract class ProjectStep with _$ProjectStep {
   const factory ProjectStep({
     @HiveField(0) required String id,
     @HiveField(1) required String name,

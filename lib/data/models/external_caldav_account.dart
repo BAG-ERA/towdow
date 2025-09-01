@@ -21,7 +21,7 @@ enum ExternalCalendarAuthType {
 
 @HiveType(typeId: 32)
 @freezed
-class ExternalCaldavAccount with _$ExternalCaldavAccount {
+abstract class ExternalCaldavAccount with _$ExternalCaldavAccount {
   const factory ExternalCaldavAccount({
     @HiveField(0) required String id,
     @HiveField(1) required String displayName, // User-friendly name
