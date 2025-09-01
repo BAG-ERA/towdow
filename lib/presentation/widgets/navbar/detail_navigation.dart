@@ -1,5 +1,6 @@
 // Detail navigation widget for sidebar
 // Shows projects grouped by domain when on project/workflow detail screens
+// Supports drag and drop of tasks from project detail views
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/logger.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task_calendar.dart';
+import '../../../data/models/task.dart';
 import '../adaptive_app_layout.dart';
 
 class DetailNavigation extends ConsumerWidget {
@@ -225,7 +227,7 @@ class _ProjectListItem extends ConsumerWidget {
         : '/project/${Uri.encodeComponent(project.path)}';
     final isActive = currentLocation == projectRoute;
     
-    return Material(
+    final projectWidget = Material(
       color: isActive 
           ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
           : Colors.transparent,
@@ -270,6 +272,66 @@ class _ProjectListItem extends ConsumerWidget {
         ),
       ),
     );
+
+    // Wrap with DragTarget to accept task drops
+    return DragTarget<Task>(
+      onAcceptWithDetails: (details) => _handleTaskDrop(context, ref, details.data),
+      builder: (context, candidateData, rejectedData) {
+        final isHoveringWithTask = candidateData.isNotEmpty;
+        
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            border: isHoveringWithTask 
+                ? Border.all(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                    width: 2,
+                  )
+                : null,
+            color: isHoveringWithTask 
+                ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                : Colors.transparent,
+          ),
+          child: projectWidget,
+        );
+      },
+    );
+  }
+
+  /// Handle dropping a task onto this project to move it
+  void _handleTaskDrop(BuildContext context, WidgetRef ref, Task task) async {
+    // Encode project path to match task storage format
+    final encodedProjectPath = project.path.replaceAll('@', '%40');
+    
+    // Don't move if task is already in this project
+    if (task.projectPath == encodedProjectPath) {
+      AppLogger.info('ProjectListItem: Task ${task.summary} is already in project ${project.displayName}');
+      return;
+    }
+
+    try {
+      AppLogger.info('ProjectListItem: Moving task ${task.summary} to project ${project.displayName}');
+      
+      // Use the existing TaskViewModel moveTask functionality
+      final taskViewModel = ref.read(taskViewModelProvider.notifier);
+      await taskViewModel.moveTask(task, project.path);
+      
+      AppLogger.info('ProjectListItem: Successfully moved task ${task.summary} to project ${project.displayName}');
+    } catch (e) {
+      AppLogger.error('ProjectListItem: Failed to move task ${task.summary} to project ${project.displayName}: $e');
+      
+      // Show error feedback
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to move task: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }
 
@@ -303,7 +365,7 @@ class _DomainHeader extends ConsumerWidget {
       return currentLocation == projectRoute;
     });
     
-    return Padding(
+    final domainWidget = Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
         color: Colors.transparent,
@@ -337,6 +399,139 @@ class _DomainHeader extends ConsumerWidget {
         ),
       ),
     );
+
+    // Wrap with DragTarget to accept task drops
+    return DragTarget<Task>(
+      onAcceptWithDetails: (details) => _handleTaskDrop(context, ref, details.data),
+      builder: (context, candidateData, rejectedData) {
+        final isHoveringWithTask = candidateData.isNotEmpty;
+        
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            border: isHoveringWithTask 
+                ? Border.all(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                    width: 2,
+                  )
+                : null,
+            color: isHoveringWithTask 
+                ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                : Colors.transparent,
+          ),
+          child: domainWidget,
+        );
+      },
+    );
+  }
+
+  /// Handle dropping a task onto this domain header
+  void _handleTaskDrop(BuildContext context, WidgetRef ref, Task task) async {
+    if (projects.isEmpty) {
+      AppLogger.info('DomainHeader: No projects in domain $title to move task to');
+      return;
+    }
+
+    try {
+      AppLogger.info('DomainHeader: Task ${task.summary} dropped on domain $title');
+      
+      // Show dialog to select which project in this domain to move the task to
+      if (context.mounted) {
+        final selectedProject = await _showProjectSelectionDialog(context, projects, isWorkflowDetail);
+        if (selectedProject != null) {
+          await _moveTaskToProject(context, ref, task, selectedProject);
+        }
+      }
+    } catch (e) {
+      AppLogger.error('DomainHeader: Error handling task drop: $e');
+    }
+  }
+
+  /// Show dialog to select a project from the domain
+  Future<TaskCalendar?> _showProjectSelectionDialog(
+    BuildContext context, 
+    List<TaskCalendar> projects, 
+    bool isWorkflowDetail
+  ) async {
+    return showDialog<TaskCalendar>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Select ${isWorkflowDetail ? 'Workflow' : 'Project'}'),
+          content: SizedBox(
+            width: 300,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: projects.length,
+              itemBuilder: (context, index) {
+                final project = projects[index];
+                return ListTile(
+                  title: Text(project.displayName),
+                  subtitle: Text(project.path),
+                  onTap: () => Navigator.of(context).pop(project),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Move task to the selected project
+  Future<void> _moveTaskToProject(
+    BuildContext context, 
+    WidgetRef ref, 
+    Task task, 
+    TaskCalendar project
+  ) async {
+    // Encode project path to match task storage format
+    final encodedProjectPath = project.path.replaceAll('@', '%40');
+    
+    // Don't move if task is already in this project
+    if (task.projectPath == encodedProjectPath) {
+      AppLogger.info('DomainHeader: Task ${task.summary} is already in project ${project.displayName}');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Task is already in ${project.displayName}'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      AppLogger.info('DomainHeader: Moving task ${task.summary} to project ${project.displayName}');
+      
+      // Use the existing TaskViewModel moveTask functionality
+      final taskViewModel = ref.read(taskViewModelProvider.notifier);
+      await taskViewModel.moveTask(task, project.path);
+      
+      AppLogger.info('DomainHeader: Successfully moved task ${task.summary} to project ${project.displayName}');
+    } catch (e) {
+      AppLogger.error('DomainHeader: Failed to move task ${task.summary} to project ${project.displayName}: $e');
+      
+      // Show error feedback
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to move task: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }
 

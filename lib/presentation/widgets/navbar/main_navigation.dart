@@ -1,5 +1,6 @@
 ﻿// Main navigation component for FlowIt
 // Displays primary navigation destinations with proper highlighting
+// Supports drag and drop of tasks from project detail views
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,8 @@ import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:towdow_app/data/providers/providers_services_core.dart';
 import 'package:towdow_app/data/providers/providers_project.dart';
 import 'package:towdow_app/data/models/task_calendar.dart';
+import 'package:towdow_app/data/models/task.dart';
+import '../../../core/logger.dart';
 
 class MainNavigation extends ConsumerWidget {
   const MainNavigation({
@@ -161,7 +164,10 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
+    // Check if this item supports task drops (Projects or Workflows)
+    final supportsTaskDrops = widget.item.route == '/projects' || widget.item.route == '/workflows';
+    
+    Widget navItem = MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       cursor: SystemMouseCursors.click,
@@ -200,7 +206,7 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
               ),
           ],
         ),
-        trailing: widget.isIconOnly ? null : ((widget.item.route == '/projects' || widget.item.route == '/workflows') && _isHovered
+        trailing: widget.isIconOnly ? null : (supportsTaskDrops && _isHovered
             ? Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -228,6 +234,64 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
         ),
       ),
     );
+
+    // Wrap with DragTarget if this item supports task drops
+    if (supportsTaskDrops) {
+      return DragTarget<Task>(
+        onAcceptWithDetails: (details) => _handleTaskDrop(context, details.data),
+        builder: (context, candidateData, rejectedData) {
+          final isHoveringWithTask = candidateData.isNotEmpty;
+          
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              borderRadius: widget.borderRadius,
+              border: isHoveringWithTask 
+                  ? Border.all(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+                      width: 2,
+                    )
+                  : null,
+              color: isHoveringWithTask 
+                  ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                  : Colors.transparent,
+            ),
+            child: navItem,
+          );
+        },
+      );
+    }
+
+    return navItem;
+  }
+
+  /// Handle dropping a task onto this navigation item
+  void _handleTaskDrop(BuildContext context, Task task) async {
+    try {
+      AppLogger.info('MainNavigation: Task ${task.summary} dropped on ${widget.item.label}');
+      
+      // Navigate to the detail view for this section
+      if (widget.item.route == '/projects') {
+        // Navigate to projects detail view
+        widget.onDetailPressed();
+      } else if (widget.item.route == '/workflows') {
+        // Navigate to workflows detail view
+        widget.onDetailPressed();
+      }
+      
+      // Show feedback that user should select a specific project/workflow
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Select a specific ${widget.item.label.toLowerCase().replaceAll('my', '')} to move the task'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      AppLogger.error('MainNavigation: Error handling task drop: $e');
+    }
   }
 }
 
