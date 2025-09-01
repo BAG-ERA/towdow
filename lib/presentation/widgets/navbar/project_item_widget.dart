@@ -88,9 +88,10 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
                 }
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: Row(
                   children: [
+                    /* Not sure to use this, TODO decidehow we let user know object is draggable
                     // Drag handle icon
                     if (widget.enableDragDrop)
                       Padding(
@@ -101,7 +102,7 @@ class _ProjectItemWidgetState extends ConsumerState<ProjectItemWidget> {
                           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                         ),
                       ),
-                    
+                    */
                     Expanded(
                       child: Row(
                         children: [

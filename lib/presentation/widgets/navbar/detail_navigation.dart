@@ -11,6 +11,7 @@ import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../../viewmodels/project_list_viewmodel.dart';
 import '../adaptive_app_layout.dart';
+import 'project_item_widget.dart';
 
 class DetailNavigation extends ConsumerWidget {
   const DetailNavigation({
@@ -197,121 +198,15 @@ class _ProjectListItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final borderRadius = isDesktop ? BorderRadius.circular(8) : BorderRadius.zero;
-    
-    // Check if this item is currently active
-    final currentLocation = GoRouterState.of(context).uri.path;
-    final projectRoute = isWorkflowDetail 
-        ? '/workflow/${Uri.encodeComponent(project.path)}'
-        : '/project/${Uri.encodeComponent(project.path)}';
-    final isActive = currentLocation == projectRoute;
-    
-    final projectWidget = Material(
-      color: isActive 
-          ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
-          : Colors.transparent,
-      borderRadius: borderRadius,
-      child: InkWell(
-        borderRadius: borderRadius,
-        onTap: () {
-          AppLogger.info('ProjectItem: Navigating to project ${project.path} (${project.displayName})');
-          final route = isWorkflowDetail 
-              ? '/workflow/${Uri.encodeComponent(project.path)}'
-              : '/project/${Uri.encodeComponent(project.path)}';
-          context.go(route);
-          if (!isDesktop) {
-            final closeDrawer = ref.read(drawerControllerProvider);
-            closeDrawer?.call();
-          }
-        },
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: isIndented ? 32.0 : 16.0,
-            right: 16.0,
-            top: 4.0,
-            bottom: 4.0,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  project.displayName,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isActive 
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurface,
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-
-            ],
-          ),
-        ),
-      ),
-    );
-
-    // Wrap with DragTarget to accept task drops
-    return DragTarget<Task>(
-      onAcceptWithDetails: (details) => _handleTaskDrop(context, ref, details.data),
-      builder: (context, candidateData, rejectedData) {
-        final isHoveringWithTask = candidateData.isNotEmpty;
-        
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          decoration: BoxDecoration(
-            borderRadius: borderRadius,
-            border: isHoveringWithTask 
-                ? Border.all(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
-                    width: 2,
-                  )
-                : null,
-            color: isHoveringWithTask 
-                ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
-                : Colors.transparent,
-          ),
-          child: projectWidget,
-        );
-      },
+    // Use the ProjectItemWidget which includes draggable functionality
+    return ProjectItemWidget(
+      project: project,
+      enableDragDrop: true,
+      isDesktop: isDesktop,
     );
   }
 
-  /// Handle dropping a task onto this project to move it
-  void _handleTaskDrop(BuildContext context, WidgetRef ref, Task task) async {
-    // Encode project path to match task storage format
-    final encodedProjectPath = project.path.replaceAll('@', '%40');
-    
-    // Don't move if task is already in this project
-    if (task.projectPath == encodedProjectPath) {
-      AppLogger.info('ProjectListItem: Task ${task.summary} is already in project ${project.displayName}');
-      return;
-    }
 
-    try {
-      AppLogger.info('ProjectListItem: Moving task ${task.summary} to project ${project.displayName}');
-      
-      // Use the existing TaskViewModel moveTask functionality
-      final taskViewModel = ref.read(taskViewModelProvider.notifier);
-      await taskViewModel.moveTask(task, project.path);
-      
-      AppLogger.info('ProjectListItem: Successfully moved task ${task.summary} to project ${project.displayName}');
-    } catch (e) {
-      AppLogger.error('ProjectListItem: Failed to move task ${task.summary} to project ${project.displayName}: $e');
-      
-      // Show error feedback
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to move task: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
 }
 
 class _DomainHeader extends ConsumerWidget {
@@ -379,11 +274,18 @@ class _DomainHeader extends ConsumerWidget {
       ),
     );
 
-    // Wrap with DragTarget to accept task drops
-    return DragTarget<Task>(
-      onAcceptWithDetails: (details) => _handleTaskDrop(context, ref, details.data),
+    // Wrap with DragTarget to accept both task and project drops
+    return DragTarget<Object>(
+      onAcceptWithDetails: (details) {
+        if (details.data is Task) {
+          _handleTaskDrop(context, ref, details.data as Task);
+        } else if (details.data is TaskCalendar) {
+          _handleProjectDrop(context, ref, details.data as TaskCalendar);
+        }
+      },
       builder: (context, candidateData, rejectedData) {
-        final isHoveringWithTask = candidateData.isNotEmpty;
+        final isHoveringWithTask = candidateData.any((data) => data is Task);
+        final isHoveringWithProject = candidateData.any((data) => data is TaskCalendar);
         
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -394,10 +296,17 @@ class _DomainHeader extends ConsumerWidget {
                     color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
                     width: 2,
                   )
-                : null,
+                : isHoveringWithProject
+                    ? Border.all(
+                        color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.8),
+                        width: 2,
+                      )
+                    : null,
             color: isHoveringWithTask 
                 ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
-                : Colors.transparent,
+                : isHoveringWithProject
+                    ? Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3)
+                    : Colors.transparent,
           ),
           child: domainWidget,
         );
@@ -409,6 +318,38 @@ class _DomainHeader extends ConsumerWidget {
   void _handleTaskDrop(BuildContext context, WidgetRef ref, Task task) async {
     // Do nothing when dropping on domain header
     AppLogger.info('DomainHeader: Task ${task.summary} dropped on domain $title - no action taken');
+  }
+
+  /// Handle dropping a project onto this domain header
+  void _handleProjectDrop(BuildContext context, WidgetRef ref, TaskCalendar project) async {
+    // Don't move if project is already in this domain
+    if (project.flowitDomain == title) {
+      AppLogger.info('DomainHeader: Project ${project.displayName} is already in domain $title');
+      return;
+    }
+
+    try {
+      AppLogger.info('DomainHeader: Moving project ${project.displayName} to domain $title');
+      
+      // Use the existing ProjectListViewModel assignDomainToProject functionality
+      final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+      await projectListViewModel.assignDomainToProject(project.path, title);
+      
+      AppLogger.info('DomainHeader: Successfully moved project ${project.displayName} to domain $title');
+    } catch (e) {
+      AppLogger.error('DomainHeader: Failed to move project ${project.displayName} to domain $title: $e');
+      
+      // Show error feedback
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to move project: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
 
@@ -499,93 +440,149 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     return isActive;
   }
 
+    /// Handle dropping a project onto this domain section
+  void _handleProjectDrop(BuildContext context, WidgetRef ref, TaskCalendar project) async {
+    // Don't move if project is already in this domain
+    if (project.flowitDomain == widget.domain) {
+      AppLogger.info('DomainSection: Project ${project.displayName} is already in domain ${widget.domain}');
+      return;
+    }
+
+    try {
+      AppLogger.info('DomainSection: Moving project ${project.displayName} to domain ${widget.domain}');
+      
+      // Use the existing ProjectListViewModel assignDomainToProject functionality
+      final projectListViewModel = ref.read(projectListViewModelProvider.notifier);
+      await projectListViewModel.assignDomainToProject(project.path, widget.domain);
+      
+      AppLogger.info('DomainSection: Successfully moved project ${project.displayName} to domain ${widget.domain}');
+    } catch (e) {
+      AppLogger.error('DomainSection: Failed to move project ${project.displayName} to domain ${widget.domain}: $e');
+      
+      // Show error feedback
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to move project: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Domain header with expand/collapse
-        _DomainHeader(
-          title: widget.domain,
-          isExpanded: _isExpanded,
-          onTap: _toggleExpanded,
-          isDesktop: widget.isDesktop,
-          projects: widget.projects,
-          isWorkflowDetail: widget.isWorkflowDetail,
-        ),
+    
+    // Wrap the entire domain section with DragTarget for project drops
+    return DragTarget<ProjectDragData>(
+      onAcceptWithDetails: (details) => _handleProjectDrop(context, ref, details.data.project),
+      builder: (context, candidateData, rejectedData) {
+        final isHoveringWithProject = candidateData.isNotEmpty;
         
-        // Projects list with conditional animation
-        if (_isExpanded) ...[
-          // Use AnimatedBuilder only when needed to reduce rebuilds
-          AnimatedBuilder(
-            animation: _heightAnimation,
-            builder: (context, child) {
-              return SizeTransition(
-                sizeFactor: _heightAnimation,
-                child: Stack(
-                  children: [
-                    // Continuous vertical line
-                    if (widget.projects.isNotEmpty)
-                      Positioned(
-                        left: 24.0,
-                        top: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 2,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(1),
-                          ),
-                        ),
-                      ),
-                    // Project items with active line segments
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ...widget.projects.asMap().entries.map((entry) {
-                          final project = entry.value;
-                          final isActive = _isProjectActive(project);
-                          
-                                                  return Stack(
-                          key: ValueKey(project.path), // Stable key for Flutter optimization
-                          children: [
-                            // Active line segment overlay
-                            if (isActive)
-                              Positioned(
-                                left: 24.0, // Align with the main line
-                                top: 0,
-                                bottom: 0,
-                                child: Container(
-                                  width: 2,
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primary,
-                                    borderRadius: BorderRadius.circular(1),
-                                  ),
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: isHoveringWithProject 
+                ? Border.all(
+                    color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.8),
+                    width: 2,
+                  )
+                : null,
+            color: isHoveringWithProject 
+                ? Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.3)
+                : Colors.transparent,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Domain header with expand/collapse
+              _DomainHeader(
+                title: widget.domain,
+                isExpanded: _isExpanded,
+                onTap: _toggleExpanded,
+                isDesktop: widget.isDesktop,
+                projects: widget.projects,
+                isWorkflowDetail: widget.isWorkflowDetail,
+              ),
+              
+              // Projects list with conditional animation
+              if (_isExpanded) ...[
+                // Use AnimatedBuilder only when needed to reduce rebuilds
+                AnimatedBuilder(
+                  animation: _heightAnimation,
+                  builder: (context, child) {
+                    return SizeTransition(
+                      sizeFactor: _heightAnimation,
+                      child: Stack(
+                        children: [
+                          // Continuous vertical line
+                          if (widget.projects.isNotEmpty)
+                            Positioned(
+                              left: 24.0,
+                              top: 0,
+                              bottom: 0,
+                              child: Container(
+                                width: 2,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(1),
                                 ),
                               ),
-                            // Project item
-                            Padding(
-                              padding: const EdgeInsets.only(left: 32.0),
-                              child: _ProjectListItem(
-                                project: project,
-                                isDesktop: widget.isDesktop,
-                                isWorkflowDetail: widget.isWorkflowDetail,
-                                isIndented: false, // No individual indentation since we have the line
-                              ),
                             ),
-                          ],
-                        );
-                        }),
-                      ],
-                    ),
-                  ],
+                          // Project items with active line segments
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ...widget.projects.asMap().entries.map((entry) {
+                                final project = entry.value;
+                                final isActive = _isProjectActive(project);
+                                
+                                return Stack(
+                                  key: ValueKey(project.path), // Stable key for Flutter optimization
+                                  children: [
+                                    // Active line segment overlay
+                                    if (isActive)
+                                      Positioned(
+                                        left: 24.0, // Align with the main line
+                                        top: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          width: 2,
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.primary,
+                                            borderRadius: BorderRadius.circular(1),
+                                          ),
+                                        ),
+                                      ),
+                                    // Project item
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 32.0),
+                                      child: _ProjectListItem(
+                                        project: project,
+                                        isDesktop: widget.isDesktop,
+                                        isWorkflowDetail: widget.isWorkflowDetail,
+                                        isIndented: false, // No individual indentation since we have the line
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ],
+            ],
           ),
-        ],
-      ],
+        );
+      },
     );
   }
 }
