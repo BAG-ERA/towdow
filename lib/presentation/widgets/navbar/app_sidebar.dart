@@ -47,16 +47,10 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
             const SizedBox(height: 8),
             const UserAccountBadge(),
             Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  NavigationSwitcher(
-                    currentDestination: widget.currentDestination,
-                    isDesktop: isDesktop,
-                    isIconOnly: false,
-                  ),
-                  const Divider(height: 24, color: Colors.transparent),
-                ],
+              child: NavigationSwitcher(
+                currentDestination: widget.currentDestination,
+                isDesktop: isDesktop,
+                isIconOnly: false,
               ),
             ),
             const ToolbarWidget(),
@@ -84,16 +78,10 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
             children: [
               const UserAccountBadge(),
               Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    NavigationSwitcher(
-                      currentDestination: widget.currentDestination,
-                      isDesktop: isDesktop,
-                      isIconOnly: isIconOnly,
-                    ),
-                    const Divider(height: 24, color: Colors.transparent),
-                  ],
+                child: NavigationSwitcher(
+                  currentDestination: widget.currentDestination,
+                  isDesktop: isDesktop,
+                  isIconOnly: isIconOnly,
                 ),
               ),
               ToolbarWidget(isIconOnly: isIconOnly),
