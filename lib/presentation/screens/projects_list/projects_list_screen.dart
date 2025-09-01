@@ -12,13 +12,14 @@ import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
 import '../../../data/models/task_calendar.dart';
-import '../../../core/theme/chart_theme_usage.dart';
-import '../../widgets/utils/styled_tab_bar.dart';
 import '../../widgets/project-list/projects_table.dart';
 import '../../widgets/utils/buttons/create_project_button.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
 import '../../widgets/utils/popup/project_sharing_dialog.dart';
-import '../../widgets/header_screen_widget.dart';
+import '../../widgets/list_screen/list_screen_scaffold.dart';
+import '../../widgets/list_screen/list_screen_body.dart';
+import '../../widgets/list_screen/domain_group_section.dart';
+import '../../widgets/list_screen/explanation_header.dart';
 
 class ProjectsListScreen extends ConsumerStatefulWidget {
   const ProjectsListScreen({super.key});
@@ -58,33 +59,17 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   Widget build(BuildContext context) {
     final projectListState = ref.watch(projectListViewModelProvider);
     
-    return Scaffold(
-      appBar: HeaderScreenWidget(
-        title: AppLocalizations.of(context)!.allProjects,
-        showVoiceFeedback: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(80),
-          child: StyledTabBar(
-            items: [
-              StyledTabItem(label: AppLocalizations.of(context)!.ongoing),
-              StyledTabItem(label: AppLocalizations.of(context)!.archived),
-              StyledTabItem(label: AppLocalizations.of(context)!.all),
-            ],
-            selectedIndex: _selectedTabIndex,
-            onTabSelected: (index) {
-              setState(() {
-                _selectedTabIndex = index;
-              });
-              _applyFilter();
-            },
-          ),
-        ),
-      ),
+    return ListScreenScaffold(
+      title: AppLocalizations.of(context)!.allProjects,
+      selectedTabIndex: _selectedTabIndex,
+      onTabSelected: (index) {
+        setState(() {
+          _selectedTabIndex = index;
+        });
+        _applyFilter();
+      },
       body: _buildBody(projectListState),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: SafeArea(
-        child: _buildCreateProjectButton(),
-      ),
+      floatingActionButton: _buildCreateProjectButton(),
     );
   }
 
@@ -99,90 +84,47 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   }
 
   Widget _buildBody(ProjectListState state) {
-    if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (state.error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline_rounded, size: 64, color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 16),
-            Text('${AppLocalizations.of(context)!.failedToLoad} ${AppLocalizations.of(context)!.projects.toLowerCase()}', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text(state.error!, style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.read(projectListViewModelProvider.notifier).loadProjects(),
-              child: Text(AppLocalizations.of(context)!.retry),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (state.filteredProjects.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.folder_open_rounded, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
-            const SizedBox(height: 16),
-            Text(AppLocalizations.of(context)!.noneFound(AppLocalizations.of(context)!.projects.toLowerCase()), style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text(
-              AppLocalizations.of(context)!.projectsExplainer,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
+    return ListScreenBody(
+      isLoading: state.isLoading,
+      error: state.error,
+      isEmpty: state.filteredProjects.isEmpty,
+      emptyTitle: AppLocalizations.of(context)!.projects,
+      emptyDescription: AppLocalizations.of(context)!.projectsExplainer,
+      emptyIcon: Icons.folder_open_rounded,
       onRefresh: () => ref.read(projectListViewModelProvider.notifier).refresh(),
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          Builder(
-            builder: (context) {
-              final state = ref.watch(projectListViewModelProvider);
-              final viewModel = ref.read(projectListViewModelProvider.notifier);
-              final groups = viewModel.filteredDomainGroups;
-              
-              return Column(
-                children: [
-                  for (final group in groups)
-                    _DomainTableSection(
-                      title: group.domain,
-                      projects: group.projects,
-                      isExpanded: group.isExpanded,
-                      onToggle: () => group.isExpanded 
-                          ? viewModel.collapseDomain(group.domain)
-                          : viewModel.expandDomain(group.domain),
-              buildTable: (projects) => ProjectsTable(
-                state: state,
-                projectsOverride: projects,
-                onProjectTap: _navigateToProject,
-                onProjectAction: _handleProjectAction,
-                onSortChanged: (sortType) {
-                  ref.read(projectListViewModelProvider.notifier).setSortBy(sortType);
-                },
-              ),
+      child: Builder(
+        builder: (context) {
+          final state = ref.watch(projectListViewModelProvider);
+          final viewModel = ref.read(projectListViewModelProvider.notifier);
+          final groups = viewModel.filteredDomainGroups;
+          
+          return Column(
+            children: [
+              for (final group in groups)
+                DomainGroupSection(
+                  title: group.domain,
+                  isExpanded: group.isExpanded,
+                  onToggle: () => group.isExpanded 
+                      ? viewModel.collapseDomain(group.domain)
+                      : viewModel.expandDomain(group.domain),
+                  child: ProjectsTable(
+                    state: state,
+                    projectsOverride: group.projects,
+                    onProjectTap: _navigateToProject,
+                    onProjectAction: _handleProjectAction,
+                    onSortChanged: (sortType) {
+                      ref.read(projectListViewModelProvider.notifier).setSortBy(sortType);
+                    },
+                  ),
                 ),
-                ],
-              );
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: _ProjectsExplanationHeader(),
-          ),
-          const SizedBox(height: 96),
-        ],
+            ],
+          );
+        },
+      ),
+      explanationHeader: ExplanationHeader(
+        text: 'Projects are conventional containers that group related tasks. \n'
+            'Use them to organize work like app development, event planning, or any multi-step initiative. \n'
+            'This table lets you browse, sort, and manage your projects at a glance.',
       ),
     );
   }
@@ -314,91 +256,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   }
 }
 
-class _ProjectsExplanationHeader extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Projects are conventional containers that group related tasks. \n'
-            'Use them to organize work like app development, event planning, or any multi-step initiative. \n'
-            'This table lets you browse, sort, and manage your projects at a glance.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-class _DomainTableSection extends StatelessWidget {
-  final String title;
-  final List<ProjectWithStats> projects;
-  final Widget Function(List<ProjectWithStats>) buildTable;
-  final bool isExpanded;
-  final VoidCallback? onToggle;
-
-  const _DomainTableSection({
-    required this.title,
-    required this.projects,
-    required this.buildTable,
-    this.isExpanded = true,
-    this.onToggle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: InkWell(
-              onTap: onToggle,
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        title,
-                        style: context.domainNameStyle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Icon(
-                      isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (isExpanded) ...[
-            const SizedBox(height: 8),
-            buildTable(projects),
-          ],
-        ],
-      ),
-    );
-  }
-}
 
 
 
