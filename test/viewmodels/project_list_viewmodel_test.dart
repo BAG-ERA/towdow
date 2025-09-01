@@ -33,7 +33,6 @@ void main() {
     late MockCalendarRepository mockCalendarRepository;
     late MockTaskRepository mockTaskRepository;
     late MockSyncService mockSyncService;
-    late MockAccountRepository mockAccountRepository;
     late MockUserRepository mockUserRepository;
 
     late List<TaskCalendar> testCalendars;
@@ -43,7 +42,6 @@ void main() {
       mockCalendarRepository = MockCalendarRepository();
       mockTaskRepository = MockTaskRepository();
       mockSyncService = MockSyncService();
-      mockAccountRepository = MockAccountRepository();
       mockUserRepository = MockUserRepository();
 
       // Create test data first
@@ -90,7 +88,6 @@ void main() {
       viewModel = ProjectListViewModel(
         mockCalendarRepository,
         mockTaskRepository,
-        mockAccountRepository,
         mockUserRepository,
       );
     });
@@ -288,7 +285,6 @@ void main() {
       // Arrange
       final mockCalendarRepository = MockCalendarRepository();
       final mockTaskRepository = MockTaskRepository();
-      final mockAccountRepository = MockAccountRepository();
       final mockUserRepository = MockUserRepository();
       
       // Stub the watchCalendars method to prevent errors
@@ -297,7 +293,6 @@ void main() {
       final viewModel = ProjectListViewModel(
         mockCalendarRepository,
         mockTaskRepository,
-        mockAccountRepository,
         mockUserRepository,
       );
 
