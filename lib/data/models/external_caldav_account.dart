@@ -3,7 +3,7 @@
 // Supports different authentication methods and server types
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'external_caldav_account.freezed.dart';
 part 'external_caldav_account.g.dart';

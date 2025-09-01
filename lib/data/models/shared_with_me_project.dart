@@ -1,7 +1,7 @@
 // Shared with me project model for tracking projects shared with current user
 // Represents a project shared with the current user with acknowledgment tracking
 
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'shared_with_me_project.g.dart';
 

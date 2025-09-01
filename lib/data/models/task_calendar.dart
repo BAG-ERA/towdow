@@ -3,7 +3,7 @@
 // Supports persistent storage with Hive and synchronization tracking
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'task.dart';

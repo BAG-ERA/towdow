@@ -10,7 +10,7 @@ library;
 /// response status, and potential delegations according to iCalendar standards.
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'attendee.freezed.dart';
 part 'attendee.g.dart';

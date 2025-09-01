@@ -3,7 +3,7 @@
 // Supports both file attachments and media attachments
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'attachment.freezed.dart';
 part 'attachment.g.dart';

@@ -2,7 +2,7 @@
 // Supports offline-first functionality with automatic sync when connection is available
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'offline_file.freezed.dart';
 part 'offline_file.g.dart';

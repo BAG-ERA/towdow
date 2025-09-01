@@ -2,7 +2,7 @@
 // Implements queue-based upload system similar to CalDAV sync
 
 import 'dart:async';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import '../../../core/result.dart';
 import '../../../core/logger.dart';
 import '../../models/user_preferences.dart';

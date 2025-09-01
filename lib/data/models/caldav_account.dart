@@ -2,7 +2,7 @@
 // Supports different provider types including Google OAuth
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'caldav_account.freezed.dart';
 part 'caldav_account.g.dart';

@@ -2,7 +2,7 @@
 // Represents a note entry synchronized via CalDAV VJOURNAL
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 import 'attendee.dart';
 

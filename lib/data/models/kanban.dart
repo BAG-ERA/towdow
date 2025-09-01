@@ -3,7 +3,7 @@
 // Supports serialization for storage in TaskCalendar and UserPreferences
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'kanban.freezed.dart';
 part 'kanban.g.dart';

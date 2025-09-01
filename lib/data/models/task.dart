@@ -2,7 +2,7 @@
 // Represents a single actionable item with x-flowit-type: task
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'attendee.dart';
 
 part 'task.freezed.dart';

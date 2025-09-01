@@ -12,7 +12,7 @@ class Result<T> with _$Result<T> {
 }
 
 @freezed
-class Failure with _$Failure {
+abstract class Failure with _$Failure {
   const factory Failure({
     required String message,
     String? code,

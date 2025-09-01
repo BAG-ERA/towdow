@@ -3,7 +3,7 @@
 // Supports persistent storage with Hive and basic calendar functionality
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'attendee.dart';
 
 part 'calendar_event.freezed.dart';
