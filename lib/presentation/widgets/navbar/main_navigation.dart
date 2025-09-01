@@ -272,8 +272,6 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
   /// Handle dropping a task onto this navigation item
   void _handleTaskDrop(BuildContext context, Task task) async {
     try {
-      AppLogger.info('MainNavigation: Task ${task.summary} dropped on ${widget.item.label}');
-      
       // Navigate to the detail view for this section
       if (widget.item.route == '/projects') {
         // Navigate to projects detail view

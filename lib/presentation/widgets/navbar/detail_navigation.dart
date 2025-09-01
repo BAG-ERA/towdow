@@ -62,7 +62,6 @@ class DetailNavigation extends ConsumerWidget {
       isDesktop: isDesktop,
       isWorkflowDetail: isWorkflowDetail,
       onBackPressed: onBackPressed,
-      isWorkflowDetailOverride: this.isWorkflowDetail,
     );
   }
 
@@ -75,14 +74,12 @@ class _ProjectListContent extends ConsumerStatefulWidget {
     required this.isDesktop,
     required this.isWorkflowDetail,
     required this.onBackPressed,
-    this.isWorkflowDetailOverride,
   });
 
   final ProjectListState state;
   final bool isDesktop;
   final bool isWorkflowDetail;
   final VoidCallback onBackPressed;
-  final bool? isWorkflowDetailOverride;
 
   @override
   ConsumerState<_ProjectListContent> createState() => _ProjectListContentState();
@@ -125,20 +122,10 @@ class _ProjectListContentState extends ConsumerState<_ProjectListContent> {
     
     _domainGroups = domainGroups;
     _sortedDomains = filteredDomainGroups.map((dg) => dg.domain).toList();
-    
-    // Debug logging to help troubleshoot
-    AppLogger.info('Domain groups updated: ${domainGroups.keys.toList()}');
-    AppLogger.info('Sorted domains: $_sortedDomains');
-    AppLogger.info('Projects without domain: ${domainGroups['No Domain']?.length ?? 0}');
   }
 
   @override
   Widget build(BuildContext context) {
-    // Debug logging to help troubleshoot
-    AppLogger.info('Building ProjectListContent with ${_domainGroups.length} domain groups');
-    AppLogger.info('Domain groups: ${_domainGroups.keys.toList()}');
-    AppLogger.info('Sorted domains: $_sortedDomains');
-    
     if (_domainGroups.isEmpty) {
       return const Center(
         child: Padding(
@@ -195,7 +182,6 @@ class _ProjectListContentState extends ConsumerState<_ProjectListContent> {
                 projects: _domainGroups[domain] ?? [],
                 isDesktop: widget.isDesktop,
                 isWorkflowDetail: widget.isWorkflowDetail,
-                isWorkflowDetailOverride: widget.isWorkflowDetailOverride,
               ),
             )),
           ],
@@ -210,13 +196,11 @@ class _ProjectListItem extends ConsumerWidget {
     required this.project,
     required this.isDesktop,
     required this.isWorkflowDetail,
-    this.isIndented = true,
   });
 
   final TaskCalendar project;
   final bool isDesktop;
   final bool isWorkflowDetail;
-  final bool isIndented;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -227,8 +211,6 @@ class _ProjectListItem extends ConsumerWidget {
       isDesktop: isDesktop,
     );
   }
-
-
 }
 
 class _DomainHeader extends ConsumerWidget {
@@ -239,7 +221,6 @@ class _DomainHeader extends ConsumerWidget {
     required this.isDesktop,
     this.projects = const [],
     this.isWorkflowDetail = false,
-    this.isWorkflowDetailOverride,
   });
 
   final String title;
@@ -248,7 +229,6 @@ class _DomainHeader extends ConsumerWidget {
   final bool isDesktop;
   final List<TaskCalendar> projects;
   final bool isWorkflowDetail;
-  final bool? isWorkflowDetailOverride;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -301,9 +281,7 @@ class _DomainHeader extends ConsumerWidget {
     // Wrap with DragTarget to accept both task and project drops
     return DragTarget<Object>(
       onAcceptWithDetails: (details) {
-        if (details.data is Task) {
-          _handleTaskDrop(context, ref, details.data as Task);
-        } else if (details.data is TaskCalendar) {
+        if (details.data is TaskCalendar) {
           _handleProjectDrop(context, ref, details.data as TaskCalendar);
         }
       },
@@ -336,12 +314,6 @@ class _DomainHeader extends ConsumerWidget {
         );
       },
     );
-  }
-
-  /// Handle dropping a task onto this domain header
-  void _handleTaskDrop(BuildContext context, WidgetRef ref, Task task) async {
-    // Do nothing when dropping on domain header
-    AppLogger.info('DomainHeader: Task ${task.summary} dropped on domain $title - no action taken');
   }
 
   /// Handle dropping a project onto this domain header
@@ -388,14 +360,12 @@ class _DomainSection extends ConsumerStatefulWidget {
     required this.projects,
     required this.isDesktop,
     required this.isWorkflowDetail,
-    this.isWorkflowDetailOverride,
   });
 
   final String domain;
   final List<TaskCalendar> projects;
   final bool isDesktop;
   final bool isWorkflowDetail;
-  final bool? isWorkflowDetailOverride;
 
   @override
   ConsumerState<_DomainSection> createState() => _DomainSectionState();
@@ -404,7 +374,6 @@ class _DomainSection extends ConsumerStatefulWidget {
 class _DomainSectionState extends ConsumerState<_DomainSection> 
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   bool _isExpanded = true;
-  bool _isAnimating = false;
   late AnimationController _animationController;
   late Animation<double> _heightAnimation;
   
@@ -437,16 +406,13 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
   }
 
   void _toggleExpanded() {
-    if (_isAnimating) return; // Prevent multiple animations
-    
     setState(() {
       _isExpanded = !_isExpanded;
-      _isAnimating = true;
       
       if (_isExpanded) {
-        _animationController.forward().then((_) => _isAnimating = false);
+        _animationController.forward();
       } else {
-        _animationController.reverse().then((_) => _isAnimating = false);
+        _animationController.reverse();
       }
     });
   }
@@ -456,14 +422,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
     final projectRoute = widget.isWorkflowDetail 
         ? '/workflow/${Uri.encodeComponent(project.path)}'
         : '/project/${Uri.encodeComponent(project.path)}';
-    final isActive = currentLocation == projectRoute;
-    
-    // Debug logging
-    if (isActive) {
-      AppLogger.info('Project ${project.displayName} is ACTIVE. Current: $currentLocation, Route: $projectRoute');
-    }
-    
-    return isActive;
+    return currentLocation == projectRoute;
   }
 
     /// Handle dropping a project onto this domain section
@@ -533,7 +492,6 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                 isDesktop: widget.isDesktop,
                 projects: widget.projects,
                 isWorkflowDetail: widget.isWorkflowDetail,
-                isWorkflowDetailOverride: widget.isWorkflowDetailOverride,
               ),
               
               // Projects list with conditional animation
@@ -592,7 +550,6 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                                         project: project,
                                         isDesktop: widget.isDesktop,
                                         isWorkflowDetail: widget.isWorkflowDetail,
-                                        isIndented: false, // No individual indentation since we have the line
                                       ),
                                     ),
                                   ],
