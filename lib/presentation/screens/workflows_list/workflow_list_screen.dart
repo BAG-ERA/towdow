@@ -16,7 +16,6 @@ import '../../widgets/navbar/workflow_popup_menu.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
 import '../../widgets/list_screen/list_screen_scaffold.dart';
 import '../../widgets/list_screen/list_screen_body.dart';
-import '../../widgets/list_screen/domain_group_section.dart';
 import '../../widgets/list_screen/explanation_header.dart';
 
 class WorkflowListScreen extends ConsumerStatefulWidget {
@@ -28,6 +27,7 @@ class WorkflowListScreen extends ConsumerStatefulWidget {
 
 class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   int _selectedTabIndex = 0;
+  bool _showArchived = false;
 
   @override
   void initState() {
@@ -39,33 +39,53 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   }
 
   void _applyFilter() {
-    switch (_selectedTabIndex) {
-      case 0:
-        ref.read(workflowListViewModelProvider.notifier).setFilter(ProjectFilter.active);
-        break;
-      case 1:
-        ref.read(workflowListViewModelProvider.notifier).setFilter(ProjectFilter.completed);
-        break;
-      case 2:
-        ref.read(workflowListViewModelProvider.notifier).setFilter(ProjectFilter.all);
-        break;
+    final viewModel = ref.read(workflowListViewModelProvider.notifier);
+    final state = ref.read(workflowListViewModelProvider);
+    
+    // Apply domain filter based on selected tab
+    if (_selectedTabIndex == 0) {
+      viewModel.setDomainFilter(null);
+    } else {
+      final domains = state.availableDomains;
+      if (_selectedTabIndex - 1 < domains.length) {
+        final selectedDomain = domains[_selectedTabIndex - 1];
+        viewModel.setDomainFilter(selectedDomain);
+      }
     }
+    
+    // Apply archived filter
+    if (_showArchived) {
+      viewModel.setFilter(ProjectFilter.completed);
+    } else {
+      viewModel.setFilter(ProjectFilter.active);
+    }
+  }
+
+  void _toggleArchived() {
+    _showArchived = !_showArchived;
+    _applyFilter();
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workflowListViewModelProvider);
+    
+    final domains = state.availableDomains;
+    final domainTabs = ['All Domains', ...domains];
 
     return ListScreenScaffold(
       title: AppLocalizations.of(context)!.allWorkflows,
       selectedTabIndex: _selectedTabIndex,
       onTabSelected: (index) {
-        setState(() {
-          _selectedTabIndex = index;
-        });
+        _selectedTabIndex = index;
         _applyFilter();
+        setState(() {});
       },
-      body: _buildBody(state),
+      domainTabs: domainTabs,
+      showArchived: _showArchived,
+      onToggleArchived: _toggleArchived,
+      body: _buildBody(),
       floatingActionButton: _buildCreateWorkflowButton(context),
     );
   }
@@ -78,7 +98,9 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
     );
   }
 
-  Widget _buildBody(ProjectListState state) {
+  Widget _buildBody() {
+    final state = ref.watch(workflowListViewModelProvider);
+    
     return ListScreenBody(
       isLoading: state.isLoading,
       error: state.error,
@@ -87,35 +109,14 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
       emptyDescription: AppLocalizations.of(context)!.workflowsExplainer,
       emptyIcon: Icons.route_rounded,
       onRefresh: () => ref.read(workflowListViewModelProvider.notifier).refresh(),
-      child: Builder(
-        builder: (context) {
-          final state = ref.watch(workflowListViewModelProvider);
-          final viewModel = ref.read(workflowListViewModelProvider.notifier);
-          final groups = viewModel.filteredDomainGroups;
-          
-          return Column(
-            children: [
-              for (final group in groups)
-                DomainGroupSection(
-                  title: group.domain,
-                  isExpanded: group.isExpanded,
-                  onToggle: () => group.isExpanded 
-                      ? viewModel.collapseDomain(group.domain)
-                      : viewModel.expandDomain(group.domain),
-                  child: ProjectsTable(
-                    state: state,
-                    projectsOverride: group.projects,
-                    onProjectTap: _navigateToWorkflow,
-                    onProjectAction: _handleWorkflowAction,
-                    onSortChanged: (sortType) {
-                      ref.read(workflowListViewModelProvider.notifier).setSortBy(sortType);
-                    },
-                    menuBuilder: (context, ref, project) => WorkflowPopupMenu.getMenuItems(context, ref, project: project),
-                  ),
-                ),
-            ],
-          );
+      child: ProjectsTable(
+        state: state,
+        onProjectTap: _navigateToWorkflow,
+        onProjectAction: _handleWorkflowAction,
+        onSortChanged: (sortType) {
+          ref.read(workflowListViewModelProvider.notifier).setSortBy(sortType);
         },
+        menuBuilder: (context, ref, project) => WorkflowPopupMenu.getMenuItems(context, ref, project: project),
       ),
       explanationHeader: ExplanationHeader(
         text: 'Workflows define steps to move tasks through. \n'

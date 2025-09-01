@@ -18,7 +18,6 @@ import '../../widgets/utils/popup/move_to_domain_dialog.dart';
 import '../../widgets/utils/popup/project_sharing_dialog.dart';
 import '../../widgets/list_screen/list_screen_scaffold.dart';
 import '../../widgets/list_screen/list_screen_body.dart';
-import '../../widgets/list_screen/domain_group_section.dart';
 import '../../widgets/list_screen/explanation_header.dart';
 
 class ProjectsListScreen extends ConsumerStatefulWidget {
@@ -30,6 +29,7 @@ class ProjectsListScreen extends ConsumerStatefulWidget {
 
 class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   int _selectedTabIndex = 0;
+  bool _showArchived = false;
 
   @override
   void initState() {
@@ -42,38 +42,56 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   }
 
   void _applyFilter() {
-    switch (_selectedTabIndex) {
-      case 0:
-        ref.read(projectListViewModelProvider.notifier).setFilter(ProjectFilter.active);
-        break;
-      case 1:
-        ref.read(projectListViewModelProvider.notifier).setFilter(ProjectFilter.completed);
-        break;
-      case 2:
-        ref.read(projectListViewModelProvider.notifier).setFilter(ProjectFilter.all);
-        break;
+    final viewModel = ref.read(projectListViewModelProvider.notifier);
+    final state = ref.read(projectListViewModelProvider);
+    
+    // Apply domain filter based on selected tab
+    if (_selectedTabIndex == 0) {
+      viewModel.setDomainFilter(null);
+    } else {
+      final domains = state.availableDomains;
+      if (_selectedTabIndex - 1 < domains.length) {
+        final selectedDomain = domains[_selectedTabIndex - 1];
+        viewModel.setDomainFilter(selectedDomain);
+      }
     }
+    
+    // Apply archived filter
+    if (_showArchived) {
+      viewModel.setFilter(ProjectFilter.completed);
+    } else {
+      viewModel.setFilter(ProjectFilter.active);
+    }
+  }
+
+  void _toggleArchived() {
+    _showArchived = !_showArchived;
+    _applyFilter();
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final projectListState = ref.watch(projectListViewModelProvider);
     
+    final domains = projectListState.availableDomains;
+    final domainTabs = ['All Domains', ...domains];
+    
     return ListScreenScaffold(
       title: AppLocalizations.of(context)!.allProjects,
       selectedTabIndex: _selectedTabIndex,
       onTabSelected: (index) {
-        setState(() {
-          _selectedTabIndex = index;
-        });
+        _selectedTabIndex = index;
         _applyFilter();
+        setState(() {});
       },
-      body: _buildBody(projectListState),
+      domainTabs: domainTabs,
+      showArchived: _showArchived,
+      onToggleArchived: _toggleArchived,
+      body: _buildBody(),
       floatingActionButton: _buildCreateProjectButton(),
     );
   }
-
-
 
   Widget _buildCreateProjectButton() {
     return CreateProjectButton.compact(
@@ -83,7 +101,9 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     );
   }
 
-  Widget _buildBody(ProjectListState state) {
+  Widget _buildBody() {
+    final state = ref.watch(projectListViewModelProvider);
+    
     return ListScreenBody(
       isLoading: state.isLoading,
       error: state.error,
@@ -92,33 +112,12 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
       emptyDescription: AppLocalizations.of(context)!.projectsExplainer,
       emptyIcon: Icons.folder_open_rounded,
       onRefresh: () => ref.read(projectListViewModelProvider.notifier).refresh(),
-      child: Builder(
-        builder: (context) {
-          final state = ref.watch(projectListViewModelProvider);
-          final viewModel = ref.read(projectListViewModelProvider.notifier);
-          final groups = viewModel.filteredDomainGroups;
-          
-          return Column(
-            children: [
-              for (final group in groups)
-                DomainGroupSection(
-                  title: group.domain,
-                  isExpanded: group.isExpanded,
-                  onToggle: () => group.isExpanded 
-                      ? viewModel.collapseDomain(group.domain)
-                      : viewModel.expandDomain(group.domain),
-                  child: ProjectsTable(
-                    state: state,
-                    projectsOverride: group.projects,
-                    onProjectTap: _navigateToProject,
-                    onProjectAction: _handleProjectAction,
-                    onSortChanged: (sortType) {
-                      ref.read(projectListViewModelProvider.notifier).setSortBy(sortType);
-                    },
-                  ),
-                ),
-            ],
-          );
+      child: ProjectsTable(
+        state: state,
+        onProjectTap: _navigateToProject,
+        onProjectAction: _handleProjectAction,
+        onSortChanged: (sortType) {
+          ref.read(projectListViewModelProvider.notifier).setSortBy(sortType);
         },
       ),
       explanationHeader: ExplanationHeader(

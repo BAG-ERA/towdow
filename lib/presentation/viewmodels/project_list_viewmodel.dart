@@ -8,7 +8,6 @@ import '../../core/result.dart';
 import '../../data/models/task_calendar.dart';
 import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/task_repository.dart';
-import '../../data/repositories/account_repository.dart';
 import '../../data/repositories/user_repository.dart';
 
 // Project with associated statistics
@@ -181,7 +180,7 @@ class ProjectListState {
       sortBy: sortBy ?? this.sortBy,
       sortDirection: sortDirection ?? this.sortDirection,
       searchQuery: searchQuery ?? this.searchQuery,
-      selectedDomain: selectedDomain,
+      selectedDomain: selectedDomain ?? this.selectedDomain,
       isDomainGroupingEnabled: isDomainGroupingEnabled ?? this.isDomainGroupingEnabled,
       domainExpandedState: domainExpandedState ?? this.domainExpandedState,
       totalProjects: totalProjects ?? this.totalProjects,
@@ -317,7 +316,6 @@ enum ProjectFilter {
 class ProjectListViewModel extends StateNotifier<ProjectListState> {
   final CalendarRepository _calendarRepository;
   final TaskRepository _taskRepository;
-  final AccountRepository _accountRepository; 
   final UserRepository _userRepository;
   // When true, this view model will list only workflows (flow calendars)
   // When false, it will list only standard projects (non-workflow calendars)
@@ -330,7 +328,6 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
   ProjectListViewModel(
     this._calendarRepository,
     this._taskRepository,
-    this._accountRepository,
     this._userRepository,
     {this.workflowsMode = false}
   ) : super(const ProjectListState()) {
@@ -561,7 +558,6 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
 
   /// Set project filter
   void setFilter(ProjectFilter filter) {
-    // AppLogger.info('ProjectListViewModel: Setting filter: $filter');
     // Check if still mounted before updating state
     if (mounted) {
       state = state.copyWith(filter: filter);
@@ -921,7 +917,6 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
 
   /// Set domain filter
   void setDomainFilter(String? domain) {
-    // AppLogger.info('ProjectListViewModel: Setting domain filter: ${domain ?? "All"}');
     // Check if still mounted before updating state
     if (mounted) {
       state = state.copyWith(selectedDomain: domain);
