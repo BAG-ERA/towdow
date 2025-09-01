@@ -27,6 +27,7 @@ class NavigationSwitcher extends ConsumerStatefulWidget {
 
 class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
   NavigationType _currentNavigationType = NavigationType.main;
+  bool _isTransitioningToMain = false;
 
   @override
   void didChangeDependencies() {
@@ -34,18 +35,35 @@ class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
     final location = GoRouterState.of(context).uri.path;
     
     // Determine navigation type based on route
+    NavigationType newNavigationType;
     if (location.startsWith('/project/') || location.startsWith('/workflow/')) {
-      _currentNavigationType = NavigationType.detail;
+      newNavigationType = NavigationType.detail;
     } else if (location.startsWith('/settings')) {
-      _currentNavigationType = NavigationType.settings;
+      newNavigationType = NavigationType.settings;
     } else {
-      _currentNavigationType = NavigationType.main;
+      newNavigationType = NavigationType.main;
+    }
+    
+    // Update navigation type if it changed
+    if (newNavigationType != _currentNavigationType) {
+      setState(() {
+        _currentNavigationType = newNavigationType;
+        _isTransitioningToMain = newNavigationType == NavigationType.main;
+      });
     }
   }
 
   void _goBackToMain() {
     setState(() {
       _currentNavigationType = NavigationType.main;
+      _isTransitioningToMain = true;
+    });
+  }
+
+  void _goToDetail() {
+    setState(() {
+      _currentNavigationType = NavigationType.detail;
+      _isTransitioningToMain = false;
     });
   }
 
@@ -67,37 +85,44 @@ class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
         );
         break;
       case NavigationType.main:
-      default:
         navigationContent = MainNavigation(
           currentDestination: widget.currentDestination,
           isDesktop: widget.isDesktop,
+          onDetailPressed: _goToDetail,
         );
         break;
     }
 
-    // Wrap navigation content with pink background, take all available space, and add animation
+    // Wrap navigation content with animation
     return Expanded(
-      child: Container(
-        width: double.infinity,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          transitionBuilder: (Widget child, Animation<double> animation) {
-            return FadeTransition(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          // Determine slide direction based on transition type
+          Offset slideDirection;
+          if (_isTransitioningToMain) {
+            // Coming back to main - slide from left
+            slideDirection = const Offset(-1.0, 0.0);
+          } else {
+            // Going to detail/settings - slide from right
+            slideDirection = const Offset(1.0, 0.0);
+          }
+
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: slideDirection,
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOutCubic,
+            )),
+            child: FadeTransition(
               opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.1, 0.0),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeInOut,
-                )),
-                child: child,
-              ),
-            );
-          },
-          child: navigationContent,
-        ),
+              child: child,
+            ),
+          );
+        },
+        child: navigationContent,
       ),
     );
   }
