@@ -5,12 +5,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../core/logger.dart';
+import '../../../core/theme/chart_theme_usage.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
 import '../../viewmodels/project_list_viewmodel.dart';
-import '../adaptive_app_layout.dart';
 import 'project_item_widget.dart';
 
 class DetailNavigation extends ConsumerWidget {
@@ -19,17 +20,20 @@ class DetailNavigation extends ConsumerWidget {
     required this.isDesktop,
     required this.onBackPressed,
     this.isIconOnly = false,
+    this.isWorkflowDetail,
   });
 
   final bool isDesktop;
   final VoidCallback onBackPressed;
   final bool isIconOnly;
+  final bool? isWorkflowDetail;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Determine if we're on a workflow detail screen
     final location = GoRouterState.of(context).uri.path;
-    final isWorkflowDetail = location.startsWith('/workflow/');
+    final isWorkflowDetail = location.startsWith('/workflow/') || 
+                            this.isWorkflowDetail == true;
     
     // Use the appropriate ProjectListViewModel based on context
     final projectListViewModel = ref.watch(
@@ -51,6 +55,7 @@ class DetailNavigation extends ConsumerWidget {
       isDesktop: isDesktop,
       isWorkflowDetail: isWorkflowDetail,
       onBackPressed: onBackPressed,
+      isWorkflowDetailOverride: this.isWorkflowDetail,
     );
   }
 
@@ -63,12 +68,14 @@ class _ProjectListContent extends ConsumerStatefulWidget {
     required this.isDesktop,
     required this.isWorkflowDetail,
     required this.onBackPressed,
+    this.isWorkflowDetailOverride,
   });
 
   final ProjectListState state;
   final bool isDesktop;
   final bool isWorkflowDetail;
   final VoidCallback onBackPressed;
+  final bool? isWorkflowDetailOverride;
 
   @override
   ConsumerState<_ProjectListContent> createState() => _ProjectListContentState();
@@ -152,9 +159,11 @@ class _ProjectListContentState extends ConsumerState<_ProjectListContent> {
                     // Title
                     Expanded(
                       child: Text(
-                        widget.isWorkflowDetail ? 'Workflows' : 'Projects',
+                        widget.isWorkflowDetail 
+                            ? AppLocalizations.of(context)!.workflows 
+                            : AppLocalizations.of(context)!.projects,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -174,6 +183,7 @@ class _ProjectListContentState extends ConsumerState<_ProjectListContent> {
                 projects: _domainGroups[domain] ?? [],
                 isDesktop: widget.isDesktop,
                 isWorkflowDetail: widget.isWorkflowDetail,
+                isWorkflowDetailOverride: widget.isWorkflowDetailOverride,
               ),
             )),
           ],
@@ -217,6 +227,7 @@ class _DomainHeader extends ConsumerWidget {
     required this.isDesktop,
     this.projects = const [],
     this.isWorkflowDetail = false,
+    this.isWorkflowDetailOverride,
   });
 
   final String title;
@@ -225,6 +236,7 @@ class _DomainHeader extends ConsumerWidget {
   final bool isDesktop;
   final List<TaskCalendar> projects;
   final bool isWorkflowDetail;
+  final bool? isWorkflowDetailOverride;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -254,7 +266,7 @@ class _DomainHeader extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    style: context.domainNameStyle.copyWith(
                       color: hasActiveProject 
                           ? Theme.of(context).colorScheme.primary
                           : Theme.of(context).colorScheme.onSurfaceVariant,
@@ -364,12 +376,14 @@ class _DomainSection extends ConsumerStatefulWidget {
     required this.projects,
     required this.isDesktop,
     required this.isWorkflowDetail,
+    this.isWorkflowDetailOverride,
   });
 
   final String domain;
   final List<TaskCalendar> projects;
   final bool isDesktop;
   final bool isWorkflowDetail;
+  final bool? isWorkflowDetailOverride;
 
   @override
   ConsumerState<_DomainSection> createState() => _DomainSectionState();
@@ -507,6 +521,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                 isDesktop: widget.isDesktop,
                 projects: widget.projects,
                 isWorkflowDetail: widget.isWorkflowDetail,
+                isWorkflowDetailOverride: widget.isWorkflowDetailOverride,
               ),
               
               // Projects list with conditional animation
@@ -528,7 +543,7 @@ class _DomainSectionState extends ConsumerState<_DomainSection>
                               child: Container(
                                 width: 2,
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                                   borderRadius: BorderRadius.circular(1),
                                 ),
                               ),

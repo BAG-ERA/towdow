@@ -24,7 +24,7 @@ class MainNavigation extends ConsumerWidget {
 
   final AppDestination? currentDestination;
   final bool isDesktop;
-  final VoidCallback onDetailPressed;
+  final void Function({bool? isWorkflow}) onDetailPressed;
   final bool isIconOnly;
 
   @override
@@ -151,7 +151,7 @@ class _HoverableNavItem extends StatefulWidget {
   final _NavItem item;
   final bool selected;
   final BorderRadius borderRadius;
-  final VoidCallback onDetailPressed;
+  final void Function({bool? isWorkflow}) onDetailPressed;
   final VoidCallback onTap;
   final bool isIconOnly;
 
@@ -211,7 +211,11 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(8),
-                  onTap: widget.onDetailPressed,
+                  onTap: () {
+                    // Pass the context based on which navigation item this is
+                    final isWorkflow = widget.item.route == '/workflows';
+                    widget.onDetailPressed(isWorkflow: isWorkflow);
+                  },
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     child: Icon(
@@ -273,10 +277,10 @@ class _HoverableNavItemState extends State<_HoverableNavItem> {
       // Navigate to the detail view for this section
       if (widget.item.route == '/projects') {
         // Navigate to projects detail view
-        widget.onDetailPressed();
+        widget.onDetailPressed(isWorkflow: false);
       } else if (widget.item.route == '/workflows') {
         // Navigate to workflows detail view
-        widget.onDetailPressed();
+        widget.onDetailPressed(isWorkflow: true);
       }
       
       // Show feedback that user should select a specific project/workflow

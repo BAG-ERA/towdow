@@ -30,6 +30,9 @@ class NavigationSwitcher extends ConsumerStatefulWidget {
 class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
   NavigationType _currentNavigationType = NavigationType.main;
   bool _isTransitioningToMain = false;
+  bool? _isWorkflowDetail; // Track whether we're showing workflows (true) or projects (false)
+  bool _isUserAction = false; // Track if navigation change was triggered by user action
+  String _lastRoute = ''; // Track the last route to detect changes
 
   @override
   void didChangeDependencies() {
@@ -57,18 +60,54 @@ class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
     setState(() {
       _currentNavigationType = NavigationType.main;
       _isTransitioningToMain = true;
+      _isUserAction = false; // Reset user action flag
     });
   }
 
-  void _goToDetail() {
+  // Method to handle automatic navigation updates (when navbar updates by itself)
+  void _updateDetailContextFromRoute() {
+    if (_currentNavigationType == NavigationType.detail && !_isUserAction) {
+      // Only update context if we're in detail mode and it wasn't triggered by user action
+      final location = GoRouterState.of(context).uri.path;
+      final newIsWorkflowDetail = location.startsWith('/workflow/') || location == '/workflows';
+      
+      if (_isWorkflowDetail != newIsWorkflowDetail) {
+        setState(() {
+          _isWorkflowDetail = newIsWorkflowDetail;
+        });
+      }
+    }
+  }
+
+  void _goToDetail({bool? isWorkflow}) {
     setState(() {
       _currentNavigationType = NavigationType.detail;
       _isTransitioningToMain = false;
+      _isUserAction = isWorkflow != null; // Mark as user action if context is provided
+      
+      // Use the passed parameter if provided (user action), otherwise fall back to route-based detection
+      if (isWorkflow != null) {
+        _isWorkflowDetail = isWorkflow;
+      } else {
+        // Automatic navigation: Determine if we're showing workflows based on current route
+        final location = GoRouterState.of(context).uri.path;
+        _isWorkflowDetail = location == '/workflows';
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentLocation = GoRouterState.of(context).uri.path;
+    
+    // Check if route has changed and update context if needed
+    if (currentLocation != _lastRoute) {
+      _lastRoute = currentLocation;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _updateDetailContextFromRoute();
+      });
+    }
+    
     // Switch navigation content based on current navigation type
     Widget navigationContent;
     switch (_currentNavigationType) {
@@ -77,6 +116,7 @@ class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
           isDesktop: widget.isDesktop,
           onBackPressed: _goBackToMain,
           isIconOnly: widget.isIconOnly,
+          isWorkflowDetail: _isWorkflowDetail,
         );
         break;
       case NavigationType.main:
