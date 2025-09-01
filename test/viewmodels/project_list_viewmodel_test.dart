@@ -358,5 +358,7 @@ void main() {
       expect(viewModel.filteredDomainGroups.first.projects.length, 1);
       expect(viewModel.filteredDomainGroups.first.projects.first.project.displayName, 'Archived Project');
     });
+
+
   });
 } 

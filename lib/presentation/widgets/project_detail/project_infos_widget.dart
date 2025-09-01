@@ -66,7 +66,7 @@ class ProjectInfosWidget extends ConsumerWidget {
                     if (onCollapse != null)
                       IconButton(
                         onPressed: onCollapse,
-                        icon: const Icon(Icons.chevron_left_rounded),
+                        icon: const Icon(Icons.keyboard_double_arrow_left),
                         tooltip: 'Collapse project details',
                       ),
                   ],

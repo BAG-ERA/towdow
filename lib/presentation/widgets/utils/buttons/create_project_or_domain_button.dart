@@ -2,6 +2,7 @@
 // Reusable button for creating new projects and domains with consistent styling
 // Contains the dialog selection logic for choosing between project and domain creation
 // Uses FlowIt typography system with automatic capitalization
+// Responsive design that adapts content based on available space
 
 import 'package:flutter/material.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
@@ -114,8 +115,7 @@ class CreateProjectOrDomainButton extends StatelessWidget {
       );
     }
 
-    // With dropdown affordance: build a simple custom Material button for full control
-    // This guarantees the arrow can be exactly flush to the right border
+    // With dropdown affordance: build a responsive custom Material button
     final double iconSize = _getIconSize() * scale;
     return Material(
       color: effectiveBackgroundColor,
@@ -130,53 +130,132 @@ class CreateProjectOrDomainButton extends StatelessWidget {
             vertical: _getPadding(chartTheme).vertical/4,
             horizontal: _getPadding(chartTheme).horizontal/8,
           ),
-          child: IntrinsicHeight(
-            child: Row(
-            children: [
-              // Left content with classic padding
-              Padding(
-                padding: EdgeInsets.only(
-                  left: chartTheme.dimensions.paddingMedium,
-                  right: chartTheme.dimensions.paddingSmall,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (icon != null) ...[
-                      Icon(icon, size: iconSize, color: effectiveTextColor ?? onPrimaryColor),
-                      SizedBox(width: chartTheme.dimensions.paddingSmall),
-                    ],
-                    Text(
-                      localizedLabel,
-                      style: chartTheme.typography.primaryButton.copyWith(
-                        color: effectiveTextColor,
-                      ),
-                    ),
-                  ],
-                ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return _buildResponsiveContent(
+                context,
+                constraints,
+                chartTheme,
+                effectiveTextColor,
+                onPrimaryColor,
+                iconSize,
+                localizedLabel,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResponsiveContent(
+    BuildContext context,
+    BoxConstraints constraints,
+    ChartTheme chartTheme,
+    Color? effectiveTextColor,
+    Color onPrimaryColor,
+    double iconSize,
+    String localizedLabel,
+  ) {
+    final availableWidth = constraints.maxWidth;
+    
+    // When space is really thin (< 120px), show only icon
+    if (availableWidth < 120) {
+      return IntrinsicHeight(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: iconSize,
+              color: effectiveTextColor ?? onPrimaryColor,
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // When space is reduced but not too thin, show icon + text without dropdown arrow
+    if (availableWidth < 200) {
+      return IntrinsicHeight(
+        child: Row(
+          children: [
+            // Icon + text
+            Padding(
+              padding: EdgeInsets.only(
+                left: chartTheme.dimensions.paddingSmall,
+                right: chartTheme.dimensions.paddingSmall,
               ),
-              // Spacer takes remaining width
-              Expanded(child: SizedBox.shrink()),
-              VerticalDivider(
-                width: 8,
-                thickness: 1,
-                color: (effectiveTextColor ?? onPrimaryColor).withOpacity(0.24),
-              ),
-              SizedBox(
-                width: iconSize, // tight area: icon width only
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Icon(
-                    Icons.keyboard_arrow_down_rounded,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
                     size: iconSize,
                     color: effectiveTextColor ?? onPrimaryColor,
                   ),
-                ),
+                  SizedBox(width: chartTheme.dimensions.paddingSmall),
+                  Text(
+                    localizedLabel,
+                    style: chartTheme.typography.primaryButton.copyWith(
+                      color: effectiveTextColor,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
+            // Spacer takes remaining width
+            Expanded(child: SizedBox.shrink()),
+          ],
+        ),
+      );
+    }
+    
+    // Normal state: show icon + text + dropdown arrow
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          // Left content with classic padding
+          Padding(
+            padding: EdgeInsets.only(
+              left: chartTheme.dimensions.paddingMedium,
+              right: chartTheme.dimensions.paddingSmall,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: iconSize, color: effectiveTextColor ?? onPrimaryColor),
+                  SizedBox(width: chartTheme.dimensions.paddingSmall),
+                ],
+                Text(
+                  localizedLabel,
+                  style: chartTheme.typography.primaryButton.copyWith(
+                    color: effectiveTextColor,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
+          // Spacer takes remaining width
+          Expanded(child: SizedBox.shrink()),
+          VerticalDivider(
+            width: 8,
+            thickness: 1,
+            color: (effectiveTextColor ?? onPrimaryColor).withValues(alpha: 0.24),
+          ),
+          SizedBox(
+            width: iconSize, // tight area: icon width only
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: iconSize,
+                color: effectiveTextColor ?? onPrimaryColor,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
