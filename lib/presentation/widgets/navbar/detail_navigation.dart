@@ -411,91 +411,9 @@ class _DomainHeader extends ConsumerWidget {
     AppLogger.info('DomainHeader: Task ${task.summary} dropped on domain $title - no action taken');
   }
 
-  /// Show dialog to select a project from the domain
-  Future<TaskCalendar?> _showProjectSelectionDialog(
-    BuildContext context, 
-    List<TaskCalendar> projects, 
-    bool isWorkflowDetail
-  ) async {
-    return showDialog<TaskCalendar>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Select ${isWorkflowDetail ? 'Workflow' : 'Project'}'),
-          content: SizedBox(
-            width: 300,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: projects.length,
-              itemBuilder: (context, index) {
-                final project = projects[index];
-                return ListTile(
-                  title: Text(project.displayName),
-                  subtitle: Text(project.path),
-                  onTap: () => Navigator.of(context).pop(project),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  /// Move task to the selected project
-  Future<void> _moveTaskToProject(
-    BuildContext context, 
-    WidgetRef ref, 
-    Task task, 
-    TaskCalendar project
-  ) async {
-    // Encode project path to match task storage format
-    final encodedProjectPath = project.path.replaceAll('@', '%40');
-    
-    // Don't move if task is already in this project
-    if (task.projectPath == encodedProjectPath) {
-      AppLogger.info('DomainHeader: Task ${task.summary} is already in project ${project.displayName}');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Task is already in ${project.displayName}'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-      return;
-    }
 
-    try {
-      AppLogger.info('DomainHeader: Moving task ${task.summary} to project ${project.displayName}');
-      
-      // Use the existing TaskViewModel moveTask functionality
-      final taskViewModel = ref.read(taskViewModelProvider.notifier);
-      await taskViewModel.moveTask(task, project.path);
-      
-      AppLogger.info('DomainHeader: Successfully moved task ${task.summary} to project ${project.displayName}');
-    } catch (e) {
-      AppLogger.error('DomainHeader: Failed to move task ${task.summary} to project ${project.displayName}: $e');
-      
-      // Show error feedback
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to move task: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
+
 }
 
 class _DomainSection extends ConsumerStatefulWidget {
