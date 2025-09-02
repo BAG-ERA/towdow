@@ -77,7 +77,7 @@ If you want to manually build the image you can do this:
 
 ```shell
 docker login registry.gitlab.com/towdow/towdow-flutter
-export FLUTTER_VERSION=3.32.5
+export FLUTTER_VERSION=3.35.2
 export ANDROID_TOOL_VERSION_X=34
 export ANDROID_TOOL_VERSION=34.0.0
 docker build --build-arg FLUTTER_VERSION=${FLUTTER_VERSION} \
@@ -118,7 +118,7 @@ we could do the same as for Linux and build a Windows docker to build with the C
 
 ```shell
 docker login registry.gitlab.com/towdow/towdow-flutter
-export FLUTTER_VERSION=3.32.5
+export FLUTTER_VERSION=3.35.2
 docker build --build-arg FLUTTER_VERSION=${FLUTTER_VERSION} \
   -t registry.gitlab.com/towdow/towdow-flutter/flutter-windows-build-env:${FLUTTER_VERSION} \
   -f CI_scripts/windows/Dockerfile .
