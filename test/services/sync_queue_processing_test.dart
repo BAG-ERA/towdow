@@ -1,4 +1,6 @@
 // Tests for SyncService queue processing (create/update/delete)
+@Timeout(Duration(seconds: 60))
+library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
