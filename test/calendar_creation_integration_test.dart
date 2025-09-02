@@ -6,6 +6,7 @@
 import 'package:test/test.dart';
 import 'package:towdow_app/data/services/caldav/caldav_service.dart';
 import 'package:towdow_app/data/models/caldav_account.dart';
+import 'package:towdow_app/core/result.dart';
 
 void main() {
   group('Calendar Creation Integration Tests', () {
@@ -30,34 +31,27 @@ void main() {
       // First, test connection and get capabilities
       final capabilitiesResult = await service.testConnection();
       
-      await capabilitiesResult.when(
-        success: (capabilities) async {
+      if (capabilitiesResult is Success) {
+        final createResult = await service.createCalendar(
+          displayName: 'FlowIt Integration Test',
+          description: 'Test calendar created by FlowIt integration test',
+        );
 
-          
-          final createResult = await service.createCalendar(
-            displayName: 'FlowIt Integration Test',
-            description: 'Test calendar created by FlowIt integration test',
-          );
-          
-          await createResult.when(
-            success: (calendar) {
-              
-              expect(calendar.displayName, equals('FlowIt Integration Test'));
-              expect(calendar.supportsTodos, isTrue);
-            },
-            failure: (failure) {
-              print('✗ Calendar creation failed: ${failure.message}');
-              if (failure.exception != null) {
-                print('  Exception: ${failure.exception}');
-              }
-            },
-          );
-        },
-        failure: (failure) {
-          
-          expect(failure.message, isNotEmpty);
-        },
-      );
+        if (createResult is Success) {
+          final calendar = (createResult as Success).data;
+          expect(calendar.displayName, equals('FlowIt Integration Test'));
+          expect(calendar.supportsTodos, isTrue);
+        } else if (createResult is Error) {
+          final failure = (createResult as Error).failure;
+          print('✗ Calendar creation failed: ${failure.message}');
+          if (failure.exception != null) {
+            print('  Exception: ${failure.exception}');
+          }
+        }
+      } else if (capabilitiesResult is Error) {
+        final failure = (capabilitiesResult as Error).failure;
+        expect(failure.message, isNotEmpty);
+      }
     }, skip: 'Requires live CalDAV server - run manually with test server');
 
     test('Test MKCALENDAR XML generation', () {
