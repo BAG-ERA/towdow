@@ -70,14 +70,30 @@ class LocalStorageService {
         if (kIsWeb) {
           await Hive.initFlutter();
         } else {
-          final appDocumentDir = await getApplicationDocumentsDirectory();
-          // Ensure we use a dedicated subdirectory for TowDow across all platforms
-          final towdowDirPath = path.join(appDocumentDir.path, '.towdow');
-          final towdowDir = Directory(towdowDirPath);
+          // Choose platform-appropriate persistent data directory
+          Directory baseDir;
+          if (Platform.isLinux) {
+            // Use ~/.local/share/towdow
+            final home = Platform.environment['HOME'] ?? Directory.current.path;
+            baseDir = Directory(path.join(home, '.local', 'share', 'towdow'));
+          } else if (Platform.isWindows) {
+            // Use AppData\Roaming\TowDow (Application Support)
+            final appSupport = await getApplicationSupportDirectory();
+            baseDir = Directory(path.join(appSupport.path, 'TowDow'));
+          } else if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+            // Use Application Support directory on mobile and macOS
+            baseDir = await getApplicationSupportDirectory();
+          } else {
+            // Fallback to documents dir
+            baseDir = await getApplicationDocumentsDirectory();
+          }
+
+          final towdowDir = Directory(baseDir.path);
           if (!await towdowDir.exists()) {
             await towdowDir.create(recursive: true);
           }
-          Hive.init(towdowDirPath);
+          AppLogger.info('LocalStorageService: Using directory: ${towdowDir.path}');
+          Hive.init(towdowDir.path);
         }
 
       }
@@ -185,7 +201,7 @@ class LocalStorageService {
 
   // Helper method to get a generic path message for a Hive box file
   String _getBoxPathMessage(String boxName) {
-    return 'fichiers Hive locaux ($boxName.hive dans le dossier Documents)';
+    return 'fichiers Hive locaux ($boxName.hive dans le dossier de données de l\'application)';
   }
 
   /// Clear all boxes safely on web and optionally refresh page via platform channel

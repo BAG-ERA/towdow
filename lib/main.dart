@@ -37,7 +37,7 @@ void main() async {
   tz.initializeTimeZones();
   AppLogger.info('Main: Timezone database initialized');
   
-  // Initialize Hive
+  // Initialize Hive (boxes will be opened with platform-specific path in LocalStorageService)
   await Hive.initFlutter();
   
   // Register Hive adapters for all models
