@@ -59,6 +59,7 @@ class ProjectKanbanView extends ConsumerWidget {
     // Use filtered tasks instead of all tasks (respects search filtering)
     final filteredTasks = ref.watch(filteredProjectTasksProvider(projectPath));
     final searchQuery = ref.watch(projectSearchQueryProvider(projectPath));
+    final isUncategorizedCollapsed = ref.watch(uncategorizedColumnCollapsedProvider(projectPath));
     
     // Get project categories from the category view model
     final categoryViewModelState = ref.watch(projectCategoryViewModelProvider(projectPath));
@@ -121,7 +122,7 @@ class ProjectKanbanView extends ConsumerWidget {
     
     final columns = <KanbanColumn>[];
     
-    // Add uncategorized column first (never hidden)
+    // Add uncategorized column first (can be collapsed)
     columns.add(
       KanbanColumn(
         id: 'uncategorized',
@@ -131,6 +132,8 @@ class ProjectKanbanView extends ConsumerWidget {
         color: Colors.grey,
         icon: Icons.inbox_rounded,
         onAddTask: () => _addTaskToCategory(context, ref, null),
+        isCollapsed: isUncategorizedCollapsed,
+        onToggleCollapse: () => _toggleUncategorizedColumn(context, ref),
       ),
     );
     
@@ -580,5 +583,11 @@ class ProjectKanbanView extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Toggle uncategorized column collapse state
+  void _toggleUncategorizedColumn(BuildContext context, WidgetRef ref) {
+    final currentState = ref.read(uncategorizedColumnCollapsedProvider(projectPath));
+    ref.read(uncategorizedColumnCollapsedProvider(projectPath).notifier).state = !currentState;
   }
 } 

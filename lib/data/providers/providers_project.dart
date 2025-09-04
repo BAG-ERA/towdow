@@ -198,3 +198,6 @@ final filteredProjectTasksProvider = Provider.family<List<Task>, String>((ref, p
   }).toList();
 });
 
+// Provider for managing uncategorized column collapse state per project
+final uncategorizedColumnCollapsedProvider = StateProvider.family<bool, String>((ref, projectPath) => false);
+

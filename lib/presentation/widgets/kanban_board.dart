@@ -15,6 +15,8 @@ class KanbanColumn {
   final Color color;
   final IconData icon;
   final VoidCallback? onAddTask;
+  final bool isCollapsed;
+  final VoidCallback? onToggleCollapse;
 
   const KanbanColumn({
     required this.id,
@@ -24,6 +26,8 @@ class KanbanColumn {
     required this.color,
     required this.icon,
     this.onAddTask,
+    this.isCollapsed = false,
+    this.onToggleCollapse,
   });
 }
 
@@ -62,12 +66,20 @@ class KanbanBoard extends ConsumerWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           const targetColumnWidth = 360.0;
+          const collapsedColumnWidth = 60.0;
           const columnSpacing = 16.0;
           
-          // Calculate total width needed for all columns
+          // Calculate total width needed for all columns (considering collapsed columns)
           final totalColumns = columns.length + (hiddenColumnsButton != null ? 1 : 0) + (onAddCategory != null ? 1 : 0);
           final totalSpacing = (totalColumns - 1) * columnSpacing;
-          final totalWidth = (totalColumns * targetColumnWidth) + totalSpacing;
+          
+          // Calculate width based on collapsed/expanded columns
+          double totalWidth = totalSpacing;
+          for (final column in columns) {
+            totalWidth += column.isCollapsed ? collapsedColumnWidth : targetColumnWidth;
+          }
+          if (hiddenColumnsButton != null) totalWidth += targetColumnWidth;
+          if (onAddCategory != null) totalWidth += targetColumnWidth;
           
           return ScrollbarTheme(
             data: ScrollbarThemeData(
@@ -113,7 +125,7 @@ class KanbanBoard extends ConsumerWidget {
                       ...columns.map((column) => Padding(
                         padding: const EdgeInsets.only(right: 12.0),
                         child: SizedBox(
-                          width: targetColumnWidth,
+                          width: column.isCollapsed ? collapsedColumnWidth : targetColumnWidth,
                           child: KanbanColumnWidget(
                             column: column,
                             onTaskMoved: onTaskMoved,
@@ -192,6 +204,10 @@ class KanbanColumnWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (column.isCollapsed) {
+      return _buildCollapsedColumn(context);
+    }
+    
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -262,7 +278,22 @@ class KanbanColumnWidget extends ConsumerWidget {
                     ),
                   ),
                 ),
-                if (onColumnHide != null && column.id != 'uncategorized')
+                if (column.id == 'uncategorized' && column.onToggleCollapse != null)
+                  IconButton(
+                    onPressed: column.onToggleCollapse,
+                    icon: Icon(
+                      Icons.keyboard_double_arrow_left,
+                      size: 16,
+                      color: column.color.withValues(alpha: 0.7),
+                    ),
+                    tooltip: 'Collapse column',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 24,
+                      minHeight: 24,
+                    ),
+                  )
+                else if (onColumnHide != null && column.id != 'uncategorized')
                   IconButton(
                     onPressed: () => onColumnHide!(column.id),
                     icon: Icon(
@@ -432,6 +463,98 @@ class KanbanColumnWidget extends ConsumerWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  /// Build collapsed column (60px width with icon and expand button)
+  Widget _buildCollapsedColumn(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Collapsed Header - Just icon
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: column.color.withValues(alpha: 0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: column.color.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                column.icon,
+                color: column.color,
+                size: 16,
+              ),
+            ),
+          ),
+          
+          // Collapsed Body - Vertical text and expand button
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Vertical text
+                  RotatedBox(
+                    quarterTurns: 3,
+                    child: Text(
+                      column.title,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: column.color,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Task count
+                  Text(
+                    '${column.tasks.length}',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: column.color,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Expand button
+                  IconButton(
+                    onPressed: column.onToggleCollapse,
+                    icon: Icon(
+                      Icons.keyboard_double_arrow_right,
+                      color: column.color,
+                      size: 20,
+                    ),
+                    tooltip: 'Expand ${column.title}',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 24,
+                      minHeight: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
