@@ -1,6 +1,8 @@
 // Local storage service using Hive for offline-first data persistence
 // Provides generic CRUD operations for all FlowIt models
 
+import 'dart:io';
+import 'package:path/path.dart' as path;
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -69,7 +71,13 @@ class LocalStorageService {
           await Hive.initFlutter();
         } else {
           final appDocumentDir = await getApplicationDocumentsDirectory();
-          Hive.init(appDocumentDir.path);
+          // Ensure we use a dedicated subdirectory for TowDow across all platforms
+          final towdowDirPath = path.join(appDocumentDir.path, '.towdow');
+          final towdowDir = Directory(towdowDirPath);
+          if (!await towdowDir.exists()) {
+            await towdowDir.create(recursive: true);
+          }
+          Hive.init(towdowDirPath);
         }
 
       }
