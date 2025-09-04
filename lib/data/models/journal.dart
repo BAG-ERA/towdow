@@ -2,7 +2,7 @@
 // Represents a note entry synchronized via CalDAV VJOURNAL
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 import 'attendee.dart';
 
@@ -11,7 +11,7 @@ part 'journal.g.dart';
 
 @HiveType(typeId: 23)
 @freezed
-class Journal with _$Journal {
+abstract class Journal with _$Journal {
   const factory Journal({
     @HiveField(0) required String uid,
     @HiveField(1) required String summary,

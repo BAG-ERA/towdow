@@ -18,6 +18,7 @@ import '../../../data/models/journal.dart';
 import '../../../data/models/step.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
+import '../../../core/result.dart';
 // commands now handled in ViewModel
 import '../../viewmodels/project_detail_viewmodel.dart';
 

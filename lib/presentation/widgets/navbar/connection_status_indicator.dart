@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
 import '../../../data/services/sync/connection_monitor_service.dart';
 import '../../../data/services/storage/file_upload_queue_service.dart';
+import '../../../core/result.dart';
 
 class ConnectionStatusIndicator extends ConsumerWidget {
   const ConnectionStatusIndicator({super.key});

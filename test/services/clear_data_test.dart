@@ -4,7 +4,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:towdow_app/data/services/storage/local_storage_service.dart';
 import 'package:towdow_app/core/result.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'dart:io';
 
 // Import all the models that need adapters

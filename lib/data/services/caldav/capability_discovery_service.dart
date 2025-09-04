@@ -74,12 +74,14 @@ class ServerCapabilities {
     );
   }
 
-  bool get isCompatible => supportsWebDAV && supportsCalDAV;
+  bool get isCompatible => supportsCalDAV;
+  
+  bool get hasFullCompliance => supportsWebDAV && supportsCalDAV;
   
   String get compatibilityDescription {
-    if (!supportsWebDAV) return 'Server does not support WebDAV (RFC 4918)';
-    if (!supportsCalDAV) return 'Server does not support CalDAV (RFC 4791)';
-    return 'Server is compatible with FlowIt';
+    if (!supportsCalDAV) return 'Server does not support CalDAV (RFC 4791) TowDow will not work';
+    if (!supportsWebDAV) return 'Warning: Server does not support WebDAV (RFC 4918) - some features may be limited';
+    return 'Server is compatible with TowDow';
   }
 }
 

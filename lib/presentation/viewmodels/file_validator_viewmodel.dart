@@ -13,6 +13,7 @@ import '../../data/services/storage/offline_file_service.dart';
 import '../../data/services/storage/file_upload_queue_service.dart';
 import '../../data/providers/providers.dart';
 import '../../core/logger.dart';
+import '../../core/result.dart';
 
 /// File Validator ViewModel State
 class FileValidatorState {

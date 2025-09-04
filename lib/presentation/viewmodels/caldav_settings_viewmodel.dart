@@ -11,6 +11,7 @@ import '../../data/services/caldav/capability_discovery_service.dart';
 import '../../data/services/sync/sync_service.dart';
 import '../../data/repositories/calendar_repository.dart' show SyncCommander;
 import '../../core/logger.dart';
+import '../../core/result.dart';
 
 // CalDAV Settings ViewModel State
 class CaldavSettingsState {

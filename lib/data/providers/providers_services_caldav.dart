@@ -1,6 +1,7 @@
 // CalDAV and integration service providers
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/result.dart';
 import '../models/caldav_account.dart';
 import '../models/external_caldav_account.dart';
 import '../services/caldav/caldav_discovery_service.dart';

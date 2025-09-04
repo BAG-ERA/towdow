@@ -2,7 +2,7 @@
 // Represents a category with id, name, and color attributes for task organization
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/chart_theme.dart';
 
@@ -11,7 +11,7 @@ part 'category.g.dart';
 
 @HiveType(typeId: 50)
 @freezed
-class Category with _$Category {
+abstract class Category with _$Category {
   const factory Category({
     @HiveField(0) required String id,
     @HiveField(1) required String name,

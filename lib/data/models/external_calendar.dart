@@ -3,14 +3,14 @@
 // Supports persistent storage with Hive and synchronization tracking
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'external_calendar.freezed.dart';
 part 'external_calendar.g.dart';
 
 @HiveType(typeId: 30)
 @freezed
-class ExternalCalendar with _$ExternalCalendar {
+abstract class ExternalCalendar with _$ExternalCalendar {
   const factory ExternalCalendar({
     // CalDAV server properties
     @HiveField(0) required String path,

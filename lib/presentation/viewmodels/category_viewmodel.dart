@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../core/logger.dart';
+import '../../core/result.dart';
 import '../../data/models/category.dart';
 import '../../data/repositories/category_repository.dart';
 
@@ -13,7 +14,7 @@ part 'category_viewmodel.freezed.dart';
 
 /// State class for CategoryViewModel
 @freezed
-class CategoryViewModelState with _$CategoryViewModelState {
+abstract class CategoryViewModelState with _$CategoryViewModelState {
   const factory CategoryViewModelState({
     @Default([]) List<Category> categories,
     @Default([]) List<Category> projectCategories,

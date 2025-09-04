@@ -2,14 +2,14 @@
 // Supports different provider types including Google OAuth
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'caldav_account.freezed.dart';
 part 'caldav_account.g.dart';
 
 @HiveType(typeId: 1)
 @freezed
-class CaldavAccount with _$CaldavAccount {
+abstract class CaldavAccount with _$CaldavAccount {
   const factory CaldavAccount({
     @HiveField(0) required String id,
     @HiveField(1) required String providerType, // towdow_cloud, google, nextcloud, custom

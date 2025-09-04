@@ -99,7 +99,6 @@ void main() {
         final viewModel = ProjectListViewModel(
           mockCalendarRepository,
           _FakeTaskRepositoryForDelete(),
-          mockAccountRepository,
           mockUserRepository,
         );
 
@@ -152,7 +151,6 @@ void main() {
         final viewModel = ProjectListViewModel(
           mockCalendarRepository,
           mockTaskRepository,
-          mockAccountRepository,
           mockUserRepository,
         );
 
@@ -186,7 +184,6 @@ void main() {
         final viewModel = ProjectListViewModel(
           mockCalendarRepository,
           mockTaskRepository,
-          mockAccountRepository,
           mockUserRepository,
         );
 

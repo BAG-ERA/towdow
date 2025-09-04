@@ -2,7 +2,7 @@
 // Represents a single actionable item with x-flowit-type: task
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'attendee.dart';
 
 part 'task.freezed.dart';
@@ -10,7 +10,7 @@ part 'task.g.dart';
 
 @HiveType(typeId: 6)
 @freezed
-class Task with _$Task {
+abstract class Task with _$Task {
   const factory Task({
     @HiveField(0) required String uid,
     @HiveField(1) required String summary,

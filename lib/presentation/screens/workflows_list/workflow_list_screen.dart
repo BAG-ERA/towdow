@@ -5,18 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-
+import '../../../core/result.dart';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/providers/providers.dart';
 import '../../viewmodels/project_list_viewmodel.dart';
 import '../../widgets/project-list/projects_table.dart';
-import '../../widgets/utils/styled_tab_bar.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../widgets/utils/buttons/create_workflow_button.dart';
 import '../../widgets/navbar/workflow_popup_menu.dart';
 import '../../widgets/utils/popup/move_to_domain_dialog.dart';
-import '../../../core/theme/chart_theme_usage.dart';
-import '../../widgets/header_screen_widget.dart';
+import '../../widgets/list_screen/list_screen_scaffold.dart';
+import '../../widgets/list_screen/list_screen_body.dart';
+import '../../widgets/list_screen/explanation_header.dart';
+import '../../../core/logger.dart';
 
 class WorkflowListScreen extends ConsumerStatefulWidget {
   const WorkflowListScreen({super.key});
@@ -27,6 +28,7 @@ class WorkflowListScreen extends ConsumerStatefulWidget {
 
 class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   int _selectedTabIndex = 0;
+  bool _showArchived = false;
 
   @override
   void initState() {
@@ -38,50 +40,67 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   }
 
   void _applyFilter() {
-    switch (_selectedTabIndex) {
-      case 0:
-        ref.read(workflowListViewModelProvider.notifier).setFilter(ProjectFilter.active);
-        break;
-      case 1:
-        ref.read(workflowListViewModelProvider.notifier).setFilter(ProjectFilter.completed);
-        break;
-      case 2:
-        ref.read(workflowListViewModelProvider.notifier).setFilter(ProjectFilter.all);
-        break;
+    final viewModel = ref.read(workflowListViewModelProvider.notifier);
+    final state = ref.read(workflowListViewModelProvider);
+    
+    AppLogger.info('WorkflowListScreen: _applyFilter called with _selectedTabIndex: $_selectedTabIndex');
+    
+    // Determine domain filter
+    String? selectedDomain;
+    if (_selectedTabIndex == 0) {
+      AppLogger.info('WorkflowListScreen: Setting domain filter to null (All Domains)');
+      selectedDomain = null;
+    } else {
+      final domains = state.availableDomains;
+      AppLogger.info('WorkflowListScreen: Available domains: $domains');
+      if (_selectedTabIndex - 1 < domains.length) {
+        selectedDomain = domains[_selectedTabIndex - 1];
+        AppLogger.info('WorkflowListScreen: Setting domain filter to: $selectedDomain');
+      } else {
+        AppLogger.error('WorkflowListScreen: Index out of bounds! _selectedTabIndex: $_selectedTabIndex, domains length: ${domains.length}');
+      }
     }
+    
+    // Determine status filter
+    final statusFilter = _showArchived ? ProjectFilter.completed : ProjectFilter.active;
+    AppLogger.info('WorkflowListScreen: Setting filter to: $statusFilter');
+    
+    // Apply both filters at once to avoid state conflicts
+    viewModel.setFilters(selectedDomain, statusFilter);
+    
+    // Check the state after applying filters
+    final newState = ref.read(workflowListViewModelProvider);
+    AppLogger.info('WorkflowListScreen: After filter - selectedDomain: ${newState.selectedDomain}');
+    AppLogger.info('WorkflowListScreen: After filter - filteredProjects count: ${newState.filteredProjects.length}');
+  }
+
+  void _toggleArchived() {
+    _showArchived = !_showArchived;
+    _applyFilter();
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workflowListViewModelProvider);
+    
+    final domains = state.availableDomains;
+    final domainTabs = [AppLocalizations.of(context)!.all, ...domains];
 
-    return Scaffold(
-      appBar: HeaderScreenWidget(
-        title: AppLocalizations.of(context)!.allWorkflows,
-        showVoiceFeedback: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(80),
-          child: StyledTabBar(
-            items: [
-              StyledTabItem(label: AppLocalizations.of(context)!.ongoing),
-              StyledTabItem(label: AppLocalizations.of(context)!.archived),
-              StyledTabItem(label: AppLocalizations.of(context)!.all),
-            ],
-            selectedIndex: _selectedTabIndex,
-            onTabSelected: (index) {
-              setState(() {
-                _selectedTabIndex = index;
-              });
-              _applyFilter();
-            },
-          ),
-        ),
-      ),
-      body: _buildBody(state),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: SafeArea(
-        child: _buildCreateWorkflowButton(context),
-      ),
+    return ListScreenScaffold(
+      title: AppLocalizations.of(context)!.allWorkflows,
+      selectedTabIndex: _selectedTabIndex,
+      onTabSelected: (index) {
+        _selectedTabIndex = index;
+        _applyFilter();
+        setState(() {});
+      },
+      domainTabs: domainTabs,
+      showArchived: _showArchived,
+      onToggleArchived: _toggleArchived,
+      body: _buildBody(),
+      floatingActionButton: _buildCreateWorkflowButton(context),
+      contentType: 'workflows',
     );
   }
 
@@ -93,107 +112,28 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
     );
   }
 
-  Widget _buildBody(ProjectListState state) {
-    if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (state.error != null) {
-      return Center(child: Text(state.error!));
-    }
-    if (state.filteredProjects.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.route_rounded, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
-            const SizedBox(height: 16),
-             Text(AppLocalizations.of(context)!.noneFound(AppLocalizations.of(context)!.workflows.toLowerCase()), style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text(
-              AppLocalizations.of(context)!.workflowsExplainer,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
-    return RefreshIndicator(
+  Widget _buildBody() {
+    final state = ref.watch(workflowListViewModelProvider);
+    
+    return ListScreenBody(
+      isLoading: state.isLoading,
+      error: state.error,
+      isEmpty: state.filteredProjects.isEmpty,
+      emptyTitle: AppLocalizations.of(context)!.workflows,
+      emptyDescription: AppLocalizations.of(context)!.workflowsExplainer,
+      emptyIcon: Icons.route_rounded,
       onRefresh: () => ref.read(workflowListViewModelProvider.notifier).refresh(),
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          Builder(
-            builder: (context) {
-              final state = ref.watch(workflowListViewModelProvider);
-              final viewModel = ref.read(workflowListViewModelProvider.notifier);
-              final groups = viewModel.filteredDomainGroups;
-              
-              return Column(
-                children: [
-                  for (final group in groups)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: InkWell(
-                              onTap: () => group.isExpanded 
-                                  ? viewModel.collapseDomain(group.domain)
-                                  : viewModel.expandDomain(group.domain),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                child: Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        group.domain,
-                                        style: context.domainNameStyle,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Icon(
-                                      group.isExpanded
-                                          ? Icons.expand_less_rounded
-                                          : Icons.expand_more_rounded,
-                                      size: 20,
-                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (group.isExpanded) ...[
-                            const SizedBox(height: 8),
-                            ProjectsTable(
-                              state: state,
-                              projectsOverride: group.projects,
-                              onProjectTap: _navigateToWorkflow,
-                              onProjectAction: _handleWorkflowAction,
-                              onSortChanged: (sortType) {
-                                ref.read(workflowListViewModelProvider.notifier).setSortBy(sortType);
-                              },
-                              menuBuilder: (context, ref, project) => WorkflowPopupMenu.getMenuItems(context, ref, project: project),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: _WorkflowsExplanationHeader(),
-          ),
-          const SizedBox(height: 96),
-        ],
+      child: ProjectsTable(
+        state: state,
+        onProjectTap: _navigateToWorkflow,
+        onProjectAction: _handleWorkflowAction,
+        onSortChanged: (sortType) {
+          ref.read(workflowListViewModelProvider.notifier).setSortBy(sortType);
+        },
+        menuBuilder: (context, ref, project) => WorkflowPopupMenu.getMenuItems(context, ref, project: project),
+      ),
+      explanationHeader: ExplanationHeader(
+        text: AppLocalizations.of(context)!.workflowsListExplainer,
       ),
     );
   }
@@ -311,30 +251,5 @@ class _WorkflowListScreenState extends ConsumerState<WorkflowListScreen> {
   }
 }
 
-class _WorkflowsExplanationHeader extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Workflows define steps to move tasks through. \n'
-            'Use them to standardize progress across tasks and teams. \n'
-            'This table lets you browse, sort, and manage your workflows at a glance.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+
 

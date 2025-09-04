@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'app.dart';
 
@@ -26,6 +26,7 @@ import 'data/services/user/user_preferences_queue_service.dart';
 
 // Import services and providers
 import 'core/logger.dart';
+import 'core/result.dart';
 import 'data/services/storage/local_storage_service.dart';
 import 'data/providers/providers.dart';
 

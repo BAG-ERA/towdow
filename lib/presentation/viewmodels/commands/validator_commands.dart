@@ -8,6 +8,7 @@ import '../../../data/repositories/account_repository.dart';
 import '../../../data/services/sync/sync_service.dart';
 import '../../../data/services/validator_service.dart';
 import '../../../core/logger.dart';
+import '../../../core/result.dart';
 
 /// Parameters for updating validator state
 class UpdateValidatorStateParams {

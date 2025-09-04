@@ -3,7 +3,7 @@
 // Supports persistent storage with Hive and basic calendar functionality
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'attendee.dart';
 
 part 'calendar_event.freezed.dart';
@@ -11,7 +11,7 @@ part 'calendar_event.g.dart';
 
 @HiveType(typeId: 31)
 @freezed
-class CalendarEvent with _$CalendarEvent {
+abstract class CalendarEvent with _$CalendarEvent {
   const factory CalendarEvent({
     // Basic event properties (RFC 5545)
     @HiveField(0) required String uid,

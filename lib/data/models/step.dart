@@ -2,7 +2,7 @@
 // Represents a step definition stored at project (VCALENDAR) level
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'step.freezed.dart';
 part 'step.g.dart';
@@ -51,7 +51,7 @@ StepStatus stepStatusFromString(String value) {
 
 @HiveType(typeId: 51)
 @freezed
-class ProjectStep with _$ProjectStep {
+abstract class ProjectStep with _$ProjectStep {
   const factory ProjectStep({
     @HiveField(0) required String id,
     @HiveField(1) required String name,

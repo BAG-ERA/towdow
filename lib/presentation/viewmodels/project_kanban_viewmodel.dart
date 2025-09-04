@@ -5,7 +5,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import '../../core/logger.dart';
+import '../../core/logger.dart';  
+import '../../core/result.dart';
 import '../../data/models/kanban.dart';
 import '../../data/models/category.dart';
 import '../../data/repositories/category_repository.dart';
@@ -15,7 +16,7 @@ part 'project_kanban_viewmodel.freezed.dart';
 
 /// State class for ProjectKanbanViewModel
 @freezed
-class ProjectKanbanState with _$ProjectKanbanState {
+abstract class ProjectKanbanState with _$ProjectKanbanState {
   const factory ProjectKanbanState({
     @Default([]) List<Kanban> kanbans,
     Kanban? selectedKanban,

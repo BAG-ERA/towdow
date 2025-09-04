@@ -7,6 +7,7 @@ import '../../data/models/attendee.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../core/logger.dart';
+import '../../core/result.dart';
 
 // Task ViewModel State
 class TaskViewModelState {

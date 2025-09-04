@@ -2,14 +2,14 @@
 // Represents a requirement with id, name and attendeeEmails (kept empty in DRAFT)
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'requirement.freezed.dart';
 part 'requirement.g.dart';
 
 @HiveType(typeId: 51)
 @freezed
-class Requirement with _$Requirement {
+abstract class Requirement with _$Requirement {
   const factory Requirement({
     @HiveField(0) required String id,
     @HiveField(1) required String name,

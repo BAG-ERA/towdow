@@ -3,14 +3,14 @@
 // Supports serialization for storage in TaskCalendar and UserPreferences
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'kanban.freezed.dart';
 part 'kanban.g.dart';
 
 @HiveType(typeId: 12)
 @freezed
-class Kanban with _$Kanban {
+abstract class Kanban with _$Kanban {
   const factory Kanban({
     @HiveField(0) required String title,
     @HiveField(1) @Default([]) List<String> orderedList, // List of category IDs in order

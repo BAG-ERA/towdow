@@ -14,6 +14,7 @@ import '../../data/services/storage/file_upload_queue_service.dart';
 import '../../data/services/storage/s3_storage_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../core/logger.dart';
+import '../../core/result.dart';
 
 /// State for unified attachment operations
 class UnifiedAttachmentState {

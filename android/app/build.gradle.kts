@@ -25,7 +25,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "app.towdow"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -79,7 +79,7 @@ android {
 flutter { source = "../.." }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 // OPTIONAL: Gradle Play Publisher (enable plugin above first)

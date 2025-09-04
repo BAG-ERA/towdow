@@ -3,13 +3,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../core/logger.dart';
+import '../../core/result.dart';
 import '../../data/models/step.dart';
 import '../../data/repositories/step_repository.dart';
 
 part 'step_viewmodel.freezed.dart';
 
 @freezed
-class StepViewModelState with _$StepViewModelState {
+abstract class StepViewModelState with _$StepViewModelState {
   const factory StepViewModelState({
     @Default([]) List<ProjectStep> steps,
     @Default(false) bool isLoading,

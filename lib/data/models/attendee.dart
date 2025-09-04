@@ -10,7 +10,7 @@ library;
 /// response status, and potential delegations according to iCalendar standards.
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'attendee.freezed.dart';
 part 'attendee.g.dart';
@@ -131,7 +131,7 @@ enum CalendarUserType {
 /// Attendee model representing a participant in a task or project
 @HiveType(typeId: 5)
 @freezed
-class Attendee with _$Attendee {
+abstract class Attendee with _$Attendee {
   const factory Attendee({
     /// Email address (URI) - mandatory field
     @HiveField(0) required String email,

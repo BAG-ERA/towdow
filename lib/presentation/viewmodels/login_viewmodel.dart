@@ -17,6 +17,7 @@ import 'package:openid_client/openid_client_io.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/logger.dart';
+import '../../core/result.dart';
 
 import '../../data/models/caldav_account.dart';
 import '../../data/services/integration/external_caldav_calendar/external_sync_service.dart';
@@ -117,7 +118,24 @@ class LoginViewModel extends StateNotifier<LoginState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
+    String successPage = '<h1> Login succeeded you can close this window now and go back to the app. </h1>';
+    try{
+      // get login success page from website
+      final resp = await http.get(Uri.parse('https://towdow.gitlab.io/login_success.html'));
+
+      if (resp.statusCode == 200) {
+        successPage = resp.body;
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Login: Failed to get success login page',
+        e,
+        stackTrace,
+      );
+    }
+
     try {
+
       // Discover the OpenID configuration
       final issuer = await Issuer.discover(Uri.parse(issuerUrl));
       final client = Client(issuer, clientId, clientSecret: "");
@@ -139,6 +157,7 @@ class LoginViewModel extends StateNotifier<LoginState> {
           }
         },
         redirectUri: redirectUri,
+        htmlPage: successPage,
       );
 
       final c = await authenticator.authorize();

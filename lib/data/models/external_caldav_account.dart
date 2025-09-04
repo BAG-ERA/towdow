@@ -3,7 +3,7 @@
 // Supports different authentication methods and server types
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'external_caldav_account.freezed.dart';
 part 'external_caldav_account.g.dart';
@@ -21,7 +21,7 @@ enum ExternalCalendarAuthType {
 
 @HiveType(typeId: 32)
 @freezed
-class ExternalCaldavAccount with _$ExternalCaldavAccount {
+abstract class ExternalCaldavAccount with _$ExternalCaldavAccount {
   const factory ExternalCaldavAccount({
     @HiveField(0) required String id,
     @HiveField(1) required String displayName, // User-friendly name

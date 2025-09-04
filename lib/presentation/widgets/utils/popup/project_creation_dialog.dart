@@ -6,9 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart'; // Add this import for navigation
 import '../../../../core/logger.dart';
+import '../../../../core/result.dart';
 import '../../../../core/theme/chart_theme_usage.dart';
 import '../../../../data/providers/providers.dart';
-import '../../../../app.dart'; // Add this import for globalNavigatorKey
 import 'domain_creation_dialog.dart';
 import '../enhanced_text_field.dart';
 import '../../../viewmodels/project_creation_viewmodel.dart';

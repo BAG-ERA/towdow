@@ -3,7 +3,7 @@
 // Supports both file attachments and media attachments
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'attachment.freezed.dart';
 part 'attachment.g.dart';
@@ -35,7 +35,7 @@ enum MediaType {
 /// Unified Attachment model
 @HiveType(typeId: 32)
 @freezed
-class Attachment with _$Attachment {
+abstract class Attachment with _$Attachment {
   const factory Attachment({
     @HiveField(0) required String uri,
     @HiveField(1) required String filename,

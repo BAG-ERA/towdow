@@ -11,6 +11,7 @@ import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/providers/providers_repositories.dart';
 import '../../data/models/task.dart';
+import '../../core/result.dart';
 
 class AttendeeSuggestionsState {
   final bool isLoading;

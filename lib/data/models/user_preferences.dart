@@ -1,7 +1,7 @@
 // User preferences model for storing customizable app settings
 // Includes project ordering and future user preference options
 
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'shared_with_me_project.dart';
 
 part 'user_preferences.g.dart';
