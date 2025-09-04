@@ -56,6 +56,10 @@ class ProjectKanbanView extends ConsumerWidget {
 
   // Kanban View - Organized by categories
   Widget _buildCategoryKanban(BuildContext context, WidgetRef ref, List<Task> tasks) {
+    // Use filtered tasks instead of all tasks (respects search filtering)
+    final filteredTasks = ref.watch(filteredProjectTasksProvider(projectPath));
+    final searchQuery = ref.watch(projectSearchQueryProvider(projectPath));
+    
     // Get project categories from the category view model
     final categoryViewModelState = ref.watch(projectCategoryViewModelProvider(projectPath));
     
@@ -81,8 +85,38 @@ class ProjectKanbanView extends ConsumerWidget {
         !visibleCategories.any((visible) => visible.id == category.id)
     ).toList();
     
+    // Check if search is active but no tasks match
+    if (filteredTasks.isEmpty && searchQuery.trim().isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No Matching Tasks',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your search or filters',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
     // Tasks without categories - sorted by status (done tasks last)
-    final uncategorizedTasks = tasks.where((task) => task.categoryIds.isEmpty).toList();
+    final uncategorizedTasks = filteredTasks.where((task) => task.categoryIds.isEmpty).toList();
     _sortTasksByStatus(uncategorizedTasks);
     
     final columns = <KanbanColumn>[];
@@ -103,7 +137,7 @@ class ProjectKanbanView extends ConsumerWidget {
     // Add columns for each visible project category
     for (final category in visibleCategories) {
       
-      final categoryTasks = tasks.where((task) => task.categoryIds.contains(category.id)).toList();
+      final categoryTasks = filteredTasks.where((task) => task.categoryIds.contains(category.id)).toList();
       _sortTasksByStatus(categoryTasks);
       
       columns.add(
