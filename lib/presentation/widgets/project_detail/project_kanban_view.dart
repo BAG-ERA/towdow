@@ -56,6 +56,11 @@ class ProjectKanbanView extends ConsumerWidget {
 
   // Kanban View - Organized by categories
   Widget _buildCategoryKanban(BuildContext context, WidgetRef ref, List<Task> tasks) {
+    // Use filtered tasks instead of all tasks (respects search filtering)
+    final filteredTasks = ref.watch(filteredProjectTasksProvider(projectPath));
+    final searchQuery = ref.watch(projectSearchQueryProvider(projectPath));
+    final isUncategorizedCollapsed = ref.watch(uncategorizedColumnCollapsedProvider(projectPath));
+    
     // Get project categories from the category view model
     final categoryViewModelState = ref.watch(projectCategoryViewModelProvider(projectPath));
     
@@ -72,6 +77,7 @@ class ProjectKanbanView extends ConsumerWidget {
     // Get kanban regex to filter visible categories
     final kanbanViewModelState = ref.watch(projectKanbanViewModelProvider(projectPath));
     final kanbanRegex = kanbanViewModelState.selectedKanban?.regex ?? r'.*';
+    final kanbanOrderedList = kanbanViewModelState.selectedKanban?.orderedList ?? [];
     
     // Apply regex filter to project categories to get visible categories
     final visibleCategories = _getVisibleCategoriesFromRegex(kanbanRegex, projectCategories);
@@ -81,46 +87,119 @@ class ProjectKanbanView extends ConsumerWidget {
         !visibleCategories.any((visible) => visible.id == category.id)
     ).toList();
     
+    // Check if search is active but no tasks match
+    if (filteredTasks.isEmpty && searchQuery.trim().isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No Matching Tasks',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your search or filters',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
     // Tasks without categories - sorted by status (done tasks last)
-    final uncategorizedTasks = tasks.where((task) => task.categoryIds.isEmpty).toList();
+    final uncategorizedTasks = filteredTasks.where((task) => task.categoryIds.isEmpty).toList();
     _sortTasksByStatus(uncategorizedTasks);
     
     final columns = <KanbanColumn>[];
     
-    // Add uncategorized column first (never hidden)
-    columns.add(
-      KanbanColumn(
-        id: 'uncategorized',
-        title: 'Uncategorized',
-        subtitle: '${uncategorizedTasks.length} tasks',
-        tasks: uncategorizedTasks,
-        color: Colors.grey,
-        icon: Icons.inbox_rounded,
-        onAddTask: () => _addTaskToCategory(context, ref, null),
-      ),
-    );
+    // Build columns in the order specified by kanbanOrderedList
+    final orderedColumnIds = kanbanOrderedList.isNotEmpty 
+        ? kanbanOrderedList 
+        : ['uncategorized', ...visibleCategories.map((c) => c.id)];
     
-    // Add columns for each visible project category
+    for (final columnId in orderedColumnIds) {
+      if (columnId == 'uncategorized') {
+        // Add uncategorized column
+        columns.add(
+          KanbanColumn(
+            id: 'uncategorized',
+            title: 'Uncategorized',
+            subtitle: '${uncategorizedTasks.length} tasks',
+            tasks: uncategorizedTasks,
+            color: Colors.grey,
+            icon: Icons.inbox_rounded,
+            onAddTask: () => _addTaskToCategory(context, ref, null),
+            isCollapsed: isUncategorizedCollapsed,
+            onToggleCollapse: () => _toggleUncategorizedColumn(context, ref),
+          ),
+        );
+      } else {
+        // Find the category for this column ID
+        try {
+          final category = visibleCategories.firstWhere(
+            (cat) => cat.id == columnId,
+          );
+          
+          final categoryTasks = filteredTasks.where((task) => task.categoryIds.contains(category.id)).toList();
+          _sortTasksByStatus(categoryTasks);
+          
+          columns.add(
+            KanbanColumn(
+              id: category.id,
+              title: category.name,
+              subtitle: '${categoryTasks.length} tasks',
+              tasks: categoryTasks,
+              color: category.colorValue,
+              icon: Icons.label_rounded,
+              onAddTask: () => _addTaskToCategory(context, ref, category.id),
+            ),
+          );
+        } catch (e) {
+          // Skip this column if the category is not found (filtered out or deleted)
+          AppLogger.warning('ProjectKanbanView: Category "$columnId" not found in visible categories, skipping');
+          continue;
+        }
+      }
+    }
+    
+    // Add any visible categories that are not in the orderedList yet
     for (final category in visibleCategories) {
-      
-      final categoryTasks = tasks.where((task) => task.categoryIds.contains(category.id)).toList();
-      _sortTasksByStatus(categoryTasks);
-      
-      columns.add(
-        KanbanColumn(
-          id: category.id,
-          title: category.name,
-          subtitle: '${categoryTasks.length} tasks',
-          tasks: categoryTasks,
-          color: category.colorValue,
-          icon: Icons.label_rounded,
-          onAddTask: () => _addTaskToCategory(context, ref, category.id),
-        ),
-      );
+      if (!orderedColumnIds.contains(category.id)) {
+        final categoryTasks = filteredTasks.where((task) => task.categoryIds.contains(category.id)).toList();
+        _sortTasksByStatus(categoryTasks);
+        
+        columns.add(
+          KanbanColumn(
+            id: category.id,
+            title: category.name,
+            subtitle: '${categoryTasks.length} tasks',
+            tasks: categoryTasks,
+            color: category.colorValue,
+            icon: Icons.label_rounded,
+            onAddTask: () => _addTaskToCategory(context, ref, category.id),
+          ),
+        );
+      }
     }
 
     return KanbanBoard(
       columns: columns,
+      onColumnMoved: (columnId, newIndex) => _onColumnMoved(context, ref, columnId, newIndex),
+      draggingColumnId: kanbanViewModelState.draggingColumnId,
+      isReorderingColumns: kanbanViewModelState.isReorderingColumns,
+      onColumnDragStarted: (columnId) => _onColumnDragStarted(context, ref, columnId),
+      onColumnDragEnded: () => _onColumnDragEnded(context, ref),
       hiddenColumnsButton: hiddenCategories.isNotEmpty
           ? Container(
               decoration: BoxDecoration(
@@ -546,5 +625,38 @@ class ProjectKanbanView extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Toggle uncategorized column collapse state
+  void _toggleUncategorizedColumn(BuildContext context, WidgetRef ref) {
+    final currentState = ref.read(uncategorizedColumnCollapsedProvider(projectPath));
+    ref.read(uncategorizedColumnCollapsedProvider(projectPath).notifier).state = !currentState;
+  }
+
+  /// Handle column reordering when a column is dropped
+  void _onColumnMoved(BuildContext context, WidgetRef ref, String columnId, int newIndex) {
+    AppLogger.info('ProjectKanbanView: Column "$columnId" moved to index $newIndex');
+    
+    // Get the kanban view model and call the reorder method
+    final kanbanViewModel = ref.read(projectKanbanViewModelProvider(projectPath).notifier);
+    kanbanViewModel.reorderColumns(columnId, newIndex);
+  }
+
+  /// Handle column drag started
+  void _onColumnDragStarted(BuildContext context, WidgetRef ref, String columnId) {
+    AppLogger.info('ProjectKanbanView: Started dragging column "$columnId"');
+    
+    // Get the kanban view model and call the start dragging method
+    final kanbanViewModel = ref.read(projectKanbanViewModelProvider(projectPath).notifier);
+    kanbanViewModel.startDraggingColumn(columnId);
+  }
+
+  /// Handle column drag ended
+  void _onColumnDragEnded(BuildContext context, WidgetRef ref) {
+    AppLogger.info('ProjectKanbanView: Ended dragging column');
+    
+    // Get the kanban view model and call the stop dragging method
+    final kanbanViewModel = ref.read(projectKanbanViewModelProvider(projectPath).notifier);
+    kanbanViewModel.stopDraggingColumn();
   }
 } 
