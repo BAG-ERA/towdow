@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task.dart';
 import 'task_item/task_item.dart';
 import 'utils/mobile_delayed_draggable.dart';
+import 'kanban_board/draggable_column_header.dart';
+import 'kanban_board/column_drop_zone.dart';
 
 class KanbanColumn {
   final String id;
@@ -42,6 +44,12 @@ class KanbanBoard extends ConsumerWidget {
   final double? height;
   final Widget? hiddenColumnsButton;
   final VoidCallback? onAddCategory;
+  // Column drag and drop callbacks
+  final Function(String, int)? onColumnMoved;
+  final String? draggingColumnId;
+  final bool isReorderingColumns;
+  final Function(String)? onColumnDragStarted;
+  final VoidCallback? onColumnDragEnded;
 
   const KanbanBoard({
     super.key,
@@ -55,15 +63,27 @@ class KanbanBoard extends ConsumerWidget {
     this.height,
     this.hiddenColumnsButton,
     this.onAddCategory,
+    this.onColumnMoved,
+    this.draggingColumnId,
+    this.isReorderingColumns = false,
+    this.onColumnDragStarted,
+    this.onColumnDragEnded,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scrollController = ScrollController();
     
-    return SizedBox(
-      height: height ?? MediaQuery.of(context).size.height * 0.7,
-      child: LayoutBuilder(
+    return GestureDetector(
+      onTap: () {
+        // Reset drag state when clicking anywhere on the board
+        if (isReorderingColumns) {
+          onColumnDragEnded?.call();
+        }
+      },
+      child: SizedBox(
+        height: height ?? MediaQuery.of(context).size.height * 0.7,
+        child: LayoutBuilder(
         builder: (context, constraints) {
           const targetColumnWidth = 360.0;
           const collapsedColumnWidth = 60.0;
@@ -122,21 +142,8 @@ class KanbanBoard extends ConsumerWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ...columns.map((column) => Padding(
-                        padding: const EdgeInsets.only(right: 12.0),
-                        child: SizedBox(
-                          width: column.isCollapsed ? collapsedColumnWidth : targetColumnWidth,
-                          child: KanbanColumnWidget(
-                            column: column,
-                            onTaskMoved: onTaskMoved,
-                            onTaskTap: onTaskTap,
-                            onTaskToggle: onTaskToggle,
-                            onTaskUpdated: onTaskUpdated,
-                            onTaskDeleted: onTaskDeleted,
-                            onColumnHide: onColumnHide,
-                          ),
-                        ),
-                      )),
+                      // Build columns with drop zones between them
+                      ..._buildColumnsWithDropZones(context),
                       if (hiddenColumnsButton != null) ...[
                         const SizedBox(width: 16),
                         SizedBox(
@@ -177,8 +184,91 @@ class KanbanBoard extends ConsumerWidget {
             ),
           );
         },
+        ),
       ),
     );
+  }
+
+  /// Build columns with drop zones between them for column reordering
+  List<Widget> _buildColumnsWithDropZones(BuildContext context) {
+    const targetColumnWidth = 360.0;
+    const collapsedColumnWidth = 60.0;
+    
+    // Get the kanban board height
+    final boardHeight = height ?? MediaQuery.of(context).size.height * 0.7;
+    
+    final widgets = <Widget>[];
+    
+    for (int i = 0; i < columns.length; i++) {
+      final column = columns[i];
+      
+      // Add drop zone before the first column
+      if (i == 0 && isReorderingColumns) {
+        widgets.add(
+          SizedBox(
+            height: boardHeight, // Match the kanban board height
+            child: ColumnDropZone(
+              dropIndex: 0,
+              isVisible: draggingColumnId != null,
+              onColumnDropped: onColumnMoved ?? (_, __) {},
+            ),
+          ),
+        );
+      }
+      
+      // Add the column
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(right: 12.0),
+          child: SizedBox(
+            width: column.isCollapsed ? collapsedColumnWidth : targetColumnWidth,
+            child: KanbanColumnWidget(
+              column: column,
+              onTaskMoved: onTaskMoved,
+              onTaskTap: onTaskTap,
+              onTaskToggle: onTaskToggle,
+              onTaskUpdated: onTaskUpdated,
+              onTaskDeleted: onTaskDeleted,
+              onColumnHide: onColumnHide,
+              draggingColumnId: draggingColumnId,
+              isReorderingColumns: isReorderingColumns,
+              onColumnDragStarted: onColumnDragStarted,
+              onColumnDragEnded: onColumnDragEnded,
+            ),
+          ),
+        ),
+      );
+      
+      // Add drop zone after each column (except the last one)
+      if (i < columns.length - 1 && isReorderingColumns) {
+        widgets.add(
+          SizedBox(
+            height: boardHeight, // Match the kanban board height
+            child: ColumnDropZone(
+              dropIndex: i + 1,
+              isVisible: draggingColumnId != null,
+              onColumnDropped: onColumnMoved ?? (_, __) {},
+            ),
+          ),
+        );
+      }
+    }
+    
+    // Add drop zone after the last column
+    if (columns.isNotEmpty && isReorderingColumns) {
+      widgets.add(
+        SizedBox(
+          height: boardHeight, // Match the kanban board height
+          child: ColumnDropZone(
+            dropIndex: columns.length,
+            isVisible: draggingColumnId != null,
+            onColumnDropped: onColumnMoved ?? (_, __) {},
+          ),
+        ),
+      );
+    }
+    
+    return widgets;
   }
 }
 
@@ -190,6 +280,10 @@ class KanbanColumnWidget extends ConsumerWidget {
   final Function(Task)? onTaskUpdated;
   final Function(Task)? onTaskDeleted;
   final Function(String)? onColumnHide;
+  final String? draggingColumnId;
+  final bool isReorderingColumns;
+  final Function(String)? onColumnDragStarted;
+  final VoidCallback? onColumnDragEnded;
 
   const KanbanColumnWidget({
     super.key,
@@ -200,6 +294,10 @@ class KanbanColumnWidget extends ConsumerWidget {
     this.onTaskUpdated,
     this.onTaskDeleted,
     this.onColumnHide,
+    this.draggingColumnId,
+    this.isReorderingColumns = false,
+    this.onColumnDragStarted,
+    this.onColumnDragEnded,
   });
 
   @override
@@ -220,96 +318,20 @@ class KanbanColumnWidget extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Column Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: column.color.withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: column.color.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(
-                    column.icon,
-                    color: column.color,
-                    size: 16,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        column.title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: column.color,
-                        ),
-                      ),
-                      Text(
-                        column.subtitle,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: column.color.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${column.tasks.length}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: column.color,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                if (column.id == 'uncategorized' && column.onToggleCollapse != null)
-                  IconButton(
-                    onPressed: column.onToggleCollapse,
-                    icon: Icon(
-                      Icons.keyboard_double_arrow_left,
-                      size: 16,
-                      color: column.color.withValues(alpha: 0.7),
-                    ),
-                    tooltip: 'Collapse column',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 24,
-                      minHeight: 24,
-                    ),
-                  )
-                else if (onColumnHide != null && column.id != 'uncategorized')
-                  IconButton(
-                    onPressed: () => onColumnHide!(column.id),
-                    icon: Icon(
-                      Icons.visibility_off_rounded,
-                      size: 16,
-                      color: column.color.withValues(alpha: 0.7),
-                    ),
-                    tooltip: 'Hide column',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 24,
-                      minHeight: 24,
-                    ),
-                  ),
-              ],
-            ),
+          DraggableColumnHeader(
+            columnId: column.id,
+            title: column.title,
+            subtitle: column.subtitle,
+            color: column.color,
+            icon: column.icon,
+            taskCount: column.tasks.length,
+            isCollapsed: column.isCollapsed,
+            onToggleCollapse: column.onToggleCollapse,
+            onColumnHide: onColumnHide,
+            isDragging: draggingColumnId == column.id,
+            isReorderingColumns: isReorderingColumns,
+            onDragStarted: onColumnDragStarted,
+            onDragEnded: () => onColumnDragEnded?.call(),
           ),
           
           // Tasks List
@@ -559,6 +581,7 @@ class KanbanColumnWidget extends ConsumerWidget {
       ),
     );
   }
+
 }
 
  
