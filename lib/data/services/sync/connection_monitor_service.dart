@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 import '../../../core/logger.dart';
 
 /// Connection status
@@ -27,7 +28,8 @@ class ConnectionMonitorService {
   
   // Configuration
   static const Duration _checkInterval = Duration(seconds: 10);
-  // Simple, interface-only connectivity check (no reachability probes)
+  static const Duration _httpTimeout = Duration(seconds: 3);
+  static const String _probeUrl = 'https://api.towdow.app/docs';
   
   /// Stream of connection status changes
   Stream<ConnectionStatus> get statusStream => _statusController.stream;
@@ -89,12 +91,37 @@ class ConnectionMonitorService {
       if (connectivityResults.contains(ConnectivityResult.none) || connectivityResults.isEmpty) {
         AppLogger.debug('ConnectionMonitorService: No network interface available');
         _updateStatus(ConnectionStatus.disconnected);
-      } else {
-        _updateStatus(ConnectionStatus.connected);
+        return;
       }
-    } catch (e) {
+      
+      // We have a network interface, verify actual internet reachability via HTTP probe
+      final hasInternet = await _hasInternetAccess();
+      if (hasInternet) {
+        _updateStatus(ConnectionStatus.connected);
+      } else {
+        _updateStatus(ConnectionStatus.disconnected);
+      }
+    } catch (e, st) {
       AppLogger.warning('ConnectionMonitorService: Failed to check connectivity: $e');
+      AppLogger.debug('ConnectionMonitorService: Stacktrace for connectivity check failure: $st');
       _updateStatus(ConnectionStatus.unknown);
+    }
+  }
+  
+  /// Performs a lightweight HTTP request to validate internet connectivity
+  Future<bool> _hasInternetAccess() async {
+    try {
+      final uri = Uri.parse(_probeUrl);
+      final response = await http.get(uri).timeout(_httpTimeout);
+      AppLogger.debug('ConnectionMonitorService: Probe response: ${response.statusCode}');
+      // Common captive portal check endpoints return 204 on success; accept 204 or any 2xx as online
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } on TimeoutException {
+      AppLogger.debug('ConnectionMonitorService: HTTP probe timed out');
+      return false;
+    } catch (e) {
+      AppLogger.debug('ConnectionMonitorService: HTTP probe failed: $e');
+      return false;
     }
   }
 
