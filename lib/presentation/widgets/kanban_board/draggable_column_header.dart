@@ -4,7 +4,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/logger.dart';
 
 class DraggableColumnHeader extends ConsumerWidget {
   final String columnId;
@@ -49,11 +48,9 @@ class DraggableColumnHeader extends ConsumerWidget {
       feedback: _buildDragFeedback(context),
       childWhenDragging: _buildDraggingPlaceholder(context),
       onDragStarted: () {
-        AppLogger.info('DraggableColumnHeader: Started dragging column "$columnId"');
         onDragStarted?.call(columnId);
       },
       onDragEnd: (details) {
-        AppLogger.info('DraggableColumnHeader: Ended dragging column "$columnId" - wasAccepted: ${details.wasAccepted}');
         onDragEnded?.call();
       },
       child: _buildNormalHeader(context),

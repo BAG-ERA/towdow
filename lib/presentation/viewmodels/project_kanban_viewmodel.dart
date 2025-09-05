@@ -422,7 +422,6 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
 
   /// Start dragging a column
   void startDraggingColumn(String columnId) {
-    AppLogger.info('ProjectKanbanViewModel: Starting to drag column "$columnId"');
     state = state.copyWith(
       draggingColumnId: columnId,
       isReorderingColumns: true,
@@ -431,7 +430,6 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
 
   /// Stop dragging a column
   void stopDraggingColumn() {
-    AppLogger.info('ProjectKanbanViewModel: Stopping column drag');
     state = state.copyWith(
       draggingColumnId: null,
       isReorderingColumns: false,
@@ -453,7 +451,6 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     state = state.copyWith(isSaving: true, error: null);
 
     try {
-      AppLogger.info('ProjectKanbanViewModel: Reordering columns - moving "$draggedColumnId" to index $newIndex');
 
       final currentKanban = state.selectedKanban!;
       final currentOrder = List<String>.from(currentKanban.orderedList);
@@ -462,8 +459,6 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
       final currentIndex = currentOrder.indexOf(draggedColumnId);
       
       if (currentIndex == -1) {
-        // Column not found in orderedList, add it at the specified position
-        AppLogger.info('ProjectKanbanViewModel: Column "$draggedColumnId" not found in current order, adding at index $newIndex');
         
         // Ensure the newIndex is within bounds
         final adjustedIndex = newIndex.clamp(0, currentOrder.length);
@@ -484,7 +479,6 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
       // Update the kanban
       await updateKanban(updatedKanban);
 
-      AppLogger.info('ProjectKanbanViewModel: Successfully reordered columns');
     } catch (e, stackTrace) {
       AppLogger.error('ProjectKanbanViewModel: Exception reordering columns', e, stackTrace);
       state = state.copyWith(

@@ -4,7 +4,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/logger.dart';
 
 class ColumnDropZone extends ConsumerWidget {
   final int dropIndex;
@@ -22,15 +21,10 @@ class ColumnDropZone extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return DragTarget<String>(
       onWillAcceptWithDetails: (details) {
-        AppLogger.debug('ColumnDropZone: Will accept column "${details.data}" at index $dropIndex');
         return true;
       },
       onAcceptWithDetails: (details) {
-        AppLogger.info('ColumnDropZone: Accepted column "${details.data}" at index $dropIndex');
         onColumnDropped(details.data, dropIndex);
-      },
-      onLeave: (data) {
-        AppLogger.debug('ColumnDropZone: Column "$data" left drop zone at index $dropIndex');
       },
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty;
