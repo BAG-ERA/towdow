@@ -27,6 +27,9 @@ abstract class ProjectKanbanState with _$ProjectKanbanState {
     String? error,
     String? projectPath,
     @Default([]) List<Category> availableCategories,
+    // Column drag and drop state
+    String? draggingColumnId,
+    @Default(false) bool isReorderingColumns,
   }) = _ProjectKanbanState;
 }
 
@@ -415,6 +418,74 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     
     // For other patterns, just return the original regex
     return currentRegex;
+  }
+
+  /// Start dragging a column
+  void startDraggingColumn(String columnId) {
+    state = state.copyWith(
+      draggingColumnId: columnId,
+      isReorderingColumns: true,
+    );
+  }
+
+  /// Stop dragging a column
+  void stopDraggingColumn() {
+    state = state.copyWith(
+      draggingColumnId: null,
+      isReorderingColumns: false,
+    );
+  }
+
+  /// Reorder columns by moving a column to a new position
+  Future<void> reorderColumns(String draggedColumnId, int newIndex) async {
+    if (state.projectPath == null) {
+      state = state.copyWith(error: 'No project selected');
+      return;
+    }
+
+    if (state.selectedKanban == null) {
+      AppLogger.warning('ProjectKanbanViewModel: No selected kanban for reordering');
+      return;
+    }
+
+    state = state.copyWith(isSaving: true, error: null);
+
+    try {
+
+      final currentKanban = state.selectedKanban!;
+      final currentOrder = List<String>.from(currentKanban.orderedList);
+      
+      // Find the current index of the dragged column
+      final currentIndex = currentOrder.indexOf(draggedColumnId);
+      
+      if (currentIndex == -1) {
+        
+        // Ensure the newIndex is within bounds
+        final adjustedIndex = newIndex.clamp(0, currentOrder.length);
+        currentOrder.insert(adjustedIndex, draggedColumnId);
+      } else {
+        // Column found, move it to the new position
+        // Remove the column from its current position
+        currentOrder.removeAt(currentIndex);
+        
+        // Insert it at the new position (adjust for removal)
+        final adjustedIndex = newIndex > currentIndex ? newIndex - 1 : newIndex;
+        currentOrder.insert(adjustedIndex, draggedColumnId);
+      }
+
+      // Create updated kanban with new order
+      final updatedKanban = currentKanban.copyWith(orderedList: currentOrder);
+
+      // Update the kanban
+      await updateKanban(updatedKanban);
+
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectKanbanViewModel: Exception reordering columns', e, stackTrace);
+      state = state.copyWith(
+        isSaving: false,
+        error: 'Failed to reorder columns: $e',
+      );
+    }
   }
 
   /// Clear any errors
