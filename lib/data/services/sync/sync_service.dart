@@ -427,11 +427,11 @@ class SyncService implements SyncCommander {
       success: (serverSyncToken) async {
         final localSyncToken = calendar.syncToken;
         
-        AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: ${localSyncToken}, Server: ${serverSyncToken}');
+        AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: ${localSyncToken}, Server: ${serverSyncToken} (displayName: ${calendar.displayName})');
         
         if (localSyncToken != serverSyncToken) {
           // Case 1: Sync token changed - get actual changes and apply them
-          AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing changes from server');
+          AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing changes from server (displayName: ${calendar.displayName})');
           await _syncFromServer(caldavTask, caldavProps, calendar, serverSyncToken, errors);
           return true;
         }
@@ -446,7 +446,7 @@ class SyncService implements SyncCommander {
             AppLogger.debug('🔄 SyncService:   ETags equal? ${calendar.etag == serverCalendar.etag}');
             
             if (calendar.etag != serverCalendar.etag) {
-              AppLogger.info('🔄 SyncService: ETag differs - updating calendar properties');
+              AppLogger.info('🔄 SyncService: ETag differs - updating calendar properties (displayName: ${calendar.displayName})');
               final updatedCalendar = calendar.copyWith(
                 etag: serverCalendar.etag,
                 lastSyncAt: DateTime.now(),
@@ -476,7 +476,7 @@ class SyncService implements SyncCommander {
                 },
               );
             } else {
-              AppLogger.debug('🔄 SyncService: ETags are equal - no update needed');
+              AppLogger.debug('🔄 SyncService: ETags are equal - no update needed (displayName: ${calendar.displayName})');
             }
           },
           failure: (failure) async {
