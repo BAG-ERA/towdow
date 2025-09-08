@@ -139,7 +139,7 @@ class CalDAVMonitor {
       try {
         final connectionStatus = _connectionMonitorService.currentStatus;
         if (connectionStatus != ConnectionStatus.connected) {
-          AppLogger.warning('CalDAVMonitor: No internet connection, skipping change monitoring');
+          AppLogger.warning('CalDAVMonitor: No internet connection, skipping change monitoring (current status: $connectionStatus)');
           _updateInterval(false); /// if no connexion update intervel
           return;
         }
