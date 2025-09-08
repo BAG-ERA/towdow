@@ -17,8 +17,8 @@ enum ConnectionStatus {
 class ConnectionMonitorService {
   final Connectivity _connectivity = Connectivity();
   
-  // State
-  ConnectionStatus _currentStatus = ConnectionStatus.unknown;
+  // State (start connected better getting a network error than being stuck while waiting for first connectivity check)
+  ConnectionStatus _currentStatus = ConnectionStatus.connected;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _connectivityCheckTimer;
   
