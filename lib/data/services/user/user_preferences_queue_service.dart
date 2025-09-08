@@ -235,10 +235,30 @@ class UserPreferencesQueueService {
   /// Get current queue from storage
   Future<List<UserPreferencesQueueItem>> _getQueue() async {
     try {
-      final result = await _localStorage.get<List<UserPreferencesQueueItem>>(_queueBoxName, _queueKey);
+      // Use dynamic to avoid generic cast issues from Hive returning List<dynamic>
+      final result = await _localStorage.get<dynamic>(_queueBoxName, _queueKey);
       return result.when(
-        success: (queue) => queue ?? [],
-        failure: (_) => [],
+        success: (raw) {
+          if (raw == null) return <UserPreferencesQueueItem>[];
+          if (raw is List<UserPreferencesQueueItem>) return raw;
+          if (raw is List) {
+            // Defensive conversion from List<dynamic> -> List<UserPreferencesQueueItem>
+            final items = <UserPreferencesQueueItem>[];
+            for (final e in raw) {
+              if (e is UserPreferencesQueueItem) {
+                items.add(e);
+              } else {
+                // Unknown element type; log once and skip
+                AppLogger.warning('UserPreferencesQueueService: Unexpected element type in queue list: ${e.runtimeType}');
+              }
+            }
+            return items;
+          }
+          // Unexpected type stored under the key; log and return empty
+          AppLogger.warning('UserPreferencesQueueService: Unexpected stored type for queue: ${raw.runtimeType}');
+          return <UserPreferencesQueueItem>[];
+        },
+        failure: (_) => <UserPreferencesQueueItem>[],
       );
     } catch (e) {
       AppLogger.warning('UserPreferencesQueueService: Failed to get queue, returning empty list: $e');
