@@ -82,11 +82,11 @@ class ConnectionMonitorService {
   /// Check actual internet connectivity
   Future<void> _checkConnectivity() async {
     try {
-      AppLogger.debug('ConnectionMonitorService: Checking connectivity...');
+      // AppLogger.debug('ConnectionMonitorService: Checking connectivity...');
       
       // First check if we have network interface connectivity
       final connectivityResults = await _connectivity.checkConnectivity();
-      AppLogger.debug('ConnectionMonitorService: Network interface results: $connectivityResults');
+      // AppLogger.debug('ConnectionMonitorService: Network interface results: $connectivityResults');
       
       if (connectivityResults.contains(ConnectivityResult.none) || connectivityResults.isEmpty) {
         AppLogger.debug('ConnectionMonitorService: No network interface available');
@@ -113,7 +113,7 @@ class ConnectionMonitorService {
     try {
       final uri = Uri.parse(_probeUrl);
       final response = await http.get(uri).timeout(_httpTimeout);
-      AppLogger.debug('ConnectionMonitorService: Probe response: ${response.statusCode}');
+      // AppLogger.debug('ConnectionMonitorService: Probe response: ${response.statusCode}');
       // Common captive portal check endpoints return 204 on success; accept 204 or any 2xx as online
       return response.statusCode >= 200 && response.statusCode < 300;
     } on TimeoutException {
