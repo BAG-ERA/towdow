@@ -134,6 +134,7 @@ class CalDAVMonitor {
     }
 
     _isPerformingMonitoring = true;
+    AppLogger.debug('CalDAVMonitor: start performMonitoring');
     try {
       // Check connection status first (defensive against unconfigured mocks)
       try {
@@ -170,7 +171,7 @@ class CalDAVMonitor {
                // If discovery added/updated calendars, trigger an immediate full sync
                if (calendarListChanged) {
                  try {
-                   AppLogger.info('CalDAVMonitor: Discovery detected changes - triggering immediate full sync');
+                   AppLogger.info('CalDAVMonitor: calendar list changed - triggering immediate full sync');
                    await _syncService.syncAllActiveCaldav();
                  } catch (e, st) {
                    AppLogger.warning('CalDAVMonitor: Failed to trigger full sync after discovery: $e');
@@ -178,7 +179,7 @@ class CalDAVMonitor {
                  }
                }
                else{
-                 AppLogger.debug('CalDAVMonitor: Discovery detected NO changes - skipping full sync');
+                 AppLogger.debug('CalDAVMonitor: calendar list not changed - skipping full sync');
                }
 
               // Run independent checks in parallel to speed up the cycle
@@ -235,6 +236,7 @@ class CalDAVMonitor {
       AppLogger.error('CalDAVMonitor: Change monitoring failed', e, stackTrace);
     } finally {
       _isPerformingMonitoring = false;
+      AppLogger.debug('CalDAVMonitor: end performMonitoring');
     }
   }
 
