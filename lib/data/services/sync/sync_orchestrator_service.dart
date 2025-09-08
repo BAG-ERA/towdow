@@ -299,8 +299,6 @@ class CalDAVMonitor {
         AppLogger.debug('CalDAVMonitor: Skipping user preferences S3 checks for custom provider');
         return false;
       }
-      // First, check and update shared projects from server
-      await _checkAndUpdateSharedProjects(account);
 
       // Get current local etag
       final localEtagResult = await _userRepository.getEtag();
