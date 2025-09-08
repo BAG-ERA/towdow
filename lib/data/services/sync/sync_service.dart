@@ -1249,6 +1249,12 @@ class SyncService implements SyncCommander {
         final tasksResult = await caldavTask.fetchTasks(calendar.path);
         await tasksResult.when(
           success: (remoteTasks) async {
+            // Log each fetched task details from server before saving
+            for (final t in remoteTasks) {
+              try {
+                AppLogger.debug("🔄 SyncService: fetched task from server: uid=${t.uid}, summary='${t.summary}', status=${t.status}, project=${calendar.path}");
+              } catch (_) {}
+            }
             for (final task in remoteTasks) {
               final taskWithCalendar = task.copyWith(projectPath: calendar.path);
               await _taskRepository.saveFromSync(taskWithCalendar);
@@ -1256,6 +1262,7 @@ class SyncService implements SyncCommander {
             AppLogger.debug('🔄 SyncService: Full sync completed - ${remoteTasks.length} tasks from ${calendar.path}');
           },
           failure: (failure) async {
+            AppLogger.warning('🔄 SyncService: Failed to fetch tasks from ${calendar.path}: ${failure.message}');
             errors.add('Failed to fetch tasks from ${calendar.path}: ${failure.message}');
           },
         );
@@ -1281,7 +1288,7 @@ class SyncService implements SyncCommander {
         await changesResult.when(
           success: (result) async {
             final changes = result['changes'] as List<dynamic>;
-            //AppLogger.debug('🔄 SyncService: Processing ${changes.length} changes from server');
+            AppLogger.debug('🔄 SyncService: Processing ${changes.length} changes from server');
             
             // Process each change
             for (final change in changes) {
@@ -1293,7 +1300,7 @@ class SyncService implements SyncCommander {
                 // Delete task or journal from local storage
                 await _deleteTaskByHref(href, calendar.path);
                 await _deleteJournalByHref(href, calendar.path);
-                //AppLogger.debug('🔄 SyncService: Deleted item $href');
+                AppLogger.debug('🔄 SyncService: Deleted remote item fetched from server (applied locally): href=$href, project=${calendar.path}');
               } else if (changeType == 'updated') {
                 // Check if it's a task or journal based on the data
                 if (changeMap.containsKey('task')) {
@@ -1302,7 +1309,7 @@ class SyncService implements SyncCommander {
                   final task = Task.fromJson(taskData);
                   final taskWithCalendar = task.copyWith(projectPath: calendar.path);
                   await _taskRepository.saveFromSync(taskWithCalendar);
-                  //AppLogger.debug('🔄 SyncService: Updated task ${task.uid}');
+                  AppLogger.debug("🔄 SyncService: updated task from server applied locally: uid=${task.uid}, summary='${task.summary}', status=${task.status}, project=${calendar.path}");
                 } else if (changeMap.containsKey('journal')) {
                   // Create or update journal in local storage
                   final journalData = changeMap['journal'] as Map<String, dynamic>;

@@ -243,12 +243,21 @@ class CalDAVService implements ICalDAVService {
     </C:comp-filter>
   </C:filter>
 </C:calendar-query>''';
-
+      AppLogger.debug("caldav_service fetch tasks for project $calendarPath");
       final reportResult = await _client.report(calendarPath, reportQuery);
       return await reportResult.when(
         success: (response) async {
           if (response.statusCode == 207) {
             final tasks = VTODOParser.parseTasksFromResponse(response.body);
+            AppLogger.debug("caldav_service fetched ${tasks.length} tasks for project $calendarPath");
+            // Log each fetched task for additional visibility
+            for (final t in tasks) {
+              try {
+                AppLogger.debug("caldav_service task fetched: uid=${t.uid}, summary='${t.summary}', status=${t.status}");
+              } catch (_) {
+                // Defensive: ignore logging errors
+              }
+            }
             // AppLogger.info('CalDAVService: Fetched ${tasks.length} tasks');
             return Result.success(tasks);
           } else {
