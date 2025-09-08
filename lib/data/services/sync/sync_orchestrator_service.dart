@@ -134,7 +134,8 @@ class CalDAVMonitor {
     }
 
     _isPerformingMonitoring = true;
-    AppLogger.debug('CalDAVMonitor: start performMonitoring');
+    final DateTime monitoringStart = DateTime.now();
+    AppLogger.debug('CalDAVMonitor: start performMonitoring at ${monitoringStart.toIso8601String()}');
     try {
       // Check connection status first (defensive against unconfigured mocks)
       try {
@@ -236,7 +237,9 @@ class CalDAVMonitor {
       AppLogger.error('CalDAVMonitor: Change monitoring failed', e, stackTrace);
     } finally {
       _isPerformingMonitoring = false;
-      AppLogger.debug('CalDAVMonitor: end performMonitoring');
+      final DateTime monitoringEnd = DateTime.now();
+      final Duration elapsed = monitoringEnd.difference(monitoringStart);
+      AppLogger.debug('CalDAVMonitor: end performMonitoring after ${elapsed.inMilliseconds}ms (started at ${monitoringStart.toIso8601String()}, ended at ${monitoringEnd.toIso8601String()})');
     }
   }
 
