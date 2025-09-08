@@ -623,7 +623,6 @@ class UserSyncService {
       'enableNotifications': preferences.enableNotifications,
       'defaultProjectView': preferences.defaultProjectView,
       'customSettings': preferences.customSettings,
-      'excludedProjects': preferences.excludedProjects,
       'userPrincipal': preferences.userPrincipal,
       'sharedWithMeProjects': preferences.sharedWithMeProjects.map((project) => {
         'projectId': project.projectId,
@@ -659,7 +658,6 @@ class UserSyncService {
       enableNotifications: json['enableNotifications'] as bool?,
       defaultProjectView: json['defaultProjectView'] as String?,
       customSettings: json['customSettings'] as Map<String, dynamic>?,
-      excludedProjects: (json['excludedProjects'] as List<dynamic>?)?.cast<String>() ?? [],
       userPrincipal: json['userPrincipal'] as String?,
       sharedWithMeProjects: sharedProjects,
     );

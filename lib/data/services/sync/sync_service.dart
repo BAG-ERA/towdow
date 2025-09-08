@@ -1,4 +1,4 @@
-﻿// Sync service for bidirectional synchronization between local storage and CalDAV
+// Sync service for bidirectional synchronization between local storage and CalDAV
 // Implements offline-first architecture with sync queue
 
 import 'dart:async';
@@ -308,19 +308,8 @@ class SyncService implements SyncCommander {
         },
       );
       
-      // Filter out excluded calendars based on user preferences
-      final userPrefsResult = await _userRepository.getUserPreferences();
-      final calendarsToSync = await userPrefsResult.when(
-        success: (prefs) async {
-          final filtered = allCalendars.where((calendar) => prefs.shouldSyncProject(calendar.path)).toList();
-          AppLogger.info('SyncService: Syncing ${filtered.length} of ${allCalendars.length} available calendars (${prefs.excludedProjects.length} excluded)');
-          return filtered;
-        },
-        failure: (failure) async {
-          AppLogger.warning('SyncService: Failed to get user preferences, syncing all calendars: ${failure.message}');
-          return allCalendars; // Fallback: sync all if can't get preferences
-        },
-      );
+      // Sync all calendars regardless of user preferences (removed per new requirement)
+      final calendarsToSync = allCalendars;
       
       if (calendarsToSync.isEmpty) {
         AppLogger.warning('SyncService: No calendars available for sync.');

@@ -20,10 +20,6 @@ abstract class UserRepository {
   Future<Result<void>> removeProjectFromOrder(String projectUid);
   Future<Result<void>> reorderProject(String projectUid, int newIndex);
   
-  // Project sync management (exclude/include approach)
-  Future<Result<void>> excludeProject(String projectPath);
-  Future<Result<void>> includeProject(String projectPath);
-  
   // Shared projects management
   Future<Result<void>> acknowledgeSharedProject(String projectId);
   Future<Result<void>> updateSharedWithMeProjects(List<SharedWithMeProject> projects);
@@ -196,32 +192,6 @@ class LocalUserRepository implements UserRepository {
     );
   }
 
-  // Legacy syncedProjects methods removed - use excludedProjects instead
-  // All projects sync by default now, use excludeProject/includeProject instead
-  
-  @override
-  Future<Result<void>> excludeProject(String projectPath) async {
-    final prefsResult = await getUserPreferences();
-    return await prefsResult.when(
-      success: (prefs) async {
-        final updatedPrefs = prefs.excludeProject(projectPath);
-        return await saveUserPreferences(updatedPrefs);
-      },
-      failure: (failure) async => Result.failure(failure),
-    );
-  }
-
-  @override
-  Future<Result<void>> includeProject(String projectPath) async {
-    final prefsResult = await getUserPreferences();
-    return await prefsResult.when(
-      success: (prefs) async {
-        final updatedPrefs = prefs.includeProject(projectPath);
-        return await saveUserPreferences(updatedPrefs);
-      },
-      failure: (failure) async => Result.failure(failure),
-    );
-  }
 
   @override
   Stream<UserPreferences> watchUserPreferences() async* {

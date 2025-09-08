@@ -371,7 +371,7 @@ class CalDAVMonitor {
             // Check if we have local preferences that should be uploaded
             final localPrefsResult = await _userRepository.getUserPreferences();
             final hasLocalPrefs = localPrefsResult.when(
-              success: (prefs) => prefs.projectOrder.isNotEmpty || prefs.excludedProjects.isNotEmpty,
+              success: (prefs) => prefs.projectOrder.isNotEmpty,
               failure: (_) => false,
             );
             
@@ -579,21 +579,14 @@ class CalDAVMonitor {
     }
     AppLogger.info('CalDAVMonitor: Calendar discovery complete - $addedCount added, $existingCount already existed');
 
-    // Ensure newly added calendars are included for sync and visible in project order by default
+    // Ensure newly added calendars are visible in project order by default (sync is now for all projects)
     if (newlyAddedPaths.isNotEmpty) {
       try {
         final prefsResult = await _userRepository.getUserPreferences();
         await prefsResult.when(
           success: (prefs) async {
             var updated = prefs;
-            // Remove from excluded list if present
-            for (final path in newlyAddedPaths) {
-              if (!updated.shouldSyncProject(path)) {
-                updated = updated.includeProject(path);
-                AppLogger.info('CalDAVMonitor: Included newly discovered project in sync: $path');
-              }
-            }
-            // Append to project order for visibility
+            // Append to project order for visibility only
             final currentOrder = [...updated.projectOrder];
             for (final path in newlyAddedPaths) {
               if (!currentOrder.contains(path)) {
@@ -602,10 +595,10 @@ class CalDAVMonitor {
             }
             updated = updated.copyWith(projectOrder: currentOrder);
             await _userRepository.saveUserPreferences(updated);
-            AppLogger.info('CalDAVMonitor: Updated user preferences for ${newlyAddedPaths.length} newly discovered projects');
+            AppLogger.info('CalDAVMonitor: Updated user preferences project order for ${newlyAddedPaths.length} newly discovered projects');
           },
           failure: (failure) async {
-            AppLogger.warning('CalDAVMonitor: Could not load user preferences to include new calendars: ${failure.message}');
+            AppLogger.warning('CalDAVMonitor: Could not load user preferences to update project order: ${failure.message}');
           },
         );
       } catch (e, st) {
@@ -668,17 +661,15 @@ class CalDAVMonitor {
             }
           } catch (_) {}
 
-          // Update user preferences to remove missing calendars from project order/excluded lists
+          // Update user preferences to remove missing calendars from project order
           try {
             final prefsResult = await _userRepository.getUserPreferences();
             await prefsResult.when(
               success: (prefs) async {
                 final updatedOrder = prefs.projectOrder.where((p) => discoveredPaths.contains(p)).toList();
-                final updatedExcluded = prefs.excludedProjects.where((p) => discoveredPaths.contains(p)).toList();
-                if (updatedOrder.length != prefs.projectOrder.length || updatedExcluded.length != prefs.excludedProjects.length) {
+                if (updatedOrder.length != prefs.projectOrder.length) {
                   final updatedPrefs = prefs.copyWith(
                     projectOrder: updatedOrder,
-                    excludedProjects: updatedExcluded,
                   );
                   await _userRepository.saveUserPreferences(updatedPrefs);
                   AppLogger.info('CalDAVMonitor: Updated user preferences after removing missing calendars');
