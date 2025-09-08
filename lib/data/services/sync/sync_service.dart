@@ -1,4 +1,4 @@
-// Sync service for bidirectional synchronization between local storage and CalDAV
+﻿// Sync service for bidirectional synchronization between local storage and CalDAV
 // Implements offline-first architecture with sync queue
 
 import 'dart:async';
@@ -1216,7 +1216,7 @@ class SyncService implements SyncCommander {
   /// Sync changes from server using sync-collection REPORT
   Future<void> _syncFromServer(CalDavTaskService caldavTask, CalDavPropertiesService caldavProps, TaskCalendar calendar, String newSyncToken, List<String> errors) async {
     try {
-      //AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
+      AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
       
       // Use CalDAVMonitor logic for incremental sync
       final webdavClient = WebDAVClient.fromAccount(caldavTask.account);
