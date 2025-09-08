@@ -52,6 +52,24 @@ The current status is:
 
 ## local development
 
+### cursor configuration
+
+Configuration for Cursor are found in [mvvm.mdc](.cursor/rules/mvvm.mdc)
+
+### Junie configuration
+
+Junie (the autonomous assistant used in this repo) looks for its configuration files in the following location within this project:
+
+- Directory: .junie/rules/
+- Active example: .junie/rules/guidelines.md
+
+Guidelines files are plain Markdown with a YAML front matter block at the top. This repo uses:
+
+- globs: a list of file patterns the rule applies to (e.g., "**/*.dart", "**/*.md")
+- alwaysApply: when true, Junie applies the rule automatically without needing explicit selection
+
+Note: .junie/guidelines.md is only a pointer indicating that guidelines have been relocated to .junie/rules/guidelines.md.
+
 ### Web
 
 When running flutter in your browser for local test (ex. ```flutter run -d chrome```) you MUST authorise the origin in KeyCloak to prevent CORS errors.

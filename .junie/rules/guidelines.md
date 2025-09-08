@@ -1,6 +1,8 @@
 ---
 description: Junie MVVM Guidelines for TowDow Flutter project (inspired by Cursor rules)
 globs:
+  - "**/*.dart"
+  - "**/*.md"
 alwaysApply: true
 ---
 Purpose
@@ -38,7 +40,7 @@ Testing
 - Unit tests: Cover ViewModels, Services, and Repositories. Test individual methods’ logic.
 - Widget tests: Cover Views, routing, and dependency injection wiring.
 - Fakes: Provide fake implementations for repositories/services to enable deterministic tests.
-- run the tests with: ```flutter test```
+- Run the tests with: flutter test
 
 Codebase rules
 - Minimal dependencies: Prefer Flutter Material and stdlib; avoid unnecessary packages.
