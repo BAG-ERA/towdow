@@ -177,22 +177,41 @@ class CalDAVMonitor {
                    AppLogger.debug('CalDAVMonitor: Stack: $st');
                  }
                }
+               else{
+                 AppLogger.debug('CalDAVMonitor: Discovery detected NO changes - skipping full sync');
+               }
 
-              // Process queued operations
-              changesDetected |= await _processQueuedOperations();
-              
-              // Process user preferences queue
-              changesDetected |= await _processUserPreferencesQueue();
-              
-              // Check for changes in user preferences
-              changesDetected |= await _checkUserPreferencesChanges(account);
-              
-              // Check for changes in external accounts
-              changesDetected |= await _checkExternalAccountChanges(account);
-              
-              // Check for changes in shared projects (now simplified since calendars already exist)
-              changesDetected |= await _checkAndUpdateSharedProjects(account);
-                        
+              // Run independent checks in parallel to speed up the cycle
+              try {
+                final futures = <Future<bool>>[
+                  _processQueuedOperations(),
+                  _processUserPreferencesQueue(),
+                  _checkUserPreferencesChanges(account),
+                  _checkExternalAccountChanges(account),
+                  _checkAndUpdateSharedProjects(account),
+                ];
+                final results = await Future.wait(
+                  futures.map((f) async {
+                    try {
+                      return await f;
+                    } catch (e, st) {
+                      AppLogger.warning('CalDAVMonitor: Parallel task failed: $e');
+                      AppLogger.debug('CalDAVMonitor: Parallel task stack: $st');
+                      return false;
+                    }
+                  }).toList(),
+                  eagerError: false,
+                );
+                // Aggregate results
+                for (final r in results) {
+                  changesDetected |= r;
+                }
+              } catch (e, st) {
+                // Should not happen due to per-task try/catch, but keep defensive logging
+                AppLogger.warning('CalDAVMonitor: Parallel checks encountered an error: $e');
+                AppLogger.debug('CalDAVMonitor: Stack: $st');
+              }
+
               // Update interval based on changes detected
               _updateInterval(changesDetected);
               
