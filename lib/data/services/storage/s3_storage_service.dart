@@ -178,7 +178,7 @@ class S3StorageService {
         final sub = jwtPayload['sub'] as String?;
         if (exp != null) {
           final expiryTime = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
-          AppLogger.debug('S3StorageService._getStsCredentials: JWT sub=$sub, expires at $expiryTime');
+          // AppLogger.debug('S3StorageService._getStsCredentials: JWT sub=$sub, expires at $expiryTime');
           if (DateTime.now().isAfter(expiryTime)) {
             AppLogger.warning('S3StorageService._getStsCredentials: JWT token appears expired! Current time: ${DateTime.now()}');
           }
@@ -189,11 +189,11 @@ class S3StorageService {
 
       // Use query parameters approach like in sample code
       final stsUrl = Uri.parse('$_s3Endpoint?Action=AssumeRoleWithWebIdentity&WebIdentityToken=$accessToken&Version=2011-06-15&DurationSeconds=3600');
-      AppLogger.debug('S3StorageService._getStsCredentials: Making STS request to $stsUrl');
+      // AppLogger.debug('S3StorageService._getStsCredentials: Making STS request to $stsUrl');
 
       final response = await http.post(stsUrl).timeout(Duration(seconds: 30));
 
-      AppLogger.debug('S3StorageService._getStsCredentials: STS response status: ${response.statusCode}');
+      // AppLogger.debug('S3StorageService._getStsCredentials: STS response status: ${response.statusCode}');
 
       if (response.statusCode != 200) {
         AppLogger.error('S3StorageService._getStsCredentials: STS request failed with status ${response.statusCode}');
@@ -201,7 +201,7 @@ class S3StorageService {
         return Result.failure(Failure(message: 'STS request failed: ${response.statusCode} ${response.body}'));
       }
 
-      AppLogger.debug('S3StorageService._getStsCredentials: Parsing STS XML response');
+      // AppLogger.debug('S3StorageService._getStsCredentials: Parsing STS XML response');
       
       // Parse XML response
       final document = XmlDocument.parse(response.body);
@@ -214,11 +214,11 @@ class S3StorageService {
       
       final expiration = DateTime.parse(expirationStr);
       
-      AppLogger.debug('S3StorageService._getStsCredentials: STS credentials parsed successfully, expires at $expiration');
+      // AppLogger.debug('S3StorageService._getStsCredentials: STS credentials parsed successfully, expires at $expiration');
       
       // Parse JWT to get file size limits
       final jwtPayload = _parseJwtPayload(accessToken);
-      AppLogger.debug('S3StorageService._getStsCredentials: JWT payload extracted for file limits');
+      // AppLogger.debug('S3StorageService._getStsCredentials: JWT payload extracted for file limits');
       
       return Result.success(S3Credentials(
         accessKeyId: accessKeyId,
@@ -243,11 +243,11 @@ class S3StorageService {
   Map<String, dynamic> _parseJwtPayload(String token) {
     try {
       // DEBUG: Log token details for diagnosis
-      AppLogger.debug('S3StorageService._parseJwtPayload: Token length: ${token.length}');
-      AppLogger.debug('S3StorageService._parseJwtPayload: Token starts with: ${token.length > 20 ? token.substring(0, 20) : token}...');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: Token length: ${token.length}');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: Token starts with: ${token.length > 20 ? token.substring(0, 20) : token}...');
       
       final parts = token.split('.');
-      AppLogger.debug('S3StorageService._parseJwtPayload: JWT parts count: ${parts.length}');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: JWT parts count: ${parts.length}');
       
       if (parts.length != 3) {
         AppLogger.warning('S3StorageService._parseJwtPayload: Invalid JWT - expected 3 parts, got ${parts.length}');
@@ -255,7 +255,7 @@ class S3StorageService {
       }
       
       final payload = parts[1];
-      AppLogger.debug('S3StorageService._parseJwtPayload: Payload part length: ${payload.length}');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: Payload part length: ${payload.length}');
       
       // Remove any existing padding and add correct padding
       String normalizedPayload = payload.replaceAll('=', '');
@@ -266,8 +266,8 @@ class S3StorageService {
       final jsonStr = utf8.decode(decoded);
       
       final claims = json.decode(jsonStr) as Map<String, dynamic>;
-      AppLogger.debug('S3StorageService._parseJwtPayload: Successfully parsed JWT with ${claims.keys.length} claims');
-      AppLogger.debug('S3StorageService._parseJwtPayload: Claims keys: ${claims.keys.toList()}');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: Successfully parsed JWT with ${claims.keys.length} claims');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: Claims keys: ${claims.keys.toList()}');
       
       return claims;
     } catch (e, stackTrace) {
