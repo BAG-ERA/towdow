@@ -27,8 +27,8 @@ class ConnectionMonitorService {
   final _connectionRestoredController = StreamController<void>.broadcast();
   
   // Configuration
-  static const Duration _checkInterval = Duration(seconds: 10);
-  static const Duration _httpTimeout = Duration(seconds: 3);
+  static const Duration _checkInterval = Duration(seconds: 60);
+  static const Duration _httpTimeout = Duration(seconds: 10);
   static const String _probeUrl = 'https://api.towdow.app/docs';
   
   /// Stream of connection status changes
