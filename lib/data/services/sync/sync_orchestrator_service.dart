@@ -159,16 +159,16 @@ class CalDAVMonitor {
             return;
           }
 
-          bool discoveryChanges = await _discoverAndEnsureAllCalendars(account);
+          bool calendarListChanged = await _discoverAndEnsureAllCalendars(account);
           
           // Get all calendars to monitor (now includes all discovered calendars)
           final calendarsResult = await _calendarRepository.getProjectCalendars();
           await calendarsResult.when(
             success: (calendars) async {
-              bool changesDetected = discoveryChanges; // Include discovery changes
+              bool changesDetected = calendarListChanged; // Include discovery changes
               
                // If discovery added/updated calendars, trigger an immediate full sync
-               if (discoveryChanges) {
+               if (calendarListChanged) {
                  try {
                    AppLogger.info('CalDAVMonitor: Discovery detected changes - triggering immediate full sync');
                    await _syncService.syncAllActiveCaldav();
