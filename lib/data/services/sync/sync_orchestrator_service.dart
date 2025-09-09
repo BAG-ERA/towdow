@@ -161,35 +161,33 @@ class CalDAVMonitor {
             return;
           }
 
-          bool calendarListChanged = await _discoverAndEnsureAllCalendars(account);
-          
+          // 1. Update the calendar list from server (add, remove calendars if needed)
+          bool changesDetected = await _syncService.updateCalendarList(account);
+          // 2. synchronize all calendars from server,
+          // this MUST be done before queue processing to handle orphan in queues (e.g. project deleted or unshared)
           // Get all calendars to monitor (now includes all discovered calendars)
           final calendarsResult = await _calendarRepository.getProjectCalendars();
           await calendarsResult.when(
             success: (calendars) async {
-              bool changesDetected = calendarListChanged; // Include discovery changes
-              
-               // If discovery added/updated calendars, trigger an immediate full sync
-               if (calendarListChanged) {
-                 try {
-                   AppLogger.info('CalDAVMonitor: calendar list changed - triggering immediate full sync');
-                   await _syncService.syncAllActiveCaldav();
-                 } catch (e, st) {
-                   AppLogger.warning('CalDAVMonitor: Failed to trigger full sync after discovery: $e');
-                   AppLogger.debug('CalDAVMonitor: Stack: $st');
-                 }
-               }
-               else{
-                 AppLogger.debug('CalDAVMonitor: calendar list not changed - skipping full sync');
-               }
-
-              // Run independent checks in parallel to speed up the cycle
+              try {
+                await _syncService.syncAllActiveCaldav();
+              } catch (e, st) {
+                AppLogger.warning('CalDAVMonitor: Failed to trigger full sync after calendar list update: $e');
+                AppLogger.debug('CalDAVMonitor: Stack: $st');
+              }
+              // Run other synchro (upload / download) in parallel to speed up the cycle
               try {
                 final futures = <Future<bool>>[
+                  // push action done locally
                   _processQueuedOperations(),
+                  // push local changes in user preferences
                   _processUserPreferencesQueue(),
+                  // get remote changes for user preferences
                   _checkUserPreferencesChanges(account),
+                  // add missing upload of externalAccount local changes (rename to integration)
+                  // get remote changes for external accounts
                   _checkExternalAccountChanges(account),
+                  // get remotes for project shared with me (local changes have been handled in processQueue as for owned calendars)
                   _checkAndUpdateSharedProjects(account),
                 ];
                 final results = await Future.wait(
@@ -495,7 +493,7 @@ class CalDAVMonitor {
           AppLogger.warning('CalDAVMonitor: Could not get remote etag for external credentials: ${failure.message}');
         },
       );
-      
+
       return anyChanges;
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVMonitor: Failed to check external account changes', e, stackTrace);
@@ -503,214 +501,6 @@ class CalDAVMonitor {
     }
   }
 
-  /// Discover all available calendars and ensure they exist locally
-  /// This ensures shared projects and all other accessible projects are available for sync
-  Future<bool> _discoverAndEnsureAllCalendars(CaldavAccount account) async {
-    try {
-      AppLogger.info('CalDAVMonitor: Discovering all available calendars from server');
-      
-      // Use DI CalDAV service if available to test connection and list calendars
-      if (_ref != null) {
-        final caldav = _ref.read(caldavServiceProvider(account));
-        final capabilitiesResult = await caldav.testConnection();
-        return await capabilitiesResult.when(
-          success: (capabilities) async {
-            final availableCalendars = capabilities.taskCalendars;
-            AppLogger.info('CalDAVMonitor: Server has ${availableCalendars.length} available calendars');
-            return await _ensureCalendarsExist(availableCalendars);
-          },
-          failure: (f) async {
-            AppLogger.error('CalDAVMonitor: Failed to discover calendars: ${f.message}');
-            return false;
-          },
-        );
-      }
-      // Fallback to discovery service
-      final discovery = CalDavDiscoveryService(account: account);
-      final capabilitiesResult = await discovery.testConnection();
-      
-      return await capabilitiesResult.when(
-        success: (capabilities) async {
-          return _ensureCalendarsExist(capabilities.taskCalendars);
-        },
-        failure: (failure) async {
-          AppLogger.error('CalDAVMonitor: Failed to discover calendars: ${failure.message}');
-          return false;
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('CalDAVMonitor: Exception during calendar discovery', e, stackTrace);
-      return false;
-    }
-  }
-
-  Future<bool> _ensureCalendarsExist(List<TaskCalendar> availableCalendars) async {
-    // Ensure all discovered calendars exist in local repository
-    int addedCount = 0;
-    int existingCount = 0;
-    final newlyAddedPaths = <String>[];
-    for (final serverCalendar in availableCalendars) {
-      final pendingDeletion = await _syncService.hasPendingDeletionForCalendar(serverCalendar.path);
-      if (pendingDeletion) {
-        AppLogger.info('CalDAVMonitor: Skipping discovered calendar pending deletion: ${serverCalendar.path}');
-        continue;
-      }
-      final existingCalendarResult = await _calendarRepository.getByPath(serverCalendar.path);
-      await existingCalendarResult.when(
-        success: (existingCalendar) async {
-          if (existingCalendar == null) {
-            final saveResult = await _calendarRepository.save(serverCalendar);
-            saveResult.when(
-              success: (_) {
-                addedCount++;
-                AppLogger.info('CalDAVMonitor: Added discovered calendar: ${serverCalendar.displayName}');
-                newlyAddedPaths.add(serverCalendar.path);
-              },
-              failure: (failure) {
-                AppLogger.warning('CalDAVMonitor: Failed to save discovered calendar ${serverCalendar.displayName}: ${failure.message}');
-              },
-            );
-          } else {
-            existingCount++;
-            if (existingCalendar.etag != serverCalendar.etag) {
-              final updatedCalendar = existingCalendar.copyWith(
-                displayName: serverCalendar.displayName,
-                description: serverCalendar.description,
-                etag: serverCalendar.etag,
-                lastModified: DateTime.now(),
-              );
-              await _calendarRepository.save(updatedCalendar);
-              AppLogger.debug('CalDAVMonitor: Updated existing calendar: ${serverCalendar.displayName}');
-            }
-          }
-        },
-        failure: (_) async {
-          final saveResult = await _calendarRepository.save(serverCalendar);
-          saveResult.when(
-            success: (_) {
-              addedCount++;
-              AppLogger.info('CalDAVMonitor: Added discovered calendar (after lookup error): ${serverCalendar.displayName}');
-              newlyAddedPaths.add(serverCalendar.path);
-            },
-            failure: (failure) {
-              AppLogger.warning('CalDAVMonitor: Failed to save discovered calendar ${serverCalendar.displayName}: ${failure.message}');
-            },
-          );
-        },
-      );
-    }
-    AppLogger.info('CalDAVMonitor: Calendar discovery complete - $addedCount added, $existingCount already existed');
-
-    // Ensure newly added calendars are visible in project order by default (sync is now for all projects)
-    if (newlyAddedPaths.isNotEmpty) {
-      try {
-        final prefsResult = await _userRepository.getUserPreferences();
-        await prefsResult.when(
-          success: (prefs) async {
-            var updated = prefs;
-            // Append to project order for visibility only
-            final currentOrder = [...updated.projectOrder];
-            for (final path in newlyAddedPaths) {
-              if (!currentOrder.contains(path)) {
-                currentOrder.add(path);
-              }
-            }
-            updated = updated.copyWith(projectOrder: currentOrder);
-            await _userRepository.saveUserPreferences(updated);
-            AppLogger.info('CalDAVMonitor: Updated user preferences project order for ${newlyAddedPaths.length} newly discovered projects');
-          },
-          failure: (failure) async {
-            AppLogger.warning('CalDAVMonitor: Could not load user preferences to update project order: ${failure.message}');
-          },
-        );
-      } catch (e, st) {
-        AppLogger.warning('CalDAVMonitor: Failed to update preferences for new calendars: $e');
-        AppLogger.debug('CalDAVMonitor: Stack: $st');
-      }
-    }
-    // Remove calendars that disappeared from discovery (owned projects only)
-    try {
-      await _removeCalendarsMissingFromDiscovery(availableCalendars);
-    } catch (e, st) {
-      AppLogger.warning('CalDAVMonitor: Failed to remove calendars missing from discovery: $e');
-      AppLogger.debug('CalDAVMonitor: Stack: $st');
-    }
-    return addedCount > 0;
-  }
-
-  /// Remove locally stored calendars that are no longer returned by discovery.
-  /// Only applies to owned projects. Shared-with-me removals are handled by
-  /// _checkAndUpdateSharedProjects using ShareService API semantics.
-  Future<void> _removeCalendarsMissingFromDiscovery(List<TaskCalendar> availableCalendars) async {
-    try {
-      final discoveredPaths = availableCalendars.map((c) => c.path).toSet();
-      final localResult = await _calendarRepository.getProjectCalendars();
-      await localResult.when(
-        success: (localCalendars) async {
-          final toRemove = localCalendars
-              .where((c) => !discoveredPaths.contains(c.path))
-              .toList();
-
-          if (toRemove.isEmpty) {
-            return;
-          }
-
-          AppLogger.info('CalDAVMonitor: ${toRemove.length} local calendars not present in discovery');
-
-          // For owned calendars, just unsync locally. Shared-with-me calendars are removed via share flow.
-          for (final calendar in toRemove) {
-            if (calendar.isSharedWithMe) {
-              // Skip here; handled by _checkAndUpdateSharedProjects
-              AppLogger.debug('CalDAVMonitor: Skipping shared-with-me calendar missing from discovery: ${calendar.path}');
-              continue;
-            }
-            AppLogger.info('CalDAVMonitor: Unsyncing disappeared owned calendar: ${calendar.path}');
-            final res = await _calendarRepository.unsyncCalendar(calendar.path);
-            res.when(
-              success: (_) => AppLogger.debug('CalDAVMonitor: Unsynced ${calendar.path}'),
-              failure: (f) => AppLogger.warning('CalDAVMonitor: Failed to unsync ${calendar.path}: ${f.message}'),
-            );
-          }
-
-          // Cleanup orphaned tasks referencing calendars that are not in discovery
-          try {
-            if (_taskRepository != null) {
-              final cleanup = await _taskRepository!.deleteOrphanedTasksLocalOnly(discoveredPaths);
-            cleanup.when(
-              success: (_) => AppLogger.info('CalDAVMonitor: Cleaned up orphaned tasks for missing calendars'),
-              failure: (f) => AppLogger.warning('CalDAVMonitor: Failed to cleanup orphaned tasks: ${f.message}'),
-            );
-            }
-          } catch (_) {}
-
-          // Update user preferences to remove missing calendars from project order
-          try {
-            final prefsResult = await _userRepository.getUserPreferences();
-            await prefsResult.when(
-              success: (prefs) async {
-                final updatedOrder = prefs.projectOrder.where((p) => discoveredPaths.contains(p)).toList();
-                if (updatedOrder.length != prefs.projectOrder.length) {
-                  final updatedPrefs = prefs.copyWith(
-                    projectOrder: updatedOrder,
-                  );
-                  await _userRepository.saveUserPreferences(updatedPrefs);
-                  AppLogger.info('CalDAVMonitor: Updated user preferences after removing missing calendars');
-                }
-              },
-              failure: (f) async {
-                AppLogger.warning('CalDAVMonitor: Could not load user preferences to update removed calendars: ${f.message}');
-              },
-            );
-          } catch (_) {}
-        },
-        failure: (failure) async {
-          AppLogger.warning('CalDAVMonitor: Failed to load local calendars for removal check: ${failure.message}');
-        },
-      );
-    } catch (e, stackTrace) {
-      AppLogger.error('CalDAVMonitor: Exception while removing calendars missing from discovery', e, stackTrace);
-    }
-  }
 
   /// Check and update shared projects from server
   Future<bool> _checkAndUpdateSharedProjects(CaldavAccount account) async {
