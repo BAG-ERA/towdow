@@ -378,6 +378,9 @@ class CalDAVMonitor {
             
             return true;
           }
+          else{
+            AppLogger.debug('CalDAVMonitor: User preferences etags match, no sync needed');
+          }
           
           return false;
         },
