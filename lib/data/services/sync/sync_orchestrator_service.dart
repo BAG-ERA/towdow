@@ -180,13 +180,8 @@ class CalDAVMonitor {
                 final futures = <Future<bool>>[
                   // push action done locally
                   _processQueuedOperations(),
-                  // push local changes in user preferences
-                  _processUserPreferencesQueue(),
-                  // get remote changes for user preferences
-                  _checkUserPreferencesChanges(account),
-                  // add missing upload of externalAccount local changes (rename to integration)
-                  // get remote changes for external accounts
-                  _checkExternalAccountChanges(account),
+                  _checkAndUpdateUserPreferences(account),
+                  _checkAndUpdateExternalAccounts(account),
                   // get remotes for project shared with me (local changes have been handled in processQueue as for owned calendars)
                   _checkAndUpdateSharedProjects(account),
                 ];
@@ -241,6 +236,12 @@ class CalDAVMonitor {
     }
   }
 
+  Future<bool> _checkAndUpdateUserPreferences(CaldavAccount account) async {
+    // push local changes in user preferences
+    await _processUserPreferencesQueue();
+    // get remote changes for user preferences
+    return await _checkUserPreferencesChanges(account);
+  }
   /// Process queued operations if connection is available
   Future<bool> _processQueuedOperations() async {
     try {
@@ -259,6 +260,12 @@ class CalDAVMonitor {
       AppLogger.error('CalDAVMonitor: Queue processing failed', e, stackTrace);
       return false;
     }
+  }
+
+  Future<bool> _checkAndUpdateExternalAccounts(CaldavAccount account) async {
+    // add missing upload of externalAccount local changes (rename to integration)
+    // get remote changes for external accounts
+    return await _checkExternalAccountChanges(account);
   }
 
   /// Process user preferences queue
