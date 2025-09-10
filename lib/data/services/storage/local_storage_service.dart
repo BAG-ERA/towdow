@@ -33,6 +33,8 @@ class LocalStorageService {
   
   // User preferences queue box
   static const String userPreferencesQueueBoxName = 'user_preferences_queue'; // For storing user preferences queue items
+  // External account queue box
+  static const String externalAccountQueueBoxName = 'external_account_queue'; // For storing external account queue items
 
   // Box references
   late Box _tasksBox;
@@ -57,6 +59,8 @@ class LocalStorageService {
   
   // User preferences queue box reference
   late Box _userPreferencesQueueBox;
+  // External account queue box reference
+  late Box _externalAccountQueueBox;
 
   // Initialize all Hive boxes
   Future<Result<void>> initialize() async {
@@ -110,6 +114,7 @@ class LocalStorageService {
       await _initializeBoxSafely(statusesBoxName, 'statuses');
       await _initializeBoxSafely(userPreferencesBoxName, 'user_preferences');
       await _initializeBoxSafely(userPreferencesQueueBoxName, 'user_preferences_queue');
+      await _initializeBoxSafely(externalAccountQueueBoxName, 'external_account_queue');
       
       // Initialize external calendar boxes
       await _initializeBoxSafely(externalAccountsBoxName, 'external_accounts');
@@ -132,6 +137,7 @@ class LocalStorageService {
       _statusesBox = Hive.box(statusesBoxName);
       _userPreferencesBox = Hive.box(userPreferencesBoxName);
       _userPreferencesQueueBox = Hive.box(userPreferencesQueueBoxName);
+      _externalAccountQueueBox = Hive.box(externalAccountQueueBoxName);
       
       // Assign external calendar boxes
       _externalAccountsBox = Hive.box(externalAccountsBoxName);
@@ -224,6 +230,7 @@ class LocalStorageService {
         offlineFilesBoxName,
         fileUploadQueueBoxName,
         userPreferencesQueueBoxName,
+        externalAccountQueueBoxName,
       ];
 
       for (final boxName in boxNames) {
@@ -412,6 +419,7 @@ class LocalStorageService {
       await clear(statusesBoxName);
       await clear(userPreferencesBoxName);
       await clear(userPreferencesQueueBoxName);
+      await clear(externalAccountQueueBoxName);
       
       // Clear external calendar data
       await clear(externalAccountsBoxName);
@@ -450,6 +458,7 @@ class LocalStorageService {
         statusesBoxName,
         userPreferencesBoxName,
         userPreferencesQueueBoxName,
+        externalAccountQueueBoxName,
         externalAccountsBoxName,
         externalCalendarsBoxName,
         externalEventsBoxName,
@@ -519,6 +528,8 @@ class LocalStorageService {
         return _userPreferencesBox;
       case userPreferencesQueueBoxName:
         return _userPreferencesQueueBox;
+      case externalAccountQueueBoxName:
+        return _externalAccountQueueBox;
       case externalAccountsBoxName:
         return _externalAccountsBox;
       case externalCalendarsBoxName:

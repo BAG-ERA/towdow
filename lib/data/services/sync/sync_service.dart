@@ -333,8 +333,13 @@ class SyncService implements SyncCommander {
               }
             }
             updated = updated.copyWith(projectOrder: currentOrder);
-            await _userRepository.saveUserPreferences(updated);
-            AppLogger.info('CalDAVMonitor: Updated user preferences project order for ${newlyAddedPaths.length} newly discovered projects');
+            if (prefs.etag == null) {
+              await _userRepository.saveUserPreferencesWithoutSync(updated);
+              AppLogger.info('CalDAVMonitor: Updated project order during initial bootstrap (no local ETag) without triggering upload');
+            } else {
+              await _userRepository.saveUserPreferences(updated);
+              AppLogger.info('CalDAVMonitor: Updated user preferences project order for ${newlyAddedPaths.length} newly discovered projects');
+            }
           },
           failure: (failure) async {
             AppLogger.warning('CalDAVMonitor: Could not load user preferences to update project order: ${failure.message}');
@@ -408,8 +413,13 @@ class SyncService implements SyncCommander {
                   final updatedPrefs = prefs.copyWith(
                     projectOrder: updatedOrder,
                   );
-                  await _userRepository.saveUserPreferences(updatedPrefs);
-                  AppLogger.info('CalDAVMonitor: Updated user preferences after removing missing calendars');
+                  if (prefs.etag == null) {
+                    await _userRepository.saveUserPreferencesWithoutSync(updatedPrefs);
+                    AppLogger.info('CalDAVMonitor: Updated project order during initial bootstrap (no local ETag) without triggering upload');
+                  } else {
+                    await _userRepository.saveUserPreferences(updatedPrefs);
+                    AppLogger.info('CalDAVMonitor: Updated user preferences after removing missing calendars');
+                  }
                 }
               },
               failure: (f) async {

@@ -79,11 +79,15 @@ class LocalUserRepository implements UserRepository {
 
   @override
   Future<Result<void>> saveUserPreferences(UserPreferences preferences) async {
+    // Mark local modification with a local ETag so uploads are triggered and downloads don't overwrite blindly
+    final localEtag = 'local-${DateTime.now().millisecondsSinceEpoch}';
+    final toSave = preferences.copyWith(etag: localEtag);
+
     // Save to local storage
     final result = await _storageService.put(
       LocalStorageService.userPreferencesBoxName,
       _userPreferencesKey,
-      preferences,
+      toSave,
     );
     
     // Queue for upload instead of direct upload
@@ -91,13 +95,13 @@ class LocalUserRepository implements UserRepository {
       success: (_) async {
         // Use queue callback if available, otherwise use direct service
         if (_queueCallback != null) {
-          await _queueCallback!(preferences);
-          AppLogger.debug('LocalUserRepository: User preferences saved locally and queued for upload via callback');
+          await _queueCallback!(toSave);
+          AppLogger.debug('LocalUserRepository: User preferences saved locally (etag set: $localEtag) and queued for upload via callback');
         } else if (_userPreferencesQueueService != null) {
-          await _userPreferencesQueueService.queueUserPreferencesUpdate(preferences);
-          AppLogger.debug('LocalUserRepository: User preferences saved locally and queued for upload via service');
+          await _userPreferencesQueueService.queueUserPreferencesUpdate(toSave);
+          AppLogger.debug('LocalUserRepository: User preferences saved locally (etag set: $localEtag) and queued for upload via service');
         } else {
-          AppLogger.debug('LocalUserRepository: User preferences saved locally only (no queue available)');
+          AppLogger.debug('LocalUserRepository: User preferences saved locally only (etag set: $localEtag, no queue available)');
         }
       },
       failure: (_) async {

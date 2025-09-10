@@ -26,6 +26,7 @@ import '../../models/task_calendar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../user/user_sync_service.dart';
 import '../user/user_preferences_queue_service.dart';
+import '../user/external_account_queue_service.dart';
 import '../share/share_service.dart';
 
 class CalDAVMonitor {
@@ -40,6 +41,7 @@ class CalDAVMonitor {
   final SyncService _syncService;
   final UserSyncService _userSyncService;
   final UserPreferencesQueueService _userPreferencesQueueService;
+  final ExternalAccountQueueService _externalAccountQueueService;
   // Optional Ref for DI families
   final Ref? _ref;
 
@@ -67,6 +69,7 @@ class CalDAVMonitor {
     required SyncService syncService,
     required UserSyncService userSyncService,
     required UserPreferencesQueueService userPreferencesQueueService,
+    required ExternalAccountQueueService externalAccountQueueService,
     TaskRepository? taskRepository,
   })  : _ref = ref,
         _accountRepository = accountRepository,
@@ -77,7 +80,8 @@ class CalDAVMonitor {
         _connectionMonitorService = connectionMonitorService,
         _syncService = syncService,
         _userSyncService = userSyncService,
-        _userPreferencesQueueService = userPreferencesQueueService;
+        _userPreferencesQueueService = userPreferencesQueueService,
+        _externalAccountQueueService = externalAccountQueueService;
 
   /// Start monitoring with dynamic interval
   Future<Result<void>> start() async {
@@ -242,6 +246,7 @@ class CalDAVMonitor {
     // get remote changes for user preferences
     return await _checkUserPreferencesChanges(account);
   }
+  
   /// Process queued operations if connection is available
   Future<bool> _processQueuedOperations() async {
     try {
@@ -263,7 +268,7 @@ class CalDAVMonitor {
   }
 
   Future<bool> _checkAndUpdateExternalAccounts(CaldavAccount account) async {
-    // add missing upload of externalAccount local changes (rename to integration)
+    await _processExternalAccountQueue();
     // get remote changes for external accounts
     return await _checkExternalAccountChanges(account);
   }
@@ -282,6 +287,19 @@ class CalDAVMonitor {
     }
   }
 
+  /// Process external account queue
+  Future<bool> _processExternalAccountQueue() async {
+    try {
+      final result = await _externalAccountQueueService.processQueue();
+      return result.when(
+        success: (_) => true,
+        failure: (_) => false,
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVMonitor: External account queue processing failed', e, stackTrace);
+      return false;
+    }
+  }
 
 
   /// Update interval based on whether changes were detected
@@ -348,9 +366,7 @@ class CalDAVMonitor {
       final remoteEtagResult = await s3Service.getCurrentEtag(key: key, isPrivate: true);
       return await remoteEtagResult.when(
         success: (remoteEtag) async {
-          AppLogger.debug('CalDAVMonitor: User preferences etag comparison:');
-          AppLogger.debug('  Local etag:  ${localEtag ?? "(null)"}');
-          AppLogger.debug('  Remote etag: ${remoteEtag ?? "(null)"}');
+          AppLogger.debug('CalDAVMonitor: User preferences etag comparison: Local etag:  ${localEtag ?? "(null)"}, Remote etag: ${remoteEtag ?? "(null)"}');
           
           if (localEtag != remoteEtag) {
             AppLogger.info('CalDAVMonitor: User preferences etags differ, triggering download');
@@ -362,7 +378,7 @@ class CalDAVMonitor {
                 AppLogger.debug('CalDAVMonitor: Remote file last modified: ${fileInfo.lastModified}');
                 
                 // Use injected UserSyncService instead of creating a new instance
-                final downloadResult = await _userSyncService.downloadUserData();
+                final downloadResult = await _userSyncService.downloadUserPreferences();
                 await downloadResult.when(
                   success: (hasData) async {
                     if (hasData) {
@@ -409,7 +425,7 @@ class CalDAVMonitor {
               AppLogger.info('CalDAVMonitor: Found local preferences, triggering upload to server');
               
               // Trigger upload of local preferences
-              final uploadResult = await _userSyncService.uploadUserData();
+              final uploadResult = await _userSyncService.uploadUserPreferences();
               await uploadResult.when(
                 success: (_) async {
                   AppLogger.info('CalDAVMonitor: Successfully uploaded local user preferences to server');
@@ -460,10 +476,7 @@ class CalDAVMonitor {
       
       await remoteEtagResult.when(
         success: (remoteEtag) async {
-          AppLogger.debug('CalDAVMonitor: External credentials etag comparison:');
-          AppLogger.debug('  Local etag:  ${localEtag ?? "(null)"}');
-          AppLogger.debug('  Remote etag: ${remoteEtag ?? "(null)"}');
-          
+          AppLogger.debug('CalDAVMonitor: External credentials etag comparison: Local etag:  ${localEtag ?? "(null)"}, Remote etag: ${remoteEtag ?? "(null)"}');
           if (localEtag != remoteEtag) {
             AppLogger.info('CalDAVMonitor: External credentials etags differ, triggering download');
             
@@ -474,7 +487,7 @@ class CalDAVMonitor {
                 AppLogger.debug('CalDAVMonitor: Remote credentials file last modified: ${fileInfo.lastModified}');
                 
                 // Use injected UserSyncService instead of creating a new instance
-                final downloadResult = await _userSyncService.downloadUserData();
+                final downloadResult = await _userSyncService.downloadExternalCredentials();
                 await downloadResult.when(
                   success: (hasData) async {
                     if (hasData) {
@@ -619,7 +632,7 @@ class CalDAVMonitor {
                   projectOrder: updatedProjectOrder,
                 );
                 
-                await _userRepository.saveUserPreferences(updatedPrefs);
+                await _userRepository.saveUserPreferencesWithoutSync(updatedPrefs);
                 AppLogger.info('CalDAVMonitor: Updated user preferences with ${newSharedProjects.length} shared projects and updated active lists');
                 
                 // Note: Calendar activation removed - projectOrder is UI state only

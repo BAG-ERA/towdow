@@ -210,7 +210,7 @@ class UserPreferencesQueueService {
       
       switch (item.operation) {
         case UserPreferencesOperation.upload:
-          final result = await _userSyncService.uploadUserData();
+          final result = await _userSyncService.uploadUserPreferences();
           return result.when(
             success: (_) {
               AppLogger.debug('UserPreferencesQueueService: Successfully processed upload item ${item.id}');

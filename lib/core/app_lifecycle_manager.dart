@@ -250,13 +250,12 @@ class AppLifecycleManager {
           success: (acc) async {
             final enableUserSync = acc != null && acc.providerType == 'towdow_cloud';
             if (enableUserSync) {
-              AppLogger.debug('AppLifecycleManager: Starting UserSyncService periodic sync');
-              _userSyncService!.startPeriodicSync(interval: const Duration(hours: 2)); // Check every 2 hours for user data updates
+              // Periodic user sync removed (handled by SyncOrchestrator/ConnectionMonitor)
 
               // Fetch shared projects on startup
               AppLogger.debug('AppLifecycleManager: Fetching shared projects on startup');
               try {
-                final sharedProjectsResult = await _userSyncService!.updateSharedProjects();
+                final sharedProjectsResult = await _userSyncService!.updateSharedProjects(duringDownload: true);
                 sharedProjectsResult.when(
                   success: (_) {
                     AppLogger.info('AppLifecycleManager: Shared projects fetched successfully on startup');
@@ -431,7 +430,7 @@ class AppLifecycleManager {
       // Update shared projects when app resumes
       if (_userSyncService != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Updating shared projects on app resume');
-        _userSyncService!.updateSharedProjects().then((result) {
+        _userSyncService!.updateSharedProjects(duringDownload: true).then((result) {
           result.when(
             success: (_) {
               // AppLogger.debug('AppLifecycleManager: Shared projects updated successfully on app resume');

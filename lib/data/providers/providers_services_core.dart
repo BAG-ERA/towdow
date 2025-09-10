@@ -18,6 +18,7 @@ import '../services/sync/connection_monitor_service.dart';
 import '../services/sync/sync_orchestrator_service.dart';
 import '../services/sync/sync_service.dart';
 import '../services/user/user_preferences_queue_service.dart';
+import '../services/user/external_account_queue_service.dart';
 import '../services/user/user_sync_service.dart';
 import '../services/user/users_api_service.dart';
 import '../services/share/share_service.dart';
@@ -214,6 +215,14 @@ final userPreferencesQueueServiceProvider = Provider<UserPreferencesQueueService
   );
 });
 
+final externalAccountQueueServiceProvider = Provider<ExternalAccountQueueService>((ref) {
+  return ExternalAccountQueueService(
+    externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
+    userSyncService: ref.watch(userSyncServiceProvider),
+    localStorage: ref.watch(localStorageServiceProvider),
+  );
+});
+
 final userPreferencesQueueSetupProvider = Provider<void>((ref) {
   final userRepository = ref.watch(userRepositoryProvider);
   final userPreferencesQueueService = ref.watch(userPreferencesQueueServiceProvider);
@@ -380,6 +389,7 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
   final syncService = ref.watch(syncServiceProvider);
   final userSyncService = ref.watch(userSyncServiceProvider);
   final userPreferencesQueueService = ref.watch(userPreferencesQueueServiceProvider);
+  final externalAccountQueueService = ref.watch(externalAccountQueueServiceProvider);
 
   AppLogger.debug('Providers: Creating CalDAVMonitor with injected UserSyncService');
 
@@ -394,6 +404,7 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
     syncService: syncService,
     userSyncService: userSyncService,
     userPreferencesQueueService: userPreferencesQueueService,
+    externalAccountQueueService: externalAccountQueueService,
     taskRepository: taskRepository,
   );
 });

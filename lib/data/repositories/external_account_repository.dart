@@ -73,12 +73,21 @@ class LocalExternalAccountRepository implements ExternalAccountRepository {
 
   @override
   Future<Result<void>> save(ExternalCaldavAccount account) async {
-    return await _storageService.put(_boxName, account.id, account);
+    // Save account
+    final res = await _storageService.put(_boxName, account.id, account);
+    // Mark local modification by setting a local credentials file ETag so next upload is triggered
+    final localEtag = 'local-${DateTime.now().millisecondsSinceEpoch}';
+    await _storageService.put<String?>(_boxName, 'credentials_file_etag', localEtag);
+    return res;
   }
 
   @override
   Future<Result<void>> delete(String id) async {
-    return await _storageService.delete(_boxName, id);
+    final res = await _storageService.delete(_boxName, id);
+    // Mark local modification by setting a local credentials file ETag so next upload is triggered
+    final localEtag = 'local-${DateTime.now().millisecondsSinceEpoch}';
+    await _storageService.put<String?>(_boxName, 'credentials_file_etag', localEtag);
+    return res;
   }
 
   @override
