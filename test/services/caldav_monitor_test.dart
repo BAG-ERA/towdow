@@ -123,6 +123,18 @@ void main() {
           .thenAnswer((_) async => const Result.success(false));
       when(mockUserSyncService.uploadUserData())
           .thenAnswer((_) async => const Result.success(null));
+      // Provide default stubs for SyncService methods invoked by CalDAVMonitor
+      when(mockSyncService.updateCalendarList(any))
+          .thenAnswer((_) async => false);
+      when(mockSyncService.syncAllActiveCaldav()).thenAnswer(
+        (_) async => Result.success(SyncResult(
+          success: true,
+          syncedItems: 0,
+          failedItems: 0,
+          errors: const [],
+          syncTime: DateTime(2024, 1, 1),
+        )),
+      );
 
       // Default connection status to connected unless overridden per test
       when(mockConnectionMonitorService.currentStatus)

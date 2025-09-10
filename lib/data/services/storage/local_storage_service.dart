@@ -68,8 +68,19 @@ class LocalStorageService {
       // AppLogger.info('LocalStorageService: Initializing Hive boxes');
 
 
-      // In test environment, Hive is already initialized
-      if (!Hive.isBoxOpen(tasksBoxName)) {
+      // In tests or when Hive was initialized earlier, avoid overriding the Hive home path.
+      // We detect prior initialization by checking if any known adapter was registered.
+      final bool hiveLikelyInitialized = (() {
+        try {
+          // CaldavAccountAdapter is registered in tests and app bootstrap.
+          final temp = CaldavAccountAdapter();
+          return Hive.isAdapterRegistered(temp.typeId);
+        } catch (_) {
+          return false;
+        }
+      })();
+
+      if (!hiveLikelyInitialized) {
         // Initialize Hive with a platform-specific path
         if (kIsWeb) {
           await Hive.initFlutter();
@@ -81,7 +92,7 @@ class LocalStorageService {
             final home = Platform.environment['HOME'] ?? Directory.current.path;
             baseDir = Directory(path.join(home, '.local', 'share', 'towdow'));
           } else if (Platform.isWindows) {
-            // Use AppData\Roaming\TowDow (Application Support)
+            // Use AppData\\Roaming\\TowDow (Application Support)
             final appSupport = await getApplicationSupportDirectory();
             baseDir = Directory(path.join(appSupport.path, 'TowDow'));
           } else if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
@@ -99,7 +110,6 @@ class LocalStorageService {
           AppLogger.info('LocalStorageService: Using directory: ${towdowDir.path}');
           Hive.init(towdowDir.path);
         }
-
       }
       
       // Try to open boxes, but handle corrupted data gracefully
