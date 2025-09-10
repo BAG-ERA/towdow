@@ -108,7 +108,34 @@ class ExternalCalendarViewModel extends StateNotifier<ExternalCalendarState> {
     try {
       final updated = calendar.copyWith(color: color, lastModified: DateTime.now());
       final result = await _calendarRepository.save(updated);
-      result.when(success: (_) {}, failure: (f) => state = state.copyWith(error: f.message));
+      await result.when(
+        success: (_) async {
+          // Touch the owning external account to mark a local change and enqueue external credentials upload
+          try {
+            final accountId = updated.accountId;
+            if (accountId != null && accountId.isNotEmpty) {
+              final accRes = await _accountRepository.getById(accountId);
+              await accRes.when(
+                success: (acc) async {
+                  if (acc != null) {
+                    // Benign update to ensure persistence and trigger side-effects (queue upload)
+                    final touched = acc.copyWith(lastSyncAt: DateTime.now());
+                    await _accountRepository.save(touched);
+                  }
+                },
+                failure: (_) async {
+                  // Ignore account touch failure; calendar color was saved already
+                },
+              );
+            }
+          } catch (_) {
+            // Swallow errors from account touching to avoid breaking UI flow
+          }
+        },
+        failure: (f) async {
+          state = state.copyWith(error: f.message);
+        },
+      );
     } catch (e, st) {
       AppLogger.error('ExternalCalendarVM: updateCalendarColor failed', e, st);
       state = state.copyWith(error: e.toString());

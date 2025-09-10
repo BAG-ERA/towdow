@@ -703,9 +703,9 @@ class UserSyncService {
               failure: (_) => null,
             );
             
-            // Save each account (no longer need to save individual etags)
+            // Save each account from server without triggering local upload side-effects
             for (final account in accounts) {
-              await _externalAccountRepository.save(account);
+              await _externalAccountRepository.saveWithoutSync(account);
             }
             
             // Save each calendar

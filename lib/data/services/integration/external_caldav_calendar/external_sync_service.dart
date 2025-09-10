@@ -155,7 +155,7 @@ class ExternalCalendarSyncService {
             syncErrorCount: 0,
             lastSyncError: null,
           );
-          await _accountRepository.save(updatedAccount);
+          await _accountRepository.saveWithoutSync(updatedAccount);
           
           AppLogger.info('ExternalCalendarSyncService: Successfully synced account ${account.id}');
           return const Result.success(null);
@@ -175,7 +175,7 @@ class ExternalCalendarSyncService {
           syncErrorCount: account.syncErrorCount + 1,
           lastSyncError: e.toString(),
         );
-        await _accountRepository.save(updatedAccount);
+        await _accountRepository.saveWithoutSync(updatedAccount);
       } catch (updateError) {
         AppLogger.warning('ExternalCalendarSyncService: Failed to update account error status: $updateError');
       }
