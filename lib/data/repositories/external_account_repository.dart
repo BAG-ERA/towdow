@@ -75,18 +75,72 @@ class LocalExternalAccountRepository implements ExternalAccountRepository {
   Future<Result<void>> save(ExternalCaldavAccount account) async {
     // Save account
     final res = await _storageService.put(_boxName, account.id, account);
-    // Mark local modification by setting a local credentials file ETag so next upload is triggered
-    final localEtag = 'local-${DateTime.now().millisecondsSinceEpoch}';
-    await _storageService.put<String?>(_boxName, 'credentials_file_etag', localEtag);
+    // Mark local modification: clear global credentials file ETag to force next upload
+    await _storageService.put<String?>(_boxName, 'credentials_file_etag', null);
+    // Enqueue an external credentials upload so it gets pushed promptly
+    final queueItem = <String, dynamic>{
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'op': 'upload',
+      'createdAt': DateTime.now().toIso8601String(),
+      'retry': 0,
+      'next': null,
+    };
+    // Read current queue, append, and save back
+    final queueRes = await _storageService.get<List<dynamic>>(LocalStorageService.externalAccountQueueBoxName, 'queue_items');
+    final currentQueue = queueRes.when(
+      success: (raw) {
+        final list = <Map<String, dynamic>>[];
+        if (raw != null) {
+          for (final e in raw) {
+            if (e is Map) {
+              final map = <String, dynamic>{};
+              e.forEach((k, v) => map[k.toString()] = v);
+              list.add(map);
+            }
+          }
+        }
+        return list;
+      },
+      failure: (_) => <Map<String, dynamic>>[],
+    );
+    currentQueue.add(queueItem);
+    await _storageService.put<List<Map<String, dynamic>>>(LocalStorageService.externalAccountQueueBoxName, 'queue_items', currentQueue);
     return res;
   }
 
   @override
   Future<Result<void>> delete(String id) async {
     final res = await _storageService.delete(_boxName, id);
-    // Mark local modification by setting a local credentials file ETag so next upload is triggered
-    final localEtag = 'local-${DateTime.now().millisecondsSinceEpoch}';
-    await _storageService.put<String?>(_boxName, 'credentials_file_etag', localEtag);
+    // Mark local modification: clear global credentials file ETag to force next upload
+    await _storageService.put<String?>(_boxName, 'credentials_file_etag', null);
+    // Enqueue an external credentials upload so it gets pushed promptly
+    final queueItem = <String, dynamic>{
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'op': 'upload',
+      'createdAt': DateTime.now().toIso8601String(),
+      'retry': 0,
+      'next': null,
+    };
+    // Read current queue, append, and save back
+    final queueRes = await _storageService.get<List<dynamic>>(LocalStorageService.externalAccountQueueBoxName, 'queue_items');
+    final currentQueue = queueRes.when(
+      success: (raw) {
+        final list = <Map<String, dynamic>>[];
+        if (raw != null) {
+          for (final e in raw) {
+            if (e is Map) {
+              final map = <String, dynamic>{};
+              e.forEach((k, v) => map[k.toString()] = v);
+              list.add(map);
+            }
+          }
+        }
+        return list;
+      },
+      failure: (_) => <Map<String, dynamic>>[],
+    );
+    currentQueue.add(queueItem);
+    await _storageService.put<List<Map<String, dynamic>>>(LocalStorageService.externalAccountQueueBoxName, 'queue_items', currentQueue);
     return res;
   }
 
