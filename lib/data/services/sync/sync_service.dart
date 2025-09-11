@@ -639,7 +639,7 @@ class SyncService implements SyncCommander {
       success: (serverSyncToken) async {
         final localSyncToken = calendar.syncToken;
         
-        AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: ${localSyncToken}, Server: ${serverSyncToken} (displayName: ${calendar.displayName})');
+        AppLogger.debug('🔄 SyncService: sync-token changed: ${localSyncToken != serverSyncToken}, Calendar ${calendar.path} - Local: ${localSyncToken}, Server: ${serverSyncToken} (displayName: ${calendar.displayName})');
         
         if (localSyncToken != serverSyncToken) {
           // Case 1: Sync token changed - get actual changes and apply them
@@ -652,13 +652,10 @@ class SyncService implements SyncCommander {
         final serverPropertiesResult = await caldavProps.getCalendarProperties(calendar);
         await serverPropertiesResult.when(
           success: (serverCalendar) async {
-            AppLogger.debug('🔄 SyncService: ETag comparison for ${calendar.path}:');
-            AppLogger.debug('🔄 SyncService:   Local ETag: ${calendar.etag ?? "(null)"}');
-            AppLogger.debug('🔄 SyncService:   Server ETag: ${serverCalendar.etag ?? "(null)"}');
-            AppLogger.debug('🔄 SyncService:   ETags equal? ${calendar.etag == serverCalendar.etag}');
+            AppLogger.debug('🔄 SyncService: ETag comparison, ETags equal? ${calendar.etag == serverCalendar.etag}, for ${calendar.path} (displayName: ${calendar.displayName}): Local ETag: ${calendar.etag ?? "(null)"}, Server ETag: ${serverCalendar.etag ?? "(null)"}');
             
             if (calendar.etag != serverCalendar.etag) {
-              AppLogger.info('🔄 SyncService: ETag differs - updating calendar properties (displayName: ${calendar.displayName})');
+              AppLogger.info('🔄 SyncService: ETag differs - updating calendar ${calendar.path} properties (displayName: ${calendar.displayName})');
               final updatedCalendar = calendar.copyWith(
                 etag: serverCalendar.etag,
                 lastSyncAt: DateTime.now(),
@@ -681,18 +678,19 @@ class SyncService implements SyncCommander {
               final saveResult = await _calendarRepository.save(updatedCalendar);
               await saveResult.when(
                 success: (_) async {
-                  AppLogger.info('🔄 SyncService: Calendar ${calendar.path} ETag updated successfully');
+                  AppLogger.info('🔄 SyncService: Calendar ${calendar.path} (${calendar.displayName}) ETag updated successfully');
                 },
                 failure: (failure) async {
-                  AppLogger.error('🔄 SyncService: Failed to save ETag update: ${failure.message}');
+                  AppLogger.error('🔄 SyncService: Failed to save ETag update for ${calendar.path} (displayName: ${calendar.displayName}): ${failure.message}');
                 },
               );
-            } else {
-              AppLogger.debug('🔄 SyncService: ETags are equal - no update needed (displayName: ${calendar.displayName})');
             }
+            // else {
+            //   AppLogger.debug('🔄 SyncService: ETags are equal - no update needed ${calendar.path} (displayName: ${calendar.displayName})');
+            // }
           },
           failure: (failure) async {
-            AppLogger.warning('🔄 SyncService: Could not get server properties: ${failure.message}');
+            AppLogger.warning('🔄 SyncService: Could not get server properties for ${calendar.path} (displayName: ${calendar.displayName}): ${failure.message}');
           },
         );
         
@@ -749,21 +747,21 @@ class SyncService implements SyncCommander {
                   },
                 );
               } else {
-                AppLogger.info('🔄 SyncService: Server sync token unchanged after queue processing');
+                AppLogger.info('🔄 SyncService: Server sync token unchanged after queue processing ${calendar.path} ${calendar.displayName}');
               }
             },
             failure: (failure) async {
-              AppLogger.warning('🔄 SyncService: Could not get updated sync token after push: ${failure.message}');
+              AppLogger.warning('🔄 SyncService: Could not get updated sync token after push ${calendar.path} ${calendar.displayName}: ${failure.message}');
             },
           );
           return true;
         }
-        
+
         // Si aucun des deux tests n'est vrai, rien à faire
-        if (localSyncToken == serverSyncToken) {
-          //AppLogger.debug('🔄 SyncService: No changes needed for ${calendar.path}');
-        }
-        
+        // if (localSyncToken == serverSyncToken) {
+        //   AppLogger.debug('🔄 SyncService: No changes needed for ${calendar.path} ${calendar.displayName}');
+        // }
+
         return true;
       },
       failure: (failure) async {
