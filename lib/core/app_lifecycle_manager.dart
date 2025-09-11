@@ -89,7 +89,7 @@ class AppLifecycleManager {
       // Always start external calendar sync service (independent of main account)
       if (_externalSyncService != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting ExternalCalendarSyncService (always)');
-        _externalSyncService!.startBackgroundSync();
+        _externalSyncService!.startExternalAccountBackgroundSync();
         AppLogger.info('AppLifecycleManager: ExternalCalendarSyncService started successfully (independent)');
       }
 
@@ -489,7 +489,7 @@ class AppLifecycleManager {
         // Since we don't have direct access to _syncTimer, we'll periodically restart it
         // This is safer than checking the sync flag which is only true during active sync
         try {
-          _externalSyncService!.startBackgroundSync(); // This will cancel existing timer and restart
+          _externalSyncService!.startExternalAccountBackgroundSync(); // This will cancel existing timer and restart
           // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Ensured external calendar sync service is running');
         } catch (e) {
           AppLogger.warning('AppLifecycleManager: Failed to ensure external calendar sync is running: $e');

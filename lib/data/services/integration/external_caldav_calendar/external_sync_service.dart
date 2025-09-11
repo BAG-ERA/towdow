@@ -28,7 +28,7 @@ class ExternalCalendarSyncService {
   );
 
   /// Start background sync with specified interval
-  void startBackgroundSync({Duration interval = const Duration(minutes: 5)}) {
+  void startExternalAccountBackgroundSync({Duration interval = const Duration(minutes: 5)}) {
     AppLogger.info('ExternalCalendarSyncService: Starting background sync with interval: ${interval.inMinutes} minutes');
     
     _syncTimer?.cancel();
