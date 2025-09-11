@@ -191,6 +191,8 @@ class SyncService implements SyncCommander {
   static const Duration syncInterval = Duration(seconds: 10);
   static const int maxRetryCount = 3;
   static const String syncQueueBoxName = 'sync_queue';
+  // Diagnostic flags
+  static const bool debugStorageInspection = false;
 
   // Public streams
   Stream<SyncStatus> get statusStream => _statusController.stream;
@@ -512,9 +514,14 @@ class SyncService implements SyncCommander {
     int failedItems = 0;
 
     try {
-      // DEBUG: Inspect storage contents
+      // DEBUG: Inspect storage contents (disabled by default as it can be slow)
       // AppLogger.info('SyncService: DEBUG - Inspecting storage before sync');
-      await _localStorage.debugAllBoxes();
+      if (debugStorageInspection) {
+        final swDebugBoxes = Stopwatch()..start();
+        await _localStorage.debugAllBoxes();
+        swDebugBoxes.stop();
+        timings?['debugAllBoxes_ms'] = swDebugBoxes.elapsedMilliseconds;
+      }
       
       // Optionally run discovery to ensure all calendars are available
       if (requireDiscovery) {
