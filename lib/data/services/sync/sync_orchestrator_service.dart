@@ -30,6 +30,8 @@ import '../user/external_account_queue_service.dart';
 import '../share/share_service.dart';
 
 class CalDAVMonitor {
+  // Global cross-instance guard to prevent concurrent monitoring across multiple instances
+  static int? _globalRunnerId; // identityHashCode of the instance currently running
   // Dependencies - focused on calendar monitoring
   final AccountRepository _accountRepository;
   final CalendarRepository _calendarRepository;
@@ -131,15 +133,26 @@ class CalDAVMonitor {
       return;
     }
 
-    // Prevent concurrent executions
+    // Prevent concurrent executions (per-instance)
     if (_isPerformingMonitoring) {
-      AppLogger.debug('CalDAVMonitor: Monitoring already in progress, skipping concurrent execution');
+      final int selfId = identityHashCode(this);
+      AppLogger.debug('CalDAVMonitor['+selfId.toString()+']: Monitoring already in progress, skipping concurrent execution');
       return;
+    }
+
+    // Cross-instance guard to ensure only one monitor runs app-wide
+    final int instanceId = identityHashCode(this);
+    if (_globalRunnerId != null && _globalRunnerId != instanceId) {
+      AppLogger.debug('CalDAVMonitor['+instanceId.toString()+']: Another instance is monitoring (owner: '+_globalRunnerId.toString()+'), skipping');
+      return;
+    }
+    if (_globalRunnerId == null) {
+      _globalRunnerId = instanceId;
     }
 
     _isPerformingMonitoring = true;
     final DateTime monitoringStart = DateTime.now();
-    AppLogger.debug('CalDAVMonitor: start performMonitoring at ${monitoringStart.toIso8601String()}');
+    AppLogger.debug('CalDAVMonitor['+instanceId.toString()+']: start performMonitoring at ${monitoringStart.toIso8601String()}');
     try {
       // Check connection status first (defensive against unconfigured mocks)
       try {
@@ -236,10 +249,15 @@ class CalDAVMonitor {
     } catch (e, stackTrace) {
       AppLogger.error('CalDAVMonitor: Change monitoring failed', e, stackTrace);
     } finally {
+      // Release per-instance flag and global guard if owned
       _isPerformingMonitoring = false;
+      final int instanceId = identityHashCode(this);
+      if (_globalRunnerId == instanceId) {
+        _globalRunnerId = null;
+      }
       final DateTime monitoringEnd = DateTime.now();
       final Duration elapsed = monitoringEnd.difference(monitoringStart);
-      AppLogger.debug('CalDAVMonitor: end performMonitoring after ${elapsed.inMilliseconds}ms (started at ${monitoringStart.toIso8601String()}, ended at ${monitoringEnd.toIso8601String()})');
+      AppLogger.debug('CalDAVMonitor['+instanceId.toString()+']: end performMonitoring after ${elapsed.inMilliseconds}ms (started at ${monitoringStart.toIso8601String()}, ended at ${monitoringEnd.toIso8601String()})');
     }
   }
 
