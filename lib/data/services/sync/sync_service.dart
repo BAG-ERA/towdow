@@ -88,6 +88,8 @@ class SyncResult {
   final int failedItems;
   final List<String> errors;
   final DateTime syncTime;
+  // Optional detailed timing metrics in milliseconds for diagnostics
+  final Map<String, int>? timingsMs;
 
   SyncResult({
     required this.success,
@@ -95,6 +97,7 @@ class SyncResult {
     required this.failedItems,
     required this.errors,
     required this.syncTime,
+    this.timingsMs,
   });
 }
 
@@ -455,6 +458,8 @@ class SyncService implements SyncCommander {
   }
 
   Future<Result<SyncResult>> _syncAllActiveCaldavInternal({required bool requireDiscovery}) async {
+      final Stopwatch swTotal = Stopwatch()..start();
+      final Map<String, int> timings = {};
     if (_status == SyncStatus.syncing) {
       // AppLogger.debug('SyncService: Sync already in progress, skipping');
       return Result.failure(Failure(
@@ -470,7 +475,10 @@ class SyncService implements SyncCommander {
       AppLogger.debug('SyncService: Starting sync operation with requireDiscovery: $requireDiscovery');
 
       // Get active account
+      final swGetAccount = Stopwatch()..start();
       final accountResult = await _accountRepository.getActiveAccount();
+      swGetAccount.stop();
+      timings['getActiveAccount_ms'] = swGetAccount.elapsedMilliseconds;
       return await accountResult.when(
         success: (account) async {
           if (account == null) {
@@ -482,7 +490,29 @@ class SyncService implements SyncCommander {
           }
 
           try {
-            return await _performSync(account, requireDiscovery: requireDiscovery);
+            final res = await _performSync(account, requireDiscovery: requireDiscovery, timings: timings);
+            swTotal.stop();
+            timings['overall_wall_ms'] = swTotal.elapsedMilliseconds;
+            // If success, append total to the returned SyncResult
+            return await res.when(
+              success: (syncRes) async {
+                final augmented = SyncResult(
+                  success: syncRes.success,
+                  syncedItems: syncRes.syncedItems,
+                  failedItems: syncRes.failedItems,
+                  errors: syncRes.errors,
+                  syncTime: syncRes.syncTime,
+                  timingsMs: {...?syncRes.timingsMs, ...timings},
+                );
+                final tm = {...?augmented.timingsMs};
+                AppLogger.info('SyncService: Sync timings (ms): ${tm}');
+                return Result.success(augmented);
+              },
+              failure: (f) async {
+                AppLogger.info('SyncService: Sync timings before failure (ms): ${timings}');
+                return Result.failure(f);
+              },
+            );
           } on RefreshTokenExpiredException {
             rethrow;
           }
@@ -506,7 +536,7 @@ class SyncService implements SyncCommander {
   }
 
   /// Perform the actual sync operation with a CalDAV account
-  Future<Result<SyncResult>> _performSync(CaldavAccount account, {bool requireDiscovery = true}) async {
+  Future<Result<SyncResult>> _performSync(CaldavAccount account, {bool requireDiscovery = true, Map<String, int>? timings}) async {
     final caldavTask = SyncService.taskServiceFactory(account);
     final caldavProps = SyncService.propertiesServiceFactory(account);
     final errors = <String>[];
@@ -525,11 +555,17 @@ class SyncService implements SyncCommander {
       
       // Optionally run discovery to ensure all calendars are available
       if (requireDiscovery) {
+        final swDiscovery = Stopwatch()..start();
         await _discoverAndEnsureAllCalendars(account);
+        swDiscovery.stop();
+        timings?['discovery_ms'] = swDiscovery.elapsedMilliseconds;
       }
       
       // Get ALL available calendars from repository (discovery ensures all are available)
+      final swGetCalendars = Stopwatch()..start();
       final allCalendarsResult = await _calendarRepository.getProjectCalendars();
+      swGetCalendars.stop();
+      timings?['getProjectCalendars_ms'] = swGetCalendars.elapsedMilliseconds;
       final allCalendars = allCalendarsResult.when(
         success: (calendars) => calendars,
         failure: (failure) {
@@ -573,10 +609,13 @@ class SyncService implements SyncCommander {
         //AppLogger.debug('🔄 SyncService: Starting sync for ${calendarsToSync.length} calendars');
         
         // Perform pending-deletion checks in parallel for all calendars
+        final swCheckPending = Stopwatch()..start();
         final pendingDeletionFutures = calendarsToSync
             .map((c) => _hasPendingDeletionForCalendar(c.path))
             .toList(growable: false);
         final pendingDeletionResults = await Future.wait(pendingDeletionFutures);
+        swCheckPending.stop();
+        timings?['checkPendingDeletion_ms'] = (timings?['checkPendingDeletion_ms'] ?? 0) + swCheckPending.elapsedMilliseconds;
 
         // Start sync for all eligible calendars in parallel while preserving association by index
         final List<Future<bool>?> syncFutures = List.filled(calendarsToSync.length, null, growable: false);
@@ -591,7 +630,7 @@ class SyncService implements SyncCommander {
             continue;
           }
           // Kick off sync without awaiting immediately
-          final future = _syncCalendar(caldavTask, caldavProps, calendar, errors).then((result) {
+          final future = _syncCalendar(caldavTask, caldavProps, calendar, errors, timings: timings).then((result) {
             // update progress as each calendar finishes
             completed++;
             _progressController.add(0.2 + (0.6 * (completed) / totalCalendars));
@@ -601,7 +640,10 @@ class SyncService implements SyncCommander {
         }
 
         // Wait for all started syncs to complete
+        final swCalendarsSync = Stopwatch()..start();
         final results = await Future.wait(syncFutures.map((f) => f ?? Future.value(false)));
+        swCalendarsSync.stop();
+        timings?['syncCalendars_total_ms'] = swCalendarsSync.elapsedMilliseconds;
 
         // Tally results
         for (final ok in results) {
@@ -615,10 +657,16 @@ class SyncService implements SyncCommander {
 
       // Also process queue items for calendars not included in this sync pass (e.g., excluded by prefs)
       final includedPaths = calendarsToSync.map((c) => c.path).toSet();
+      final swProcessRemaining = Stopwatch()..start();
       await _processRemainingQueueItems(caldavTask, includedPaths, errors);
+      swProcessRemaining.stop();
+      timings?['processRemainingQueueItems_ms'] = swProcessRemaining.elapsedMilliseconds;
 
       // Process queue items for calendars that no longer exist locally
+      final swProcessOrphaned = Stopwatch()..start();
       await _processOrphanedQueueItems(caldavTask, errors);
+      swProcessOrphaned.stop();
+      timings?['processOrphanedQueueItems_ms'] = swProcessOrphaned.elapsedMilliseconds;
 
       _progressController.add(1.0);
       _lastSyncTime = DateTime.now();
@@ -629,6 +677,7 @@ class SyncService implements SyncCommander {
         failedItems: failedItems,
         errors: errors,
         syncTime: _lastSyncTime!,
+        timingsMs: timings,
       );
 
       _updateStatus(errors.isEmpty ? SyncStatus.idle : SyncStatus.error);
@@ -649,7 +698,7 @@ class SyncService implements SyncCommander {
 
   /// Sync a single calendar with the server
   /// Returns true if sync was successful, false if it failed
-  Future<bool> _syncCalendar(CalDavTaskService caldavTask, CalDavPropertiesService caldavProps, TaskCalendar calendar, List<String> errors) async {
+  Future<bool> _syncCalendar(CalDavTaskService caldavTask, CalDavPropertiesService caldavProps, TaskCalendar calendar, List<String> errors, {Map<String, int>? timings}) async {
     // Push queued operations first for this calendar to avoid UI re-adding stale server state
     try {
       final hasQueuedOpsEarly = await _hasQueuedOperationsForCalendar(calendar.path);
@@ -660,7 +709,10 @@ class SyncService implements SyncCommander {
       // ignore push-first failures; pull will still proceed
     }
     // Étape 1: Obtenir le sync-token actuel du serveur
+    final swGetToken = Stopwatch()..start();
     final serverSyncTokenResult = await _getServerSyncToken(caldavProps, calendar);
+    swGetToken.stop();
+    timings?['getServerSyncToken_ms_total'] = (timings['getServerSyncToken_ms_total'] ?? 0) + swGetToken.elapsedMilliseconds;
     
     return await serverSyncTokenResult.when(
       success: (serverSyncToken) async {
@@ -671,7 +723,10 @@ class SyncService implements SyncCommander {
         if (localSyncToken != serverSyncToken) {
           // Case 1: Sync token changed - get actual changes and apply them
           AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing changes from server (displayName: ${calendar.displayName})');
+          final swSyncFromServer = Stopwatch()..start();
           await _syncFromServer(caldavTask, caldavProps, calendar, serverSyncToken, errors);
+          swSyncFromServer.stop();
+          timings?['syncFromServer_ms_total'] = (timings?['syncFromServer_ms_total'] ?? 0) + swSyncFromServer.elapsedMilliseconds;
           return true;
         }
         
@@ -725,7 +780,10 @@ class SyncService implements SyncCommander {
         final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
         if (hasQueuedOperations) {
           //AppLogger.debug('🔄 SyncService: Queue has operations - pushing to server');
+          final swPushQueue = Stopwatch()..start();
           await _processSyncQueueForCalendar(caldavTask, calendar.path, errors);
+          swPushQueue.stop();
+          timings?['pushQueue_ms_total'] = (timings?['pushQueue_ms_total'] ?? 0) + swPushQueue.elapsedMilliseconds;
           
           // Récupérer le nouveau sync-token après push
           final newServerSyncTokenResult = await _getServerSyncToken(caldavProps, calendar);

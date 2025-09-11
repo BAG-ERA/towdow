@@ -128,8 +128,14 @@ class CalDAVMonitor {
 
   /// Perform change monitoring for all calendars
   Future<void> _performChangeMonitoring() async {
+    // Timings for monitoring cycle
+    final Stopwatch swTotal = Stopwatch()..start();
+    final Map<String, int> timings = {};
     if (!_isMonitoring) {
       AppLogger.debug('CalDAVMonitor: Not monitoring, skipping change check');
+      swTotal.stop();
+      timings['overall_wall_ms'] = swTotal.elapsedMilliseconds;
+      AppLogger.info('CalDAVMonitor: Monitor timings (ms): '+timings.toString());
       return;
     }
 
@@ -137,6 +143,9 @@ class CalDAVMonitor {
     if (_isPerformingMonitoring) {
       final int selfId = identityHashCode(this);
       AppLogger.debug('CalDAVMonitor['+selfId.toString()+']: Monitoring already in progress, skipping concurrent execution');
+      swTotal.stop();
+      timings['overall_wall_ms'] = swTotal.elapsedMilliseconds;
+      AppLogger.info('CalDAVMonitor: Monitor timings (ms): '+timings.toString());
       return;
     }
 
@@ -144,6 +153,9 @@ class CalDAVMonitor {
     final int instanceId = identityHashCode(this);
     if (_globalRunnerId != null && _globalRunnerId != instanceId) {
       AppLogger.debug('CalDAVMonitor['+instanceId.toString()+']: Another instance is monitoring (owner: '+_globalRunnerId.toString()+'), skipping');
+      swTotal.stop();
+      timings['overall_wall_ms'] = swTotal.elapsedMilliseconds;
+      AppLogger.info('CalDAVMonitor: Monitor timings (ms): '+timings.toString());
       return;
     }
     if (_globalRunnerId == null) {
@@ -156,21 +168,33 @@ class CalDAVMonitor {
     try {
       // Check connection status first (defensive against unconfigured mocks)
       try {
+        final swConn = Stopwatch()..start();
         final connectionStatus = _connectionMonitorService.currentStatus;
+        swConn.stop();
+        timings['connectionStatus_ms'] = swConn.elapsedMilliseconds;
         if (connectionStatus != ConnectionStatus.connected) {
           AppLogger.warning('CalDAVMonitor: No internet connection, skipping change monitoring (current status: $connectionStatus)');
           _updateInterval(false); /// if no connexion update intervel
+          swTotal.stop();
+          timings['overall_wall_ms'] = swTotal.elapsedMilliseconds;
+          AppLogger.info('CalDAVMonitor: Monitor timings (ms): '+timings.toString());
           return;
         }
       } catch (e, st) {
         AppLogger.warning('CalDAVMonitor: Could not read connection status, skipping cycle');
         AppLogger.debug('CalDAVMonitor: Connection status error: $e');
         _updateInterval(false);
+        swTotal.stop();
+        timings['overall_wall_ms'] = swTotal.elapsedMilliseconds;
+        AppLogger.info('CalDAVMonitor: Monitor timings (ms): '+timings.toString());
         return;
       }
 
       // Get active account
+      final swGetAccount = Stopwatch()..start();
       final accountResult = await _accountRepository.getActiveAccount();
+      swGetAccount.stop();
+      timings['getActiveAccount_ms'] = swGetAccount.elapsedMilliseconds;
       await accountResult.when(
         success: (account) async {
           if (account == null) {
@@ -180,14 +204,26 @@ class CalDAVMonitor {
 
           // 1. Update the calendar list from server (add, remove calendars if needed)
           bool changesDetected = await _syncService.updateCalendarList(account);
+          bool changesDetected = false;
+          // if (shouldRefreshCalendarList) {
+          final swUpdateList = Stopwatch()..start();
+          changesDetected = await _syncService.updateCalendarList(account);
+          swUpdateList.stop();
+          timings['updateCalendarList_ms'] = swUpdateList.elapsedMilliseconds;
           // 2. synchronize all calendars from server,
           // this MUST be done before queue processing to handle orphan in queues (e.g. project deleted or unshared)
           // Get all calendars to monitor (now includes all discovered calendars)
+          final swGetCalendars = Stopwatch()..start();
           final calendarsResult = await _calendarRepository.getProjectCalendars();
+          swGetCalendars.stop();
+          timings['getProjectCalendars_ms'] = swGetCalendars.elapsedMilliseconds;
           await calendarsResult.when(
             success: (calendars) async {
               try {
+                final swSync = Stopwatch()..start();
                 await _syncService.syncAllActiveCaldavNoDiscovery();
+                swSync.stop();
+                timings['syncAllActiveCaldavNoDiscovery_ms'] = swSync.elapsedMilliseconds;
               } catch (e, st) {
                 AppLogger.warning('CalDAVMonitor: Failed to trigger full sync after calendar list update: $e');
                 AppLogger.debug('CalDAVMonitor: Stack: $st');
@@ -258,6 +294,12 @@ class CalDAVMonitor {
       final DateTime monitoringEnd = DateTime.now();
       final Duration elapsed = monitoringEnd.difference(monitoringStart);
       AppLogger.debug('CalDAVMonitor['+instanceId.toString()+']: end performMonitoring after ${elapsed.inMilliseconds}ms (started at ${monitoringStart.toIso8601String()}, ended at ${monitoringEnd.toIso8601String()})');
+      // Log timings
+      try {
+        swTotal.stop();
+        timings['overall_wall_ms'] = swTotal.elapsedMilliseconds;
+        AppLogger.info('CalDAVMonitor: Monitor timings (ms): '+timings.toString());
+      } catch (_) {}
     }
   }
 
