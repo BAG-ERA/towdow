@@ -242,14 +242,63 @@ class SyncService implements SyncCommander {
   /// This ensures shared projects and all other accessible projects are available for sync
   Future<bool> _discoverAndEnsureAllCalendars(CaldavAccount account) async {
     try {
-      AppLogger.info('CalDAVMonitor: Discovering all available calendars from server');
+      AppLogger.info('CalDAVMonitor: Discovering calendars from server (lightweight when possible)');
 
-      // Use discovery service to test connection and list calendars
-      final discovery = CalDavDiscoveryService(account: account);
-      final capabilitiesResult = await discovery.testConnection();
+      final caldavService = CalDAVService(account: account);
 
+      // If we already know the calendarHome, avoid full discovery and only list calendars
+      final knownCalendarHome = account.calendarHome;
+      if (knownCalendarHome != null && knownCalendarHome.isNotEmpty) {
+        final listResult = await caldavService.listCalendars(knownCalendarHome);
+        return await listResult.when(
+          success: (availableCalendars) async {
+            AppLogger.info('CalDAVMonitor: Server has ${availableCalendars.length} available calendars');
+            return await _ensureCalendarsExist(availableCalendars);
+          },
+          failure: (f) async {
+            AppLogger.warning('CalDAVMonitor: Failed to list calendars using known calendarHome, falling back to discovery: ${f.message}');
+            // Fall back to one-time discovery
+            return await _discoverWithCapabilitiesAndCache(account, caldavService);
+          },
+        );
+      }
+
+      // No known calendarHome: perform discovery once and cache
+      return await _discoverWithCapabilitiesAndCache(account, caldavService);
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVMonitor: Exception during calendar discovery', e, stackTrace);
+      return false;
+    }
+  }
+
+  /// Perform full discovery to obtain principal and calendarHome, cache them in account,
+  /// and ensure calendars locally. Intended as a fallback/initialization path.
+  Future<bool> _discoverWithCapabilitiesAndCache(CaldavAccount account, CalDAVService caldavService) async {
+    try {
+      final capabilitiesResult = await caldavService.discoverCapabilities();
       return await capabilitiesResult.when(
         success: (capabilities) async {
+          // Persist principal and calendarHome if not stored yet or changed
+          try {
+            final newPrincipal = capabilities.principal;
+            final newHome = capabilities.calendarHome;
+            if (account.principal != newPrincipal || account.calendarHome != newHome) {
+              final updated = account.copyWith(principal: newPrincipal, calendarHome: newHome);
+              final saveRes = await _accountRepository.save(updated);
+              await saveRes.when(
+                success: (_) {
+                  AppLogger.debug('CalDAVMonitor: Cached principal/home in account');
+                },
+                failure: (f) async {
+                  AppLogger.warning('CalDAVMonitor: Failed to cache principal/home in account: ${f.message}');
+                },
+              );
+            }
+          } catch (e, st) {
+            AppLogger.warning('CalDAVMonitor: Exception while caching principal/home: $e');
+            AppLogger.debug('CalDAVMonitor: Stack: $st');
+          }
+
           final availableCalendars = capabilities.taskCalendars;
           AppLogger.info('CalDAVMonitor: Server has ${availableCalendars.length} available calendars');
           return await _ensureCalendarsExist(availableCalendars);
@@ -259,8 +308,8 @@ class SyncService implements SyncCommander {
           return false;
         },
       );
-    } catch (e, stackTrace) {
-      AppLogger.error('CalDAVMonitor: Exception during calendar discovery', e, stackTrace);
+    } catch (e, st) {
+      AppLogger.error('CalDAVMonitor: Exception in _discoverWithCapabilitiesAndCache', e, st);
       return false;
     }
   }
@@ -270,11 +319,23 @@ class SyncService implements SyncCommander {
     int addedCount = 0;
     int existingCount = 0;
     final newlyAddedPaths = <String>[];
-    for (final serverCalendar in availableCalendars) {
+
+    // Deduplicate by path to avoid duplicate work/races
+    final uniqueByPath = <String, TaskCalendar>{};
+    for (final cal in availableCalendars) {
+      uniqueByPath[cal.path] = cal;
+    }
+    final calendars = uniqueByPath.values.toList();
+
+    // Bounded concurrency to limit repository contention
+    const int maxConcurrent = 4; // conservative parallelism to reduce contention
+    int index = 0;
+
+    Future<void> processOne(TaskCalendar serverCalendar) async {
       final pendingDeletion = await _hasPendingDeletionForCalendar(serverCalendar.path);
       if (pendingDeletion) {
         AppLogger.info('CalDAVMonitor: Skipping discovered calendar pending deletion: ${serverCalendar.path}');
-        continue;
+        return;
       }
       final existingCalendarResult = await _calendarRepository.getByPath(serverCalendar.path);
       await existingCalendarResult.when(
@@ -321,6 +382,22 @@ class SyncService implements SyncCommander {
         },
       );
     }
+
+    // Simple worker pool
+    final List<Future<void>> workers = [];
+    for (int w = 0; w < maxConcurrent; w++) {
+      workers.add(() async {
+        while (true) {
+          TaskCalendar? next;
+          // pull next index under microtask to reduce race; single-threaded event loop ensures safe access
+          if (index >= calendars.length) break;
+          next = calendars[index++];
+          await processOne(next);
+        }
+      }());
+    }
+    await Future.wait(workers);
+
     AppLogger.info('CalDAVMonitor: Calendar discovery complete - $addedCount added, $existingCount already existed');
 
     // Ensure newly added calendars are visible in project order by default (sync is now for all projects)
@@ -559,6 +636,9 @@ class SyncService implements SyncCommander {
         await _discoverAndEnsureAllCalendars(account);
         swDiscovery.stop();
         timings?['discovery_ms'] = swDiscovery.elapsedMilliseconds;
+      }
+      else{
+        timings?['discovery_ms'] = 0;
       }
       
       // Get ALL available calendars from repository (discovery ensures all are available)

@@ -431,6 +431,11 @@ class CalDAVService implements ICalDAVService {
     );
   }
 
+  /// Public: List available calendars when calendarHome is known (lightweight)
+  Future<Result<List<TaskCalendar>>> listCalendars(String calendarHome) async {
+    return _listCalendars(calendarHome);
+  }
+
   /// List available calendars that support VTODO
   Future<Result<List<TaskCalendar>>> _listCalendars(String calendarHome) async {
     // AppLogger.debug('CalDAVService: Listing calendars in: $calendarHome');
