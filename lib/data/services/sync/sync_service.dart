@@ -565,24 +565,44 @@ class SyncService implements SyncCommander {
       } else {
         //AppLogger.debug('🔄 SyncService: Starting sync for ${calendarsToSync.length} calendars');
         
-        for (final calendar in calendarsToSync) {
-          // Check if calendar has pending deletion
-          final hasPendingDeletion = await _hasPendingDeletionForCalendar(calendar.path);
+        // Perform pending-deletion checks in parallel for all calendars
+        final pendingDeletionFutures = calendarsToSync
+            .map((c) => _hasPendingDeletionForCalendar(c.path))
+            .toList(growable: false);
+        final pendingDeletionResults = await Future.wait(pendingDeletionFutures);
+
+        // Start sync for all eligible calendars in parallel while preserving association by index
+        final List<Future<bool>?> syncFutures = List.filled(calendarsToSync.length, null, growable: false);
+        int totalCalendars = calendarsToSync.length;
+        int completed = 0;
+        for (var i = 0; i < calendarsToSync.length; i++) {
+          final calendar = calendarsToSync[i];
+          final hasPendingDeletion = pendingDeletionResults[i];
           if (hasPendingDeletion) {
             AppLogger.info('🔄 SyncService: Skipping calendar ${calendar.path} - pending deletion');
-            continue; // Skip this calendar
+            syncFutures[i] = Future.value(false); // treat as not synced
+            continue;
           }
-          
-          //AppLogger.debug('🔄 SyncService: Processing calendar ${calendar.path}');
-          
-          final calendarResult = await _syncCalendar(caldavTask, caldavProps, calendar, errors);
-          if (calendarResult) {
+          // Kick off sync without awaiting immediately
+          final future = _syncCalendar(caldavTask, caldavProps, calendar, errors).then((result) {
+            // update progress as each calendar finishes
+            completed++;
+            _progressController.add(0.2 + (0.6 * (completed) / totalCalendars));
+            return result;
+          });
+          syncFutures[i] = future;
+        }
+
+        // Wait for all started syncs to complete
+        final results = await Future.wait(syncFutures.map((f) => f ?? Future.value(false)));
+
+        // Tally results
+        for (final ok in results) {
+          if (ok) {
             syncedItems++;
           } else {
             failedItems++;
           }
-          
-          _progressController.add(0.2 + (0.6 * (calendarsToSync.indexOf(calendar) + 1) / calendarsToSync.length));
         }
       }
 
