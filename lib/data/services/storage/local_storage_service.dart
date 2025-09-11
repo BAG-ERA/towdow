@@ -68,19 +68,9 @@ class LocalStorageService {
       // AppLogger.info('LocalStorageService: Initializing Hive boxes');
 
 
-      // In tests or when Hive was initialized earlier, avoid overriding the Hive home path.
-      // We detect prior initialization by checking if any known adapter was registered.
-      final bool hiveLikelyInitialized = (() {
-        try {
-          // CaldavAccountAdapter is registered in tests and app bootstrap.
-          final temp = CaldavAccountAdapter();
-          return Hive.isAdapterRegistered(temp.typeId);
-        } catch (_) {
-          return false;
-        }
-      })();
 
-      if (!hiveLikelyInitialized) {
+
+      if (!Hive.isBoxOpen(tasksBoxName)) {
         // Initialize Hive with a platform-specific path
         if (kIsWeb) {
           await Hive.initFlutter();
