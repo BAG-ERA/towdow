@@ -444,6 +444,15 @@ class SyncService implements SyncCommander {
 
   /// Perform immediate sync with CalDAV server
   Future<Result<SyncResult>> syncAllActiveCaldav() async {
+    return await _syncAllActiveCaldavInternal(requireDiscovery: true);
+  }
+
+  /// Perform immediate sync with an option to skip calendar discovery
+  Future<Result<SyncResult>> syncAllActiveCaldavNoDiscovery() async {
+    return await _syncAllActiveCaldavInternal(requireDiscovery: false);
+  }
+
+  Future<Result<SyncResult>> _syncAllActiveCaldavInternal({required bool requireDiscovery}) async {
     if (_status == SyncStatus.syncing) {
       // AppLogger.debug('SyncService: Sync already in progress, skipping');
       return Result.failure(Failure(
@@ -456,7 +465,7 @@ class SyncService implements SyncCommander {
       _updateStatus(SyncStatus.syncing);
       _progressController.add(0.0);
 
-      // AppLogger.info('SyncService: Starting sync operation');
+      AppLogger.debug('SyncService: Starting sync operation with requireDiscovery: $requireDiscovery');
 
       // Get active account
       final accountResult = await _accountRepository.getActiveAccount();
@@ -471,7 +480,7 @@ class SyncService implements SyncCommander {
           }
 
           try {
-            return await _performSync(account);
+            return await _performSync(account, requireDiscovery: requireDiscovery);
           } on RefreshTokenExpiredException {
             rethrow;
           }
@@ -495,7 +504,7 @@ class SyncService implements SyncCommander {
   }
 
   /// Perform the actual sync operation with a CalDAV account
-  Future<Result<SyncResult>> _performSync(CaldavAccount account) async {
+  Future<Result<SyncResult>> _performSync(CaldavAccount account, {bool requireDiscovery = true}) async {
     final caldavTask = SyncService.taskServiceFactory(account);
     final caldavProps = SyncService.propertiesServiceFactory(account);
     final errors = <String>[];
@@ -506,6 +515,11 @@ class SyncService implements SyncCommander {
       // DEBUG: Inspect storage contents
       // AppLogger.info('SyncService: DEBUG - Inspecting storage before sync');
       await _localStorage.debugAllBoxes();
+      
+      // Optionally run discovery to ensure all calendars are available
+      if (requireDiscovery) {
+        await _discoverAndEnsureAllCalendars(account);
+      }
       
       // Get ALL available calendars from repository (discovery ensures all are available)
       final allCalendarsResult = await _calendarRepository.getProjectCalendars();
@@ -1303,7 +1317,7 @@ class SyncService implements SyncCommander {
     }
     _scheduledSyncTimer = Timer(delay, () async {
       try {
-        await syncAllActiveCaldav();
+        await syncAllActiveCaldavNoDiscovery();
       } catch (e, stackTrace) {
         AppLogger.error('SyncService: Error during scheduled sync', e, stackTrace);
       } finally {

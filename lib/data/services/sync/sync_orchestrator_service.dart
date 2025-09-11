@@ -174,7 +174,7 @@ class CalDAVMonitor {
           await calendarsResult.when(
             success: (calendars) async {
               try {
-                await _syncService.syncAllActiveCaldav();
+                await _syncService.syncAllActiveCaldavNoDiscovery();
               } catch (e, st) {
                 AppLogger.warning('CalDAVMonitor: Failed to trigger full sync after calendar list update: $e');
                 AppLogger.debug('CalDAVMonitor: Stack: $st');
