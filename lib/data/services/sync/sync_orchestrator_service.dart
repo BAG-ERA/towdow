@@ -171,9 +171,6 @@ class CalDAVMonitor {
           // this MUST be done before queue processing to handle orphan in queues (e.g. project deleted or unshared)
           // Get all calendars to monitor (now includes all discovered calendars)
           final calendarsResult = await _calendarRepository.getProjectCalendars();
-          final DateTime monitoringDownloadTask = DateTime.now();
-          final Duration elapsed = monitoringDownloadTask.difference(monitoringStart);
-          AppLogger.debug('CalDAVMonitor: performMonitoring got task after ${elapsed.inMilliseconds}ms (started at ${monitoringStart.toIso8601String()}, ended at ${monitoringDownloadTask.toIso8601String()})');
           await calendarsResult.when(
             success: (calendars) async {
               try {
@@ -182,6 +179,9 @@ class CalDAVMonitor {
                 AppLogger.warning('CalDAVMonitor: Failed to trigger full sync after calendar list update: $e');
                 AppLogger.debug('CalDAVMonitor: Stack: $st');
               }
+              final DateTime monitoringDownloadTask = DateTime.now();
+              final Duration elapsed = monitoringDownloadTask.difference(monitoringStart);
+              AppLogger.debug('CalDAVMonitor: performMonitoring got task after ${elapsed.inMilliseconds}ms (started at ${monitoringStart.toIso8601String()}, ended at ${monitoringDownloadTask.toIso8601String()})');
               // Run other synchro (upload / download) in parallel to speed up the cycle
               try {
                 final futures = <Future<bool>>[
