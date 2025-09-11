@@ -203,10 +203,8 @@ class CalDAVMonitor {
           }
 
           // 1. Update the calendar list from server (add, remove calendars if needed)
-          bool changesDetected = await _syncService.updateCalendarList(account);
-
           final swUpdateList = Stopwatch()..start();
-          changesDetected = await _syncService.updateCalendarList(account);
+          bool changesDetected = await _syncService.updateCalendarList(account);
           swUpdateList.stop();
           timings['updateCalendarList_ms'] = swUpdateList.elapsedMilliseconds;
           // 2. synchronize all calendars from server,
