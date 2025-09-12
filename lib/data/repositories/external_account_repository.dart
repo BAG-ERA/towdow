@@ -12,6 +12,8 @@ abstract class ExternalAccountRepository {
   Future<Result<List<ExternalCaldavAccount>>> getAll();
   Future<Result<ExternalCaldavAccount?>> getById(String id);
   Future<Result<void>> save(ExternalCaldavAccount account);
+  // Save without triggering sync side-effects (used when applying server downloads)
+  Future<Result<void>> saveWithoutSync(ExternalCaldavAccount account);
   Future<Result<void>> delete(String id);
   Stream<List<ExternalCaldavAccount>> watchAccounts();
   Future<Result<List<ExternalCaldavAccount>>> getActiveAccounts();
@@ -51,6 +53,46 @@ class LocalExternalAccountRepository implements ExternalAccountRepository {
 
   LocalExternalAccountRepository(this._storageService);
 
+  Future<Result<void>> _saveInternal(ExternalCaldavAccount account, {required bool withSideEffects}) async {
+    AppLogger.debug('LocalExternalAccountRepository: _saveInternal withSideEffects: $withSideEffects');
+    // Save account
+    final res = await _storageService.put(_boxName, account.id, account);
+    if (withSideEffects) {
+      // Mark local modification: set a local credentials file ETag to indicate local change and trigger upload
+      final localEtag = 'local-${DateTime.now().millisecondsSinceEpoch}';
+      await _storageService.put<String?>(_boxName, 'credentials_file_etag', localEtag);
+      // Enqueue an external credentials upload so it gets pushed promptly
+      final queueItem = <String, dynamic>{
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'op': 'upload',
+        'createdAt': DateTime.now().toIso8601String(),
+        'retry': 0,
+        'next': null,
+      };
+      // Read current queue, append, and save back
+      final queueRes = await _storageService.get<List<dynamic>>(LocalStorageService.externalAccountQueueBoxName, 'queue_items');
+      final currentQueue = queueRes.when(
+        success: (raw) {
+          final list = <Map<String, dynamic>>[];
+          if (raw != null) {
+            for (final e in raw) {
+              if (e is Map) {
+                final map = <String, dynamic>{};
+                e.forEach((k, v) => map[k.toString()] = v);
+                list.add(map);
+              }
+            }
+          }
+          return list;
+        },
+        failure: (_) => <Map<String, dynamic>>[],
+      );
+      currentQueue.add(queueItem);
+      await _storageService.put<List<Map<String, dynamic>>>(LocalStorageService.externalAccountQueueBoxName, 'queue_items', currentQueue);
+    }
+    return res;
+  }
+
   @override
   Future<Result<List<ExternalCaldavAccount>>> getAll() async {
     final result = await _storageService.getAll<ExternalCaldavAccount>(_boxName);
@@ -73,12 +115,49 @@ class LocalExternalAccountRepository implements ExternalAccountRepository {
 
   @override
   Future<Result<void>> save(ExternalCaldavAccount account) async {
-    return await _storageService.put(_boxName, account.id, account);
+    return _saveInternal(account, withSideEffects: true);
+  }
+
+  @override
+  Future<Result<void>> saveWithoutSync(ExternalCaldavAccount account) async {
+    return _saveInternal(account, withSideEffects: false);
   }
 
   @override
   Future<Result<void>> delete(String id) async {
-    return await _storageService.delete(_boxName, id);
+    final res = await _storageService.delete(_boxName, id);
+    // Mark local modification: set a local credentials file ETag to indicate local change and trigger upload
+    final localEtag = 'local-${DateTime.now().millisecondsSinceEpoch}';
+    await _storageService.put<String?>(_boxName, 'credentials_file_etag', localEtag);
+    // Enqueue an external credentials upload so it gets pushed promptly
+    final queueItem = <String, dynamic>{
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'op': 'upload',
+      'createdAt': DateTime.now().toIso8601String(),
+      'retry': 0,
+      'next': null,
+    };
+    // Read current queue, append, and save back
+    final queueRes = await _storageService.get<List<dynamic>>(LocalStorageService.externalAccountQueueBoxName, 'queue_items');
+    final currentQueue = queueRes.when(
+      success: (raw) {
+        final list = <Map<String, dynamic>>[];
+        if (raw != null) {
+          for (final e in raw) {
+            if (e is Map) {
+              final map = <String, dynamic>{};
+              e.forEach((k, v) => map[k.toString()] = v);
+              list.add(map);
+            }
+          }
+        }
+        return list;
+      },
+      failure: (_) => <Map<String, dynamic>>[],
+    );
+    currentQueue.add(queueItem);
+    await _storageService.put<List<Map<String, dynamic>>>(LocalStorageService.externalAccountQueueBoxName, 'queue_items', currentQueue);
+    return res;
   }
 
   @override
@@ -152,7 +231,7 @@ class LocalExternalAccountRepository implements ExternalAccountRepository {
             totalEvents: totalEvents,
             lastEventSync: lastEventSync,
           );
-          return await save(updatedAccount);
+          return await saveWithoutSync(updatedAccount);
         } else {
           return Result.failure(Failure(
             message: 'Account not found: $id',
@@ -179,7 +258,7 @@ class LocalExternalAccountRepository implements ExternalAccountRepository {
             refreshToken: refreshToken,
             tokenExpiry: tokenExpiry,
           );
-          return await save(updatedAccount);
+          return await saveWithoutSync(updatedAccount);
         } else {
           return Result.failure(Failure(
             message: 'Account not found: $id',
@@ -252,7 +331,7 @@ class LocalExternalAccountRepository implements ExternalAccountRepository {
       success: (account) async {
         if (account != null) {
           final updatedAccount = account.withEtag(etag);
-          return await save(updatedAccount);
+          return await saveWithoutSync(updatedAccount);
         } else {
           return Result.failure(Failure(
             message: 'Account not found: $id',
@@ -334,7 +413,7 @@ extension ExternalAccountRepositoryExtensions on ExternalAccountRepository {
       success: (account) async {
         if (account != null) {
           final updatedAccount = account.withError(error);
-          return await save(updatedAccount);
+          return await saveWithoutSync(updatedAccount);
         } else {
           return Result.failure(Failure(
             message: 'Account not found: $id',

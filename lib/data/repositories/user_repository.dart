@@ -20,10 +20,6 @@ abstract class UserRepository {
   Future<Result<void>> removeProjectFromOrder(String projectUid);
   Future<Result<void>> reorderProject(String projectUid, int newIndex);
   
-  // Project sync management (exclude/include approach)
-  Future<Result<void>> excludeProject(String projectPath);
-  Future<Result<void>> includeProject(String projectPath);
-  
   // Shared projects management
   Future<Result<void>> acknowledgeSharedProject(String projectId);
   Future<Result<void>> updateSharedWithMeProjects(List<SharedWithMeProject> projects);
@@ -83,11 +79,15 @@ class LocalUserRepository implements UserRepository {
 
   @override
   Future<Result<void>> saveUserPreferences(UserPreferences preferences) async {
+    // Mark local modification with a local ETag so uploads are triggered and downloads don't overwrite blindly
+    final localEtag = 'local-${DateTime.now().millisecondsSinceEpoch}';
+    final toSave = preferences.copyWith(etag: localEtag);
+
     // Save to local storage
     final result = await _storageService.put(
       LocalStorageService.userPreferencesBoxName,
       _userPreferencesKey,
-      preferences,
+      toSave,
     );
     
     // Queue for upload instead of direct upload
@@ -95,13 +95,13 @@ class LocalUserRepository implements UserRepository {
       success: (_) async {
         // Use queue callback if available, otherwise use direct service
         if (_queueCallback != null) {
-          await _queueCallback!(preferences);
-          AppLogger.debug('LocalUserRepository: User preferences saved locally and queued for upload via callback');
+          await _queueCallback!(toSave);
+          AppLogger.debug('LocalUserRepository: User preferences saved locally (etag set: $localEtag) and queued for upload via callback');
         } else if (_userPreferencesQueueService != null) {
-          await _userPreferencesQueueService.queueUserPreferencesUpdate(preferences);
-          AppLogger.debug('LocalUserRepository: User preferences saved locally and queued for upload via service');
+          await _userPreferencesQueueService.queueUserPreferencesUpdate(toSave);
+          AppLogger.debug('LocalUserRepository: User preferences saved locally (etag set: $localEtag) and queued for upload via service');
         } else {
-          AppLogger.debug('LocalUserRepository: User preferences saved locally only (no queue available)');
+          AppLogger.debug('LocalUserRepository: User preferences saved locally only (etag set: $localEtag, no queue available)');
         }
       },
       failure: (_) async {
@@ -196,32 +196,6 @@ class LocalUserRepository implements UserRepository {
     );
   }
 
-  // Legacy syncedProjects methods removed - use excludedProjects instead
-  // All projects sync by default now, use excludeProject/includeProject instead
-  
-  @override
-  Future<Result<void>> excludeProject(String projectPath) async {
-    final prefsResult = await getUserPreferences();
-    return await prefsResult.when(
-      success: (prefs) async {
-        final updatedPrefs = prefs.excludeProject(projectPath);
-        return await saveUserPreferences(updatedPrefs);
-      },
-      failure: (failure) async => Result.failure(failure),
-    );
-  }
-
-  @override
-  Future<Result<void>> includeProject(String projectPath) async {
-    final prefsResult = await getUserPreferences();
-    return await prefsResult.when(
-      success: (prefs) async {
-        final updatedPrefs = prefs.includeProject(projectPath);
-        return await saveUserPreferences(updatedPrefs);
-      },
-      failure: (failure) async => Result.failure(failure),
-    );
-  }
 
   @override
   Stream<UserPreferences> watchUserPreferences() async* {

@@ -1,4 +1,4 @@
-﻿// Sync service for bidirectional synchronization between local storage and CalDAV
+// Sync service for bidirectional synchronization between local storage and CalDAV
 // Implements offline-first architecture with sync queue
 
 import 'dart:async';
@@ -88,6 +88,8 @@ class SyncResult {
   final int failedItems;
   final List<String> errors;
   final DateTime syncTime;
+  // Optional detailed timing metrics in milliseconds for diagnostics
+  final Map<String, int>? timingsMs;
 
   SyncResult({
     required this.success,
@@ -95,6 +97,7 @@ class SyncResult {
     required this.failedItems,
     required this.errors,
     required this.syncTime,
+    this.timingsMs,
   });
 }
 
@@ -191,6 +194,8 @@ class SyncService implements SyncCommander {
   static const Duration syncInterval = Duration(seconds: 10);
   static const int maxRetryCount = 3;
   static const String syncQueueBoxName = 'sync_queue';
+  // Diagnostic flags
+  static const bool debugStorageInspection = false;
 
   // Public streams
   Stream<SyncStatus> get statusStream => _statusController.stream;
@@ -233,8 +238,330 @@ class SyncService implements SyncCommander {
     }
   }
 
+  /// Discover all available calendars and ensure they exist locally
+  /// This ensures shared projects and all other accessible projects are available for sync
+  Future<bool> _discoverAndEnsureAllCalendars(CaldavAccount account) async {
+    try {
+      AppLogger.info('CalDAVMonitor: Discovering calendars from server (lightweight when possible)');
+
+      final caldavService = CalDAVService(account: account);
+
+      // If we already know the calendarHome, avoid full discovery and only list calendars
+      final knownCalendarHome = account.calendarHome;
+      if (knownCalendarHome != null && knownCalendarHome.isNotEmpty) {
+        final listResult = await caldavService.listCalendars(knownCalendarHome);
+        return await listResult.when(
+          success: (availableCalendars) async {
+            AppLogger.info('CalDAVMonitor: Server has ${availableCalendars.length} available calendars');
+            return await _ensureCalendarsExist(availableCalendars);
+          },
+          failure: (f) async {
+            AppLogger.warning('CalDAVMonitor: Failed to list calendars using known calendarHome, falling back to discovery: ${f.message}');
+            // Fall back to one-time discovery
+            return await _discoverWithCapabilitiesAndCache(account, caldavService);
+          },
+        );
+      }
+
+      // No known calendarHome: perform discovery once and cache
+      return await _discoverWithCapabilitiesAndCache(account, caldavService);
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVMonitor: Exception during calendar discovery', e, stackTrace);
+      return false;
+    }
+  }
+
+  /// Perform full discovery to obtain principal and calendarHome, cache them in account,
+  /// and ensure calendars locally. Intended as a fallback/initialization path.
+  Future<bool> _discoverWithCapabilitiesAndCache(CaldavAccount account, CalDAVService caldavService) async {
+    try {
+      final capabilitiesResult = await caldavService.discoverCapabilities();
+      return await capabilitiesResult.when(
+        success: (capabilities) async {
+          // Persist principal and calendarHome if not stored yet or changed (run in background to avoid delaying ensure step)
+          try {
+            final newPrincipal = capabilities.principal;
+            final newHome = capabilities.calendarHome;
+            if (account.principal != newPrincipal || account.calendarHome != newHome) {
+              final updated = account.copyWith(principal: newPrincipal, calendarHome: newHome);
+              // Kick off caching asynchronously; errors will be logged inside
+              Future(() async {
+                try {
+                  final saveRes = await _accountRepository.save(updated);
+                  await saveRes.when(
+                    success: (_) {
+                      AppLogger.debug('CalDAVMonitor: Cached principal/home in account');
+                    },
+                    failure: (f) async {
+                      AppLogger.warning('CalDAVMonitor: Failed to cache principal/home in account: ${f.message}');
+                    },
+                  );
+                } catch (e, st) {
+                  AppLogger.warning('CalDAVMonitor: Exception while caching principal/home async: $e');
+                  AppLogger.debug('CalDAVMonitor: Stack: $st');
+                }
+              });
+            }
+          } catch (e, st) {
+            AppLogger.warning('CalDAVMonitor: Exception while preparing caching principal/home: $e');
+            AppLogger.debug('CalDAVMonitor: Stack: $st');
+          }
+
+          final availableCalendars = capabilities.taskCalendars;
+          AppLogger.info('CalDAVMonitor: Server has ${availableCalendars.length} available calendars');
+          return await _ensureCalendarsExist(availableCalendars);
+        },
+        failure: (failure) async {
+          AppLogger.error('CalDAVMonitor: Failed to discover calendars: ${failure.message}');
+          return false;
+        },
+      );
+    } catch (e, st) {
+      AppLogger.error('CalDAVMonitor: Exception in _discoverWithCapabilitiesAndCache', e, st);
+      return false;
+    }
+  }
+
+  Future<bool> _ensureCalendarsExist(List<TaskCalendar> availableCalendars) async {
+    // Ensure all discovered calendars exist in local repository
+    int addedCount = 0;
+    int existingCount = 0;
+    final newlyAddedPaths = <String>[];
+
+    // Deduplicate by path to avoid duplicate work/races
+    final uniqueByPath = <String, TaskCalendar>{};
+    for (final cal in availableCalendars) {
+      uniqueByPath[cal.path] = cal;
+    }
+    final calendars = uniqueByPath.values.toList();
+
+    // Bounded concurrency to limit repository contention
+    const int maxConcurrent = 4; // conservative parallelism to reduce contention
+    int index = 0;
+
+    Future<void> processOne(TaskCalendar serverCalendar) async {
+      final pendingDeletion = await _hasPendingDeletionForCalendar(serverCalendar.path);
+      if (pendingDeletion) {
+        AppLogger.info('CalDAVMonitor: Skipping discovered calendar pending deletion: ${serverCalendar.path}');
+        return;
+      }
+      final existingCalendarResult = await _calendarRepository.getByPath(serverCalendar.path);
+      await existingCalendarResult.when(
+        success: (existingCalendar) async {
+          if (existingCalendar == null) {
+            final saveResult = await _calendarRepository.save(serverCalendar);
+            saveResult.when(
+              success: (_) {
+                addedCount++;
+                AppLogger.info('CalDAVMonitor: Added discovered calendar: ${serverCalendar.displayName}');
+                newlyAddedPaths.add(serverCalendar.path);
+              },
+              failure: (failure) {
+                AppLogger.warning('CalDAVMonitor: Failed to save discovered calendar ${serverCalendar.displayName}: ${failure.message}');
+              },
+            );
+          } else {
+            existingCount++;
+            if (existingCalendar.etag != serverCalendar.etag) {
+              final updatedCalendar = existingCalendar.copyWith(
+                displayName: serverCalendar.displayName,
+                description: serverCalendar.description,
+                etag: existingCalendar.etag,
+                syncToken: existingCalendar.syncToken,
+                lastModified: DateTime.now(),
+              );
+              await _calendarRepository.save(updatedCalendar);
+              AppLogger.debug('CalDAVMonitor: Updated existing calendar: ${serverCalendar.displayName}');
+            }
+          }
+        },
+        failure: (_) async {
+          final saveResult = await _calendarRepository.save(serverCalendar);
+          saveResult.when(
+            success: (_) {
+              addedCount++;
+              AppLogger.info('CalDAVMonitor: Added discovered calendar (after lookup error): ${serverCalendar.displayName}');
+              newlyAddedPaths.add(serverCalendar.path);
+            },
+            failure: (failure) {
+              AppLogger.warning('CalDAVMonitor: Failed to save discovered calendar ${serverCalendar.displayName}: ${failure.message}');
+            },
+          );
+        },
+      );
+    }
+
+    // Simple worker pool
+    final List<Future<void>> workers = [];
+    for (int w = 0; w < maxConcurrent; w++) {
+      workers.add(() async {
+        while (true) {
+          TaskCalendar? next;
+          // pull next index under microtask to reduce race; single-threaded event loop ensures safe access
+          if (index >= calendars.length) break;
+          next = calendars[index++];
+          await processOne(next);
+        }
+      }());
+    }
+    await Future.wait(workers);
+
+    AppLogger.info('CalDAVMonitor: Calendar discovery complete - $addedCount added, $existingCount already existed');
+
+    // Ensure newly added calendars are visible in project order by default (sync is now for all projects)
+    if (newlyAddedPaths.isNotEmpty) {
+      try {
+        final prefsResult = await _userRepository.getUserPreferences();
+        await prefsResult.when(
+          success: (prefs) async {
+            var updated = prefs;
+            // Append to project order for visibility only
+            final currentOrder = [...updated.projectOrder];
+            for (final path in newlyAddedPaths) {
+              if (!currentOrder.contains(path)) {
+                currentOrder.add(path);
+              }
+            }
+            updated = updated.copyWith(projectOrder: currentOrder);
+            if (prefs.etag == null) {
+              await _userRepository.saveUserPreferencesWithoutSync(updated);
+              AppLogger.info('CalDAVMonitor: Updated project order during initial bootstrap (no local ETag) without triggering upload');
+            } else {
+              await _userRepository.saveUserPreferences(updated);
+              AppLogger.info('CalDAVMonitor: Updated user preferences project order for ${newlyAddedPaths.length} newly discovered projects');
+            }
+          },
+          failure: (failure) async {
+            AppLogger.warning('CalDAVMonitor: Could not load user preferences to update project order: ${failure.message}');
+          },
+        );
+      } catch (e, st) {
+        AppLogger.warning('CalDAVMonitor: Failed to update preferences for new calendars: $e');
+        AppLogger.debug('CalDAVMonitor: Stack: $st');
+      }
+    }
+    // Remove calendars that disappeared from discovery (owned projects only)
+    try {
+      await _removeCalendarsMissingFromDiscovery(availableCalendars);
+    } catch (e, st) {
+      AppLogger.warning('CalDAVMonitor: Failed to remove calendars missing from discovery: $e');
+      AppLogger.debug('CalDAVMonitor: Stack: $st');
+    }
+    return addedCount > 0;
+  }
+
+  /// Remove locally stored calendars that are no longer returned by discovery.
+  /// Only applies to owned projects. Shared-with-me removals are handled by
+  /// _checkAndUpdateSharedProjects using ShareService API semantics.
+  Future<void> _removeCalendarsMissingFromDiscovery(List<TaskCalendar> availableCalendars) async {
+    try {
+      final discoveredPaths = availableCalendars.map((c) => c.path).toSet();
+      final localResult = await _calendarRepository.getProjectCalendars();
+      await localResult.when(
+        success: (localCalendars) async {
+          final toRemove = localCalendars
+              .where((c) => !discoveredPaths.contains(c.path))
+              .toList();
+
+          if (toRemove.isEmpty) {
+            return;
+          }
+
+          AppLogger.info('CalDAVMonitor: ${toRemove.length} local calendars not present in discovery');
+
+          // For owned calendars, just unsync locally. Shared-with-me calendars are removed via share flow.
+          final ownedToRemove = <TaskCalendar>[];
+          for (final calendar in toRemove) {
+            if (calendar.isSharedWithMe) {
+              // Skip here; handled by _checkAndUpdateSharedProjects
+              AppLogger.debug('CalDAVMonitor: Skipping shared-with-me calendar missing from discovery: ${calendar.path}');
+            } else {
+              ownedToRemove.add(calendar);
+            }
+          }
+          if (ownedToRemove.isNotEmpty) {
+            const int maxConcurrent = 4; // bounded concurrency to avoid repository contention
+            int idx = 0;
+            Future<void> worker() async {
+              while (true) {
+                if (idx >= ownedToRemove.length) break;
+                final current = ownedToRemove[idx++];
+                AppLogger.info('CalDAVMonitor: Unsyncing disappeared owned calendar: ${current.path}');
+                final res = await _calendarRepository.unsyncCalendar(current.path);
+                res.when(
+                  success: (_) => AppLogger.debug('CalDAVMonitor: Unsynced ${current.path}'),
+                  failure: (f) => AppLogger.warning('CalDAVMonitor: Failed to unsync ${current.path}: ${f.message}'),
+                );
+              }
+            }
+            final futures = <Future<void>>[];
+            for (int i = 0; i < maxConcurrent; i++) {
+              futures.add(worker());
+            }
+            await Future.wait(futures);
+          }
+
+          // Cleanup orphaned tasks referencing calendars that are not in discovery
+          try {
+            final cleanup = await _taskRepository.deleteOrphanedTasksLocalOnly(discoveredPaths);
+            cleanup.when(
+              success: (_) => AppLogger.info('CalDAVMonitor: Cleaned up orphaned tasks for missing calendars'),
+              failure: (f) => AppLogger.warning('CalDAVMonitor: Failed to cleanup orphaned tasks: ${f.message}'),
+            );
+          } catch (_) {}
+
+          // Update user preferences to remove missing calendars from project order
+          try {
+            final prefsResult = await _userRepository.getUserPreferences();
+            await prefsResult.when(
+              success: (prefs) async {
+                final updatedOrder = prefs.projectOrder.where((p) => discoveredPaths.contains(p)).toList();
+                if (updatedOrder.length != prefs.projectOrder.length) {
+                  final updatedPrefs = prefs.copyWith(
+                    projectOrder: updatedOrder,
+                  );
+                  if (prefs.etag == null) {
+                    await _userRepository.saveUserPreferencesWithoutSync(updatedPrefs);
+                    AppLogger.info('CalDAVMonitor: Updated project order during initial bootstrap (no local ETag) without triggering upload');
+                  } else {
+                    await _userRepository.saveUserPreferences(updatedPrefs);
+                    AppLogger.info('CalDAVMonitor: Updated user preferences after removing missing calendars');
+                  }
+                }
+              },
+              failure: (f) async {
+                AppLogger.warning('CalDAVMonitor: Could not load user preferences to update removed calendars: ${f.message}');
+              },
+            );
+          } catch (_) {}
+        },
+        failure: (failure) async {
+          AppLogger.warning('CalDAVMonitor: Failed to load local calendars for removal check: ${failure.message}');
+        },
+      );
+    } catch (e, stackTrace) {
+      AppLogger.error('CalDAVMonitor: Exception while removing calendars missing from discovery', e, stackTrace);
+    }
+  }
+
+
+  Future<bool> updateCalendarList(CaldavAccount account) async {
+    return await _discoverAndEnsureAllCalendars(account);
+  }
+
   /// Perform immediate sync with CalDAV server
   Future<Result<SyncResult>> syncAllActiveCaldav() async {
+    return await _syncAllActiveCaldavInternal(requireDiscovery: true);
+  }
+
+  /// Perform immediate sync with an option to skip calendar discovery
+  Future<Result<SyncResult>> syncAllActiveCaldavNoDiscovery() async {
+    return await _syncAllActiveCaldavInternal(requireDiscovery: false);
+  }
+
+  Future<Result<SyncResult>> _syncAllActiveCaldavInternal({required bool requireDiscovery}) async {
+      final Stopwatch swTotal = Stopwatch()..start();
+      final Map<String, int> timings = {};
     if (_status == SyncStatus.syncing) {
       // AppLogger.debug('SyncService: Sync already in progress, skipping');
       return Result.failure(Failure(
@@ -247,10 +574,13 @@ class SyncService implements SyncCommander {
       _updateStatus(SyncStatus.syncing);
       _progressController.add(0.0);
 
-      // AppLogger.info('SyncService: Starting sync operation');
+      AppLogger.debug('SyncService: Starting sync operation with requireDiscovery: $requireDiscovery');
 
       // Get active account
+      final swGetAccount = Stopwatch()..start();
       final accountResult = await _accountRepository.getActiveAccount();
+      swGetAccount.stop();
+      timings['getActiveAccount_ms'] = swGetAccount.elapsedMilliseconds;
       return await accountResult.when(
         success: (account) async {
           if (account == null) {
@@ -262,7 +592,29 @@ class SyncService implements SyncCommander {
           }
 
           try {
-            return await _performSync(account);
+            final res = await _performSync(account, requireDiscovery: requireDiscovery, timings: timings);
+            swTotal.stop();
+            timings['overall_wall_ms'] = swTotal.elapsedMilliseconds;
+            // If success, append total to the returned SyncResult
+            return await res.when(
+              success: (syncRes) async {
+                final augmented = SyncResult(
+                  success: syncRes.success,
+                  syncedItems: syncRes.syncedItems,
+                  failedItems: syncRes.failedItems,
+                  errors: syncRes.errors,
+                  syncTime: syncRes.syncTime,
+                  timingsMs: {...?syncRes.timingsMs, ...timings},
+                );
+                final tm = {...?augmented.timingsMs};
+                AppLogger.info('SyncService: Sync timings (ms): ${tm}');
+                return Result.success(augmented);
+              },
+              failure: (f) async {
+                AppLogger.info('SyncService: Sync timings before failure (ms): ${timings}');
+                return Result.failure(f);
+              },
+            );
           } on RefreshTokenExpiredException {
             rethrow;
           }
@@ -286,7 +638,7 @@ class SyncService implements SyncCommander {
   }
 
   /// Perform the actual sync operation with a CalDAV account
-  Future<Result<SyncResult>> _performSync(CaldavAccount account) async {
+  Future<Result<SyncResult>> _performSync(CaldavAccount account, {bool requireDiscovery = true, Map<String, int>? timings}) async {
     final caldavTask = SyncService.taskServiceFactory(account);
     final caldavProps = SyncService.propertiesServiceFactory(account);
     final errors = <String>[];
@@ -294,12 +646,31 @@ class SyncService implements SyncCommander {
     int failedItems = 0;
 
     try {
-      // DEBUG: Inspect storage contents
+      // DEBUG: Inspect storage contents (disabled by default as it can be slow)
       // AppLogger.info('SyncService: DEBUG - Inspecting storage before sync');
-      await _localStorage.debugAllBoxes();
+      if (debugStorageInspection) {
+        final swDebugBoxes = Stopwatch()..start();
+        await _localStorage.debugAllBoxes();
+        swDebugBoxes.stop();
+        timings?['debugAllBoxes_ms'] = swDebugBoxes.elapsedMilliseconds;
+      }
+      
+      // Optionally run discovery to ensure all calendars are available
+      if (requireDiscovery) {
+        final swDiscovery = Stopwatch()..start();
+        await _discoverAndEnsureAllCalendars(account);
+        swDiscovery.stop();
+        timings?['discovery_ms'] = swDiscovery.elapsedMilliseconds;
+      }
+      else{
+        timings?['discovery_ms'] = 0;
+      }
       
       // Get ALL available calendars from repository (discovery ensures all are available)
+      final swGetCalendars = Stopwatch()..start();
       final allCalendarsResult = await _calendarRepository.getProjectCalendars();
+      swGetCalendars.stop();
+      timings?['getProjectCalendars_ms'] = swGetCalendars.elapsedMilliseconds;
       final allCalendars = allCalendarsResult.when(
         success: (calendars) => calendars,
         failure: (failure) {
@@ -308,19 +679,8 @@ class SyncService implements SyncCommander {
         },
       );
       
-      // Filter out excluded calendars based on user preferences
-      final userPrefsResult = await _userRepository.getUserPreferences();
-      final calendarsToSync = await userPrefsResult.when(
-        success: (prefs) async {
-          final filtered = allCalendars.where((calendar) => prefs.shouldSyncProject(calendar.path)).toList();
-          AppLogger.info('SyncService: Syncing ${filtered.length} of ${allCalendars.length} available calendars (${prefs.excludedProjects.length} excluded)');
-          return filtered;
-        },
-        failure: (failure) async {
-          AppLogger.warning('SyncService: Failed to get user preferences, syncing all calendars: ${failure.message}');
-          return allCalendars; // Fallback: sync all if can't get preferences
-        },
-      );
+      // Sync all calendars regardless of user preferences (removed per new requirement)
+      final calendarsToSync = allCalendars;
       
       if (calendarsToSync.isEmpty) {
         AppLogger.warning('SyncService: No calendars available for sync.');
@@ -353,33 +713,65 @@ class SyncService implements SyncCommander {
       } else {
         //AppLogger.debug('🔄 SyncService: Starting sync for ${calendarsToSync.length} calendars');
         
-        for (final calendar in calendarsToSync) {
-          // Check if calendar has pending deletion
-          final hasPendingDeletion = await _hasPendingDeletionForCalendar(calendar.path);
+        // Perform pending-deletion checks in parallel for all calendars
+        final swCheckPending = Stopwatch()..start();
+        final pendingDeletionFutures = calendarsToSync
+            .map((c) => _hasPendingDeletionForCalendar(c.path))
+            .toList(growable: false);
+        final pendingDeletionResults = await Future.wait(pendingDeletionFutures);
+        swCheckPending.stop();
+        timings?['checkPendingDeletion_ms'] = (timings?['checkPendingDeletion_ms'] ?? 0) + swCheckPending.elapsedMilliseconds;
+
+        // Start sync for all eligible calendars in parallel while preserving association by index
+        final List<Future<bool>?> syncFutures = List.filled(calendarsToSync.length, null, growable: false);
+        int totalCalendars = calendarsToSync.length;
+        int completed = 0;
+        for (var i = 0; i < calendarsToSync.length; i++) {
+          final calendar = calendarsToSync[i];
+          final hasPendingDeletion = pendingDeletionResults[i];
           if (hasPendingDeletion) {
             AppLogger.info('🔄 SyncService: Skipping calendar ${calendar.path} - pending deletion');
-            continue; // Skip this calendar
+            syncFutures[i] = Future.value(false); // treat as not synced
+            continue;
           }
-          
-          //AppLogger.debug('🔄 SyncService: Processing calendar ${calendar.path}');
-          
-          final calendarResult = await _syncCalendar(caldavTask, caldavProps, calendar, errors);
-          if (calendarResult) {
+          // Kick off sync without awaiting immediately
+          final future = _syncCalendar(caldavTask, caldavProps, calendar, errors, timings: timings).then((result) {
+            // update progress as each calendar finishes
+            completed++;
+            _progressController.add(0.2 + (0.6 * (completed) / totalCalendars));
+            return result;
+          });
+          syncFutures[i] = future;
+        }
+
+        // Wait for all started syncs to complete
+        final swCalendarsSync = Stopwatch()..start();
+        final results = await Future.wait(syncFutures.map((f) => f ?? Future.value(false)));
+        swCalendarsSync.stop();
+        timings?['syncCalendars_total_ms'] = swCalendarsSync.elapsedMilliseconds;
+
+        // Tally results
+        for (final ok in results) {
+          if (ok) {
             syncedItems++;
           } else {
             failedItems++;
           }
-          
-          _progressController.add(0.2 + (0.6 * (calendarsToSync.indexOf(calendar) + 1) / calendarsToSync.length));
         }
       }
 
       // Also process queue items for calendars not included in this sync pass (e.g., excluded by prefs)
       final includedPaths = calendarsToSync.map((c) => c.path).toSet();
+      final swProcessRemaining = Stopwatch()..start();
       await _processRemainingQueueItems(caldavTask, includedPaths, errors);
+      swProcessRemaining.stop();
+      timings?['processRemainingQueueItems_ms'] = swProcessRemaining.elapsedMilliseconds;
 
       // Process queue items for calendars that no longer exist locally
+      final swProcessOrphaned = Stopwatch()..start();
       await _processOrphanedQueueItems(caldavTask, errors);
+      swProcessOrphaned.stop();
+      timings?['processOrphanedQueueItems_ms'] = swProcessOrphaned.elapsedMilliseconds;
 
       _progressController.add(1.0);
       _lastSyncTime = DateTime.now();
@@ -390,6 +782,7 @@ class SyncService implements SyncCommander {
         failedItems: failedItems,
         errors: errors,
         syncTime: _lastSyncTime!,
+        timingsMs: timings,
       );
 
       _updateStatus(errors.isEmpty ? SyncStatus.idle : SyncStatus.error);
@@ -410,7 +803,7 @@ class SyncService implements SyncCommander {
 
   /// Sync a single calendar with the server
   /// Returns true if sync was successful, false if it failed
-  Future<bool> _syncCalendar(CalDavTaskService caldavTask, CalDavPropertiesService caldavProps, TaskCalendar calendar, List<String> errors) async {
+  Future<bool> _syncCalendar(CalDavTaskService caldavTask, CalDavPropertiesService caldavProps, TaskCalendar calendar, List<String> errors, {Map<String, int>? timings}) async {
     // Push queued operations first for this calendar to avoid UI re-adding stale server state
     try {
       final hasQueuedOpsEarly = await _hasQueuedOperationsForCalendar(calendar.path);
@@ -420,19 +813,33 @@ class SyncService implements SyncCommander {
     } catch (_) {
       // ignore push-first failures; pull will still proceed
     }
-    // Étape 1: Obtenir le sync-token actuel du serveur
+    // step 1: get current sync-token from server
+    final swGetServerToken1 = Stopwatch()..start();
     final serverSyncTokenResult = await _getServerSyncToken(caldavProps, calendar);
-    
+    swGetServerToken1.stop();
+    final prevMaxGetToken1 = timings?['getServerSyncToken_ms_max'] ?? 0;
+    final currentGetToken1 = swGetServerToken1.elapsedMilliseconds;
+    if (timings != null) {
+      timings['getServerSyncToken_ms_max'] = currentGetToken1 > prevMaxGetToken1 ? currentGetToken1 : prevMaxGetToken1;
+    }
+
     return await serverSyncTokenResult.when(
       success: (serverSyncToken) async {
         final localSyncToken = calendar.syncToken;
         
-        AppLogger.debug('🔄 SyncService: Calendar ${calendar.path} - Local: ${localSyncToken}, Server: ${serverSyncToken}');
+        AppLogger.debug('🔄 SyncService: sync-token changed: ${localSyncToken != serverSyncToken}, Calendar ${calendar.path} - Local: ${localSyncToken}, Server: ${serverSyncToken} (displayName: ${calendar.displayName})');
         
         if (localSyncToken != serverSyncToken) {
           // Case 1: Sync token changed - get actual changes and apply them
-          AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing changes from server');
+          AppLogger.debug('🔄 SyncService: Sync-tokens differ - syncing changes from server (displayName: ${calendar.displayName})');
+          final swSyncFromServer = Stopwatch()..start();
           await _syncFromServer(caldavTask, caldavProps, calendar, serverSyncToken, errors);
+          swSyncFromServer.stop();
+          final prevMax = timings?['syncFromServer_ms_max'] ?? 0;
+          final current = swSyncFromServer.elapsedMilliseconds;
+          if (timings != null) {
+            timings['syncFromServer_ms_max'] = current > prevMax ? current : prevMax;
+          }
           return true;
         }
         
@@ -440,13 +847,10 @@ class SyncService implements SyncCommander {
         final serverPropertiesResult = await caldavProps.getCalendarProperties(calendar);
         await serverPropertiesResult.when(
           success: (serverCalendar) async {
-            AppLogger.debug('🔄 SyncService: ETag comparison for ${calendar.path}:');
-            AppLogger.debug('🔄 SyncService:   Local ETag: ${calendar.etag ?? "(null)"}');
-            AppLogger.debug('🔄 SyncService:   Server ETag: ${serverCalendar.etag ?? "(null)"}');
-            AppLogger.debug('🔄 SyncService:   ETags equal? ${calendar.etag == serverCalendar.etag}');
+            AppLogger.debug('🔄 SyncService: ETag comparison, ETags equal? ${calendar.etag == serverCalendar.etag}, for ${calendar.path} (displayName: ${calendar.displayName}): Local ETag: ${calendar.etag ?? "(null)"}, Server ETag: ${serverCalendar.etag ?? "(null)"}');
             
             if (calendar.etag != serverCalendar.etag) {
-              AppLogger.info('🔄 SyncService: ETag differs - updating calendar properties');
+              AppLogger.info('🔄 SyncService: ETag differs - updating calendar ${calendar.path} properties (displayName: ${calendar.displayName})');
               final updatedCalendar = calendar.copyWith(
                 etag: serverCalendar.etag,
                 lastSyncAt: DateTime.now(),
@@ -469,18 +873,19 @@ class SyncService implements SyncCommander {
               final saveResult = await _calendarRepository.save(updatedCalendar);
               await saveResult.when(
                 success: (_) async {
-                  AppLogger.info('🔄 SyncService: Calendar ${calendar.path} ETag updated successfully');
+                  AppLogger.info('🔄 SyncService: Calendar ${calendar.path} (${calendar.displayName}) ETag updated successfully');
                 },
                 failure: (failure) async {
-                  AppLogger.error('🔄 SyncService: Failed to save ETag update: ${failure.message}');
+                  AppLogger.error('🔄 SyncService: Failed to save ETag update for ${calendar.path} (displayName: ${calendar.displayName}): ${failure.message}');
                 },
               );
-            } else {
-              AppLogger.debug('🔄 SyncService: ETags are equal - no update needed');
             }
+            // else {
+            //   AppLogger.debug('🔄 SyncService: ETags are equal - no update needed ${calendar.path} (displayName: ${calendar.displayName})');
+            // }
           },
           failure: (failure) async {
-            AppLogger.warning('🔄 SyncService: Could not get server properties: ${failure.message}');
+            AppLogger.warning('🔄 SyncService: Could not get server properties for ${calendar.path} (displayName: ${calendar.displayName}): ${failure.message}');
           },
         );
         
@@ -488,10 +893,20 @@ class SyncService implements SyncCommander {
         final hasQueuedOperations = await _hasQueuedOperationsForCalendar(calendar.path);
         if (hasQueuedOperations) {
           //AppLogger.debug('🔄 SyncService: Queue has operations - pushing to server');
+          final swPushQueue = Stopwatch()..start();
           await _processSyncQueueForCalendar(caldavTask, calendar.path, errors);
+          swPushQueue.stop();
+          timings?['pushQueue_ms_total'] = (timings?['pushQueue_ms_total'] ?? 0) + swPushQueue.elapsedMilliseconds;
           
           // Récupérer le nouveau sync-token après push
+          final swGetServerToken2 = Stopwatch()..start();
           final newServerSyncTokenResult = await _getServerSyncToken(caldavProps, calendar);
+          swGetServerToken2.stop();
+          final _prevMaxGetToken2 = timings?['getServerSyncToken_ms_max'] ?? 0;
+          final _currentGetToken2 = swGetServerToken2.elapsedMilliseconds;
+          if (timings != null) {
+            timings['getServerSyncToken_ms_max'] = _currentGetToken2 > _prevMaxGetToken2 ? _currentGetToken2 : _prevMaxGetToken2;
+          }
           await newServerSyncTokenResult.when(
             success: (newServerSyncToken) async {
             AppLogger.debug('🔄 SyncService: Server sync token after queue processing: ${newServerSyncToken}');
@@ -537,21 +952,21 @@ class SyncService implements SyncCommander {
                   },
                 );
               } else {
-                AppLogger.info('🔄 SyncService: Server sync token unchanged after queue processing');
+                AppLogger.info('🔄 SyncService: Server sync token unchanged after queue processing ${calendar.path} ${calendar.displayName}');
               }
             },
             failure: (failure) async {
-              AppLogger.warning('🔄 SyncService: Could not get updated sync token after push: ${failure.message}');
+              AppLogger.warning('🔄 SyncService: Could not get updated sync token after push ${calendar.path} ${calendar.displayName}: ${failure.message}');
             },
           );
           return true;
         }
-        
+
         // Si aucun des deux tests n'est vrai, rien à faire
-        if (localSyncToken == serverSyncToken) {
-          //AppLogger.debug('🔄 SyncService: No changes needed for ${calendar.path}');
-        }
-        
+        // if (localSyncToken == serverSyncToken) {
+        //   AppLogger.debug('🔄 SyncService: No changes needed for ${calendar.path} ${calendar.displayName}');
+        // }
+
         return true;
       },
       failure: (failure) async {
@@ -1105,7 +1520,7 @@ class SyncService implements SyncCommander {
     }
     _scheduledSyncTimer = Timer(delay, () async {
       try {
-        await syncAllActiveCaldav();
+        await syncAllActiveCaldavNoDiscovery();
       } catch (e, stackTrace) {
         AppLogger.error('SyncService: Error during scheduled sync', e, stackTrace);
       } finally {
@@ -1227,7 +1642,7 @@ class SyncService implements SyncCommander {
   /// Sync changes from server using sync-collection REPORT
   Future<void> _syncFromServer(CalDavTaskService caldavTask, CalDavPropertiesService caldavProps, TaskCalendar calendar, String newSyncToken, List<String> errors) async {
     try {
-      //AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
+      AppLogger.debug('🔄 SyncService: Syncing from server for ${calendar.path}');
       
       // Use CalDAVMonitor logic for incremental sync
       final webdavClient = WebDAVClient.fromAccount(caldavTask.account);
@@ -1249,6 +1664,12 @@ class SyncService implements SyncCommander {
         final tasksResult = await caldavTask.fetchTasks(calendar.path);
         await tasksResult.when(
           success: (remoteTasks) async {
+            // Log each fetched task details from server before saving
+            for (final t in remoteTasks) {
+              try {
+                AppLogger.debug("🔄 SyncService: fetched task from server: uid=${t.uid}, summary='${t.summary}', status=${t.status}, project=${calendar.path}");
+              } catch (_) {}
+            }
             for (final task in remoteTasks) {
               final taskWithCalendar = task.copyWith(projectPath: calendar.path);
               await _taskRepository.saveFromSync(taskWithCalendar);
@@ -1256,6 +1677,7 @@ class SyncService implements SyncCommander {
             AppLogger.debug('🔄 SyncService: Full sync completed - ${remoteTasks.length} tasks from ${calendar.path}');
           },
           failure: (failure) async {
+            AppLogger.warning('🔄 SyncService: Failed to fetch tasks from ${calendar.path}: ${failure.message}');
             errors.add('Failed to fetch tasks from ${calendar.path}: ${failure.message}');
           },
         );
@@ -1281,7 +1703,7 @@ class SyncService implements SyncCommander {
         await changesResult.when(
           success: (result) async {
             final changes = result['changes'] as List<dynamic>;
-            //AppLogger.debug('🔄 SyncService: Processing ${changes.length} changes from server');
+            AppLogger.debug('🔄 SyncService: Processing ${changes.length} changes from server');
             
             // Process each change
             for (final change in changes) {
@@ -1293,7 +1715,7 @@ class SyncService implements SyncCommander {
                 // Delete task or journal from local storage
                 await _deleteTaskByHref(href, calendar.path);
                 await _deleteJournalByHref(href, calendar.path);
-                //AppLogger.debug('🔄 SyncService: Deleted item $href');
+                AppLogger.debug('🔄 SyncService: Deleted remote item fetched from server (applied locally): href=$href, project=${calendar.path}');
               } else if (changeType == 'updated') {
                 // Check if it's a task or journal based on the data
                 if (changeMap.containsKey('task')) {
@@ -1302,7 +1724,7 @@ class SyncService implements SyncCommander {
                   final task = Task.fromJson(taskData);
                   final taskWithCalendar = task.copyWith(projectPath: calendar.path);
                   await _taskRepository.saveFromSync(taskWithCalendar);
-                  //AppLogger.debug('🔄 SyncService: Updated task ${task.uid}');
+                  AppLogger.debug("🔄 SyncService: updated task from server applied locally: uid=${task.uid}, summary='${task.summary}', status=${task.status}, project=${calendar.path}");
                 } else if (changeMap.containsKey('journal')) {
                   // Create or update journal in local storage
                   final journalData = changeMap['journal'] as Map<String, dynamic>;

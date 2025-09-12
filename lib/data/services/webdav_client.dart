@@ -25,6 +25,7 @@ import '../../core/result.dart';
 import '../../core/logger.dart';
 import '../../data/models/caldav_account.dart';
 import 'package:openid_client/openid_client.dart';
+import 'auth/token_manager.dart';
 
 class WebDAVResponse {
   final int statusCode;
@@ -493,9 +494,6 @@ class WebDAVClientBasicAuth extends WebDAVClient {
 }
 
 class WebDAVClientKeycloak extends WebDAVClient {
-  String accessToken;
-  String? refreshToken;
-  DateTime? tokenExpiry;
   final String? clientId;
   final String? issuerUrl;
   final void Function(
@@ -507,52 +505,54 @@ class WebDAVClientKeycloak extends WebDAVClient {
 
   WebDAVClientKeycloak({
     required super.serverUrl,
-    required this.accessToken,
-    this.refreshToken,
-    this.tokenExpiry,
+    required String accessToken,
+    String? refreshToken,
+    DateTime? tokenExpiry,
     this.clientId,
     this.issuerUrl,
     super.timeout,
     this.onTokenRefresh,
-  });
-
-  bool get _isTokenExpired {
-    if (tokenExpiry == null) return false;
-    // Add a 1 minute buffer
-    return DateTime.now().isAfter(
-      tokenExpiry!.subtract(const Duration(minutes: 1)),
+  }) {
+    // Configure singleton with latest info
+    TokenManager().configure(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      tokenExpiry: tokenExpiry,
+      clientId: clientId,
+      issuerUrl: issuerUrl,
     );
   }
 
   @override
   Future<Map<String, String>> getAuthHeaders() async {
-    if (_isTokenExpired &&
-        refreshToken != null &&
-        clientId != null &&
-        issuerUrl != null) {
-      try {
-        final issuer = await Issuer.discover(Uri.parse(issuerUrl!));
-        final client = Client(issuer, clientId!, clientSecret: "");
-        final credential = client.createCredential(refreshToken: refreshToken);
-        final tokenResponse = await credential.getTokenResponse();
-        accessToken = tokenResponse.accessToken!;
-        refreshToken = tokenResponse.refreshToken ?? refreshToken;
-        tokenExpiry = tokenResponse.expiresIn != null
-            ? DateTime.now().add(tokenResponse.expiresIn!)
-            : null;
-        if (onTokenRefresh != null) {
-          onTokenRefresh!(accessToken, refreshToken, tokenExpiry);
-        }
-      } catch (e, st) {
-        AppLogger.error(
-          'WebDAVClientKeycloak: Failed to refresh access token',
-          e,
-          st,
-        );
-        // If the error is due to invalid_grant or similar, throw our custom exception
-        throw RefreshTokenExpiredException();
+    try {
+      final manager = TokenManager();
+      final prevAccess = manager.accessToken;
+      final prevRefresh = manager.refreshToken;
+      final prevExpiry = manager.tokenExpiry;
+
+      final token = await manager.getValidAccessToken();
+      if (token == null || token.isEmpty) {
+        throw RefreshTokenExpiredException('No access token available');
       }
+      // propagate updates to caller only if tokens changed
+      if (onTokenRefresh != null) {
+        final changed = prevAccess != manager.accessToken ||
+            prevRefresh != manager.refreshToken ||
+            prevExpiry != manager.tokenExpiry;
+        if (changed) {
+          onTokenRefresh!(
+            manager.accessToken!,
+            manager.refreshToken,
+            manager.tokenExpiry,
+          );
+        }
+      }
+      return {'Authorization': 'Bearer $token'};
+    } catch (e, st) {
+      AppLogger.error('WebDAVClientKeycloak: Failed to obtain valid access token', e, st);
+      // For compatibility with existing code, map errors to RefreshTokenExpiredException
+      throw RefreshTokenExpiredException();
     }
-    return {'Authorization': 'Bearer $accessToken'};
   }
 }

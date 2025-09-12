@@ -11,6 +11,7 @@ import '../../models/caldav_account.dart';
 import '../../../core/result.dart';
 import '../../../core/logger.dart';
 import '../webdav_client.dart';
+import '../auth/token_manager.dart';
 import 'encryption_service.dart';
 
 /// S3 credentials obtained from JWT token
@@ -127,47 +128,57 @@ class S3StorageService {
   /// Get STS credentials from Keycloak JWT token
   Future<Result<S3Credentials>> _getStsCredentials() async {
     try {
-      // Get fresh access token using WebDAV client (handles refresh automatically)
-      if (account.providerType == 'towdow_cloud') {
-        final webdavClient = WebDAVClient.fromAccount(account, onTokenRefresh: (accessToken, refreshToken, tokenExpiry) {
-          // Update our local account object with refreshed tokens
+      // Ensure TokenManager is configured with current account details
+      final manager = TokenManager();
+      manager.configure(
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        tokenExpiry: account.tokenExpiry,
+        clientId: account.clientId,
+        issuerUrl: account.issuerUrl,
+      );
+
+      // Attempt to get a valid access token via the singleton
+      String? accessToken;
+      try {
+        final prevAccess = manager.accessToken;
+        final prevRefresh = manager.refreshToken;
+        final prevExpiry = manager.tokenExpiry;
+        accessToken = await manager.getValidAccessToken();
+        // If tokens changed during refresh, update local account and propagate callback
+        final changed = prevAccess != manager.accessToken ||
+            prevRefresh != manager.refreshToken ||
+            prevExpiry != manager.tokenExpiry;
+        if (changed) {
           account = account.copyWith(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-            tokenExpiry: tokenExpiry,
+            accessToken: manager.accessToken,
+            refreshToken: manager.refreshToken,
+            tokenExpiry: manager.tokenExpiry,
           );
-          AppLogger.debug('S3StorageService._getStsCredentials: Updated local account with refreshed token, new expiry: $tokenExpiry');
-          
-          // Also call the external callback if provided
-          if (onTokenRefresh != null) {
-            onTokenRefresh!(accessToken, refreshToken, tokenExpiry);
+          AppLogger.debug('S3StorageService._getStsCredentials: TokenManager refreshed token, new expiry: ${manager.tokenExpiry}');
+          if (onTokenRefresh != null && manager.accessToken != null) {
+            onTokenRefresh!(manager.accessToken!, manager.refreshToken, manager.tokenExpiry);
           }
-        });
-        
-        try {
-          // This will automatically refresh the token if needed
-          await webdavClient.getAuthHeaders();
-        } on RefreshTokenExpiredException {
-          // Re-throw this specific exception so it can be handled by the UI
-          rethrow;
-        } catch (e) {
-          AppLogger.warning('S3StorageService._getStsCredentials: Token refresh failed, trying with existing token: $e');
         }
+      } on Exception catch (e, st) {
+        // Map failures similar to WebDAV path; if we can't get a token, propagate
+        AppLogger.error('S3StorageService._getStsCredentials: Failed to obtain valid token from TokenManager', e, st);
+        throw RefreshTokenExpiredException();
       }
 
-      if (account.accessToken == null || account.accessToken!.isEmpty) {
+      if (accessToken == null || accessToken.isEmpty) {
         AppLogger.error('S3StorageService._getStsCredentials: No access token available');
         return Result.failure(Failure(message: 'No access token available for STS request'));
       }
 
       // Debug: Parse JWT to check token details
       try {
-        final jwtPayload = _parseJwtPayload(account.accessToken!);
+        final jwtPayload = _parseJwtPayload(accessToken);
         final exp = jwtPayload['exp'] as int?;
         final sub = jwtPayload['sub'] as String?;
         if (exp != null) {
           final expiryTime = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
-          AppLogger.debug('S3StorageService._getStsCredentials: JWT sub=$sub, expires at $expiryTime');
+          // AppLogger.debug('S3StorageService._getStsCredentials: JWT sub=$sub, expires at $expiryTime');
           if (DateTime.now().isAfter(expiryTime)) {
             AppLogger.warning('S3StorageService._getStsCredentials: JWT token appears expired! Current time: ${DateTime.now()}');
           }
@@ -177,12 +188,12 @@ class S3StorageService {
       }
 
       // Use query parameters approach like in sample code
-      final stsUrl = Uri.parse('$_s3Endpoint?Action=AssumeRoleWithWebIdentity&WebIdentityToken=${account.accessToken!}&Version=2011-06-15&DurationSeconds=3600');
-      AppLogger.debug('S3StorageService._getStsCredentials: Making STS request to $stsUrl');
+      final stsUrl = Uri.parse('$_s3Endpoint?Action=AssumeRoleWithWebIdentity&WebIdentityToken=$accessToken&Version=2011-06-15&DurationSeconds=3600');
+      // AppLogger.debug('S3StorageService._getStsCredentials: Making STS request to $stsUrl');
 
       final response = await http.post(stsUrl).timeout(Duration(seconds: 30));
 
-      AppLogger.debug('S3StorageService._getStsCredentials: STS response status: ${response.statusCode}');
+      // AppLogger.debug('S3StorageService._getStsCredentials: STS response status: ${response.statusCode}');
 
       if (response.statusCode != 200) {
         AppLogger.error('S3StorageService._getStsCredentials: STS request failed with status ${response.statusCode}');
@@ -190,7 +201,7 @@ class S3StorageService {
         return Result.failure(Failure(message: 'STS request failed: ${response.statusCode} ${response.body}'));
       }
 
-      AppLogger.debug('S3StorageService._getStsCredentials: Parsing STS XML response');
+      // AppLogger.debug('S3StorageService._getStsCredentials: Parsing STS XML response');
       
       // Parse XML response
       final document = XmlDocument.parse(response.body);
@@ -203,11 +214,11 @@ class S3StorageService {
       
       final expiration = DateTime.parse(expirationStr);
       
-      AppLogger.debug('S3StorageService._getStsCredentials: STS credentials parsed successfully, expires at $expiration');
+      // AppLogger.debug('S3StorageService._getStsCredentials: STS credentials parsed successfully, expires at $expiration');
       
       // Parse JWT to get file size limits
-      final jwtPayload = _parseJwtPayload(account.accessToken!);
-      AppLogger.debug('S3StorageService._getStsCredentials: JWT payload extracted for file limits');
+      final jwtPayload = _parseJwtPayload(accessToken);
+      // AppLogger.debug('S3StorageService._getStsCredentials: JWT payload extracted for file limits');
       
       return Result.success(S3Credentials(
         accessKeyId: accessKeyId,
@@ -232,11 +243,11 @@ class S3StorageService {
   Map<String, dynamic> _parseJwtPayload(String token) {
     try {
       // DEBUG: Log token details for diagnosis
-      AppLogger.debug('S3StorageService._parseJwtPayload: Token length: ${token.length}');
-      AppLogger.debug('S3StorageService._parseJwtPayload: Token starts with: ${token.length > 20 ? token.substring(0, 20) : token}...');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: Token length: ${token.length}');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: Token starts with: ${token.length > 20 ? token.substring(0, 20) : token}...');
       
       final parts = token.split('.');
-      AppLogger.debug('S3StorageService._parseJwtPayload: JWT parts count: ${parts.length}');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: JWT parts count: ${parts.length}');
       
       if (parts.length != 3) {
         AppLogger.warning('S3StorageService._parseJwtPayload: Invalid JWT - expected 3 parts, got ${parts.length}');
@@ -244,7 +255,7 @@ class S3StorageService {
       }
       
       final payload = parts[1];
-      AppLogger.debug('S3StorageService._parseJwtPayload: Payload part length: ${payload.length}');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: Payload part length: ${payload.length}');
       
       // Remove any existing padding and add correct padding
       String normalizedPayload = payload.replaceAll('=', '');
@@ -255,8 +266,8 @@ class S3StorageService {
       final jsonStr = utf8.decode(decoded);
       
       final claims = json.decode(jsonStr) as Map<String, dynamic>;
-      AppLogger.debug('S3StorageService._parseJwtPayload: Successfully parsed JWT with ${claims.keys.length} claims');
-      AppLogger.debug('S3StorageService._parseJwtPayload: Claims keys: ${claims.keys.toList()}');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: Successfully parsed JWT with ${claims.keys.length} claims');
+      // AppLogger.debug('S3StorageService._parseJwtPayload: Claims keys: ${claims.keys.toList()}');
       
       return claims;
     } catch (e, stackTrace) {
