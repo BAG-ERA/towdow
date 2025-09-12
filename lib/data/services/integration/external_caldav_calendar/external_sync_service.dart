@@ -20,6 +20,8 @@ class ExternalCalendarSyncService {
   
   Timer? _syncTimer;
   bool _syncRunning = false;
+  DateTime? _lastSyncAllAt;
+  static const Duration _minSyncInterval = Duration(minutes: 5);
   
   ExternalCalendarSyncService(
     this._accountRepository,
@@ -28,8 +30,8 @@ class ExternalCalendarSyncService {
   );
 
   /// Start background sync with specified interval
-  void startExternalAccountBackgroundSync({Duration interval = const Duration(minutes: 5)}) {
-    AppLogger.info('ExternalCalendarSyncService: Starting background sync with interval: ${interval.inMinutes} minutes');
+  void startExternalAccountBackgroundSync() {
+    AppLogger.info('ExternalCalendarSyncService: Starting background sync with interval: ${_minSyncInterval.inMinutes} minutes');
     
     _syncTimer?.cancel();
     
@@ -38,7 +40,7 @@ class ExternalCalendarSyncService {
       syncAllAccounts();
     }
     
-    _syncTimer = Timer.periodic(interval, (_) async {
+    _syncTimer = Timer.periodic(_minSyncInterval, (_) async {
       if (!_syncRunning) {
         await syncAllAccounts();
       }
@@ -54,9 +56,21 @@ class ExternalCalendarSyncService {
 
   /// Manually sync all accounts
   Future<Result<void>> syncAllAccounts() async {
+    // prevent overlapping runs
     if (_syncRunning) {
       AppLogger.warning('ExternalCalendarSyncService: Sync already running, skipping');
       return const Result.success(null);
+    }
+
+    // enforce minimum interval between syncs
+    final now = DateTime.now();
+    if (_lastSyncAllAt != null) {
+      final since = now.difference(_lastSyncAllAt!);
+      if (since < _minSyncInterval) {
+        final remaining = _minSyncInterval - since;
+        AppLogger.info('ExternalCalendarSyncService: Skipping sync, last run ${since.inSeconds}s ago. Minimum interval ${_minSyncInterval.inMinutes}m, ${remaining.inSeconds}s remaining');
+        return const Result.success(null);
+      }
     }
 
     _syncRunning = true;
@@ -95,6 +109,7 @@ class ExternalCalendarSyncService {
         exception: e is Exception ? e : Exception(e.toString()),
       ));
     } finally {
+      _lastSyncAllAt = DateTime.now();
       _syncRunning = false;
     }
   }
