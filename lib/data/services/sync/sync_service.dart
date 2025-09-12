@@ -278,24 +278,32 @@ class SyncService implements SyncCommander {
       final capabilitiesResult = await caldavService.discoverCapabilities();
       return await capabilitiesResult.when(
         success: (capabilities) async {
-          // Persist principal and calendarHome if not stored yet or changed
+          // Persist principal and calendarHome if not stored yet or changed (run in background to avoid delaying ensure step)
           try {
             final newPrincipal = capabilities.principal;
             final newHome = capabilities.calendarHome;
             if (account.principal != newPrincipal || account.calendarHome != newHome) {
               final updated = account.copyWith(principal: newPrincipal, calendarHome: newHome);
-              final saveRes = await _accountRepository.save(updated);
-              await saveRes.when(
-                success: (_) {
-                  AppLogger.debug('CalDAVMonitor: Cached principal/home in account');
-                },
-                failure: (f) async {
-                  AppLogger.warning('CalDAVMonitor: Failed to cache principal/home in account: ${f.message}');
-                },
-              );
+              // Kick off caching asynchronously; errors will be logged inside
+              Future(() async {
+                try {
+                  final saveRes = await _accountRepository.save(updated);
+                  await saveRes.when(
+                    success: (_) {
+                      AppLogger.debug('CalDAVMonitor: Cached principal/home in account');
+                    },
+                    failure: (f) async {
+                      AppLogger.warning('CalDAVMonitor: Failed to cache principal/home in account: ${f.message}');
+                    },
+                  );
+                } catch (e, st) {
+                  AppLogger.warning('CalDAVMonitor: Exception while caching principal/home async: $e');
+                  AppLogger.debug('CalDAVMonitor: Stack: $st');
+                }
+              });
             }
           } catch (e, st) {
-            AppLogger.warning('CalDAVMonitor: Exception while caching principal/home: $e');
+            AppLogger.warning('CalDAVMonitor: Exception while preparing caching principal/home: $e');
             AppLogger.debug('CalDAVMonitor: Stack: $st');
           }
 
@@ -462,18 +470,35 @@ class SyncService implements SyncCommander {
           AppLogger.info('CalDAVMonitor: ${toRemove.length} local calendars not present in discovery');
 
           // For owned calendars, just unsync locally. Shared-with-me calendars are removed via share flow.
+          final ownedToRemove = <TaskCalendar>[];
           for (final calendar in toRemove) {
             if (calendar.isSharedWithMe) {
               // Skip here; handled by _checkAndUpdateSharedProjects
               AppLogger.debug('CalDAVMonitor: Skipping shared-with-me calendar missing from discovery: ${calendar.path}');
-              continue;
+            } else {
+              ownedToRemove.add(calendar);
             }
-            AppLogger.info('CalDAVMonitor: Unsyncing disappeared owned calendar: ${calendar.path}');
-            final res = await _calendarRepository.unsyncCalendar(calendar.path);
-            res.when(
-              success: (_) => AppLogger.debug('CalDAVMonitor: Unsynced ${calendar.path}'),
-              failure: (f) => AppLogger.warning('CalDAVMonitor: Failed to unsync ${calendar.path}: ${f.message}'),
-            );
+          }
+          if (ownedToRemove.isNotEmpty) {
+            const int maxConcurrent = 4; // bounded concurrency to avoid repository contention
+            int idx = 0;
+            Future<void> worker() async {
+              while (true) {
+                if (idx >= ownedToRemove.length) break;
+                final current = ownedToRemove[idx++];
+                AppLogger.info('CalDAVMonitor: Unsyncing disappeared owned calendar: ${current.path}');
+                final res = await _calendarRepository.unsyncCalendar(current.path);
+                res.when(
+                  success: (_) => AppLogger.debug('CalDAVMonitor: Unsynced ${current.path}'),
+                  failure: (f) => AppLogger.warning('CalDAVMonitor: Failed to unsync ${current.path}: ${f.message}'),
+                );
+              }
+            }
+            final futures = <Future<void>>[];
+            for (int i = 0; i < maxConcurrent; i++) {
+              futures.add(worker());
+            }
+            await Future.wait(futures);
           }
 
           // Cleanup orphaned tasks referencing calendars that are not in discovery
