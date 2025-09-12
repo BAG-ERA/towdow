@@ -788,12 +788,16 @@ class SyncService implements SyncCommander {
     } catch (_) {
       // ignore push-first failures; pull will still proceed
     }
-    // Étape 1: Obtenir le sync-token actuel du serveur
-    final swGetToken = Stopwatch()..start();
+    // step 1: get current sync-token from server
+    final swGetServerToken1 = Stopwatch()..start();
     final serverSyncTokenResult = await _getServerSyncToken(caldavProps, calendar);
-    swGetToken.stop();
-    timings?['getServerSyncToken_ms_total'] = (timings['getServerSyncToken_ms_total'] ?? 0) + swGetToken.elapsedMilliseconds;
-    
+    swGetServerToken1.stop();
+    final prevMaxGetToken1 = timings?['getServerSyncToken_ms_max'] ?? 0;
+    final currentGetToken1 = swGetServerToken1.elapsedMilliseconds;
+    if (timings != null) {
+      timings['getServerSyncToken_ms_max'] = currentGetToken1 > prevMaxGetToken1 ? currentGetToken1 : prevMaxGetToken1;
+    }
+
     return await serverSyncTokenResult.when(
       success: (serverSyncToken) async {
         final localSyncToken = calendar.syncToken;
@@ -806,7 +810,11 @@ class SyncService implements SyncCommander {
           final swSyncFromServer = Stopwatch()..start();
           await _syncFromServer(caldavTask, caldavProps, calendar, serverSyncToken, errors);
           swSyncFromServer.stop();
-          timings?['syncFromServer_ms_total'] = (timings?['syncFromServer_ms_total'] ?? 0) + swSyncFromServer.elapsedMilliseconds;
+          final prevMax = timings?['syncFromServer_ms_max'] ?? 0;
+          final current = swSyncFromServer.elapsedMilliseconds;
+          if (timings != null) {
+            timings['syncFromServer_ms_max'] = current > prevMax ? current : prevMax;
+          }
           return true;
         }
         
@@ -866,7 +874,14 @@ class SyncService implements SyncCommander {
           timings?['pushQueue_ms_total'] = (timings?['pushQueue_ms_total'] ?? 0) + swPushQueue.elapsedMilliseconds;
           
           // Récupérer le nouveau sync-token après push
+          final swGetServerToken2 = Stopwatch()..start();
           final newServerSyncTokenResult = await _getServerSyncToken(caldavProps, calendar);
+          swGetServerToken2.stop();
+          final _prevMaxGetToken2 = timings?['getServerSyncToken_ms_max'] ?? 0;
+          final _currentGetToken2 = swGetServerToken2.elapsedMilliseconds;
+          if (timings != null) {
+            timings['getServerSyncToken_ms_max'] = _currentGetToken2 > _prevMaxGetToken2 ? _currentGetToken2 : _prevMaxGetToken2;
+          }
           await newServerSyncTokenResult.when(
             success: (newServerSyncToken) async {
             AppLogger.debug('🔄 SyncService: Server sync token after queue processing: ${newServerSyncToken}');
