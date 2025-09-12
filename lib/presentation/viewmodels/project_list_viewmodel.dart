@@ -870,10 +870,11 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
 
   /// Get project by ID
   ProjectWithStats? getProjectById(String projectPath) {
-    return state.projects.cast<ProjectWithStats?>().firstWhere(
-      (p) => p?.project.path == projectPath,
-      orElse: () => null,
-    );
+    try {
+      return state.projects.firstWhere((p) => p.project.path == projectPath);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Check if any project is currently syncing
@@ -1047,10 +1048,12 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
         
         // Add projects in user-defined order
         for (final projectPath in projectOrder) {
-          final project = allProjects.cast<ProjectWithStats?>().firstWhere(
-            (p) => p?.project.path == projectPath,
-            orElse: () => null,
-          );
+          ProjectWithStats? project;
+          try {
+            project = allProjects.firstWhere((p) => p.project.path == projectPath);
+          } catch (_) {
+            project = null;
+          }
           if (project != null) {
             orderedProjects.add(project);
           }

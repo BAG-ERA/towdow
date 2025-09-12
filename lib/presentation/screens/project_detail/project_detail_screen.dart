@@ -767,20 +767,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
   Widget _buildProjectActionButton(BuildContext context, TaskCalendar project) {
-    // Check if this project is shared with the current user using the same logic as _acknowledgeSharedProjectIfNeeded
-    final userPreferencesAsync = ref.watch(userPreferencesProvider);
-    
-    return userPreferencesAsync.when(
-      data: (preferences) {
-        final sharedProject = preferences.getSharedProject(project.uid);
-        final isSharedWithMe = sharedProject != null;
-        
+    // Determine if this project is shared with me by checking if we have a sharer email
+    final sharedByAsync = ref.watch(projectSharedByProvider(project.uid));
+    return sharedByAsync.when(
+      data: (sharedBy) {
+        final isSharedWithMe = sharedBy.isNotEmpty;
         if (isSharedWithMe) {
           // Show exit share button for shared projects
           return ExitShareButton.compact(
             projectPath: project.path,
             projectDisplayName: project.displayName,
-            // Navigation is handled internally by ExitShareButton
           );
         } else {
           // Show archive button for owned projects
