@@ -518,6 +518,15 @@ class ProjectKanbanView extends ConsumerWidget {
         ),
         actions: [
           TextButton(
+            onPressed: () async {
+              final kanbanViewModel = ref.read(projectKanbanViewModelProvider(projectPath).notifier);
+              Navigator.of(context).pop();
+              await kanbanViewModel.clearFilter();
+              onTasksRefresh?.call();
+            },
+            child: Text(AppLocalizations.of(context)!.reset),
+          ),
+          TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text(AppLocalizations.of(context)!.close),
           ),

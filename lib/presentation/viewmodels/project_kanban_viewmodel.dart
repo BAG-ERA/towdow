@@ -488,6 +488,38 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
     }
   }
 
+  /// Clear the kanban filter (show all columns)
+  Future<void> clearFilter() async {
+    if (state.projectPath == null) {
+      state = state.copyWith(error: 'No project selected');
+      return;
+    }
+
+    state = state.copyWith(isSaving: true, error: null);
+
+    try {
+      AppLogger.info('ProjectKanbanViewModel: Clearing kanban filter (regex -> .* )');
+
+      // Get the current kanban or create a default one
+      Kanban currentKanban = state.selectedKanban ??
+          (state.kanbans.isNotEmpty ? state.kanbans.first : const Kanban(title: 'Default'));
+
+      // Set regex to match-all pattern
+      final updatedKanban = currentKanban.copyWith(regex: r'.*');
+
+      // Update the kanban
+      await updateKanban(updatedKanban);
+
+      AppLogger.info('ProjectKanbanViewModel: Successfully cleared kanban filter');
+    } catch (e, stackTrace) {
+      AppLogger.error('ProjectKanbanViewModel: Exception clearing kanban filter', e, stackTrace);
+      state = state.copyWith(
+        isSaving: false,
+        error: 'Failed to clear kanban filter: $e',
+      );
+    }
+  }
+
   /// Clear any errors
   void clearError() {
     state = state.copyWith(error: null);
