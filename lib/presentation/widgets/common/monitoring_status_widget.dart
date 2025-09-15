@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers_viewmodels.dart';
 import '../../viewmodels/monitoring_status_viewmodel.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 class MonitoringStatusWidget extends ConsumerStatefulWidget {
   final bool compact;
@@ -49,17 +50,17 @@ class _MonitoringStatusWidgetState extends ConsumerState<MonitoringStatusWidget>
       case MonitoringUiState.inProgress:
         icon = Icons.sync_rounded;
         color = Theme.of(context).colorScheme.primary;
-        label = 'Monitoring in progress';
+        label = AppLocalizations.of(context)!.monitoringInProgress;
         break;
       case MonitoringUiState.waiting:
         icon = Icons.schedule_rounded;
         color = Theme.of(context).colorScheme.secondary;
-        label = 'Monitoring waiting';
+        label = AppLocalizations.of(context)!.monitoringWaiting;
         break;
       case MonitoringUiState.offline:
         icon = Icons.wifi_off_rounded;
         color = Theme.of(context).colorScheme.error;
-        label = 'Offline: monitoring paused';
+        label = AppLocalizations.of(context)!.monitoringOffline;
         break;
     }
 
@@ -69,17 +70,26 @@ class _MonitoringStatusWidgetState extends ConsumerState<MonitoringStatusWidget>
       iconWidget = RotationTransition(turns: _controller, child: iconWidget);
     }
 
+    final l10n = AppLocalizations.of(context)!;
+    final tooltip = switch (state) {
+      MonitoringUiState.inProgress => l10n.monitoringTooltipInProgress,
+      MonitoringUiState.waiting => l10n.monitoringTooltipWaiting,
+      MonitoringUiState.offline => l10n.monitoringTooltipOffline,
+    };
+
     if (widget.compact) {
       return Tooltip(
-        message: label,
+        message: tooltip,
         child: Semantics(
-          label: label,
+          label: tooltip,
           child: iconWidget,
         ),
       );
     }
 
-    return Container(
+    return Tooltip(
+      message: tooltip,
+      child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
@@ -97,6 +107,6 @@ class _MonitoringStatusWidgetState extends ConsumerState<MonitoringStatusWidget>
           ),
         ],
       ),
-    );
+    ));
   }
 }
