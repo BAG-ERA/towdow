@@ -84,9 +84,11 @@ final projectStepViewModelProvider = StateNotifierProvider.family<StepViewModel,
 final projectKanbanViewModelProvider = StateNotifierProvider.family<ProjectKanbanViewModel, ProjectKanbanState, String>((ref, projectPath) {
   final kanbanRepository = ref.watch(kanbanRepositoryProvider);
   final categoryRepository = ref.watch(categoryRepositoryProvider);
+  final calendarRepository = ref.watch(calendarRepositoryProvider);
   final viewModel = ProjectKanbanViewModel(
     kanbanRepository,
     categoryRepository,
+    calendarRepository,
   );
   viewModel.initialize(projectPath);
   return viewModel;

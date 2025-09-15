@@ -11,6 +11,9 @@ import '../../data/models/kanban.dart';
 import '../../data/models/category.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/kanban_repository.dart';
+import '../../data/repositories/calendar_repository.dart';
+import '../../data/models/task_calendar.dart';
+import 'dart:async';
 
 part 'project_kanban_viewmodel.freezed.dart';
 
@@ -38,16 +41,25 @@ abstract class ProjectKanbanState with _$ProjectKanbanState {
 class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
   final KanbanRepository _kanbanRepository;
   final CategoryRepository _categoryRepository;
+  final CalendarRepository _calendarRepository;
+  StreamSubscription<List<TaskCalendar>>? _calendarSub;
+  String? _lastFlowitKanban;
 
   ProjectKanbanViewModel(
     this._kanbanRepository,
     this._categoryRepository,
+    this._calendarRepository,
   ) : super(const ProjectKanbanState());
 
   /// Initialize the view model for a specific project
   Future<void> initialize(String projectPath) async {
     AppLogger.info('ProjectKanbanViewModel: Initializing for project $projectPath');
     
+    // Cancel existing calendar subscription if any (e.g., switching projects)
+    await _calendarSub?.cancel();
+    _calendarSub = null;
+    _lastFlowitKanban = null;
+
     state = state.copyWith(
       isLoading: true, 
       error: null, 
@@ -58,6 +70,36 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
       await _loadKanbans(projectPath);
       await _loadAvailableCategories(projectPath);
       state = state.copyWith(isLoading: false);
+
+      // Prime last known kanban to current value to avoid redundant refresh
+      try {
+        final calRes = await _calendarRepository.getByPath(projectPath);
+        await calRes.when(
+          success: (cal) async {
+            _lastFlowitKanban = cal?.flowitKanban;
+          },
+          failure: (_) async {},
+        );
+      } catch (_) {}
+
+      // Subscribe to calendar changes and reload kanban on flowitKanban change
+      _calendarSub = _calendarRepository.watchCalendars().listen((calendars) async {
+        // Find our project
+        try {
+          final cal = calendars.firstWhere((c) => c.path == projectPath);
+          final newKanban = cal.flowitKanban;
+          if (newKanban != _lastFlowitKanban) {
+            AppLogger.info('ProjectKanbanViewModel: Detected flowitKanban change via calendar stream, reloading kanbans');
+            _lastFlowitKanban = newKanban;
+            // Only reload if this VM is still bound to the same project
+            if (state.projectPath == projectPath) {
+              await _loadKanbans(projectPath);
+            }
+          }
+        } catch (_) {
+          // Project calendar not present in stream; ignore
+        }
+      });
     } catch (e, stackTrace) {
       AppLogger.error('ProjectKanbanViewModel: Failed to initialize', e, stackTrace);
       state = state.copyWith(
@@ -524,10 +566,16 @@ class ProjectKanbanViewModel extends StateNotifier<ProjectKanbanState> {
   void clearError() {
     state = state.copyWith(error: null);
   }
-
+  
+  @override
+  void dispose() {
+    _calendarSub?.cancel();
+    super.dispose();
+  }
+  
   /// Get the current project path
   String? get projectPath => state.projectPath;
-
+  
   /// Check if any operation is in progress
   bool get isBusy => state.isLoading || state.isSaving || state.isDeleting || state.isSyncing;
-} 
+}
