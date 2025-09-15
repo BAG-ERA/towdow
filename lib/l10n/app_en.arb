@@ -343,6 +343,13 @@
   "createNewProject": "Create New Project",
   "createWorkflow": "Create Workflow",
   "addNewTask": "Add New Task",
-  "exitShare": "Exit Share"
+  "exitShare": "Exit Share",
+
+  "monitoringInProgress": "Monitoring…",
+  "monitoringWaiting": "Waiting",
+  "monitoringOffline": "Offline",
+  "monitoringTooltipInProgress": "Monitoring changes and syncing if needed",
+  "monitoringTooltipWaiting": "Idle, waiting for the next check",
+  "monitoringTooltipOffline": "No internet connection"
 }
 

@@ -15,6 +15,7 @@ import '../../presentation/viewmodels/project_sharing_viewmodel.dart';
 import '../../presentation/viewmodels/step_viewmodel.dart';
 import '../../presentation/viewmodels/project_notes_viewmodel.dart';
 import '../../presentation/viewmodels/note_viewmodel.dart';
+import '../../presentation/viewmodels/monitoring_status_viewmodel.dart';
 
 import '../../data/models/journal.dart';
 import 'providers_repositories.dart';
@@ -171,3 +172,15 @@ final noteViewModelProvider = StateNotifierProvider.family<NoteViewModel, NoteSt
 });
 
 
+
+// Monitoring status ViewModel provider
+final monitoringStatusViewModelProvider = StateNotifierProvider<MonitoringStatusViewModel, MonitoringUiState>((ref) {
+  final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
+  final syncService = ref.watch(syncServiceProvider);
+  final caldavMonitor = ref.watch(caldavMonitorProvider);
+  return MonitoringStatusViewModel(
+    connectionMonitorService: connectionMonitorService,
+    syncService: syncService,
+    caldavMonitor: caldavMonitor,
+  );
+});

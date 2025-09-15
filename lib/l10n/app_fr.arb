@@ -343,6 +343,13 @@
   "createNewProject": "Créer un nouveau projet",
   "createWorkflow": "Créer un workflow",
   "addNewTask": "Ajouter une nouvelle tâche",
-  "exitShare": "Quitter le partage"
+  "exitShare": "Quitter le partage",
+
+  "monitoringInProgress": "Surveillance…",
+  "monitoringWaiting": "En attente",
+  "monitoringOffline": "Hors ligne",
+  "monitoringTooltipInProgress": "Surveillance des changements et synchronisation si nécessaire",
+  "monitoringTooltipWaiting": "En veille, en attente du prochain contrôle",
+  "monitoringTooltipOffline": "Pas de connexion Internet"
 }
 

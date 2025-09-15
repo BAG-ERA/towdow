@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
 import 'utils/voice_feedback_button.dart';
 import 'utils/editable_title.dart';
+import 'common/monitoring_status_widget.dart';
 
 class HeaderScreenWidget extends ConsumerWidget implements PreferredSizeWidget {
   const HeaderScreenWidget({
@@ -78,10 +79,15 @@ class HeaderScreenWidget extends ConsumerWidget implements PreferredSizeWidget {
   }
 
   List<Widget>? _buildActions(BuildContext context, WidgetRef ref) {
+    final actions = <Widget>[];
     if (showVoiceFeedback) {
-      return [const VoiceFeedbackButton()];
+      actions.add(const VoiceFeedbackButton());
     }
-    return null;
+    actions.add(const Padding(
+      padding: EdgeInsets.only(right: 12.0),
+      child: MonitoringStatusWidget(compact: true),
+    ));
+    return actions;
   }
 
   String _getBackButtonTooltip(BuildContext context) {
