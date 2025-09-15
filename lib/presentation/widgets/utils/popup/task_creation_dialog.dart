@@ -10,6 +10,7 @@ import '../../../viewmodels/attendee_suggestions_viewmodel.dart';
 import '../../../../data/models/task.dart';
 import '../../../../data/models/attendee.dart';
 import '../../../../data/providers/providers.dart';
+import '../../../../data/models/requirement.dart';
 import 'due_date_dialog.dart';
 import 'category_dialog.dart';
 import 'attendee_dialog.dart';
@@ -504,7 +505,12 @@ class _ProfileSelector extends ConsumerWidget {
                       Wrap(
                         spacing: 6,
                         children: selectedIds.map((id) {
-                          final label = items.firstWhere((r) => r.id == id, orElse: () => null);
+                          Requirement? label;
+                          try {
+                            label = items.firstWhere((r) => r.id == id);
+                          } catch (_) {
+                            label = null;
+                          }
                           final name = label?.name ?? id;
                           return Chip(
                             label: Text(name),

@@ -256,60 +256,63 @@ class ProjectInfosWidget extends ConsumerWidget {
           // Members - Always displayed
           sharedByAsync.when(
             data: (sharedBy) {
-              final membersList = <String>[];
               final isSharedWithMe = sharedBy.isNotEmpty;
-              
-              // Add shared members
-              if (project.sharedWithEmails.isNotEmpty) {
-                membersList.addAll(project.sharedWithEmails);
-              }
-              
-              // Add current user (project owner or shared with me)
-              if (isSharedWithMe) {
-                // Project is shared with me, add the sharer to the list
-                if (!membersList.contains(sharedBy)) {
-                  membersList.add(sharedBy);
-                }
-                // Also add current user to the list when project is shared with me
-                final currentUser = project.flowitOwner ?? project.flowitAuthor ?? '';
-                if (currentUser.isNotEmpty && !membersList.contains(currentUser)) {
-                  membersList.add(currentUser);
-                }
-              } else {
-                // Project is owned by me, add myself to the list
-                final currentUser = project.flowitOwner ?? project.flowitAuthor ?? '';
-                if (currentUser.isNotEmpty && !membersList.contains(currentUser)) {
-                  membersList.add(currentUser);
-                }
-              }
-              
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDetailRow(context, 'Members', 
-                    membersList.isNotEmpty ? membersList.join(', ') : 'No members'
-                  ),
-                  // Only show "Manage sharing" if project is not shared with me (i.e., I own it)
-                  if (!isSharedWithMe) ...[
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => ProjectSharingDialog(project: project),
-                        );
-                      },
-                      child: Text(
-                        'Manage sharing',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          decoration: TextDecoration.underline,
-                          fontWeight: FontWeight.w500,
+              // Get current user email from account repository to avoid relying on project metadata
+              final accountRepository = ref.watch(accountRepositoryProvider);
+              return FutureBuilder<String?>(
+                future: _getCurrentUserEmail(accountRepository),
+                builder: (context, snapshot) {
+                  final currentUserEmail = snapshot.data ?? '';
+                  final membersList = <String>[];
+
+                  // Add users this project is shared with (targets)
+                  if (project.sharedWithEmails.isNotEmpty) {
+                    membersList.addAll(project.sharedWithEmails);
+                  }
+
+                  if (isSharedWithMe) {
+                    // Add the sharer/owner
+                    if (!membersList.contains(sharedBy)) {
+                      membersList.add(sharedBy);
+                    }
+                    // Add the logged-in user
+                    if (currentUserEmail.isNotEmpty && !membersList.contains(currentUserEmail)) {
+                      membersList.add(currentUserEmail);
+                    }
+                  } else {
+                    // Owned by me: add the logged-in user
+                    if (currentUserEmail.isNotEmpty && !membersList.contains(currentUserEmail)) {
+                      membersList.add(currentUserEmail);
+                    }
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDetailRow(context, 'Members', membersList.isNotEmpty ? membersList.join(', ') : 'No members'),
+                      // Only show "Manage sharing" if project is not shared with me (i.e., I own it)
+                      if (!isSharedWithMe) ...[
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => ProjectSharingDialog(project: project),
+                            );
+                          },
+                          child: Text(
+                            'Manage sharing',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                ],
+                      ],
+                    ],
+                  );
+                },
               );
             },
             loading: () {

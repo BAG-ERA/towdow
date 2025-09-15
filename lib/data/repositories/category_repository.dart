@@ -76,6 +76,25 @@ class CategoryRepository {
     if (_categoryCache.isEmpty) {
       await initialize();
     }
+
+    // Always refresh categories for this project from the latest calendar snapshot.
+    try {
+      final calRes = await _calendarRepository.getByPath(projectPath);
+      await calRes.when(
+        success: (cal) async {
+          if (cal != null) {
+            // Reset mapping for this project, then load from calendar JSON.
+            _projectCategoriesMap[projectPath] = <String>{};
+            await loadCategoriesFromCalendar(cal);
+          }
+        },
+        failure: (failure) async {
+          AppLogger.warning('CategoryRepository: Could not refresh project categories for $projectPath: ${failure.message}');
+        },
+      );
+    } catch (e, st) {
+      AppLogger.warning('CategoryRepository: Exception while refreshing project categories for $projectPath: $e');
+    }
     
     final categoryIds = _projectCategoriesMap[projectPath] ?? <String>{};
     final categories = categoryIds

@@ -39,9 +39,13 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
   Widget build(BuildContext context) {
     final tasksAsync = ref.watch(projectTasksProvider(widget.workflowPath));
     final encoded = widget.workflowPath.replaceAll('@', '%40');
-    final projectAsync = ref.watch(calendarListProvider).whenData(
-      (cals) => cals.cast<TaskCalendar?>().firstWhere((c) => c?.path == encoded, orElse: () => null),
-    );
+    final projectAsync = ref.watch(calendarListProvider).whenData((cals) {
+      try {
+        return cals.firstWhere((c) => c.path == encoded);
+      } catch (_) {
+        return null;
+      }
+    });
 
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
