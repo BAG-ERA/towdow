@@ -60,6 +60,11 @@ class CalDAVMonitor {
   bool _isPerformingMonitoring = false; // Guard against concurrent executions
   Duration _currentInterval = _initialInterval;
 
+  // UI/observers stream to notify when a monitoring cycle starts/stops
+  final StreamController<bool> _monitoringActivityController = StreamController<bool>.broadcast();
+  Stream<bool> get monitoringActivityStream => _monitoringActivityController.stream;
+  bool get isPerformingMonitoring => _isPerformingMonitoring;
+
   CalDAVMonitor({
     Ref? ref,
     required AccountRepository accountRepository,
@@ -122,6 +127,12 @@ class CalDAVMonitor {
     _monitorTimer?.cancel();
     _monitorTimer = null;
     _isMonitoring = false;
+
+    // If a monitoring cycle was flagged as in progress (edge case), reset and notify
+    if (_isPerformingMonitoring) {
+      _isPerformingMonitoring = false;
+      try { _monitoringActivityController.add(false); } catch (_) {}
+    }
     
     AppLogger.info('CalDAVMonitor: Stopped calendar monitoring');
   }
@@ -163,6 +174,7 @@ class CalDAVMonitor {
     }
 
     _isPerformingMonitoring = true;
+    try { _monitoringActivityController.add(true); } catch (_) {}
     final DateTime monitoringStart = DateTime.now();
     AppLogger.debug('CalDAVMonitor['+instanceId.toString()+']: start performMonitoring at ${monitoringStart.toIso8601String()}');
     try {
@@ -284,6 +296,7 @@ class CalDAVMonitor {
     } finally {
       // Release per-instance flag and global guard if owned
       _isPerformingMonitoring = false;
+      try { _monitoringActivityController.add(false); } catch (_) {}
       final int instanceId = identityHashCode(this);
       if (_globalRunnerId == instanceId) {
         _globalRunnerId = null;
@@ -392,7 +405,7 @@ class CalDAVMonitor {
       _performChangeMonitoring();
     });
   }
-  /// Check if monitoring is active
+  /// Check if monitoring service is running at all (irrespective of active cycle)
   bool get isMonitoring => _isMonitoring;
 
   /// Get current monitoring interval
@@ -740,5 +753,6 @@ class CalDAVMonitor {
   /// Dispose resources
   void dispose() {
     stop();
+    try { _monitoringActivityController.close(); } catch (_) {}
   }
 }
