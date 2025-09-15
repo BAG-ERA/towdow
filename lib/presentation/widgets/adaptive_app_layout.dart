@@ -12,6 +12,7 @@ import '../../data/models/task_calendar.dart';
 import '../../data/providers/providers.dart';
 import 'utils/popup/move_to_domain_dialog.dart';
 import 'utils/popup/project_sharing_dialog.dart';
+import 'common/monitoring_status_widget.dart';
 
 // Provider for dynamic mobile title (used by detail screens)
 final mobileTitleProvider = StateProvider<String?>((ref) => null);
@@ -255,6 +256,12 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
                 : AppLocalizations.of(context)!.backToNavigation,
           ),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12.0),
+            child: MonitoringStatusWidget(compact: true),
+          ),
+        ],
       ) : null,
       body: SafeArea(
         child: SlideTransition(
