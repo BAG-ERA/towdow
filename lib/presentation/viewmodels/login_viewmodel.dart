@@ -16,6 +16,8 @@ import 'package:http/http.dart' as http;
 import 'package:openid_client/openid_client_io.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
+import 'package:towdow_app/web/web_utils.dart';
 import '../../core/logger.dart';
 import '../../core/result.dart';
 
@@ -24,6 +26,7 @@ import '../../data/services/integration/external_caldav_calendar/external_sync_s
 import '../../data/services/storage/s3_storage_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/providers/providers.dart';
+import '../../web/web_utils.dart';
 
 // Login state for authentication flows
 class LoginState {
@@ -371,11 +374,98 @@ class LoginViewModel extends StateNotifier<LoginState> {
   void reset() {
     state = const LoginState();
   }
+
+  /// Authenticate on web using an authorization code (Keycloak)
+  Future<void> authenticateWebWithAuthCode({
+    required String code,
+    String issuerUrl = "https://auth.towdow.app/realms/towdow",
+    String clientId = "radicale-api",
+    String serverUrl = "https://api.towdow.app",
+    String? redirectUri,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final tokenEndpoint = "$issuerUrl/protocol/openid-connect/token";
+
+      // On web, use a fetch-based form-encoded POST to avoid CORS preflight issues.
+      int statusCode;
+      String bodyStr;
+      if (kIsWeb) {
+        final res = await postFormUrlEncoded(tokenEndpoint, {
+          'grant_type': 'authorization_code',
+          'client_id': clientId,
+          'code': code,
+          'redirect_uri': redirectUri ?? getRedirectUri(),
+        });
+        statusCode = res.statusCode;
+        bodyStr = res.body;
+      } else {
+        final response = await http.post(
+          Uri.parse(tokenEndpoint),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: {
+            'grant_type': 'authorization_code',
+            'client_id': clientId,
+            'code': code,
+            'redirect_uri': redirectUri ?? getRedirectUri(),
+          },
+        );
+        statusCode = response.statusCode;
+        bodyStr = response.body;
+      }
+
+      if (statusCode != 200) {
+        throw Exception('Auth code exchange failed: $statusCode');
+      }
+
+      final tokenData = jsonDecode(bodyStr);
+
+      final account = CaldavAccount(
+        id: const Uuid().v4(),
+        providerType: serverUrl == "https://api.towdow.app" ? 'towdow_cloud' : 'towdow_self_hosted',
+        serverUrl: serverUrl,
+        username: '',
+        accessToken: tokenData['access_token'],
+        refreshToken: tokenData['refresh_token'],
+        tokenExpiry: DateTime.now().add(Duration(seconds: tokenData['expires_in'] ?? 3600)),
+        clientId: clientId,
+        issuerUrl: issuerUrl,
+        createdAt: DateTime.now(),
+        lastSyncAt: DateTime.now(),
+        isActive: true,
+      );
+
+      await _accountRepository.save(account);
+
+      try {
+        final returning = await _detectReturningUser(account);
+        if (!mounted) return; // notifier might have been disposed
+        state = state.copyWith(isReturningUser: returning);
+      } catch (_) {}
+
+      try {
+        final syncResult = await _externalSyncService.syncAllAccounts();
+        syncResult.when(
+          success: (_) => AppLogger.info('Login: External calendar sync completed successfully'),
+          failure: (failure) => AppLogger.warning('Login: External calendar sync failed: ${failure.message}'),
+        );
+      } catch (e, stackTrace) {
+        AppLogger.error('Login: Failed to trigger external calendar sync', e, stackTrace);
+      }
+
+      if (!mounted) return;
+      state = state.copyWith(account: account, isLoading: false);
+    } catch (e, stackTrace) {
+      AppLogger.error('Login: Auth code authentication failed', e, stackTrace);
+      if (!mounted) return;
+      state = state.copyWith(error: 'Authentication failed: ${e.toString()}', isLoading: false);
+    }
+  }
 }
 
 // Provider
 final loginViewModelProvider =
-    StateNotifierProvider.autoDispose<LoginViewModel, LoginState>(
+    StateNotifierProvider<LoginViewModel, LoginState>(
       (ref) => LoginViewModel(
         accountRepository: ref.read(accountRepositoryProvider),
         externalSyncService: ref.read(externalCalendarSyncServiceProvider),

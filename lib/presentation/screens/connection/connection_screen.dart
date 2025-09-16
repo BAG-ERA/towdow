@@ -10,6 +10,9 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../../data/models/caldav_account.dart';
 import '../../../data/providers/providers.dart';
+import '../../viewmodels/login_viewmodel.dart';
+import '../../../../web/web_utils.dart';
+import '../../../core/logger.dart';
 
 class ConnectionScreen extends ConsumerStatefulWidget {
   const ConnectionScreen({super.key});
@@ -20,6 +23,34 @@ class ConnectionScreen extends ConsumerStatefulWidget {
 
 class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   bool _showHostingChoice = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Auto-login via auth code saved in local storage (Web)
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final authCode = WebLocalStorage.getItem('authCode');
+        if (authCode != null && authCode.isNotEmpty) {
+          // Clear immediately to prevent relogging loops
+          WebLocalStorage.removeItem('authCode');
+          AppLogger.info('ConnectionScreen: Found authCode in localStorage, starting login');
+
+          // Start authentication with default TowDow Cloud settings
+          await ref.read(loginViewModelProvider.notifier).authenticateWebWithAuthCode(
+                code: authCode,
+              );
+        }
+      } catch (e) {
+        AppLogger.error('ConnectionScreen: Error during auto-login with auth code: $e');
+      }
+    });
+
+    // Listen for login state changes to navigate on success
+    // NOTE: ref.listen cannot be used in initState on web (Riverpod assertion). Use post-frame + listen in build instead.
+    // Moved to build() using ref.listen and guarding with a flag to avoid duplicate setup.
+  }
 
   void _openOtherMethodsSheet() {
     showModalBottomSheet(
@@ -129,8 +160,31 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     }
   }
 
+  bool _didSetupListen = false;
+
   @override
   Widget build(BuildContext context) {
+    // Setup Riverpod listen within build to satisfy web assertion
+    if (!_didSetupListen) {
+      _didSetupListen = true;
+      ref.listen<LoginState>(loginViewModelProvider, (previous, current) {
+        if (!mounted) return;
+        if (current.account != null) {
+          // Invalidate providers so router recognizes account
+          ref.invalidate(hasActiveAccountProvider);
+          ref.invalidate(activeAccountProvider);
+
+          final account = current.account!;
+          final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
+          final destination = (isOffline || current.isReturningUser == false) ? '/projects' : '/today';
+          // Defer navigation to next frame to avoid setState during build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) GoRouter.of(context).go(destination);
+          });
+        }
+      });
+    }
+
     return Scaffold(
       appBar: AppBar(title: Text(_showHostingChoice ? 'Choose hosting' : 'Welcome')),
       body: Padding(
