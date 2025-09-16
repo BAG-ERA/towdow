@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/providers/providers.dart';
 import '../utils/buttons/create_project_or_domain_button.dart';
-import '../common/monitoring_status_widget.dart';
+
 
 class ToolbarWidget extends ConsumerWidget {
   const ToolbarWidget({super.key, this.isIconOnly = false});
@@ -55,8 +55,6 @@ class ToolbarWidget extends ConsumerWidget {
               showDropdownAffordance: true,
             ),
           ),
-          const SizedBox(width: 12),
-          const MonitoringStatusWidget(compact: true),
         ],
       ),
     );
