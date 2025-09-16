@@ -130,7 +130,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
         const SizedBox(width: 16),
         
         // Create task button
-        CreateTaskButton.compact(
+        CreateTaskButton(
           projectCalendarUid: widget.projectPath,
           workflowVariant: widget.workflowVariant,
         ),
@@ -200,7 +200,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
         const Spacer(),
         
         // Create task button
-        CreateTaskButton.compact(
+        CreateTaskButton(
           projectCalendarUid: widget.projectPath,
           workflowVariant: widget.workflowVariant,
         ),

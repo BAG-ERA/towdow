@@ -1,10 +1,10 @@
 // Create Project Button component
 // Reusable button for creating new projects with consistent styling across the app
-// Uses FlowIt typography system with automatic capitalization
+// Uses PrimaryButton for consistent styling and behavior
 
 import 'package:flutter/material.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
-import '../../../../core/theme/chart_theme.dart';
+import 'primary_button.dart';
 import '../popup/project_creation_dialog.dart';
 
 class CreateProjectButton extends StatelessWidget {
@@ -21,7 +21,7 @@ class CreateProjectButton extends StatelessWidget {
   final IconData? icon;
   
   /// Button size variant
-  final CreateProjectButtonSize size;
+  final PrimaryButtonSize size;
   
   /// Whether the button should expand to fill available width
   final bool isFullWidth;
@@ -35,28 +35,11 @@ class CreateProjectButton extends StatelessWidget {
     this.textColor,
     this.text,
     this.icon = Icons.add,
-    this.size = CreateProjectButtonSize.medium,
+    this.size = PrimaryButtonSize.medium,
     this.isFullWidth = false,
     this.onProjectCreated,
   });
 
-  /// Factory constructor for a compact create project button (commonly used in toolbars)
-  factory CreateProjectButton.compact({
-    Key? key,
-    Color? backgroundColor,
-    Color? textColor,
-    Function(String)? onProjectCreated,
-  }) {
-    return CreateProjectButton(
-      key: key,
-      backgroundColor: backgroundColor,
-      textColor: textColor,
-      text: null,
-      icon: Icons.add,
-      size: CreateProjectButtonSize.small,
-      onProjectCreated: onProjectCreated,
-    );
-  }
 
   /// Factory constructor for a prominent create project button (commonly used in main areas)
   factory CreateProjectButton.prominent({
@@ -72,7 +55,7 @@ class CreateProjectButton extends StatelessWidget {
       textColor: textColor,
       text: null,
       icon: Icons.add_rounded,
-      size: CreateProjectButtonSize.large,
+      size: PrimaryButtonSize.large,
       isFullWidth: isFullWidth,
       onProjectCreated: onProjectCreated,
     );
@@ -80,70 +63,21 @@ class CreateProjectButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chartTheme = context.chartTheme;
-    final effectiveBackgroundColor = backgroundColor ?? chartTheme.colors.primary;
-    final effectiveTextColor = textColor ?? chartTheme.typography.primaryButton.color;
+    final buttonText = text ?? (size == PrimaryButtonSize.large
+        ? AppLocalizations.of(context)!.createNewProject
+        : AppLocalizations.of(context)!.createProject);
     
-    final buttonPadding = _getPadding(chartTheme);
-    final scale = (chartTheme.typography.primaryButton.fontSize ?? 14) / 14.0;
-    
-    return SizedBox(
-      width: isFullWidth ? double.infinity : null,
-      child: ElevatedButton.icon(
-        onPressed: () => _showCreateProjectDialog(context),
-        icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
-        label: Text(
-          (text ?? (size == CreateProjectButtonSize.large
-              ? AppLocalizations.of(context)!.createNewProject
-              : AppLocalizations.of(context)!.createProject)).toUpperCase(),
-          style: chartTheme.typography.primaryButton.copyWith(
-            color: effectiveTextColor,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: effectiveBackgroundColor,
-          foregroundColor: effectiveTextColor,
-          padding: buttonPadding,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(chartTheme.dimensions.cornerRadius),
-          ),
-          elevation: size == CreateProjectButtonSize.large ? 2 : 1,
-        ),
-      ),
+    return PrimaryButton(
+      text: buttonText,
+      icon: icon,
+      size: size,
+      isFullWidth: isFullWidth,
+      backgroundColor: backgroundColor,
+      textColor: textColor,
+      onPressed: () => _showCreateProjectDialog(context),
     );
   }
 
-  EdgeInsets _getPadding(ChartTheme chartTheme) {
-    switch (size) {
-      case CreateProjectButtonSize.small:
-        return EdgeInsets.symmetric(
-          horizontal: chartTheme.dimensions.paddingMedium,
-          vertical: chartTheme.dimensions.paddingSmall,
-        );
-      case CreateProjectButtonSize.medium:
-        return EdgeInsets.symmetric(
-          horizontal: chartTheme.dimensions.paddingLarge,
-          vertical: chartTheme.dimensions.paddingMedium,
-        );
-      case CreateProjectButtonSize.large:
-        return EdgeInsets.symmetric(
-          horizontal: chartTheme.dimensions.paddingLarge * 1.5,
-          vertical: chartTheme.dimensions.paddingMedium * 1.2,
-        );
-    }
-  }
-
-  double _getIconSize() {
-    // Scale icon sizes using dimensions scale by referencing paddingMedium baseline
-    switch (size) {
-      case CreateProjectButtonSize.small:
-        return 16;
-      case CreateProjectButtonSize.medium:
-        return 20;
-      case CreateProjectButtonSize.large:
-        return 24;
-    }
-  }
 
   Future<void> _showCreateProjectDialog(BuildContext context) async {
     final result = await showDialog<String>(
@@ -157,9 +91,3 @@ class CreateProjectButton extends StatelessWidget {
   }
 }
 
-/// Size variants for the create project button
-enum CreateProjectButtonSize {
-  small,   // Compact size for toolbars and tight spaces
-  medium,  // Standard size for most use cases
-  large,   // Prominent size for main actions
-}

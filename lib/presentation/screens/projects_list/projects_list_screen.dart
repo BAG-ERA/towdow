@@ -107,7 +107,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   }
 
   Widget _buildCreateProjectButton() {
-    return CreateProjectButton.compact(
+    return CreateProjectButton(
       onProjectCreated: (projectName) {
         ref.read(projectListViewModelProvider.notifier).refresh();
       },
