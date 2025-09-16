@@ -98,11 +98,11 @@ class XMLResponseParser {
     final calendars = <TaskCalendar>[];
     
     try {
-      AppLogger.debug('XMLResponseParser: Parsing calendars from XML response');
+      //AppLogger.debug('XMLResponseParser: Parsing calendars from XML response');
       
       // Extract FlowIt namespace prefixes from the FULL XML response (namespace declarations are at root level)
       final globalFlowItPrefixes = _findFlowItNamespacePrefixes(xmlResponse);
-      AppLogger.debug('XMLResponseParser: Found global FlowIt prefixes: $globalFlowItPrefixes');
+      //AppLogger.debug('XMLResponseParser: Found global FlowIt prefixes: $globalFlowItPrefixes');
       
       // Extract individual calendar responses using regex (simple approach)
       final responsePattern = RegExp(r'<(?:d:)?response[^>]*>(.*?)</(?:d:)?response>', dotAll: true, caseSensitive: false);
@@ -114,7 +114,7 @@ class XMLResponseParser {
         // Check if this response has status 200 OK (only include successful ones)
         final statusPattern = RegExp(r'<(?:d:)?status[^>]*>.*?200\s+OK.*?</(?:d:)?status>', caseSensitive: false);
         if (!statusPattern.hasMatch(responseContent)) {
-          AppLogger.debug('XMLResponseParser: Skipping response without 200 OK status');
+          //AppLogger.debug('XMLResponseParser: Skipping response without 200 OK status');
           continue;
         }
         
@@ -149,10 +149,10 @@ class XMLResponseParser {
         final description = descriptionMatch?.group(1)?.trim();
         
         // Extract FlowIt properties using the global namespace prefixes
-        AppLogger.debug('XMLResponseParser: Extracting FlowIt properties from response content for $href');
-        AppLogger.debug('XMLResponseParser: Response content snippet: ${responseContent.substring(0, responseContent.length > 500 ? 500 : responseContent.length)}...');
+        //AppLogger.debug('XMLResponseParser: Extracting FlowIt properties from response content for $href');
+        //AppLogger.debug('XMLResponseParser: Response content snippet: ${responseContent.substring(0, responseContent.length > 500 ? 500 : responseContent.length)}...');
         final domain = _extractFlowItPropertyWithPrefixes(responseContent, 'domain', globalFlowItPrefixes);
-        AppLogger.debug('XMLResponseParser: Domain extraction result: $domain');
+        //AppLogger.debug('XMLResponseParser: Domain extraction result: $domain');
         final flowitType = _extractFlowItPropertyWithPrefixes(responseContent, 'type', globalFlowItPrefixes);
         final flowitAsFlowStr = _extractFlowItPropertyWithPrefixes(responseContent, 'asflow', globalFlowItPrefixes);
         final flowitAsFlow = flowitAsFlowStr?.toLowerCase() == 'true';
@@ -166,7 +166,7 @@ class XMLResponseParser {
         final flowitSharedWith = _extractFlowItPropertyWithPrefixes(responseContent, 'sharedWith', globalFlowItPrefixes);
         
         if (isCalendar && supportsTodos) {
-          AppLogger.debug('XMLResponseParser: Found VTODO calendar: $displayName at $href with domain: $domain, status: $flowitStatus');
+          //AppLogger.debug('XMLResponseParser: Found VTODO calendar: $displayName at $href with domain: $domain, status: $flowitStatus');
           final calendar = TaskCalendarFactory.fromCalDAVDiscovery(
             path: href,
             displayName: displayName,
@@ -275,7 +275,7 @@ class XMLResponseParser {
     final responses = <Map<String, dynamic>>[];
     
     try {
-      AppLogger.debug('XMLResponseParser: Parsing multi-status response');
+      //AppLogger.debug('XMLResponseParser: Parsing multi-status response');
       
       // Extract individual response elements using regex
       final responsePattern = RegExp(r'<(?:d:)?response[^>]*>(.*?)</(?:d:)?response>', dotAll: true, caseSensitive: false);
@@ -395,7 +395,7 @@ class XMLResponseParser {
       AppLogger.error('XMLResponseParser: Failed to parse multi-status response', e, StackTrace.current);
     }
     
-    AppLogger.debug('XMLResponseParser: Parsed ${responses.length} responses from multi-status');
+    //AppLogger.debug('XMLResponseParser: Parsed ${responses.length} responses from multi-status');
     return responses;
   }
 
@@ -403,7 +403,7 @@ class XMLResponseParser {
   /// This version takes the prefixes as a parameter to avoid re-parsing namespaces for each property
   static String? _extractFlowItPropertyWithPrefixes(String xmlContent, String propertyName, List<String> knownPrefixes) {
     try {
-      AppLogger.debug('XMLResponseParser: Extracting $propertyName with known prefixes: $knownPrefixes');
+      //AppLogger.debug('XMLResponseParser: Extracting $propertyName with known prefixes: $knownPrefixes');
       
       // Try to extract property using each known FlowIt namespace prefix
       for (final prefix in knownPrefixes) {
@@ -414,7 +414,7 @@ class XMLResponseParser {
         if (match != null) {
           final value = match.group(1)?.trim();
           if (value != null && value.isNotEmpty) {
-            AppLogger.debug('XMLResponseParser: Found FlowIt property $propertyName=$value using prefix $prefix');
+            //AppLogger.debug('XMLResponseParser: Found FlowIt property $propertyName=$value using prefix $prefix');
             return value;
           }
         }
@@ -423,7 +423,7 @@ class XMLResponseParser {
       // Fallback to legacy parsing if no prefixes worked
       return _extractFlowItPropertyLegacy(xmlContent, propertyName);
     } catch (e) {
-      AppLogger.debug('XMLResponseParser: Error extracting FlowIt property $propertyName: $e');
+      //AppLogger.debug('XMLResponseParser: Error extracting FlowIt property $propertyName: $e');
       return null;
     }
   }
@@ -450,7 +450,7 @@ class XMLResponseParser {
         if (match != null) {
           final value = match.group(1)?.trim();
           if (value != null && value.isNotEmpty) {
-            AppLogger.debug('XMLResponseParser: Found FlowIt property $propertyName=$value using prefix $prefix');
+            //AppLogger.debug('XMLResponseParser: Found FlowIt property $propertyName=$value using prefix $prefix');
             return value;
           }
         }
@@ -458,7 +458,7 @@ class XMLResponseParser {
       
       return null;
     } catch (e) {
-      AppLogger.debug('XMLResponseParser: Error extracting FlowIt property $propertyName: $e');
+      //AppLogger.debug('XMLResponseParser: Error extracting FlowIt property $propertyName: $e');
       return null;
     }
   }
@@ -474,28 +474,28 @@ class XMLResponseParser {
         'http://flowit.app/ns/',
       ];
       
-      AppLogger.debug('XMLResponseParser: Looking for FlowIt namespaces in content length: ${xmlContent.length}');
+      //AppLogger.debug('XMLResponseParser: Looking for FlowIt namespaces in content length: ${xmlContent.length}');
       
       // Find all xmlns declarations
       final xmlnsMatches = RegExp(r'xmlns:([^=\s]+)=["\x27]([^"\x27]+)["\x27]').allMatches(xmlContent);
       
-      AppLogger.debug('XMLResponseParser: Found ${xmlnsMatches.length} xmlns declarations');
+      //AppLogger.debug('XMLResponseParser: Found ${xmlnsMatches.length} xmlns declarations');
       
       for (final match in xmlnsMatches) {
         final prefix = match.group(1);
         final uri = match.group(2);
         
-        AppLogger.debug('XMLResponseParser: Found namespace: $prefix -> $uri');
+        //AppLogger.debug('XMLResponseParser: Found namespace: $prefix -> $uri');
         
         if (prefix != null && uri != null && flowItNamespaces.contains(uri)) {
           prefixes.add(prefix);
-          AppLogger.debug('XMLResponseParser: Found FlowIt namespace prefix: $prefix -> $uri');
+          //AppLogger.debug('XMLResponseParser: Found FlowIt namespace prefix: $prefix -> $uri');
         }
       }
       
-      AppLogger.debug('XMLResponseParser: Total FlowIt prefixes found: ${prefixes.length}');
+      //AppLogger.debug('XMLResponseParser: Total FlowIt prefixes found: ${prefixes.length}');
     } catch (e) {
-      AppLogger.debug('XMLResponseParser: Error finding FlowIt namespace prefixes: $e');
+      //AppLogger.debug('XMLResponseParser: Error finding FlowIt namespace prefixes: $e');
     }
     
     return prefixes;
@@ -519,7 +519,7 @@ class XMLResponseParser {
         if (match != null) {
           final value = match.group(1)?.trim();
           if (value != null && value.isNotEmpty) {
-            AppLogger.debug('XMLResponseParser: Found FlowIt property $propertyName=$value (legacy)');
+            //AppLogger.debug('XMLResponseParser: Found FlowIt property $propertyName=$value (legacy)');
             return value;
           }
         }
@@ -527,7 +527,7 @@ class XMLResponseParser {
       
       return null;
     } catch (e) {
-      AppLogger.debug('XMLResponseParser: Error in legacy FlowIt property extraction: $e');
+      //AppLogger.debug('XMLResponseParser: Error in legacy FlowIt property extraction: $e');
       return null;
     }
   }

@@ -483,6 +483,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
             isRefreshing: false,
             // Preserve domain expanded state to prevent UI reset
             domainExpandedState: state.domainExpandedState,
+            // Preserve selected domain filter to prevent reset during sync
+            selectedDomain: state.selectedDomain,
           );
           
           // AppLogger.info('ProjectListViewModel: Loaded $totalProjects projects ($completedProjects completed, $activeProjects active)');
@@ -497,6 +499,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
               error: 'Failed to load projects: ${failure.message}',
               // Preserve domain expanded state to prevent UI reset
               domainExpandedState: state.domainExpandedState,
+              // Preserve selected domain filter to prevent reset during sync
+              selectedDomain: state.selectedDomain,
             );
           }
         },
@@ -511,6 +515,8 @@ class ProjectListViewModel extends StateNotifier<ProjectListState> {
           error: 'Failed to load projects: $e',
           // Preserve domain expanded state to prevent UI reset
           domainExpandedState: state.domainExpandedState,
+          // Preserve selected domain filter to prevent reset during sync
+          selectedDomain: state.selectedDomain,
         );
       }
     }
