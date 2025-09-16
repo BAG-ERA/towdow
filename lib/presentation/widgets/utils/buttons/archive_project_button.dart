@@ -1,14 +1,14 @@
 // Archive Project Button component
 // Reusable button for archiving projects with consistent styling across the app
-// Uses FlowIt typography system with automatic capitalization
+// Uses PrimaryButton for consistent styling and behavior
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/logger.dart';
 import '../../../../core/result.dart';
-import '../../../../core/theme/chart_theme.dart';
 import '../../../../data/providers/providers.dart';
+import 'primary_button.dart';
 
 class ArchiveProjectButton extends ConsumerWidget {
   /// Project path to archive (required)
@@ -30,7 +30,7 @@ class ArchiveProjectButton extends ConsumerWidget {
   final IconData? icon;
   
   /// Button size variant
-  final ArchiveProjectButtonSize size;
+  final PrimaryButtonSize size;
   
   /// Whether the button should expand to fill available width
   final bool isFullWidth;
@@ -46,7 +46,7 @@ class ArchiveProjectButton extends ConsumerWidget {
     this.textColor,
     this.text = 'Archive Project',
     this.icon = Icons.archive_rounded,
-    this.size = ArchiveProjectButtonSize.medium,
+    this.size = PrimaryButtonSize.medium,
     this.isFullWidth = false,
     this.onProjectArchived,
   });
@@ -68,7 +68,7 @@ class ArchiveProjectButton extends ConsumerWidget {
       textColor: textColor,
       text: 'Archive',
       icon: Icons.archive_rounded,
-      size: ArchiveProjectButtonSize.small,
+      size: PrimaryButtonSize.small,
       onProjectArchived: onProjectArchived,
     );
   }
@@ -91,7 +91,7 @@ class ArchiveProjectButton extends ConsumerWidget {
       textColor: textColor,
       text: 'Archive Project',
       icon: Icons.archive_rounded,
-      size: ArchiveProjectButtonSize.large,
+      size: PrimaryButtonSize.large,
       isFullWidth: isFullWidth,
       onProjectArchived: onProjectArchived,
     );
@@ -99,67 +99,17 @@ class ArchiveProjectButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final chartTheme = context.chartTheme;
-    final effectiveBackgroundColor = backgroundColor ?? chartTheme.colors.primary;
-    final effectiveTextColor = textColor ?? chartTheme.typography.primaryButton.color;
-    
-    final buttonPadding = _getPadding(chartTheme);
-    final scale = (chartTheme.typography.primaryButton.fontSize ?? 14) / 14.0;
-    
-    return SizedBox(
-      width: isFullWidth ? double.infinity : null,
-      child: ElevatedButton.icon(
-        onPressed: () => _handleArchiveProject(context, ref),
-        icon: icon != null ? Icon(icon, size: _getIconSize() * scale) : const SizedBox.shrink(),
-        label: Text(
-          text.toUpperCase(), // Automatic capitalization as per FlowIt typography system
-          style: chartTheme.typography.primaryButton.copyWith(
-            color: effectiveTextColor,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: effectiveBackgroundColor,
-          foregroundColor: effectiveTextColor,
-          padding: buttonPadding,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(chartTheme.dimensions.cornerRadius),
-          ),
-          elevation: size == ArchiveProjectButtonSize.large ? 2 : 1,
-        ),
-      ),
+    return PrimaryButton(
+      text: text,
+      icon: icon,
+      size: size,
+      isFullWidth: isFullWidth,
+      backgroundColor: backgroundColor,
+      textColor: textColor,
+      onPressed: () => _handleArchiveProject(context, ref),
     );
   }
 
-  EdgeInsets _getPadding(ChartTheme chartTheme) {
-    switch (size) {
-      case ArchiveProjectButtonSize.small:
-        return EdgeInsets.symmetric(
-          horizontal: chartTheme.dimensions.paddingMedium,
-          vertical: chartTheme.dimensions.paddingSmall,
-        );
-      case ArchiveProjectButtonSize.medium:
-        return EdgeInsets.symmetric(
-          horizontal: chartTheme.dimensions.paddingLarge,
-          vertical: chartTheme.dimensions.paddingMedium,
-        );
-      case ArchiveProjectButtonSize.large:
-        return EdgeInsets.symmetric(
-          horizontal: chartTheme.dimensions.paddingLarge * 1.5,
-          vertical: chartTheme.dimensions.paddingMedium * 1.2,
-        );
-    }
-  }
-
-  double _getIconSize() {
-    switch (size) {
-      case ArchiveProjectButtonSize.small:
-        return 16;
-      case ArchiveProjectButtonSize.medium:
-        return 20;
-      case ArchiveProjectButtonSize.large:
-        return 24;
-    }
-  }
 
   Future<void> _handleArchiveProject(BuildContext context, WidgetRef ref) async {
     try {
@@ -198,10 +148,3 @@ class ArchiveProjectButton extends ConsumerWidget {
 
   // _handleUnarchiveProject removed as unused (unarchive is not exposed here)
 }
-
-/// Size variants for the archive project button
-enum ArchiveProjectButtonSize {
-  small,   // Compact size for toolbars and tight spaces
-  medium,  // Standard size for most use cases
-  large,   // Prominent size for main actions
-} 
