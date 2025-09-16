@@ -41,6 +41,22 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
           await ref.read(loginViewModelProvider.notifier).authenticateWebWithAuthCode(
                 code: authCode,
               );
+
+          // After authentication completes, force providers refresh and navigate
+          try {
+            ref.invalidate(hasActiveAccountProvider);
+            ref.invalidate(activeAccountProvider);
+
+            // Determine destination similar to listener logic
+            final account = await ref.read(activeAccountProvider.future);
+            if (account != null && mounted) {
+              final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
+              final destination = isOffline ? '/projects' : '/today';
+              GoRouter.of(context).go(destination);
+            }
+          } catch (e) {
+            AppLogger.warning('ConnectionScreen: Post-auth redirect failed (will rely on listener/router): $e');
+          }
         }
       } catch (e) {
         AppLogger.error('ConnectionScreen: Error during auto-login with auth code: $e');
