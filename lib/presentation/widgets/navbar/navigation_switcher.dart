@@ -56,6 +56,7 @@ class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
     }
   }
 
+
   void _goBackToMain() {
     setState(() {
       _currentNavigationType = NavigationType.main;
@@ -108,67 +109,66 @@ class _NavigationSwitcherState extends ConsumerState<NavigationSwitcher> {
       });
     }
     
-    // Check available width for responsive behavior using MediaQuery
-    final availableWidth = MediaQuery.of(context).size.width;
-    final shouldSwitchToMain = availableWidth < 140.0 && _currentNavigationType == NavigationType.detail;
-    
-    // Automatically switch to main navigation if space is constrained
-    if (shouldSwitchToMain && !_isTransitioningToMain) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _goBackToMain();
-      });
-    }
-    
-    // Switch navigation content based on current navigation type
-    Widget navigationContent;
-    switch (_currentNavigationType) {
-      case NavigationType.detail:
-        navigationContent = DetailNavigation(
-          isDesktop: widget.isDesktop,
-          onBackPressed: _goBackToMain,
-          isIconOnly: widget.isIconOnly,
-          isWorkflowDetail: _isWorkflowDetail,
-        );
-        break;
-      case NavigationType.main:
-        navigationContent = MainNavigation(
-          currentDestination: widget.currentDestination,
-          isDesktop: widget.isDesktop,
-          onDetailPressed: _goToDetail,
-          isIconOnly: widget.isIconOnly,
-        );
-        break;
-    }
-
-    // Wrap navigation content with animation
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 400),
-      transitionBuilder: (Widget child, Animation<double> animation) {
-        // Determine slide direction based on transition type
-        Offset slideDirection;
-        if (_isTransitioningToMain) {
-          // Coming back to main - slide from left
-          slideDirection = const Offset(-1.0, 0.0);
-        } else {
-          // Going to detail/settings - slide from right
-          slideDirection = const Offset(1.0, 0.0);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 150 && !_isTransitioningToMain) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _goBackToMain();
+          });
+        }
+        
+        // Switch navigation content based on current navigation type
+        Widget navigationContent;
+        switch (_currentNavigationType) {
+          case NavigationType.detail:
+            navigationContent = DetailNavigation(
+              isDesktop: widget.isDesktop,
+              onBackPressed: _goBackToMain,
+              isIconOnly: widget.isIconOnly,
+              isWorkflowDetail: _isWorkflowDetail,
+            );
+            break;
+          case NavigationType.main:
+            navigationContent = MainNavigation(
+              currentDestination: widget.currentDestination,
+              isDesktop: widget.isDesktop,
+              onDetailPressed: _goToDetail,
+              isIconOnly: widget.isIconOnly,
+            );
+            break;
         }
 
-        return SlideTransition(
-          position: Tween<Offset>(
-            begin: slideDirection,
-            end: Offset.zero,
-          ).animate(CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeInOutCubic,
-          )),
-          child: FadeTransition(
-            opacity: animation,
-            child: child,
-          ),
+        // Wrap navigation content with animation
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            // Determine slide direction based on transition type
+            Offset slideDirection;
+            if (_isTransitioningToMain) {
+              // Coming back to main - slide from left
+              slideDirection = const Offset(-1.0, 0.0);
+            } else {
+              // Going to detail/settings - slide from right
+              slideDirection = const Offset(1.0, 0.0);
+            }
+
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: slideDirection,
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOutCubic,
+              )),
+              child: FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+            );
+          },
+          child: navigationContent,
         );
       },
-      child: navigationContent,
     );
   }
 }
