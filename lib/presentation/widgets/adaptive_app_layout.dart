@@ -220,7 +220,7 @@ class _AdaptiveAppLayoutState extends ConsumerState<AdaptiveAppLayout>
     } else if (location == '/' || location.startsWith('/today') || location.startsWith('/soon') ||
         location.startsWith('/next-week') || location.startsWith('/later') || location.startsWith('/anytime')) {
       title = AppLocalizations.of(context)!.myTasks;
-      isListScreen = true;
+      isListScreen = false; // Don't show AppBar for home routes - HomeScreen handles its own AppBar
     }
     return Scaffold(
       key: _scaffoldKey,

@@ -1,5 +1,5 @@
-﻿// Home screen showing tasks grouped by Today, Soon, and Unregistered
-// Refactored to use MVVM architecture with HomeViewModel and Commands
+﻿// Home screen showing tasks grouped by Today, Soon, Next Week, Later, and Anytime
+// Simple implementation with same behavior on mobile and desktop
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +15,7 @@ import '../../../data/models/calendar_event.dart';
 import '../../providers/home_providers.dart';
 import '../../../core/theme/chart_theme_usage.dart';
 import '../../widgets/header_screen_widget.dart';
+import '../../widgets/common/monitoring_status_widget.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -44,101 +45,78 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedTabIndex = ref.watch(selectedTabIndexProvider);
+    final isMobile = MediaQuery.of(context).size.width < 800.0;
     
-    // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
-    final isDesktop = MediaQuery.of(context).size.width >= 800.0;
+    // Create tab bar items once to avoid duplication
+    final tabItems = [
+      StyledTabItem(
+        label: '${AppLocalizations.of(context)!.today} (${ref.watch(todayTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})',
+        icon: Icons.today_rounded,
+      ),
+      StyledTabItem(
+        label: '${AppLocalizations.of(context)!.soon} (${ref.watch(soonTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})',
+        icon: Icons.schedule_rounded,
+      ),
+      StyledTabItem(
+        label: '${AppLocalizations.of(context)!.nextWeek} (${ref.watch(nextWeekTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})',
+        icon: Icons.date_range_rounded,
+      ),
+      StyledTabItem(
+        label: '${AppLocalizations.of(context)!.later} (${ref.watch(laterTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})',
+        icon: Icons.event_rounded,
+      ),
+      StyledTabItem(
+        label: '${AppLocalizations.of(context)!.anytime} (${ref.watch(anytimeTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})',
+        icon: Icons.inbox_rounded,
+      ),
+    ];
+    
+    final tabBar = StyledTabBar(
+      items: tabItems,
+      selectedIndex: selectedTabIndex,
+      onTabSelected: (index) {
+        ref.read(selectedTabIndexProvider.notifier).state = index;
+      },
+    );
     
     return Scaffold(
-      appBar: HeaderScreenWidget(
+      appBar: isMobile ? AppBar(
+        title: Text(AppLocalizations.of(context)!.myTasks),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.go('/nav'),
+          tooltip: AppLocalizations.of(context)!.backToNavigation,
+        ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12.0),
+            child: MonitoringStatusWidget(compact: true),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: tabBar,
+        ),
+      ) : HeaderScreenWidget(
         title: AppLocalizations.of(context)!.myTasks,
         showVoiceFeedback: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
-          child: StyledTabBar(
-            items: [
-              StyledTabItem(
-                label: '${AppLocalizations.of(context)!.today} (${ref.watch(todayTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                icon: Icons.today_rounded
-              ),
-              StyledTabItem(
-                label: '${AppLocalizations.of(context)!.soon} (${ref.watch(soonTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                icon: Icons.schedule_rounded
-              ),
-              StyledTabItem(
-                label: '${AppLocalizations.of(context)!.nextWeek} (${ref.watch(nextWeekTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                icon: Icons.date_range_rounded
-              ),
-              StyledTabItem(
-                label: '${AppLocalizations.of(context)!.later} (${ref.watch(laterTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                icon: Icons.event_rounded
-              ),
-              StyledTabItem(
-                label: '${AppLocalizations.of(context)!.anytime} (${ref.watch(anytimeTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                icon: Icons.inbox_rounded
-              ),
-            ],
-            selectedIndex: selectedTabIndex,
-            onTabSelected: (index) {
-              ref.read(selectedTabIndexProvider.notifier).state = index;
-            },
-          ),
+          child: tabBar,
         ),
       ),
-      body: Column(
-        children: [
-          // Mobile tabs - only show when no AppBar (mobile mode)
-          if (!isDesktop)
-            StyledTabBar(
-              items: [
-                StyledTabItem(
-                  label: '${AppLocalizations.of(context)!.today} (${ref.watch(todayTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                  icon: Icons.today_rounded
-                ),
-                StyledTabItem(
-                  label: '${AppLocalizations.of(context)!.soon} (${ref.watch(soonTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                  icon: Icons.schedule_rounded
-                ),
-                StyledTabItem(
-                  label: '${AppLocalizations.of(context)!.nextWeek} (${ref.watch(nextWeekTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                  icon: Icons.date_range_rounded
-                ),
-                StyledTabItem(
-                  label: '${AppLocalizations.of(context)!.later} (${ref.watch(laterTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                  icon: Icons.event_rounded
-                ),
-                StyledTabItem(
-                  label: '${AppLocalizations.of(context)!.anytime} (${ref.watch(anytimeTasksProvider).maybeWhen(data: (tasks) => tasks.length, orElse: () => 0)})', 
-                  icon: Icons.inbox_rounded
-                ),
-              ],
-              selectedIndex: selectedTabIndex,
-              onTabSelected: (index) {
-                ref.read(selectedTabIndexProvider.notifier).state = index;
-              },
-            ),
-          
-          Expanded(
-            child: IndexedStack(
-              index: selectedTabIndex,
-              children: const [
-                _TaskListTab(type: TaskListType.today),
-                _TaskListTab(type: TaskListType.soon),
-                _TaskListTab(type: TaskListType.nextWeek),
-                _TaskListTab(type: TaskListType.later),
-                _TaskListTab(type: TaskListType.anytime),
-              ],
-            ),
-          ),
+      body: IndexedStack(
+        index: selectedTabIndex,
+        children: const [
+          _TaskListTab(type: TaskListType.today),
+          _TaskListTab(type: TaskListType.soon),
+          _TaskListTab(type: TaskListType.nextWeek),
+          _TaskListTab(type: TaskListType.later),
+          _TaskListTab(type: TaskListType.anytime),
         ],
       ),
     );
   }
-
-
-
-
-
-
 }
 
 enum TaskListType { today, soon, nextWeek, later, anytime }
@@ -235,6 +213,7 @@ class _TaskListTab extends ConsumerWidget {
             final nb = cb?.displayName ?? '\uFFFF';
             return na.toLowerCase().compareTo(nb.toLowerCase());
           });
+
         if (tasks.isEmpty) {
           return Center(
             child: Column(
@@ -322,130 +301,111 @@ class _TaskListTab extends ConsumerWidget {
                       ),
                       
                       // Tasks section
-                      if (tasks.isEmpty)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(icon, size: 64, color: Theme.of(context).colorScheme.primary),
-                                const SizedBox(height: 16),
-                                Text(title, style: Theme.of(context).textTheme.headlineSmall),
-                                const SizedBox(height: 8),
-                                Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-                                const SizedBox(height: 32),
-                                Text(AppLocalizations.of(context)!.noneFound(AppLocalizations.of(context)!.projects.toLowerCase())),
-                              ],
-                            ),
-                          ),
-                        )
-                      else
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              for (final key in groupKeys) ...[
-                                // Group header: project/workflow name, tappable to navigate
-                                Builder(
-                                  builder: (context) {
-                                    final calendar = key != null ? calendarByPath[key] : null;
-                                    final title = calendar?.displayName ?? 'No Project';
-                                    final isWorkflow = (calendar?.flowitAsFlow == true) ||
-                                        ((calendar?.flowitType.toUpperCase() ?? '') == 'WORKFLOW');
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final key in groupKeys) ...[
+                              // Group header: project/workflow name, tappable to navigate
+                              Builder(
+                                builder: (context) {
+                                  final calendar = key != null ? calendarByPath[key] : null;
+                                  final title = calendar?.displayName ?? 'No Project';
+                                  final isWorkflow = (calendar?.flowitAsFlow == true) ||
+                                      ((calendar?.flowitType.toUpperCase() ?? '') == 'WORKFLOW');
 
-                                    void onTapHeader() {
-                                      if (calendar == null) return;
-                                      final rawPath = Uri.decodeComponent(calendar.path);
-                                      final routeSegment = Uri.encodeComponent(rawPath);
-                                      final route = isWorkflow ? '/workflow/$routeSegment' : '/project/$routeSegment';
-                                      context.go(route);
-                                    }
+                                  void onTapHeader() {
+                                    if (calendar == null) return;
+                                    final rawPath = Uri.decodeComponent(calendar.path);
+                                    final routeSegment = Uri.encodeComponent(rawPath);
+                                    final route = isWorkflow ? '/workflow/$routeSegment' : '/project/$routeSegment';
+                                    context.go(route);
+                                  }
 
-                                    return Padding(
-                                      padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
-                                      child: InkWell(
-                                        borderRadius: BorderRadius.circular(8),
-                                        onTap: calendar != null ? onTapHeader : null,
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                          child: Row(
-                                            crossAxisAlignment: CrossAxisAlignment.center,
-                                            children: [
-                                              Expanded(
-                                                child: Wrap(
-                                                  spacing: 8,
-                                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                                  children: [
+                                  return Padding(
+                                    padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: calendar != null ? onTapHeader : null,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            Expanded(
+                                              child: Wrap(
+                                                spacing: 8,
+                                                crossAxisAlignment: WrapCrossAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    title,
+                                                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                  if (calendar != null)
                                                     Text(
-                                                      title,
-                                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                                        fontWeight: FontWeight.w600,
+                                                      calendar.domainDisplayName,
+                                                      style: context.domainNameStyle.copyWith(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurface
+                                                            .withValues(alpha: 0.55),
                                                       ),
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
-                                                    if (calendar != null)
-                                                      Text(
-                                                        calendar.domainDisplayName,
-                                                        style: context.domainNameStyle.copyWith(
-                                                          color: Theme.of(context)
-                                                              .colorScheme
-                                                              .onSurface
-                                                              .withValues(alpha: 0.55),
-                                                        ),
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    // Navigation icon to indicate clickable project title
-                                                    if (calendar != null)
-                                                      Icon(
-                                                        Icons.open_in_new_rounded,
-                                                        size: 16,
-                                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
-                                                      ),
-                                                  ],
-                                                ),
+                                                  // Navigation icon to indicate clickable project title
+                                                  if (calendar != null)
+                                                    Icon(
+                                                      Icons.open_in_new_rounded,
+                                                      size: 16,
+                                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                                                    ),
+                                                ],
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 6),
-                                // Grouped tasks
-                                Wrap(
-                                  spacing: 12.0,
-                                  runSpacing: 12.0,
-                                  alignment: WrapAlignment.start,
-                                  runAlignment: WrapAlignment.start,
-                                  children: [
-                                    for (final task in tasksByProject[key]!)
-                                      ConstrainedBox(
-                                        constraints: const BoxConstraints(
-                                          maxWidth: 420,
-                                          minWidth: 300,
-                                        ),
-                                        child: TaskItem(
-                                          task: task,
-                                          onToggleComplete: () async {
-                                            await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
-                                          },
-                                          onTaskUpdated: (updatedTask) async {
-                                            await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
-                                          },
-                                          onTaskDeleted: () async {
-                                            await ref.read(taskViewModelProvider.notifier).deleteTask(task.uid);
-                                          },
-                                        ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 6),
+                              // Grouped tasks
+                              Wrap(
+                                spacing: 12.0,
+                                runSpacing: 12.0,
+                                alignment: WrapAlignment.start,
+                                runAlignment: WrapAlignment.start,
+                                children: [
+                                  for (final task in tasksByProject[key]!)
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 420,
+                                        minWidth: 300,
                                       ),
-                                  ],
-                                ),
-                              ],
+                                      child: TaskItem(
+                                        task: task,
+                                        onToggleComplete: () async {
+                                          await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
+                                        },
+                                        onTaskUpdated: (updatedTask) async {
+                                          await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);
+                                        },
+                                        onTaskDeleted: () async {
+                                          await ref.read(taskViewModelProvider.notifier).deleteTask(task.uid);
+                                        },
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ],
-                          ),
+                          ],
                         ),
+                      ),
                     ],
                   ),
                 ),
@@ -457,5 +417,3 @@ class _TaskListTab extends ConsumerWidget {
     );
   }
 }
-
- 
