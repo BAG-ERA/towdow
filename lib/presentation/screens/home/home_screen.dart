@@ -14,8 +14,10 @@ import '../../../data/models/task_calendar.dart';
 import '../../../data/models/calendar_event.dart';
 import '../../providers/home_providers.dart';
 import '../../../core/theme/chart_theme_usage.dart';
+import '../../../core/logger.dart';
 import '../../widgets/header_screen_widget.dart';
 import '../../widgets/common/monitoring_status_widget.dart';
+import '../../widgets/utils/buttons/create_task_button.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -40,6 +42,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     await storageService.initialize();
     
     // Data loading is handled automatically by Riverpod providers
+  }
+
+  Widget _buildFloatingActionButton() {
+    return CreateTaskButton.firstTime(
+      onTaskCreated: (taskSummary) {
+        // Optional: Handle task creation callback
+        AppLogger.info('HomeScreen: Task created: $taskSummary');
+      },
+    );
   }
 
   @override
@@ -115,6 +126,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _TaskListTab(type: TaskListType.anytime),
         ],
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: SafeArea(child: _buildFloatingActionButton()),
     );
   }
 }

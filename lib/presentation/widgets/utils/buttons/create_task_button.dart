@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../../core/theme/chart_theme.dart';
 import '../popup/task_creation_dialog.dart';
+import '../popup/project_selection_dialog.dart';
 
 class CreateTaskButton extends StatelessWidget {
   /// Optional project context to assign the task to (recommended)
@@ -93,6 +94,27 @@ class CreateTaskButton extends StatelessWidget {
     );
   }
 
+  /// Factory constructor for a first-time user create task button (shows project selection)
+  factory CreateTaskButton.firstTime({
+    Key? key,
+    Color? backgroundColor,
+    Color? textColor,
+    Function(String)? onTaskCreated,
+  }) {
+    return CreateTaskButton(
+      key: key,
+      projectCalendarUid: null, // Will trigger project selection
+      backgroundColor: backgroundColor,
+      textColor: textColor,
+      text: null,
+      icon: Icons.add_rounded,
+      size: CreateTaskButtonSize.large,
+      isFullWidth: false,
+      onTaskCreated: onTaskCreated,
+      workflowVariant: false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final chartTheme = context.chartTheme;
@@ -160,13 +182,33 @@ class CreateTaskButton extends StatelessWidget {
   }
 
   Future<void> _showCreateTaskDialog(BuildContext context) async {
-    await showDialog<void>(
-      context: context,
-      builder: (context) => TaskCreationDialog(
-        projectPath: projectCalendarUid,
-        workflowVariant: workflowVariant,
-      ),
-    );
+    // If no project is specified, show project selection dialog first
+    if (projectCalendarUid == null) {
+      final selectedProjectPath = await showDialog<String>(
+        context: context,
+        builder: (context) => const ProjectSelectionDialog(),
+      );
+
+      if (selectedProjectPath != null && context.mounted) {
+        // Show task creation dialog with the selected project
+        await showDialog<void>(
+          context: context,
+          builder: (context) => TaskCreationDialog(
+            projectPath: selectedProjectPath,
+            workflowVariant: workflowVariant,
+          ),
+        );
+      }
+    } else {
+      // Show task creation dialog directly with the specified project
+      await showDialog<void>(
+        context: context,
+        builder: (context) => TaskCreationDialog(
+          projectPath: projectCalendarUid,
+          workflowVariant: workflowVariant,
+        ),
+      );
+    }
   }
 }
 
@@ -175,4 +217,4 @@ enum CreateTaskButtonSize {
   small,   // Compact size for toolbars and tight spaces
   medium,  // Standard size for most use cases
   large,   // Prominent size for main actions
-} 
+}
