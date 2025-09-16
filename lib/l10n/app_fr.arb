@@ -58,7 +58,7 @@
   "workflowPathCopied": "Chemin du workflow copié dans le presse-papiers",
   "duplicateWorkflow": "Dupliquer le workflow",
   "newWorkflowName": "Nouveau nom du workflow",
-  "create": "Créer",
+  "create": "Nouveau",
   "done": "Terminé",
   "export": "Exporter",
   "exportCalendars": "Exporter les calendriers",
