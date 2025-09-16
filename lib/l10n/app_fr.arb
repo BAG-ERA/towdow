@@ -342,6 +342,13 @@
   "createProject": "Créer un projet",
   "createNewProject": "Créer un nouveau projet",
   "createWorkflow": "Créer un workflow",
+  "selectProjectForTask": "Dans quel Projet créer la tâche ?",
+  "searchProjects": "Rechercher des projets",
+  "searchProjectsHint": "Tapez pour rechercher des projets existants...",
+  "defaultProject": "Projet par défaut",
+  "createTaskInDefaultProject": "Créer une tâche dans un projet nommé Default",
+  "noProjectsFound": "Aucun projet trouvé. Créez votre premier projet ci-dessous.",
+  "noProjectsMatchSearch": "Aucun projet ne correspond à votre recherche.",
   "addNewTask": "Ajouter une nouvelle tâche",
   "exitShare": "Quitter le partage",
 

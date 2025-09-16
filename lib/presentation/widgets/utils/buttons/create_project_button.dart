@@ -67,11 +67,15 @@ class CreateProjectButton extends StatelessWidget {
         ? AppLocalizations.of(context)!.createNewProject
         : AppLocalizations.of(context)!.createProject);
     
+    // Make button full width on mobile devices (screen width < 800px)
+    final isMobile = MediaQuery.of(context).size.width < 800.0;
+    final shouldBeFullWidth = isFullWidth || isMobile;
+    
     return PrimaryButton(
       text: buttonText,
       icon: icon,
       size: size,
-      isFullWidth: isFullWidth,
+      isFullWidth: shouldBeFullWidth,
       backgroundColor: backgroundColor,
       textColor: textColor,
       onPressed: () => _showCreateProjectDialog(context),

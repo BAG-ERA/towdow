@@ -10,8 +10,9 @@ import '../../../../core/result.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../data/models/task_calendar.dart';
 import '../../../../data/models/caldav_account.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../enhanced_text_field.dart';
-import 'project_creation_dialog.dart';
+import '../buttons/create_project_button.dart';
 
 class ProjectSelectionDialog extends ConsumerStatefulWidget {
   const ProjectSelectionDialog({super.key});
@@ -44,55 +45,58 @@ class _ProjectSelectionDialogState extends ConsumerState<ProjectSelectionDialog>
         }
       },
       child: AlertDialog(
-        title: const Text('Select Project for Task'),
+        title: Text(AppLocalizations.of(context)!.selectProjectForTask),
         content: SizedBox(
           width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Search field
-              EnhancedTextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  labelText: 'Search projects',
-                  hintText: 'Type to search existing projects...',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.search),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Search field
+                EnhancedTextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    labelText: AppLocalizations.of(context)!.searchProjects,
+                    hintText: AppLocalizations.of(context)!.searchProjectsHint,
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.search),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value.toLowerCase();
+                    });
+                  },
                 ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value.toLowerCase();
-                  });
-                },
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Quick action for default project
-              _buildDefaultProjectOption(),
-              
-              const SizedBox(height: 16),
-              
-              // Divider
-              const Divider(),
-              
-              const SizedBox(height: 8),
-              
-              // Existing projects list
-              _buildProjectsList(),
-              
-              const SizedBox(height: 16),
-              
-              // Create new project option
-              _buildCreateNewProjectOption(),
-            ],
+                
+                const SizedBox(height: 16),
+                
+                // Quick action for default project
+                _buildDefaultProjectOption(),
+                
+                const SizedBox(height: 16),
+                
+                // Divider
+                const Divider(),
+                
+                const SizedBox(height: 8),
+                
+                // Existing projects list
+                _buildProjectsList(),
+                
+                const SizedBox(height: 16),
+                
+                // Create new project option
+                _buildCreateNewProjectOption(),
+              ],
+            ),
           ),
         ),
+        actionsPadding: const EdgeInsets.only(left: 24, right: 24, bottom: 8),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
         ],
       ),
@@ -127,14 +131,14 @@ class _ProjectSelectionDialogState extends ConsumerState<ProjectSelectionDialog>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Default Project',
+                      AppLocalizations.of(context)!.defaultProject,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Create task in a default project (will be created if needed)',
+                      AppLocalizations.of(context)!.createTaskInDefaultProject,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
@@ -177,8 +181,8 @@ class _ProjectSelectionDialogState extends ConsumerState<ProjectSelectionDialog>
             padding: const EdgeInsets.all(16.0),
             child: Text(
               _searchQuery.isEmpty 
-                ? 'No projects found. Create your first project below.'
-                : 'No projects match your search.',
+                ? AppLocalizations.of(context)!.noProjectsFound
+                : AppLocalizations.of(context)!.noProjectsMatchSearch,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
@@ -235,57 +239,23 @@ class _ProjectSelectionDialogState extends ConsumerState<ProjectSelectionDialog>
   }
 
   Widget _buildCreateNewProjectOption() {
-    return Card(
-      elevation: 1,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: _isLoading ? null : _showCreateProjectDialog,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.add_rounded,
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Create New Project',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Create a new project and add your first task',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return CreateProjectButton(
+      onProjectCreated: (projectName) {
+        // Refresh the projects list and select the newly created project
+        setState(() {});
+        
+        // Find the newly created project and return its path
+        _getAvailableProjects().then((projects) {
+          final newProject = projects.firstWhere(
+            (project) => project.displayName == projectName,
+            orElse: () => throw StateError('Newly created project not found'),
+          );
+          
+          if (mounted) {
+            Navigator.of(context).pop(newProject.path);
+          }
+        });
+      },
     );
   }
 
@@ -408,26 +378,4 @@ class _ProjectSelectionDialogState extends ConsumerState<ProjectSelectionDialog>
     }
   }
 
-  Future<void> _showCreateProjectDialog() async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => const ProjectCreationDialog(),
-    );
-    
-    if (result != null && mounted) {
-      // Refresh the projects list and select the newly created project
-      setState(() {});
-      
-      // Find the newly created project and return its path
-      final projects = await _getAvailableProjects();
-      final newProject = projects.firstWhere(
-        (project) => project.displayName == result,
-        orElse: () => throw StateError('Newly created project not found'),
-      );
-      
-      if (mounted) {
-        Navigator.of(context).pop(newProject.path);
-      }
-    }
-  }
 }
