@@ -545,7 +545,7 @@ class CalDAVMonitor {
       
       // Check external credentials file
       final credentialsKey = '${userPrefix}external_credentials.json';
-      final remoteEtagResult = await s3Service.getCurrentEtag(key: credentialsKey, isPrivate: true);
+      final remoteEtagResult = await s3Service.getCurrentEtag(key: credentialsKey, isPrivate: true, suppressNotFoundWarning: true);
       
       await remoteEtagResult.when(
         success: (remoteEtag) async {

@@ -614,6 +614,7 @@ class S3StorageService {
   Future<Result<S3FileInfo>> getFileInfo({
     required String key,
     required bool isPrivate,
+    bool suppressNotFoundWarning = false,
   }) async {
     final initResult = await _ensureInitialized();
     return initResult.when(
@@ -637,7 +638,14 @@ class S3StorageService {
           
           return Result.success(fileInfo);
         } catch (e, stackTrace) {
-          AppLogger.error('S3StorageService.getFileInfo: Failed to get file info for $key', e, stackTrace);
+          final message = e.toString();
+          final isNotFound = message.contains('404') || message.contains('NotFound') || message.contains('NoSuchKey');
+          if (isNotFound && suppressNotFoundWarning) {
+            // Downgrade to debug when 404 is expected/acceptable
+            AppLogger.debug('S3StorageService.getFileInfo: File $key not found (expected), suppressing warning');
+          } else {
+            AppLogger.error('S3StorageService.getFileInfo: Failed to get file info for $key', e, stackTrace);
+          }
           return Result.failure(Failure(message: 'Failed to get file info: $e'));
         }
       },
@@ -649,8 +657,9 @@ class S3StorageService {
   Future<Result<String?>> getCurrentEtag({
     required String key,
     required bool isPrivate,
+    bool suppressNotFoundWarning = false,
   }) async {
-    final fileInfoResult = await getFileInfo(key: key, isPrivate: isPrivate);
+    final fileInfoResult = await getFileInfo(key: key, isPrivate: isPrivate, suppressNotFoundWarning: suppressNotFoundWarning);
     return fileInfoResult.when(
       success: (fileInfo) {
         AppLogger.debug('S3StorageService.getCurrentEtag: Retrieved etag for $key: ${fileInfo.etag}');
