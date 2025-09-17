@@ -18,7 +18,7 @@ import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/step_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../data/services/sync/sync_service.dart';
+import '../../data/services/sync/sync_service.dart'; // TODO: remove direct access to service
 import 'commands/attendee_commands.dart';
 import '../../data/providers/providers.dart';
 import '../../data/models/shared_with_me_project.dart';
