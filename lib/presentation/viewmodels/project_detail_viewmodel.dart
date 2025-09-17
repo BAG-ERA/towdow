@@ -94,10 +94,9 @@ class ProjectDetailViewModel extends StateNotifier<ProjectDetailState> {
       final result = await _calendarRepository.save(updatedProject);
       return await result.when(
         success: (_) async {
-          // Invalidate dependent streams by invalidating known providers
+          // Optimistically update local state to avoid full view refresh.
           try {
-            _ref.invalidate(calendarRepositoryProvider);
-            _ref.invalidate(taskRepositoryProvider);
+            state = state.copyWith(project: AsyncValue.data(updatedProject));
           } catch (_) {}
           // Fire-and-forget sync
           unawaited(syncProjectToServer(updatedProject));

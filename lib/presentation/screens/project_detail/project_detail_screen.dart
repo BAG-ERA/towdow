@@ -1295,7 +1295,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final res = await ref.read(projectDetailViewModelProvider(widget.projectPath).notifier)
         .updateProject(updatedProject);
     res.when(success: (_) {
-      ref.invalidate(projectTasksProvider(widget.projectPath));
+      // No invalidation needed for metadata-only updates.
     }, failure: (f) {
       AppLogger.error('ProjectDetail: Failed to update project: ${f.message}', f.exception, f.stackTrace);
     });
