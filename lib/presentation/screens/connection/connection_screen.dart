@@ -35,11 +35,20 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         if (authCode != null && authCode.isNotEmpty) {
           // Clear immediately to prevent relogging loops
           WebLocalStorage.removeItem('authCode');
+          final storedRedirect = WebLocalStorage.getItem('redirectUri');
+          String? sanitizedRedirect = storedRedirect;
+          if (sanitizedRedirect == null || sanitizedRedirect.isEmpty) {
+            // Fallback to computed sanitized redirect
+            sanitizedRedirect = getRedirectUri();
+          }
+          // Always remove stored value to avoid reuse
+          WebLocalStorage.removeItem('redirectUri');
           AppLogger.info('ConnectionScreen: Found authCode in localStorage, starting login');
 
           // Start authentication with default TowDow Cloud settings
           await ref.read(loginViewModelProvider.notifier).authenticateWebWithAuthCode(
                 code: authCode,
+                redirectUri: sanitizedRedirect,
               );
 
           // After authentication completes, force providers refresh and navigate

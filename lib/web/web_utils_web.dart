@@ -12,17 +12,26 @@ class WebHttpResponse {
 }
 
 // Get the appropriate redirect URI based on the current environment
+// It must contain only the app URL and the optional 'project' query parameter.
 String getRedirectUri() {
   final currentLocation = web.window.location.href;
+  final uri = Uri.parse(currentLocation);
 
-  if (currentLocation.contains('localhost')) {
-    // Development environment
-    final uri = Uri.parse(currentLocation);
-    return 'http://${uri.host}:${uri.port}/';
-  } else {
-    // Production environment
-    return 'https://web.towdow.app/';
-  }
+  // Build sanitized query: only keep 'project' if present
+  final project = uri.queryParameters['project'];
+  final cleanQuery = project == null || project.isEmpty ? null : {'project': project};
+
+  // Compute base path: keep '/' or current path if app is hosted under subpath (non-empty path)
+  final path = uri.path.isEmpty ? '/' : uri.path;
+
+  // For localhost and production, return sanitized URL
+  return Uri(
+    scheme: uri.scheme,
+    host: uri.host,
+    port: uri.hasPort ? uri.port : null,
+    path: path,
+    queryParameters: cleanQuery,
+  ).toString();
 }
 
 // Clear sensitive query parameters from URL without reloading

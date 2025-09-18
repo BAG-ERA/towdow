@@ -44,6 +44,15 @@ void main() async {
     final currentUri = parseCurrentUri();
     AppLogger.info("uri parameters: ${currentUri.queryParameters}");
 
+    // Save sanitized redirect URL (only app URL + optional project) for token exchange
+    try {
+      final sanitizedRedirect = getRedirectUri();
+      WebLocalStorage.setItem('redirectUri', sanitizedRedirect);
+      AppLogger.info("Saved redirectUri in localStorage: $sanitizedRedirect");
+    } catch (e) {
+      AppLogger.error('Failed to save redirectUri in localStorage: $e');
+    }
+
     final authCode = currentUri.queryParameters['code'];
     if (authCode != null) {
       try {
