@@ -65,13 +65,21 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       return GoRouter(
     navigatorKey: globalNavigatorKey,
-    initialLocation: '/nav',
+    // On web, start from the browser URL (supports magic-link query handling in main.dart)
+    // On other platforms, keep mobile landing on /nav
+    initialLocation: kIsWeb ? '/projects' : '/nav',
     refreshListenable: Listenable.merge([accountNotifier, ValueNotifier(sessionEpoch)]),
     redirect: (context, state) {
       final isDesktop = _isDesktopPlatform();
 
-      // Redirect root path to nav on mobile, projects on desktop
+      // Redirect root path:
+      // - On web: do not redirect; let main.dart+ConnectionScreen handle magic-link/login flow
+      // - On desktop: go to /today
+      // - On mobile (non-web): go to /nav
       if (state.uri.path == '/') {
+        if (kIsWeb) {
+          return '/projects';
+        }
         return isDesktop ? '/today' : '/nav';
       }
 
