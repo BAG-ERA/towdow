@@ -104,7 +104,9 @@ class ShareService {
       AppLogger.debug('ShareService: PUT response status: ${response.statusCode}');
       AppLogger.debug('ShareService: PUT response body: ${response.body}');
       
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      // Accept 200 (OK), 204 (No Content), and 207 (Multi-Status) as success.
+      // Some servers return 207 when multiple sub-operations succeed.
+      if (response.statusCode == 200 || response.statusCode == 204 || response.statusCode == 207) {
         AppLogger.info('ShareService: Successfully set project members');
         return Result.success(null);
       } else {

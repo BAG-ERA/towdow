@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/providers/providers.dart';
 import '../utils/editable_title.dart';
@@ -12,7 +13,7 @@ import '../../../data/models/task.dart';
 import '../../../data/repositories/account_repository.dart';
 import '../../../core/result.dart';
 
-class ProjectInfosWidget extends ConsumerWidget {
+class ProjectInfosWidget extends ConsumerStatefulWidget {
   final TaskCalendar project;
   final AsyncValue<List<Task>> tasksAsync;
   final Function(TaskCalendar) onProjectUpdated;
@@ -27,12 +28,47 @@ class ProjectInfosWidget extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProjectInfosWidget> createState() => _ProjectInfosWidgetState();
+}
+
+class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
+  late final TextEditingController _descriptionController;
+  Timer? _descriptionDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _descriptionController = TextEditingController(text: widget.project.description);
+  }
+
+  @override
+  void didUpdateWidget(covariant ProjectInfosWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Keep controller in sync with external updates without fighting user typing
+    if (widget.project.description != _descriptionController.text) {
+      _descriptionController.text = widget.project.description;
+    }
+  }
+
+  @override
+  void dispose() {
+    _descriptionDebounce?.cancel();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) { // note: WidgetRef is now member of ConsumerState
+    final ref = this.ref;
+    final project = widget.project;
+    final tasksAsync = widget.tasksAsync;
+    final onProjectUpdated = widget.onProjectUpdated;
+    final onCollapse = widget.onCollapse;
     // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
     
     // Check if project is shared with me
-    final sharedByAsync = ref.watch(projectSharedByProvider(project.uid));
+    final sharedByAsync = ref.watch(projectSharedByProvider(widget.project.uid));
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -398,7 +434,7 @@ class ProjectInfosWidget extends ConsumerWidget {
           
           // Description content in enhanced text field
           EnhancedTextField(
-            controller: TextEditingController(text: project.description),
+            controller: _descriptionController,
             maxLines: null,
             decoration: const InputDecoration(
               hintText: 'No description provided',
@@ -410,12 +446,15 @@ class ProjectInfosWidget extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurface,
             ),
             onChanged: (value) {
-              // Update description as user types
-              final updatedProject = project.copyWith(
-                description: value,
-                lastModified: DateTime.now(),
-              );
-              onProjectUpdated(updatedProject);
+              // Debounce updates to avoid full view reload on every keystroke
+              _descriptionDebounce?.cancel();
+              _descriptionDebounce = Timer(const Duration(milliseconds: 600), () {
+                final updatedProject = project.copyWith(
+                  description: value,
+                  lastModified: DateTime.now(),
+                );
+                onProjectUpdated(updatedProject);
+              });
             },
           ),
         ],
@@ -425,6 +464,8 @@ class ProjectInfosWidget extends ConsumerWidget {
 
   /// Build warning widget for attendees without project access
   Widget _buildAttendeeAccessWarning(BuildContext context, WidgetRef ref) {
+    final tasksAsync = widget.tasksAsync;
+    final project = widget.project;
     return tasksAsync.when(
       data: (tasks) {
         // Get current user email from account repository

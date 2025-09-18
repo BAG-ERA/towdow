@@ -18,7 +18,7 @@ import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/step_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../data/services/sync/sync_service.dart';
+import '../../data/services/sync/sync_service.dart'; // TODO: remove direct access to service
 import 'commands/attendee_commands.dart';
 import '../../data/providers/providers.dart';
 import '../../data/models/shared_with_me_project.dart';
@@ -94,10 +94,9 @@ class ProjectDetailViewModel extends StateNotifier<ProjectDetailState> {
       final result = await _calendarRepository.save(updatedProject);
       return await result.when(
         success: (_) async {
-          // Invalidate dependent streams by invalidating known providers
+          // Optimistically update local state to avoid full view refresh.
           try {
-            _ref.invalidate(calendarRepositoryProvider);
-            _ref.invalidate(taskRepositoryProvider);
+            state = state.copyWith(project: AsyncValue.data(updatedProject));
           } catch (_) {}
           // Fire-and-forget sync
           unawaited(syncProjectToServer(updatedProject));
