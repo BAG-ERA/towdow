@@ -42,4 +42,8 @@ class WebLocalStorage {
   static void removeItem(String key) {
     // Do nothing on non-web platforms
   }
+
+  static void clearAll() {
+    // Do nothing on non-web platforms
+  }
 }

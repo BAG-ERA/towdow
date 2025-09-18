@@ -83,4 +83,15 @@ class WebLocalStorage {
   static void removeItem(String key) {
     web.window.localStorage.removeItem(key);
   }
+
+  // Clear all browser storage related to this origin (localStorage + sessionStorage)
+  static void clearAll() {
+    try {
+      web.window.localStorage.clear();
+    } catch (_) {}
+    try {
+      // sessionStorage may not exist in some contexts, wrap in try/catch
+      web.window.sessionStorage.clear();
+    } catch (_) {}
+  }
 }

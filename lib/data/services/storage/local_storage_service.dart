@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../core/result.dart';
 import '../../../core/logger.dart';
 import '../../models/caldav_account.dart';
+import '../../../web/web_utils.dart';
 
 class LocalStorageService {
   static const String tasksBoxName = 'tasks';
@@ -242,6 +243,15 @@ class LocalStorageService {
           } catch (e) {
             AppLogger.warning('LocalStorageService: Failed to clear box $boxName: $e');
           }
+        }
+      }
+
+      // Additionally clear browser storages when running on web
+      if (kIsWeb) {
+        try {
+          WebLocalStorage.clearAll();
+        } catch (e) {
+          AppLogger.warning('LocalStorageService: Failed to clear browser local/session storage: $e');
         }
       }
 
