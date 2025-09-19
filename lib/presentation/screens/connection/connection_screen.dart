@@ -22,6 +22,8 @@ class ConnectionScreen extends ConsumerStatefulWidget {
 }
 
 class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
+  // Guard to ensure we only navigate once after authentication completes
+  bool _handledPostAuthNavigation = false;
   bool _showHostingChoice = false;
 
   @override
@@ -56,12 +58,30 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             ref.invalidate(hasActiveAccountProvider);
             ref.invalidate(activeAccountProvider);
 
-            // Determine destination similar to listener logic
+            // Wait until account status reflects the newly saved account to avoid router redirect races
+            try { await ref.read(hasActiveAccountProvider.future); } catch (_) {}
+            // Determine destination similar to listener logic, but prioritize target project from magic link
             final account = await ref.read(activeAccountProvider.future);
-            if (account != null && mounted) {
-              final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
-              final destination = isOffline ? '/projects' : '/today';
-              GoRouter.of(context).go(destination);
+            if (account != null && mounted && !_handledPostAuthNavigation) {
+                          _handledPostAuthNavigation = true;
+              // Try to read target project path saved by main.dart from the initial magic link
+              String? targetProjectPath = WebLocalStorage.getItem('targetProjectPath');
+              AppLogger.debug('ConnectionScreen: targetProjectPath: $targetProjectPath');
+              if (targetProjectPath != null && targetProjectPath.isNotEmpty) {
+                // Clear it after use to avoid unintended future redirects
+                // WebLocalStorage.removeItem('targetProjectPath');
+                final destination = '/project/${account.id}/${Uri.encodeComponent(targetProjectPath)}';
+                AppLogger.debug('ConnectionScreen: routing to : $destination');
+                GoRouter.of(context).go(destination);
+              } else {
+                final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
+                final destination = isOffline ? '/projects' : '/today';
+                AppLogger.debug('ConnectionScreen: routing to : $destination');
+                GoRouter.of(context).go(destination);
+              }
+            }
+            else{
+              AppLogger.warning("ConnectionScreen: no account after login from magik link");
             }
           } catch (e) {
             AppLogger.warning('ConnectionScreen: Post-auth redirect failed (will rely on listener/router): $e');
@@ -181,6 +201,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
       ref.invalidate(hasActiveAccountProvider);
       // Ensure navbar user badge updates immediately
       ref.invalidate(activeAccountProvider);
+      AppLogger.debug("[ROUTING] redirect '/projects' (_confirmOfflineOnly)");
       GoRouter.of(context).go('/projects');
     }
   }
@@ -194,17 +215,44 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
       _didSetupListen = true;
       ref.listen<LoginState>(loginViewModelProvider, (previous, current) {
         if (!mounted) return;
-        if (current.account != null) {
+        if (current.account != null && !_handledPostAuthNavigation) {
+          // If a target project is pending (from magic link), let the initState flow handle navigation
+          final pendingTarget = WebLocalStorage.getItem('targetProjectPath');
+          if (pendingTarget != null && pendingTarget.isNotEmpty) {
+            AppLogger.debug("ConnectionScreen: pending targetProjectPath detected, skipping listener navigation");
+            return; // Avoid racing with initState handler which will navigate to /project/:path
+          }
+
+          _handledPostAuthNavigation = true;
           // Invalidate providers so router recognizes account
           ref.invalidate(hasActiveAccountProvider);
           ref.invalidate(activeAccountProvider);
 
-          final account = current.account!;
-          final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
-          final destination = (isOffline || current.isReturningUser == false) ? '/projects' : '/today';
-          // Defer navigation to next frame to avoid setState during build
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) GoRouter.of(context).go(destination);
+          // Ensure router sees the updated account state before we navigate,
+          // otherwise it might immediately redirect back to /connect.
+          Future.microtask(() async {
+            try { await ref.read(hasActiveAccountProvider.future); } catch (_) {}
+            final account = current.account!;
+            // Prefer target project if present (should be absent here due to early return)
+            String? targetProjectPath = WebLocalStorage.getItem('targetProjectPath');
+            if (targetProjectPath != null && targetProjectPath.isNotEmpty) {
+              // WebLocalStorage.removeItem('targetProjectPath');
+              final encoded = Uri.encodeComponent(targetProjectPath);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  AppLogger.debug("[ROUTING] redirect '/project/$encoded' (connect_screen / microtask)");
+                  GoRouter.of(context).go('/project/$encoded');
+                }
+              });
+            } else {
+              final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
+              final destination = (isOffline || current.isReturningUser == false) ? '/projects' : '/today';
+              // Defer navigation to next frame to avoid setState during build
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                AppLogger.debug("[ROUTING] redirect '$destination' (connect_screen / microtask)");
+                if (mounted) GoRouter.of(context).go(destination);
+              });
+            }
           });
         }
       });

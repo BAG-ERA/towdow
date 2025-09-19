@@ -1,4 +1,4 @@
-﻿// Main FlowIt application widget
+// Main FlowIt application widget
 // Configures Material theme, routing, and global app setup
 
 import 'package:flutter/material.dart';
@@ -16,12 +16,15 @@ import 'presentation/screens/navigation/nav_screen.dart';
 import 'presentation/screens/project_detail/project_detail_screen.dart';
 import 'presentation/viewmodels/appearance_settings_viewmodel.dart';
 import 'presentation/widgets/adaptive_app_layout.dart';
+import 'presentation/viewmodels/login_viewmodel.dart';
 import 'presentation/providers/home_providers.dart';
 import 'data/providers/providers.dart';
 import 'core/theme/chart_theme.dart';
 import 'core/update/gitlab_update_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
+import 'core/logger.dart';
+import 'web/web_utils.dart';
 
 // ChangeNotifier wrapper for AsyncValue to make GoRouter reactive
 class AsyncValueNotifier<T> extends ChangeNotifier {
@@ -67,17 +70,40 @@ final routerProvider = Provider<GoRouter>((ref) {
     navigatorKey: globalNavigatorKey,
     // On web, start from the browser URL (supports magic-link query handling in main.dart)
     // On other platforms, keep mobile landing on /nav
-    initialLocation: kIsWeb ? '/projects' : '/nav',
+    initialLocation: kIsWeb ? '/' : '/nav',
     refreshListenable: Listenable.merge([accountNotifier, ValueNotifier(sessionEpoch)]),
     redirect: (context, state) {
       final isDesktop = _isDesktopPlatform();
+      // Observe login state to avoid race-condition redirects after auth
+      final loginState = ref.read(loginViewModelProvider);
 
       // Redirect root path:
-      // - On web: do not redirect; let main.dart+ConnectionScreen handle magic-link/login flow
+      // - On web: if a targetProjectPath exists in localStorage, go to that project; otherwise go to /projects
       // - On desktop: go to /today
       // - On mobile (non-web): go to /nav
       if (state.uri.path == '/') {
         if (kIsWeb) {
+          // Check localStorage for a target project path (set by magic link or previous intent)
+          try {
+            // Lazy import to avoid platform issues
+            // ignore: avoid_web_libraries_in_flutter
+            // We use the conditional export wrapper
+            // import is at top-level: web/web_utils.dart
+          } catch (_) {}
+          String? target;
+          try {
+            // Access via conditional export class
+            // Import is declared at file top
+            // ignore: unnecessary_statements
+            target = WebLocalStorage.getItem('targetProjectPath');
+          } catch (_) {
+            target = null;
+          }
+          if (target != null && target.isNotEmpty) {
+            final destination = '/project/${Uri.encodeComponent(target)}';
+            if (kDebugMode) debugPrint("[ROUTING] redirect '/' -> 'destination' (web targetProjectPath)");
+            return destination;
+          }
           return '/projects';
         }
         return isDesktop ? '/today' : '/nav';
@@ -90,6 +116,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       
       // Skip account check if already on connection screen
       if (state.uri.path == '/connect') {
+        return null;
+      }
+
+      // During and right after authentication, allow navigation to proceed even
+      // if hasActiveAccountProvider hasn't refreshed yet to avoid race.
+      if (loginState.isLoading || loginState.account != null) {
         return null;
       }
       
