@@ -20,6 +20,7 @@ import 'package:flutter/foundation.dart';
 import 'package:towdow_app/web/web_utils.dart';
 import '../../core/logger.dart';
 import '../../core/result.dart';
+import '../../core/app_lifecycle_manager.dart';
 
 import '../../data/models/caldav_account.dart';
 import '../../data/services/integration/external_caldav_calendar/external_sync_service.dart';
@@ -210,6 +211,14 @@ class LoginViewModel extends StateNotifier<LoginState> {
       // Save account
       await _accountRepository.save(account);
 
+      // TODO: wait for the account to be configured ?
+      // // Notify lifecycle to start main services (starts CalDAV monitor)
+      // try {
+      //   await AppLifecycleManager.instance.onAccountConfigured();
+      // } catch (e) {
+      //   AppLogger.warning('Login: Failed to notify lifecycle after account save: $e');
+      // }
+
       // Detect returning user (non-blocking)
       try {
         final returning = await _detectReturningUser(account);
@@ -328,6 +337,13 @@ class LoginViewModel extends StateNotifier<LoginState> {
       // Save account
       await _accountRepository.save(account);
 
+      // Notify lifecycle to start main services (starts CalDAV monitor)
+      try {
+        await AppLifecycleManager.instance.onAccountConfigured();
+      } catch (e) {
+        AppLogger.warning('Login: Failed to notify lifecycle after account save: $e');
+      }
+
       // Detect returning user (non-blocking)
       try {
         final returning = await _detectReturningUser(account);
@@ -436,6 +452,13 @@ class LoginViewModel extends StateNotifier<LoginState> {
       );
 
       await _accountRepository.save(account);
+
+      // Notify lifecycle to start main services (starts CalDAV monitor)
+      try {
+        await AppLifecycleManager.instance.onAccountConfigured();
+      } catch (e) {
+        AppLogger.warning('Login: Failed to notify lifecycle after account save: $e');
+      }
 
       try {
         final returning = await _detectReturningUser(account);
