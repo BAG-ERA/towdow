@@ -39,7 +39,22 @@ abstract class Task with _$Task {
     @HiveField(20) String? stepId, // Reference to project step id
   }) = _Task;
 
-  factory Task.fromJson(Map<String, dynamic> json) => _$TaskFromJson(json);
+  factory Task.fromJson(Map<String, dynamic> json) {
+    // Pre-normalize attendees: ensure a List<Map<String, dynamic>> for json_serializable
+    final attendeesRaw = json['attendees'];
+    if (attendeesRaw is List) {
+      json = Map<String, dynamic>.from(json);
+      json['attendees'] = attendeesRaw
+          .map((e) => e is Attendee
+              ? e.toJson()
+              : e is Map<String, dynamic>
+                  ? e
+                  : null)
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    }
+    return _$TaskFromJson(json);
+  }
 }
 
 // Factory methods for creating tasks
