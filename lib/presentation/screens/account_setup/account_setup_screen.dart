@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../viewmodels/login_viewmodel.dart';
 import '../../../core/logger.dart';
+import '../../../web/web_utils.dart';
 
 class AccountSetupScreen extends ConsumerStatefulWidget {
   const AccountSetupScreen({super.key});
@@ -23,9 +24,18 @@ class _AccountSetupScreenState extends ConsumerState<AccountSetupScreen>
       AppLogger.debug("AccountSetupScreen: ");
       final isOffline = account.serverUrl.startsWith('https://localhost') ||
           account.serverUrl.startsWith('http://localhost');
-      final destination = (isOffline || current.isReturningUser == false)
+      String destination = (isOffline || current.isReturningUser == false)
           ? '/projects'
           : '/today';
+
+      // On web, if a target project path is present in local storage, prioritize redirecting to that project
+      try {
+        final target = WebLocalStorage.getItem('targetProjectPath');
+        if (target != null && target.isNotEmpty) {
+          destination = '/project/${Uri.encodeComponent(target)}';
+        }
+      } catch (_) {}
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           AppLogger.debug("[ROUTING] redirect '$destination' (account_setup)");
