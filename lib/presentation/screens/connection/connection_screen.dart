@@ -11,7 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../../../data/models/caldav_account.dart';
 import '../../../data/providers/providers.dart';
 import '../../viewmodels/login_viewmodel.dart';
-import '../../../../web/web_utils.dart';
+import '../../../web/web_utils.dart';
 import '../../../core/logger.dart';
 
 class ConnectionScreen extends ConsumerStatefulWidget {
