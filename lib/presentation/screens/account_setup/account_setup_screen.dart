@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../viewmodels/login_viewmodel.dart';
 import '../../../core/logger.dart';
 import '../../../web/web_utils.dart';
@@ -83,7 +84,7 @@ class _AccountSetupScreenState extends ConsumerState<AccountSetupScreen>
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Setting things up'),
+        title: Text(AppLocalizations.of(context)!.accountSetupTitle),
       ),
       body: Center(
         child: Padding(
@@ -115,13 +116,13 @@ class _AccountSetupScreenState extends ConsumerState<AccountSetupScreen>
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Getting your account ready…',
+                  AppLocalizations.of(context)!.accountSetupHeading,
                   style: theme.textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'TowDow is starting services and preparing your workspace. This usually takes a few seconds.',
+                  AppLocalizations.of(context)!.accountSetupSubtitle,
                   style: theme.textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
