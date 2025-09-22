@@ -453,16 +453,48 @@ class LoginViewModel extends StateNotifier<LoginState> {
 
       final tokenData = jsonDecode(bodyStr);
 
+      // Try to extract profile fields from id_token claims
+      String? emailFromIdToken;
+      String? firstNameFromIdToken;
+      String? lastNameFromIdToken;
+      try {
+        final idToken = tokenData['id_token'] as String?;
+        if (idToken != null && idToken.isNotEmpty) {
+          final parts = idToken.split('.');
+          if (parts.length >= 2) {
+            final payload = parts[1]
+                .replaceAll('-', '+')
+                .replaceAll('_', '/');
+            // Fix base64 padding if needed
+            final normalized = payload + '=' * ((4 - payload.length % 4) % 4);
+            final decoded = utf8.decode(base64.decode(normalized));
+            final claims = jsonDecode(decoded) as Map<String, dynamic>;
+            emailFromIdToken = claims['email'] as String?;
+            firstNameFromIdToken = claims['given_name'] as String?;
+            lastNameFromIdToken = claims['family_name'] as String?;
+          }
+        }
+        else{
+          AppLogger.warning("Login: idToken empty or null");
+        }
+      } catch (e, stackTrace) {
+        AppLogger.warning('Login: Failed to decode id_token claims on web', e, stackTrace);
+      }
+
       final account = CaldavAccount(
         id: const Uuid().v4(),
         providerType: serverUrl == "https://api.towdow.app" ? 'towdow_cloud' : 'towdow_self_hosted',
         serverUrl: serverUrl,
-        username: '',
+        // Use email or preferred username when available to avoid empty username on web
+        username: emailFromIdToken ?? '--',
         accessToken: tokenData['access_token'],
         refreshToken: tokenData['refresh_token'],
         tokenExpiry: DateTime.now().add(Duration(seconds: tokenData['expires_in'] ?? 3600)),
         clientId: clientId,
         issuerUrl: issuerUrl,
+        firstName: firstNameFromIdToken ?? '--',
+        lastName: lastNameFromIdToken ?? '--',
+        email: emailFromIdToken,
         createdAt: DateTime.now(),
         lastSyncAt: DateTime.now(),
         isActive: true,
