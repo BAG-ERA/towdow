@@ -153,8 +153,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/today';
       }
       
-      // Skip account check if already on connection or setup screen
-      if (state.uri.path == '/connect' || state.uri.path == '/account-setup') {
+      // Handle connection screen explicitly:
+      // - If account is being configured, go to setup
+      // - If an account is already active, send to root and let existing logic route appropriately
+      // - Otherwise, allow staying on the connection screen
+      if (state.uri.path == '/connect') {
+        if (loginState.account != null && loginState.isConfiguringAccount == true) {
+          return '/account-setup';
+        }
+        // If we already have an account (either via loginState or provider), redirect away from connect
+        final asyncHasAccount = accountNotifier.asyncValue;
+        bool knownHasAccount = false;
+        if (asyncHasAccount.hasValue) {
+          knownHasAccount = asyncHasAccount.value ?? false;
+        }
+        if (knownHasAccount || (loginState.account != null && loginState.isConfiguringAccount == false)) {
+          // Redirect to root; root logic decides final destination per platform/web context
+          return '/';
+        }
+        return null; // stay on connect when not authenticated
+      }
+
+      // Skip account check if already on setup screen
+      if (state.uri.path == '/account-setup') {
         return null;
       }
 
