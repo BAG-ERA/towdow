@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../viewmodels/login_viewmodel.dart';
-import '../../../data/providers/providers_viewmodels.dart';
-import '../../viewmodels/monitoring_status_viewmodel.dart';
-import '../../../core/logger.dart';
-import '../../../web/web_utils.dart';
+// Passive screen: router controls navigation; no ViewModel interaction required here
 
 class AccountSetupScreen extends ConsumerStatefulWidget {
   const AccountSetupScreen({super.key});
@@ -19,34 +14,6 @@ class _AccountSetupScreenState extends ConsumerState<AccountSetupScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _pulse;
-
-  void _maybeLeaveSetup(LoginState current) { // legacy check retained
-    final monitoring = ref.read(monitoringStatusViewModelProvider);
-    if (!mounted) return;
-    final account = current.account;
-    if (account != null && current.isConfiguringAccount == false && monitoring.hasCompletedFirstSync) {
-      AppLogger.debug("AccountSetupScreen: ");
-      final isOffline = account.serverUrl.startsWith('https://localhost') ||
-          account.serverUrl.startsWith('http://localhost');
-      final destination = (isOffline || current.isReturningUser == false)
-          ? '/projects'
-          : '/today';
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          AppLogger.debug("[ROUTING] redirect '$destination' (account_setup)");
-          GoRouter.of(context).go(destination);
-        }
-      });
-    }
-    else{
-      if (account == null){
-        AppLogger.warning("AccountSetupScreen: account is null when waiting for account setup");
-      }
-      else{
-        AppLogger.debug("AccountSetupScreen: isConfiguringAccount: ${current.isConfiguringAccount}, hasCompletedFirstSync: ${monitoring.hasCompletedFirstSync}");
-      }
-    }
-  }
 
   @override
   void initState() {
@@ -66,27 +33,8 @@ class _AccountSetupScreenState extends ConsumerState<AccountSetupScreen>
     super.dispose();
   }
 
-  bool _didListen = false;
-
   @override
   Widget build(BuildContext context) {
-    // Navigate away when configuration completes or if already completed before listener attached
-    if (!_didListen) {
-      _didListen = true;
-      // 1) Attach listener for future changes
-      ref.listen<LoginState>(loginViewModelProvider, (prev, current) {
-        _maybeLeaveSetup(current);
-      });
-      // Also listen for monitoring changes to leave when first sync completes
-      ref.listen<MonitoringState>(monitoringStatusViewModelProvider, (prev, next) {
-        final current = ref.read(loginViewModelProvider);
-        _maybeLeaveSetup(current);
-      });
-      // 2) Also check immediately in case configuration already finished
-      final current = ref.read(loginViewModelProvider);
-      _maybeLeaveSetup(current);
-    }
-
     final theme = Theme.of(context);
 
     return Scaffold(

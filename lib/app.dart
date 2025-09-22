@@ -107,18 +107,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Observe login state to avoid race-condition redirects after auth
       final loginState = ref.read(loginViewModelProvider);
 
-      // If account is being configured OR first sync not yet completed, force users to the account setup screen
+      // Gate solely on first-sync completion for authenticated users
       final needsFirstSync = (monitoring?.hasCompletedFirstSync == false);
-      if (loginState.account != null && (loginState.isConfiguringAccount == true || needsFirstSync) && state.uri.path != '/account-setup') {
+      if (loginState.account != null && needsFirstSync && state.uri.path != '/account-setup') {
         return '/account-setup';
       }
 
-      // If configuration finished and we're still on setup, navigate out deterministically
-      if (state.uri.path == '/account-setup' && loginState.account != null && loginState.isConfiguringAccount == false && (monitoring?.hasCompletedFirstSync ?? false)) {
+      // Leave setup once first sync is completed; choose deterministic exit
+      if (state.uri.path == '/account-setup' && loginState.account != null && (monitoring?.hasCompletedFirstSync ?? false)) {
         final account = loginState.account!;
         final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
-        final destination = (isOffline || loginState.isReturningUser == false) ? '/projects' : '/today';
-        if (kDebugMode) debugPrint("[ROUTING] redirect '/account-setup' -> '$destination' (configuration finished)");
+        // Default to /projects if returning status is unknown; use /projects for offline too
+        String destination = '/projects';
+        if (!isOffline) {
+          final returning = loginState.isReturningUser;
+          if (returning == true) destination = '/today';
+        }
+        if (kDebugMode) debugPrint("[ROUTING] redirect '/account-setup' -> '$destination' (first sync completed)");
         return destination;
       }
 
@@ -175,7 +180,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // - If an account is already active, send to root and let existing logic route appropriately
       // - Otherwise, allow staying on the connection screen
       if (state.uri.path == '/connect') {
-        if (loginState.account != null && loginState.isConfiguringAccount == true) {
+        if (loginState.account != null && (monitoring?.hasCompletedFirstSync == false)) {
           return '/account-setup';
         }
         // If we already have an account (either via loginState or provider), redirect away from connect
@@ -184,7 +189,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (asyncHasAccount.hasValue) {
           knownHasAccount = asyncHasAccount.value ?? false;
         }
-        if (knownHasAccount || (loginState.account != null && loginState.isConfiguringAccount == false)) {
+        if (knownHasAccount || (loginState.account != null)) {
           // Redirect to root; root logic decides final destination per platform/web context
           return '/';
         }
