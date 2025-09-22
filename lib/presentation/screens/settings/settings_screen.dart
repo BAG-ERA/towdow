@@ -4,12 +4,12 @@
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:go_router/go_router.dart';
 import '../../../core/logger.dart';
 import '../../../core/result.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
 import 'caldav_management_screen.dart';
-import 'connection_info_screen.dart';
 import 'external_calendar_management_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
@@ -136,10 +136,16 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Future<void> _showConnectionInfo(BuildContext context, WidgetRef ref) async {
-    // Navigate to connection information screen
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const ConnectionInfoScreen()),
-    );
+    // Navigate via GoRouter so it works on desktop/web/mobile
+    // ignore: use_build_context_synchronously
+    if (context.mounted) {
+      context.go('/settings/connection');
+    } else {
+      // In unlikely case context isn't mounted yet, schedule post-frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/settings/connection');
+      });
+    }
   }
 
   Future<void> _showDisconnectConfirmation(

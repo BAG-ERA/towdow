@@ -14,6 +14,7 @@ import 'presentation/screens/projects_list/projects_list_screen.dart';
 import 'presentation/screens/workflows_list/workflow_list_screen.dart';
 import 'presentation/screens/workflow_detail/workflow_detail_screen.dart';
 import 'presentation/screens/navigation/nav_screen.dart';
+import 'presentation/screens/settings/connection_info_screen.dart';
 
 import 'presentation/screens/project_detail/project_detail_screen.dart';
 import 'presentation/viewmodels/appearance_settings_viewmodel.dart';
@@ -309,6 +310,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/settings', state: state, child: const SettingsScreen()),
           ),
+          GoRoute(
+            path: '/settings/connection',
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/settings', state: state, child: const ConnectionInfoScreen()),
+          ),
           
           GoRoute(
             path: '/projects',
@@ -528,7 +533,7 @@ Page<dynamic> _buildPageForPlatformRoute({required String path, required GoRoute
   final bool isDetail = location.startsWith('/project/') || location.startsWith('/workflow/');
   final bool isList = location == '/projects' || location == '/workflows' ||
       location == '/today' || location == '/soon' || location == '/anytime' ||
-      location == '/next-week' || location == '/later' || location == '/settings' || location == '/';
+      location == '/next-week' || location == '/later' || location == '/settings' || location.startsWith('/settings/') || location == '/';
   final bool goingToNav = path == '/nav';
   final bool comingFromNav = location == '/nav';
 
