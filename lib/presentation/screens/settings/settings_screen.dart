@@ -222,7 +222,7 @@ class SettingsScreen extends ConsumerWidget {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.of(
               context,
-            ).pushNamedAndRemoveUntil('/connect', (route) => false);
+            ).pushNamedAndRemoveUntil('/', (route) => false);
           });
         },
         failure: (failure) {
