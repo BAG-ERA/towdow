@@ -357,6 +357,26 @@
   "monitoringOffline": "Hors ligne",
   "monitoringTooltipInProgress": "Surveillance des changements et synchronisation si nécessaire",
   "monitoringTooltipWaiting": "En veille, en attente du prochain contrôle",
-  "monitoringTooltipOffline": "Pas de connexion Internet"
+  "monitoringTooltipOffline": "Pas de connexion Internet",
+
+  "welcomeTitle": "Bienvenue",
+  "chooseHostingTitle": "Choisir l'hébergement",
+  "howDoYouWantToConnect": "Comment souhaitez-vous vous connecter ?",
+  "cloudOptionSubtitle": "Zéro configuration, synchronisation cloud sécurisée",
+  "towDowSelfHosted": "TowDow auto‑hébergé",
+  "selfHostedOptionSubtitle": "Utilisez votre propre serveur TowDow",
+  "otherMethods": "Autres méthodes",
+  "welcomeHeadline": "Un to‑do simple pour vous.\nDes workflows puissants pour votre équipe.",
+  "welcomeBody": "Une application de tâches claire, simple pour les particuliers et scalable pour les équipes avec des workflows flexibles.",
+  "getStarted": "Commencer",
+  "connectAnyCaldavServer": "Connecter n'importe quel serveur CalDAV",
+  "offlineNoAccountTitle": "Aucun compte (hors-ligne uniquement)",
+  "offlineNoAccountSubtitle": "Sur l'appareil uniquement. Pas de synchro, partage ni pièces jointes",
+  "offlineOnlyExplainer": "Vos données seront stockées uniquement sur cet appareil. Supprimer l'application ou effacer les données les effacera définitivement. Vous pourrez activer la synchronisation plus tard dans les Paramètres.",
+  "offlineOnlyAcknowledge": "Je comprends que les données ne sont pas sauvegardées",
+  "startOffline": "Démarrer hors‑ligne",
+  "accountSetupTitle": "Configuration du compte",
+  "accountSetupHeading": "Préparation de votre espace de travail…",
+  "accountSetupSubtitle": "Nous configurons vos calendriers, vos paramètres de synchronisation et préparons votre première session. Cela ne devrait prendre qu’un instant."
 }
 

@@ -7,6 +7,7 @@ import 'widgets/custom_caldav_dialog.dart';
 import 'widgets/towdow_cloud_dialog.dart';
 import 'widgets/towdow_self_hosted_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'package:uuid/uuid.dart';
 import '../../../data/models/caldav_account.dart';
 import '../../../data/providers/providers.dart';
@@ -108,8 +109,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.settings_rounded),
-                title: const Text('Custom CalDAV'),
-                subtitle: const Text('Connect any CalDAV server'),
+                title: Text(AppLocalizations.of(context)!.customCaldav),
+                subtitle: Text(AppLocalizations.of(context)!.connectAnyCaldavServer),
                 onTap: () {
                   Navigator.of(context).pop();
                   showDialog(
@@ -121,8 +122,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
               const Divider(height: 0),
               ListTile(
                 leading: const Icon(Icons.offline_bolt_rounded),
-                title: const Text('No account (offline only)'),
-                subtitle: const Text('On-device only. No sync, shares, or file attachments'),
+                title: Text(AppLocalizations.of(context)!.offlineNoAccountTitle),
+                subtitle: Text(AppLocalizations.of(context)!.offlineNoAccountSubtitle),
                 onTap: () {
                   Navigator.of(context).pop();
                   _confirmOfflineOnly();
@@ -142,14 +143,13 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         bool understood = false;
         return StatefulBuilder(
           builder: (context, setState) => AlertDialog(
-            title: const Text('Offline only'),
+            title: Text(AppLocalizations.of(context)!.offlineOnly),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Your data will be stored only on this device. Removing the app or clearing data will erase everything. '
-                  'You can enable sync later in Settings.',
+                Text(
+                  AppLocalizations.of(context)!.offlineOnlyExplainer,
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -158,8 +158,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                       value: understood,
                       onChanged: (v) => setState(() => understood = v ?? false),
                     ),
-                    const Expanded(
-                      child: Text('I understand data is not backed up'),
+                    Expanded(
+                      child: Text(AppLocalizations.of(context)!.offlineOnlyAcknowledge),
                     ),
                   ],
                 ),
@@ -168,13 +168,13 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text(AppLocalizations.of(context)!.cancel),
               ),
               ElevatedButton(
                 onPressed: understood
                     ? () => Navigator.of(context).pop(true)
                     : null,
-                child: const Text('Start offline'),
+                child: Text(AppLocalizations.of(context)!.startOffline),
               ),
             ],
           ),
@@ -271,7 +271,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(_showHostingChoice ? 'Choose hosting' : 'Welcome')),
+      appBar: AppBar(title: Text(_showHostingChoice ? AppLocalizations.of(context)!.chooseHostingTitle : AppLocalizations.of(context)!.welcomeTitle)), 
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Center(
@@ -285,14 +285,14 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'How do you want to connect?',
+                          AppLocalizations.of(context)!.howDoYouWantToConnect,
                           style: Theme.of(context).textTheme.headlineSmall,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
                         _ConnectionOptionCard(
-                          title: 'TowDow Cloud',
-                          subtitle: 'Zero setup, secure cloud sync',
+                          title: AppLocalizations.of(context)!.towDowCloud,
+                          subtitle: AppLocalizations.of(context)!.cloudOptionSubtitle,
                           icon: Icons.cloud_rounded,
                           onTap: () {
                             showDialog(
@@ -303,8 +303,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                         ),
                         const SizedBox(height: 12),
                         _ConnectionOptionCard(
-                          title: 'TowDow self hosted',
-                          subtitle: 'Use your own TowDow server',
+                          title: AppLocalizations.of(context)!.towDowSelfHosted,
+                          subtitle: AppLocalizations.of(context)!.selfHostedOptionSubtitle,
                           icon: Icons.account_circle_rounded,
                           onTap: () {
                             showDialog(
@@ -317,7 +317,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                         TextButton.icon(
                           onPressed: _openOtherMethodsSheet,
                           icon: const Icon(Icons.more_horiz_rounded),
-                          label: const Text('Other methods'),
+                          label: Text(AppLocalizations.of(context)!.otherMethods),
                         ),
                       ],
                     )
@@ -332,13 +332,13 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                         ),
                         const SizedBox(height: 24),
                         Text(
-                          'Simple to‑do for you.\nPowerful workflows for your team.',
+                          AppLocalizations.of(context)!.welcomeHeadline,
                           style: Theme.of(context).textTheme.headlineSmall,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'A clear task app that stays simple for individuals and scales to teams with flexible workflows.',
+                          AppLocalizations.of(context)!.welcomeBody,
                           style: Theme.of(context).textTheme.bodyMedium,
                           textAlign: TextAlign.center,
                         ),
@@ -347,9 +347,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                           width: 240,
                           child: ElevatedButton(
                             onPressed: () => setState(() => _showHostingChoice = true),
-                            child: const Padding(
+                            child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 14),
-                              child: Text('Get started'),
+                              child: Text(AppLocalizations.of(context)!.getStarted),
                             ),
                           ),
                         ),
