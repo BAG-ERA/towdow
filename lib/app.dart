@@ -21,7 +21,6 @@ import 'presentation/viewmodels/login_viewmodel.dart';
 import 'presentation/providers/home_providers.dart';
 import 'data/providers/providers.dart';
 import 'core/theme/chart_theme.dart';
-import 'core/update/gitlab_update_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'core/logger.dart';
@@ -313,10 +312,6 @@ class _FlowItAppState extends ConsumerState<FlowItApp> {
   @override
   void initState() {
     super.initState();
-    // Kick the update check right after first frame, using global navigator
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      GitLabUpdateService().checkAndPromptIfNeeded(); // no context needed
-    });
   }
 
   @override

@@ -27,7 +27,6 @@ import '../../data/services/integration/external_caldav_calendar/external_sync_s
 import '../../data/services/storage/s3_storage_service.dart';
 import '../../data/repositories/account_repository.dart';
 import '../../data/providers/providers.dart';
-import '../../web/web_utils.dart';
 
 // Login state for authentication flows
 class LoginState {

@@ -14,7 +14,6 @@ import '../data/services/user/user_sync_service.dart';
 import '../data/repositories/account_repository.dart';
 import 'logger.dart';
 import 'result.dart';
-import 'update/gitlab_update_service.dart';
 
 enum FlowItAppState {
   initial,
@@ -444,8 +443,7 @@ class AppLifecycleManager {
         });
       }
       
-      // Check for app updates when app resumes
-      GitLabUpdateService().checkAndPromptIfNeeded();
+      // Removed update check on resume
     }
   }
 
