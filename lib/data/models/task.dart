@@ -6,11 +6,10 @@ import 'package:hive_ce/hive.dart';
 import 'attendee.dart';
 
 part 'task.freezed.dart';
-part 'task.g.dart';
+// No json_serializable generation; custom (de)serialization implemented below
 
 @HiveType(typeId: 6)
 @freezed
-@JsonSerializable(explicitToJson: true)
 abstract class Task with _$Task {
   const factory Task({
     @HiveField(0) required String uid,
