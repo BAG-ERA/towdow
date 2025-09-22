@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../viewmodels/login_viewmodel.dart';
+import '../../../data/providers/providers_viewmodels.dart';
+import '../../viewmodels/monitoring_status_viewmodel.dart';
 import '../../../core/logger.dart';
 import '../../../web/web_utils.dart';
 
@@ -18,10 +20,11 @@ class _AccountSetupScreenState extends ConsumerState<AccountSetupScreen>
   late final AnimationController _controller;
   late final Animation<double> _pulse;
 
-  void _maybeLeaveSetup(LoginState current) {
+  void _maybeLeaveSetup(LoginState current) { // legacy check retained
+    final monitoring = ref.read(monitoringStatusViewModelProvider);
     if (!mounted) return;
     final account = current.account;
-    if (account != null && current.isConfiguringAccount == false) {
+    if (account != null && current.isConfiguringAccount == false && monitoring.hasCompletedFirstSync) {
       AppLogger.debug("AccountSetupScreen: ");
       final isOffline = account.serverUrl.startsWith('https://localhost') ||
           account.serverUrl.startsWith('http://localhost');
@@ -40,7 +43,7 @@ class _AccountSetupScreenState extends ConsumerState<AccountSetupScreen>
         AppLogger.warning("AccountSetupScreen: account is null when waiting for account setup");
       }
       else{
-        AppLogger.warning("AccountSetupScreen: isConfiguringAccount is false when waiting for account setup");
+        AppLogger.debug("AccountSetupScreen: isConfiguringAccount: ${current.isConfiguringAccount}, hasCompletedFirstSync: ${monitoring.hasCompletedFirstSync}");
       }
     }
   }
@@ -72,6 +75,11 @@ class _AccountSetupScreenState extends ConsumerState<AccountSetupScreen>
       _didListen = true;
       // 1) Attach listener for future changes
       ref.listen<LoginState>(loginViewModelProvider, (prev, current) {
+        _maybeLeaveSetup(current);
+      });
+      // Also listen for monitoring changes to leave when first sync completes
+      ref.listen<MonitoringState>(monitoringStatusViewModelProvider, (prev, next) {
+        final current = ref.read(loginViewModelProvider);
         _maybeLeaveSetup(current);
       });
       // 2) Also check immediately in case configuration already finished

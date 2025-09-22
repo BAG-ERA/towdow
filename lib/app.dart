@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/connection/connection_screen.dart';
 import 'presentation/screens/account_setup/account_setup_screen.dart';
+import 'data/providers/providers_viewmodels.dart';
 import 'presentation/screens/settings/settings_screen.dart';
 import 'presentation/screens/projects_list/projects_list_screen.dart';
 import 'presentation/screens/workflows_list/workflow_list_screen.dart';
@@ -25,6 +26,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'core/logger.dart';
 import 'web/web_utils.dart';
+import 'presentation/viewmodels/monitoring_status_viewmodel.dart';
 
 // ChangeNotifier wrapper for AsyncValue to make GoRouter reactive
 class AsyncValueNotifier<T> extends ChangeNotifier {
@@ -72,6 +74,14 @@ final loginRouterRefreshNotifierProvider = Provider<ValueNotifier<int>>((ref) {
   return notifier;
 });
 
+final firstSyncRouterRefreshNotifierProvider = Provider<ValueNotifier<int>>((ref) {
+  final notifier = ValueNotifier<int>(0);
+  ref.listen<MonitoringState>(monitoringStatusViewModelProvider, (previous, next) {
+    notifier.value++;
+  });
+  return notifier;
+});
+
 final routerProvider = Provider<GoRouter>((ref) {
   final accountNotifier = ref.watch(accountStatusNotifierProvider);
   final sessionEpoch = ref.watch(sessionEpochProvider);
@@ -84,20 +94,27 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: Listenable.merge([
           accountNotifier,
           ref.watch(loginRouterRefreshNotifierProvider),
+          ref.watch(firstSyncRouterRefreshNotifierProvider),
           ValueNotifier(sessionEpoch),
         ]),
     redirect: (context, state) {
+      // Observe first-sync completion to gate account_setup during first run
+      MonitoringState? monitoring;
+      try {
+        monitoring = ref.read(monitoringStatusViewModelProvider);
+      } catch (_) {}
       final isDesktop = _isDesktopPlatform();
       // Observe login state to avoid race-condition redirects after auth
       final loginState = ref.read(loginViewModelProvider);
 
-      // If account is being configured, force users to the account setup screen
-      if (loginState.account != null && loginState.isConfiguringAccount == true && state.uri.path != '/account-setup') {
+      // If account is being configured OR first sync not yet completed, force users to the account setup screen
+      final needsFirstSync = (monitoring?.hasCompletedFirstSync == false);
+      if (loginState.account != null && (loginState.isConfiguringAccount == true || needsFirstSync) && state.uri.path != '/account-setup') {
         return '/account-setup';
       }
 
       // If configuration finished and we're still on setup, navigate out deterministically
-      if (state.uri.path == '/account-setup' && loginState.account != null && loginState.isConfiguringAccount == false) {
+      if (state.uri.path == '/account-setup' && loginState.account != null && loginState.isConfiguringAccount == false && (monitoring?.hasCompletedFirstSync ?? false)) {
         final account = loginState.account!;
         final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
         final destination = (isOffline || loginState.isReturningUser == false) ? '/projects' : '/today';
