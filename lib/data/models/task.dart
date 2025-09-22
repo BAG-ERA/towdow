@@ -6,6 +6,7 @@ import 'package:hive_ce/hive.dart';
 import 'attendee.dart';
 
 part 'task.freezed.dart';
+part 'task.g.dart';
 // No json_serializable generation; custom (de)serialization implemented below
 
 @HiveType(typeId: 6)
