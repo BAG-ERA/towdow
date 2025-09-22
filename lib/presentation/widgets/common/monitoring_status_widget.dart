@@ -48,7 +48,7 @@ class _MonitoringStatusWidgetState extends ConsumerState<MonitoringStatusWidget>
 
     switch (state) {
       case MonitoringUiState.inProgress:
-        icon = Icons.sync_rounded;
+        icon = Icons.cloud_sync_rounded;
         color = Theme.of(context).colorScheme.primary;
         label = AppLocalizations.of(context)!.monitoringInProgress;
         break;
