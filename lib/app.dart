@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/connection/connection_screen.dart';
+import 'presentation/screens/account_setup/account_setup_screen.dart';
 import 'presentation/screens/settings/settings_screen.dart';
 import 'presentation/screens/projects_list/projects_list_screen.dart';
 import 'presentation/screens/workflows_list/workflow_list_screen.dart';
@@ -62,6 +63,16 @@ bool _isDesktopPlatform() {
       defaultTargetPlatform == TargetPlatform.macOS;
 }
 
+// Notifier to refresh GoRouter on LoginState changes (e.g., isConfiguringAccount flips)
+final loginRouterRefreshNotifierProvider = Provider<ValueNotifier<int>>((ref) {
+  final notifier = ValueNotifier<int>(0);
+  // Any change in LoginState will bump the notifier value, triggering router refresh
+  ref.listen<LoginState>(loginViewModelProvider, (previous, next) {
+    notifier.value++;
+  });
+  return notifier;
+});
+
 final routerProvider = Provider<GoRouter>((ref) {
   final accountNotifier = ref.watch(accountStatusNotifierProvider);
   final sessionEpoch = ref.watch(sessionEpochProvider);
@@ -71,17 +82,46 @@ final routerProvider = Provider<GoRouter>((ref) {
     // On web, start from the browser URL (supports magic-link query handling in main.dart)
     // On other platforms, keep mobile landing on /nav
     initialLocation: kIsWeb ? '/' : '/nav',
-    refreshListenable: Listenable.merge([accountNotifier, ValueNotifier(sessionEpoch)]),
+    refreshListenable: Listenable.merge([
+          accountNotifier,
+          ref.watch(loginRouterRefreshNotifierProvider),
+          ValueNotifier(sessionEpoch),
+        ]),
     redirect: (context, state) {
       final isDesktop = _isDesktopPlatform();
       // Observe login state to avoid race-condition redirects after auth
       final loginState = ref.read(loginViewModelProvider);
+
+      // If account is being configured, force users to the account setup screen
+      if (loginState.account != null && loginState.isConfiguringAccount == true && state.uri.path != '/account-setup') {
+        return '/account-setup';
+      }
+
+      // If configuration finished and we're still on setup, navigate out deterministically
+      if (state.uri.path == '/account-setup' && loginState.account != null && loginState.isConfiguringAccount == false) {
+        final account = loginState.account!;
+        final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
+        final destination = (isOffline || loginState.isReturningUser == false) ? '/projects' : '/today';
+        if (kDebugMode) debugPrint("[ROUTING] redirect '/account-setup' -> '$destination' (configuration finished)");
+        return destination;
+      }
 
       // Redirect root path:
       // - On web: if a targetProjectPath exists in localStorage, go to that project; otherwise go to /projects
       // - On desktop: go to /today
       // - On mobile (non-web): go to /nav
       if (state.uri.path == '/') {
+        // If there's no active account, always go to the connection screen
+        final accountCheck = accountNotifier.asyncValue;
+        if (accountCheck.hasValue) {
+          final hasAccount = accountCheck.value ?? false;
+          if (!hasAccount && loginState.account == null) {
+            return '/connect';
+          }
+        } else if (accountCheck.hasError) {
+          if (loginState.account == null) return '/connect';
+        }
+
         if (kIsWeb) {
           // Check localStorage for a target project path (set by magic link or previous intent)
           try {
@@ -114,8 +154,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/today';
       }
       
-      // Skip account check if already on connection screen
-      if (state.uri.path == '/connect') {
+      // Skip account check if already on connection or setup screen
+      if (state.uri.path == '/connect' || state.uri.path == '/account-setup') {
         return null;
       }
 
@@ -253,6 +293,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/connect',
         pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/connect', state: state, child: const ConnectionScreen()),
+      ),
+      GoRoute(
+        path: '/account-setup',
+        pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/account-setup', state: state, child: const AccountSetupScreen()),
       ),
     ],
   );

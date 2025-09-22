@@ -320,7 +320,7 @@ class AppLifecycleManager {
 
   /// Called when account configuration changes
   Future<void> onAccountConfigured() async {
-    // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account configured, starting main services');
+    AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account configured, starting main services');
     
     if (!hasServices) {
       AppLogger.warning('AppLifecycleManager: Cannot start services - services not initialized');

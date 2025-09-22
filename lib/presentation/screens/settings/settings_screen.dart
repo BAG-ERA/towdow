@@ -17,6 +17,8 @@ import '../../../data/services/sync/sync_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../viewmodels/appearance_settings_viewmodel.dart';
 import '../../widgets/header_screen_widget.dart';
+import '../../../core/app_lifecycle_manager.dart';
+import '../../viewmodels/login_viewmodel.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -187,6 +189,12 @@ class SettingsScreen extends ConsumerWidget {
 
       result.when(
         success: (_) async {
+          // Stop background services cleanly
+          try { await AppLifecycleManager.instance.onAccountRemoved(); } catch (_) {}
+
+          // Reset login view-model so router guards don't think we're still logged-in
+          try { ref.read(loginViewModelProvider.notifier).reset(); } catch (_) {}
+
           // Invalidate all relevant providers to clear cached data
           ref.invalidate(taskListProvider);
           ref.invalidate(calendarListProvider);
@@ -207,11 +215,14 @@ class SettingsScreen extends ConsumerWidget {
           ref.invalidate(externalEventRepositoryProvider);
           ref.invalidate(syncServiceProvider);
 
+          // Bump session epoch to force GoRouter refresh
+          try { ref.read(sessionEpochProvider.notifier).state++; } catch (_) {}
+
           // Restart the app
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.of(
               context,
-            ).pushNamedAndRemoveUntil('/', (route) => false);
+            ).pushNamedAndRemoveUntil('/connect', (route) => false);
           });
         },
         failure: (failure) {

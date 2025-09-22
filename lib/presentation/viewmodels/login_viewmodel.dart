@@ -35,12 +35,14 @@ class LoginState {
   final String? error;
   final CaldavAccount? account;
   final bool? isReturningUser; // null until checked
+  final bool isConfiguringAccount; // true while lifecycle/services are starting
 
   const LoginState({
     this.isLoading = false,
     this.error,
     this.account,
     this.isReturningUser,
+    this.isConfiguringAccount = false,
   });
 
   LoginState copyWith({
@@ -48,11 +50,13 @@ class LoginState {
     String? error,
     CaldavAccount? account,
     bool? isReturningUser,
+    bool? isConfiguringAccount,
   }) => LoginState(
     isLoading: isLoading ?? this.isLoading,
     error: error,
     account: account ?? this.account,
     isReturningUser: isReturningUser ?? this.isReturningUser,
+    isConfiguringAccount: isConfiguringAccount ?? this.isConfiguringAccount,
   );
 }
 
@@ -211,13 +215,25 @@ class LoginViewModel extends StateNotifier<LoginState> {
       // Save account
       await _accountRepository.save(account);
 
-      // TODO: wait for the account to be configured ?
-      // // Notify lifecycle to start main services (starts CalDAV monitor)
-      // try {
-      //   await AppLifecycleManager.instance.onAccountConfigured();
-      // } catch (e) {
-      //   AppLogger.warning('Login: Failed to notify lifecycle after account save: $e');
-      // }
+      // Set account and enter configuration phase (UI can show setup view)
+      state = state.copyWith(
+        account: account,
+        isConfiguringAccount: true,
+        isLoading: false,
+      );
+
+      // Notify lifecycle to start main services (starts CalDAV monitor)
+      try {
+        await AppLifecycleManager.instance.onAccountConfigured();
+        AppLogger.debug("Login: First app synchro completed");
+      } catch (e) {
+        AppLogger.warning('Login: Failed to notify lifecycle after account save: $e');
+      }
+
+      // Mark configuration as complete immediately after services start
+      state = state.copyWith(
+        isConfiguringAccount: false,
+      );
 
       // Detect returning user (non-blocking)
       try {
@@ -244,11 +260,6 @@ class LoginViewModel extends StateNotifier<LoginState> {
         );
       }
 
-      // Set account and complete authentication
-      state = state.copyWith(
-        account: account,
-        isLoading: false,
-      );
     } catch (e, stackTrace) {
       AppLogger.error('Login: Authentication failed', e, stackTrace);
       state = state.copyWith(
@@ -337,12 +348,24 @@ class LoginViewModel extends StateNotifier<LoginState> {
       // Save account
       await _accountRepository.save(account);
 
+      // Expose account and enter configuration phase
+      state = state.copyWith(
+        account: account,
+        isConfiguringAccount: true,
+        isLoading: false,
+      );
+
       // Notify lifecycle to start main services (starts CalDAV monitor)
       try {
         await AppLifecycleManager.instance.onAccountConfigured();
       } catch (e) {
         AppLogger.warning('Login: Failed to notify lifecycle after account save: $e');
       }
+
+      // Mark configuration as complete immediately after services start
+      state = state.copyWith(
+        isConfiguringAccount: false,
+      );
 
       // Detect returning user (non-blocking)
       try {
@@ -369,11 +392,6 @@ class LoginViewModel extends StateNotifier<LoginState> {
         );
       }
 
-      // Always set hasExistingUserData to true to skip calendar selection
-      state = state.copyWith(
-        account: account,
-        isLoading: false,
-      );
     } catch (e, stackTrace) {
       AppLogger.error(
         'Login: Authentication with credentials failed',
@@ -453,12 +471,21 @@ class LoginViewModel extends StateNotifier<LoginState> {
 
       await _accountRepository.save(account);
 
+      // Enter configuration phase and expose account to UI
+      if (!mounted) return;
+      state = state.copyWith(account: account, isConfiguringAccount: true, isLoading: false);
+
       // Notify lifecycle to start main services (starts CalDAV monitor)
+      AppLogger.info('Login: waiting Account to be configured configured');
       try {
         await AppLifecycleManager.instance.onAccountConfigured();
+        AppLogger.info('Login: Account configured');
       } catch (e) {
         AppLogger.warning('Login: Failed to notify lifecycle after account save: $e');
       }
+
+      // Mark configuration as complete immediately after services start
+      state = state.copyWith(isConfiguringAccount: false);
 
       try {
         final returning = await _detectReturningUser(account);
@@ -477,7 +504,6 @@ class LoginViewModel extends StateNotifier<LoginState> {
       }
 
       if (!mounted) return;
-      state = state.copyWith(account: account, isLoading: false);
     } catch (e, stackTrace) {
       AppLogger.error('Login: Auth code authentication failed', e, stackTrace);
       if (!mounted) return;

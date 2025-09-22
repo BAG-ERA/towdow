@@ -216,6 +216,18 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
       ref.listen<LoginState>(loginViewModelProvider, (previous, current) {
         if (!mounted) return;
         if (current.account != null && !_handledPostAuthNavigation) {
+          // If account is in configuration, go to setup screen first
+          if (current.isConfiguringAccount == true) {
+            _handledPostAuthNavigation = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                AppLogger.debug("[ROUTING] redirect '/account-setup' (connect_screen - configuring)");
+                GoRouter.of(context).go('/account-setup');
+              }
+            });
+            return;
+          }
+
           // If a target project is pending (from magic link), let the initState flow handle navigation
           final pendingTarget = WebLocalStorage.getItem('targetProjectPath');
           if (pendingTarget != null && pendingTarget.isNotEmpty) {
