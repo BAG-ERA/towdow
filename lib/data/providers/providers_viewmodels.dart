@@ -174,7 +174,7 @@ final noteViewModelProvider = StateNotifierProvider.family<NoteViewModel, NoteSt
 
 
 // Monitoring status ViewModel provider
-final monitoringStatusViewModelProvider = StateNotifierProvider<MonitoringStatusViewModel, MonitoringUiState>((ref) {
+final monitoringStatusViewModelProvider = StateNotifierProvider<MonitoringStatusViewModel, MonitoringState>((ref) {
   final connectionMonitorService = ref.watch(connectionMonitorServiceProvider);
   final syncService = ref.watch(syncServiceProvider);
   final caldavMonitor = ref.watch(caldavMonitorProvider);

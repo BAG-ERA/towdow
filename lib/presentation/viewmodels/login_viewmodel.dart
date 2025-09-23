@@ -16,8 +16,11 @@ import 'package:http/http.dart' as http;
 import 'package:openid_client/openid_client_io.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
+import 'package:towdow_app/web/web_utils.dart';
 import '../../core/logger.dart';
 import '../../core/result.dart';
+import '../../core/app_lifecycle_manager.dart';
 
 import '../../data/models/caldav_account.dart';
 import '../../data/services/integration/external_caldav_calendar/external_sync_service.dart';
@@ -31,12 +34,14 @@ class LoginState {
   final String? error;
   final CaldavAccount? account;
   final bool? isReturningUser; // null until checked
+  final bool isConfiguringAccount; // true while lifecycle/services are starting
 
   const LoginState({
     this.isLoading = false,
     this.error,
     this.account,
     this.isReturningUser,
+    this.isConfiguringAccount = false,
   });
 
   LoginState copyWith({
@@ -44,11 +49,13 @@ class LoginState {
     String? error,
     CaldavAccount? account,
     bool? isReturningUser,
+    bool? isConfiguringAccount,
   }) => LoginState(
     isLoading: isLoading ?? this.isLoading,
     error: error,
     account: account ?? this.account,
     isReturningUser: isReturningUser ?? this.isReturningUser,
+    isConfiguringAccount: isConfiguringAccount ?? this.isConfiguringAccount,
   );
 }
 
@@ -207,6 +214,29 @@ class LoginViewModel extends StateNotifier<LoginState> {
       // Save account
       await _accountRepository.save(account);
 
+      AppLogger.debug('LoginViewModel: Account saved - username: ${account.username}, email: ${account.email}, firstName: ${account.firstName}');
+
+
+      // Set account and enter configuration phase (UI can show setup view)
+      state = state.copyWith(
+        account: account,
+        isConfiguringAccount: true,
+        isLoading: false,
+      );
+
+      // Notify lifecycle to start main services (starts CalDAV monitor)
+      try {
+        await AppLifecycleManager.instance.onAccountConfigured();
+        AppLogger.debug("Login: First app synchro completed");
+      } catch (e) {
+        AppLogger.warning('Login: Failed to notify lifecycle after account save: $e');
+      }
+
+      // Mark configuration as complete immediately after services start
+      state = state.copyWith(
+        isConfiguringAccount: false,
+      );
+
       // Detect returning user (non-blocking)
       try {
         final returning = await _detectReturningUser(account);
@@ -232,11 +262,6 @@ class LoginViewModel extends StateNotifier<LoginState> {
         );
       }
 
-      // Set account and complete authentication
-      state = state.copyWith(
-        account: account,
-        isLoading: false,
-      );
     } catch (e, stackTrace) {
       AppLogger.error('Login: Authentication failed', e, stackTrace);
       state = state.copyWith(
@@ -325,6 +350,25 @@ class LoginViewModel extends StateNotifier<LoginState> {
       // Save account
       await _accountRepository.save(account);
 
+      // Expose account and enter configuration phase
+      state = state.copyWith(
+        account: account,
+        isConfiguringAccount: true,
+        isLoading: false,
+      );
+
+      // Notify lifecycle to start main services (starts CalDAV monitor)
+      try {
+        await AppLifecycleManager.instance.onAccountConfigured();
+      } catch (e) {
+        AppLogger.warning('Login: Failed to notify lifecycle after account save: $e');
+      }
+
+      // Mark configuration as complete immediately after services start
+      state = state.copyWith(
+        isConfiguringAccount: false,
+      );
+
       // Detect returning user (non-blocking)
       try {
         final returning = await _detectReturningUser(account);
@@ -350,11 +394,6 @@ class LoginViewModel extends StateNotifier<LoginState> {
         );
       }
 
-      // Always set hasExistingUserData to true to skip calendar selection
-      state = state.copyWith(
-        account: account,
-        isLoading: false,
-      );
     } catch (e, stackTrace) {
       AppLogger.error(
         'Login: Authentication with credentials failed',
@@ -371,11 +410,207 @@ class LoginViewModel extends StateNotifier<LoginState> {
   void reset() {
     state = const LoginState();
   }
+
+  /// Authenticate on web using an authorization code (Keycloak)
+  Future<void> authenticateWebWithAuthCode({
+    required String code,
+    String issuerUrl = "https://auth.towdow.app/realms/towdow",
+    String clientId = "radicale-api",
+    String serverUrl = "https://api.towdow.app",
+    String? redirectUri,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final tokenEndpoint = "$issuerUrl/protocol/openid-connect/token";
+
+      // On web, use a fetch-based form-encoded POST to avoid CORS preflight issues.
+      int statusCode;
+      String bodyStr;
+      if (kIsWeb) {
+        final res = await postFormUrlEncoded(tokenEndpoint, {
+          'grant_type': 'authorization_code',
+          'client_id': clientId,
+          'code': code,
+          'redirect_uri': redirectUri ?? getRedirectUri(),
+        });
+        statusCode = res.statusCode;
+        bodyStr = res.body;
+      } else {
+        final response = await http.post(
+          Uri.parse(tokenEndpoint),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: {
+            'grant_type': 'authorization_code',
+            'client_id': clientId,
+            'code': code,
+            'redirect_uri': redirectUri ?? getRedirectUri(),
+          },
+        );
+        statusCode = response.statusCode;
+        bodyStr = response.body;
+      }
+
+      if (statusCode != 200) {
+        throw Exception('Auth code exchange failed: $statusCode');
+      }
+
+      final tokenData = jsonDecode(bodyStr);
+
+      // Try to extract profile fields from id_token claims first
+      String? emailFromToken;
+      String? firstNameFromToken;
+      String? lastNameFromToken;
+      
+      try {
+        final idToken = tokenData['id_token'] as String?;
+        if (idToken != null && idToken.isNotEmpty) {
+          AppLogger.debug('Login: Found id_token, extracting claims');
+          final parts = idToken.split('.');
+          if (parts.length >= 2) {
+            final payload = parts[1]
+                .replaceAll('-', '+')
+                .replaceAll('_', '/');
+            // Fix base64 padding if needed
+            final normalized = payload + '=' * ((4 - payload.length % 4) % 4);
+            final decoded = utf8.decode(base64.decode(normalized));
+            final claims = jsonDecode(decoded) as Map<String, dynamic>;
+            emailFromToken = claims['email'] as String?;
+            firstNameFromToken = claims['given_name'] as String?;
+            lastNameFromToken = claims['family_name'] as String?;
+            
+            AppLogger.debug('Login: Extracted from id_token - email: $emailFromToken, firstName: $firstNameFromToken, lastName: $lastNameFromToken');
+          }
+        } else {
+          AppLogger.debug('Login: No id_token found, trying to extract from access_token');
+          
+          // Fallback: try to extract user info from access token
+          final accessToken = tokenData['access_token'] as String?;
+          if (accessToken != null && accessToken.isNotEmpty) {
+            try {
+              // Access tokens are usually opaque, but some providers include user info
+              // Try to decode as JWT first
+              final parts = accessToken.split('.');
+              if (parts.length >= 2) {
+                final payload = parts[1]
+                    .replaceAll('-', '+')
+                    .replaceAll('_', '/');
+                final normalized = payload + '=' * ((4 - payload.length % 4) % 4);
+                final decoded = utf8.decode(base64.decode(normalized));
+                final claims = jsonDecode(decoded) as Map<String, dynamic>;
+                emailFromToken = claims['email'] as String?;
+                firstNameFromToken = claims['given_name'] as String?;
+                lastNameFromToken = claims['family_name'] as String?;
+                
+                AppLogger.debug('Login: Extracted from access_token - email: $emailFromToken, firstName: $firstNameFromToken, lastName: $lastNameFromToken');
+              }
+            } catch (e) {
+              AppLogger.debug('Login: Access token is not a JWT, will use fallback values');
+            }
+          }
+        }
+      } catch (e, stackTrace) {
+        AppLogger.warning('Login: Failed to decode token claims on web', e, stackTrace);
+      }
+
+      // If we still don't have user info, try to fetch from userinfo endpoint
+      if (emailFromToken == null || firstNameFromToken == null || lastNameFromToken == null) {
+        try {
+          AppLogger.debug('Login: Attempting to fetch user info from userinfo endpoint');
+          final accessToken = tokenData['access_token'] as String?;
+          if (accessToken != null) {
+            final userInfoEndpoint = "$issuerUrl/protocol/openid-connect/userinfo";
+            final response = await http.get(
+              Uri.parse(userInfoEndpoint),
+              headers: {'Authorization': 'Bearer $accessToken'},
+            );
+            
+            if (response.statusCode == 200) {
+              final userInfo = jsonDecode(response.body) as Map<String, dynamic>;
+              emailFromToken ??= userInfo['email'] as String?;
+              firstNameFromToken ??= userInfo['given_name'] as String?;
+              lastNameFromToken ??= userInfo['family_name'] as String?;
+              
+              AppLogger.debug('Login: Fetched from userinfo endpoint - email: $emailFromToken, firstName: $firstNameFromToken, lastName: $lastNameFromToken');
+            }
+          }
+        } catch (e, stackTrace) {
+          AppLogger.warning('Login: Failed to fetch user info from userinfo endpoint', e, stackTrace);
+        }
+      }
+
+      final account = CaldavAccount(
+        id: const Uuid().v4(),
+        providerType: serverUrl == "https://api.towdow.app" ? 'towdow_cloud' : 'towdow_self_hosted',
+        serverUrl: serverUrl,
+        // Use email or preferred username when available to avoid empty username on web
+        username: emailFromToken ?? '',
+        accessToken: tokenData['access_token'],
+        refreshToken: tokenData['refresh_token'],
+        tokenExpiry: DateTime.now().add(Duration(seconds: tokenData['expires_in'] ?? 3600)),
+        clientId: clientId,
+        issuerUrl: issuerUrl,
+        firstName: firstNameFromToken ?? '',
+        lastName: lastNameFromToken ?? '',
+        email: emailFromToken ?? '', // Use extracted email or fallback
+        createdAt: DateTime.now(),
+        lastSyncAt: DateTime.now(),
+        isActive: true,
+      );
+
+      // Debug logging for web authentication
+      AppLogger.debug('Login: Creating account with data - username: ${account.username}, email: ${account.email}, firstName: ${account.firstName}');
+
+      await _accountRepository.save(account);
+      
+      // Debug logging after save
+      AppLogger.debug('Login: Account saved successfully - username: ${account.username}, email: ${account.email}, firstName: ${account.firstName}');
+
+      // Enter configuration phase and expose account to UI
+      if (!mounted) return;
+      AppLogger.debug('Login: Updating state with account - username: ${account.username}, email: ${account.email}');
+      state = state.copyWith(account: account, isConfiguringAccount: true, isLoading: false);
+      AppLogger.debug('Login: State updated - account: ${state.account != null}, isConfiguring: ${state.isConfiguringAccount}');
+
+      // Notify lifecycle to start main services (starts CalDAV monitor)
+      AppLogger.info('Login: waiting Account to be configured configured');
+      try {
+        await AppLifecycleManager.instance.onAccountConfigured();
+        AppLogger.info('Login: Account configured');
+      } catch (e) {
+        AppLogger.warning('Login: Failed to notify lifecycle after account save: $e');
+      }
+
+      // Mark configuration as complete immediately after services start
+      state = state.copyWith(isConfiguringAccount: false);
+
+      try {
+        final returning = await _detectReturningUser(account);
+        if (!mounted) return; // notifier might have been disposed
+        state = state.copyWith(isReturningUser: returning);
+      } catch (_) {}
+
+      try {
+        final syncResult = await _externalSyncService.syncAllAccounts();
+        syncResult.when(
+          success: (_) => AppLogger.info('Login: External calendar sync completed successfully'),
+          failure: (failure) => AppLogger.warning('Login: External calendar sync failed: ${failure.message}'),
+        );
+      } catch (e, stackTrace) {
+        AppLogger.error('Login: Failed to trigger external calendar sync', e, stackTrace);
+      }
+
+      if (!mounted) return;
+    } catch (e, stackTrace) {
+      AppLogger.error('Login: Auth code authentication failed', e, stackTrace);
+      if (!mounted) return;
+      state = state.copyWith(error: 'Authentication failed: ${e.toString()}', isLoading: false);
+    }
+  }
 }
 
 // Provider
 final loginViewModelProvider =
-    StateNotifierProvider.autoDispose<LoginViewModel, LoginState>(
+    StateNotifierProvider<LoginViewModel, LoginState>(
       (ref) => LoginViewModel(
         accountRepository: ref.read(accountRepositoryProvider),
         externalSyncService: ref.read(externalCalendarSyncServiceProvider),

@@ -14,7 +14,6 @@ import '../data/services/user/user_sync_service.dart';
 import '../data/repositories/account_repository.dart';
 import 'logger.dart';
 import 'result.dart';
-import 'update/gitlab_update_service.dart';
 
 enum FlowItAppState {
   initial,
@@ -320,7 +319,7 @@ class AppLifecycleManager {
 
   /// Called when account configuration changes
   Future<void> onAccountConfigured() async {
-    // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account configured, starting main services');
+    AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account configured, starting main services');
     
     if (!hasServices) {
       AppLogger.warning('AppLifecycleManager: Cannot start services - services not initialized');
@@ -444,8 +443,7 @@ class AppLifecycleManager {
         });
       }
       
-      // Check for app updates when app resumes
-      GitLabUpdateService().checkAndPromptIfNeeded();
+      // Removed update check on resume
     }
   }
 

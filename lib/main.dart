@@ -29,9 +29,62 @@ import 'core/logger.dart';
 import 'core/result.dart';
 import 'data/services/storage/local_storage_service.dart';
 import 'data/providers/providers.dart';
+// Import conditional web utilities
+import 'web/web_utils.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Web-specific code for handling authentication and project paths
+  // This section only runs on web platforms because the underlying
+  // implementations are conditionally imported
+  try {
+    AppLogger.info("main check KeyCloak code");
+    final currentUri = parseCurrentUri();
+    AppLogger.info("uri parameters: ${currentUri.queryParameters}");
+
+    // Save sanitized redirect URL (only app URL + optional project) for token exchange
+    try {
+      final sanitizedRedirect = getRedirectUri();
+      WebLocalStorage.setItem('redirectUri', sanitizedRedirect);
+      AppLogger.info("Saved redirectUri in localStorage: $sanitizedRedirect");
+    } catch (e) {
+      AppLogger.error('Failed to save redirectUri in localStorage: $e');
+    }
+
+    final authCode = currentUri.queryParameters['code'];
+    if (authCode != null) {
+      try {
+        WebLocalStorage.setItem('authCode', authCode);
+        AppLogger.info("authCode saved in localStorage: $authCode");
+      } catch (e) {
+        AppLogger.error('Magik link, error getting auth code: $e');
+      }
+    }
+
+    final targetProjectPath = currentUri.queryParameters['project'];
+    if (targetProjectPath != null) {
+      try {
+        WebLocalStorage.setItem('targetProjectPath', targetProjectPath);
+        AppLogger.info(
+          "targetProjectPath saved in localStorage: $targetProjectPath",
+        );
+        clearUrl(); // remove the sensitive code from URL
+      } catch (e) {
+        AppLogger.error('Magik link, error getting target project: $e');
+      }
+    }
+
+    try {
+      clearUrl(); // remove the sensitive code from URL
+    } catch (e) {
+      AppLogger.error('Magik link, failed to clear url: $e');
+    }
+  } catch (e) {
+    // Ignore errors on non-web platforms
+    AppLogger.info('Non-web platform, skipping web-specific initialization');
+  }
   
   // Initialize timezone database for proper timezone conversions
   tz.initializeTimeZones();

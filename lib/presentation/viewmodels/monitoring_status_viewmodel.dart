@@ -11,7 +11,26 @@ enum MonitoringUiState {
   offline,
 }
 
-class MonitoringStatusViewModel extends StateNotifier<MonitoringUiState> {
+/// Composite state exposed by MonitoringStatusViewModel
+class MonitoringState {
+  final MonitoringUiState ui;
+  final bool hasCompletedFirstSync;
+
+  const MonitoringState({
+    required this.ui,
+    required this.hasCompletedFirstSync,
+  });
+
+  MonitoringState copyWith({
+    MonitoringUiState? ui,
+    bool? hasCompletedFirstSync,
+  }) => MonitoringState(
+        ui: ui ?? this.ui,
+        hasCompletedFirstSync: hasCompletedFirstSync ?? this.hasCompletedFirstSync,
+      );
+}
+
+class MonitoringStatusViewModel extends StateNotifier<MonitoringState> {
   final ConnectionMonitorService _connectionMonitorService;
   final SyncService _syncService;
   final CalDAVMonitor _caldavMonitor;
@@ -27,7 +46,10 @@ class MonitoringStatusViewModel extends StateNotifier<MonitoringUiState> {
   })  : _connectionMonitorService = connectionMonitorService,
         _syncService = syncService,
         _caldavMonitor = caldavMonitor,
-        super(MonitoringUiState.waiting) {
+        super(MonitoringState(
+          ui: MonitoringUiState.waiting,
+          hasCompletedFirstSync: syncService.lastSyncTime != null,
+        )) {
     // Initialize current state
     _recompute();
 
@@ -38,22 +60,24 @@ class MonitoringStatusViewModel extends StateNotifier<MonitoringUiState> {
   }
 
   void _recompute() {
+    final hasFirst = _syncService.lastSyncTime != null;
+
     // 1) If no internet => offline
     final conn = _connectionMonitorService.currentStatus;
     if (conn == ConnectionStatus.disconnected) {
-      state = MonitoringUiState.offline;
+      state = state.copyWith(ui: MonitoringUiState.offline, hasCompletedFirstSync: hasFirst);
       return;
     }
 
     // 2) If syncing / monitoring => in progress
     final syncStatus = _syncService.status;
     if (syncStatus == SyncStatus.syncing || _caldavMonitor.isPerformingMonitoring) {
-      state = MonitoringUiState.inProgress;
+      state = state.copyWith(ui: MonitoringUiState.inProgress, hasCompletedFirstSync: hasFirst);
       return;
     }
 
     // Fallback: if connection unknown but not explicitly disconnected, show waiting
-    state = MonitoringUiState.waiting;
+    state = state.copyWith(ui: MonitoringUiState.waiting, hasCompletedFirstSync: hasFirst);
   }
 
   @override

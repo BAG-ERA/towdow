@@ -7,6 +7,7 @@ import 'attendee.dart';
 
 part 'task.freezed.dart';
 part 'task.g.dart';
+// No json_serializable generation; custom (de)serialization implemented below
 
 @HiveType(typeId: 6)
 @freezed
@@ -39,7 +40,61 @@ abstract class Task with _$Task {
     @HiveField(20) String? stepId, // Reference to project step id
   }) = _Task;
 
-  factory Task.fromJson(Map<String, dynamic> json) => _$TaskFromJson(json);
+  factory Task.fromJson(Map<String, dynamic> json) {
+    DateTime parseDate(dynamic v) {
+      if (v is DateTime) return v;
+      if (v is String && v.isNotEmpty) {
+        try { return DateTime.parse(v); } catch (_) {}
+      }
+      if (v is int) {
+        try { return DateTime.fromMillisecondsSinceEpoch(v); } catch (_) {}
+      }
+      return DateTime.now();
+    }
+
+    List<String> parseStringList(dynamic v) {
+      if (v is List) {
+        return v.map((e) => e.toString()).toList();
+      }
+      return <String>[];
+    }
+
+    List<Attendee> parseAttendees(dynamic v) {
+      if (v is List) {
+        return v.map((e) {
+          if (e is Attendee) return e;
+          if (e is Map<String, dynamic>) return Attendee.fromJson(e);
+          if (e is Map) return Attendee.fromJson(Map<String, dynamic>.from(e));
+          return null;
+        }).whereType<Attendee>().toList();
+      }
+      return <Attendee>[];
+    }
+
+    return Task(
+      uid: (json['uid'] ?? json['id'] ?? '') as String,
+      summary: (json['summary'] ?? '') as String,
+      description: (json['description'] ?? '') as String,
+      status: (json['status'] ?? 'NEEDS-ACTION') as String,
+      lastModified: parseDate(json['lastModified'] ?? json['last_modified'] ?? json['updatedAt']),
+      created: parseDate(json['created'] ?? json['createdAt']),
+      dtstamp: parseDate(json['dtstamp'] ?? json['dtStamp'] ?? json['timestamp']),
+      due: json['due'] != null ? parseDate(json['due']) : null,
+      categoryIds: parseStringList(json['categoryIds'] ?? json['category_ids']),
+      organizer: json['organizer'] as String?,
+      attendees: parseAttendees(json['attendees']),
+      percentComplete: ((json['percentComplete'] ?? json['percent_complete'] ?? 0) as num).toInt(),
+      projectPath: json['projectPath'] as String?,
+      flowitTemplate: json['flowitTemplate'] as String?,
+      flowitReversalTask: json['flowitReversalTask'] as String?,
+      flowitValidator: (json['flowitValidator'] ?? '{"type":"default"}') as String,
+      flowitRequirement: (json['flowitRequirement'] ?? '[]') as String,
+      flowitKanbanColumn: (json['flowitKanbanColumn'] ?? '[]') as String,
+      attachments: (json['attachments'] ?? '[]') as String,
+      mediaAttachments: (json['mediaAttachments'] ?? '[]') as String,
+      stepId: json['stepId'] as String?,
+    );
+  }
 }
 
 // Factory methods for creating tasks
@@ -86,6 +141,34 @@ extension TaskFactory on Task {
 }
 
 /// Extension for Task category management
+extension TaskJson on Task {
+  Map<String, dynamic> toJson() {
+    return {
+      'uid': uid,
+      'summary': summary,
+      'description': description,
+      'status': status,
+      'lastModified': lastModified.toIso8601String(),
+      'created': created.toIso8601String(),
+      'dtstamp': dtstamp.toIso8601String(),
+      'due': due?.toIso8601String(),
+      'categoryIds': categoryIds,
+      'organizer': organizer,
+      'attendees': attendees.map((e) => e.toJson()).toList(),
+      'percentComplete': percentComplete,
+      'projectPath': projectPath,
+      'flowitTemplate': flowitTemplate,
+      'flowitReversalTask': flowitReversalTask,
+      'flowitValidator': flowitValidator,
+      'flowitRequirement': flowitRequirement,
+      'flowitKanbanColumn': flowitKanbanColumn,
+      'attachments': attachments,
+      'mediaAttachments': mediaAttachments,
+      'stepId': stepId,
+    };
+  }
+}
+
 extension TaskCategoryExtension on Task {
   /// Add a category ID to the task
   Task addCategoryId(String categoryId) {

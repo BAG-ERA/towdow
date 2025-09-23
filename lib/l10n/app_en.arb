@@ -357,6 +357,26 @@
   "monitoringOffline": "Offline",
   "monitoringTooltipInProgress": "Monitoring changes and syncing if needed",
   "monitoringTooltipWaiting": "Idle, waiting for the next check",
-  "monitoringTooltipOffline": "No internet connection"
+  "monitoringTooltipOffline": "No internet connection",
+
+  "welcomeTitle": "Welcome",
+  "chooseHostingTitle": "Choose hosting",
+  "howDoYouWantToConnect": "How do you want to connect?",
+  "cloudOptionSubtitle": "Zero setup, secure cloud sync",
+  "towDowSelfHosted": "TowDow self hosted",
+  "selfHostedOptionSubtitle": "Use your own TowDow server",
+  "otherMethods": "Other methods",
+  "welcomeHeadline": "Simple to‑do for you.\nPowerful workflows for your team.",
+  "welcomeBody": "A clear task app that stays simple for individuals and scales to teams with flexible workflows.",
+  "getStarted": "Get started",
+  "connectAnyCaldavServer": "Connect any CalDAV server",
+  "offlineNoAccountTitle": "No account (offline only)",
+  "offlineNoAccountSubtitle": "On-device only. No sync, shares, or file attachments",
+  "offlineOnlyExplainer": "Your data will be stored only on this device. Removing the app or clearing data will erase everything. You can enable sync later in Settings.",
+  "offlineOnlyAcknowledge": "I understand data is not backed up",
+  "startOffline": "Start offline",
+  "accountSetupTitle": "Setting up your account",
+  "accountSetupHeading": "Preparing your workspace…",
+  "accountSetupSubtitle": "We’re setting up your calendars, syncing settings, and preparing your first session. This should only take a moment."
 }
 

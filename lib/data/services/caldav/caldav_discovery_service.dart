@@ -34,6 +34,7 @@ class CalDavDiscoveryService {
   Future<Result<CalDAVCapabilities>> testConnection() async {
     try {
       final discovery = CapabilityDiscoveryService(account: account);
+      AppLogger.debug('CalDavDiscoveryService: testConnection ${account.username} ${account.id}');
       final result = await discovery.discoverCapabilities();
       return result.when(
         success: (details) => Result.success(CalDAVCapabilities(

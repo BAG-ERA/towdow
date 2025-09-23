@@ -29,14 +29,14 @@ class _MonitoringStatusWidgetState extends ConsumerState<MonitoringStatusWidget>
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(monitoringStatusViewModelProvider);
+    final monitoring = ref.watch(monitoringStatusViewModelProvider);
 
-    IconData icon;
-    Color color;
-    String label;
+    IconData icon = Icons.schedule_rounded;
+    Color color = Theme.of(context).colorScheme.secondary;
+    String label = AppLocalizations.of(context)!.monitoringWaiting;
 
     // Control animation according to state
-    if (state == MonitoringUiState.inProgress) {
+    if (monitoring.ui == MonitoringUiState.inProgress) {
       if (!_controller.isAnimating) {
         _controller.repeat();
       }
@@ -46,9 +46,9 @@ class _MonitoringStatusWidgetState extends ConsumerState<MonitoringStatusWidget>
       }
     }
 
-    switch (state) {
+    switch (monitoring.ui) {
       case MonitoringUiState.inProgress:
-        icon = Icons.sync_rounded;
+        icon = Icons.cloud_sync_rounded;
         color = Theme.of(context).colorScheme.primary;
         label = AppLocalizations.of(context)!.monitoringInProgress;
         break;
@@ -66,16 +66,19 @@ class _MonitoringStatusWidgetState extends ConsumerState<MonitoringStatusWidget>
 
     Widget iconWidget = Icon(icon, color: color, size: widget.compact ? 20 : 18);
 
-    if (state == MonitoringUiState.inProgress) {
+    if (monitoring.ui == MonitoringUiState.inProgress) {
       iconWidget = RotationTransition(turns: _controller, child: iconWidget);
     }
 
     final l10n = AppLocalizations.of(context)!;
-    final tooltip = switch (state) {
-      MonitoringUiState.inProgress => l10n.monitoringTooltipInProgress,
-      MonitoringUiState.waiting => l10n.monitoringTooltipWaiting,
-      MonitoringUiState.offline => l10n.monitoringTooltipOffline,
-    };
+    String tooltip;
+    if (monitoring.ui == MonitoringUiState.inProgress) {
+      tooltip = l10n.monitoringTooltipInProgress;
+    } else if (monitoring.ui == MonitoringUiState.offline) {
+      tooltip = l10n.monitoringTooltipOffline;
+    } else {
+      tooltip = l10n.monitoringTooltipWaiting;
+    }
 
     if (widget.compact) {
       return Tooltip(

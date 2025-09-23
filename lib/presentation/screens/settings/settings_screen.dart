@@ -4,12 +4,12 @@
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:go_router/go_router.dart';
 import '../../../core/logger.dart';
 import '../../../core/result.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/providers/providers.dart';
 import 'caldav_management_screen.dart';
-import 'connection_info_screen.dart';
 import 'external_calendar_management_screen.dart';
 import '../../widgets/utils/popup/export_dialog.dart';
 import '../../widgets/utils/popup/import_dialog.dart';
@@ -17,6 +17,8 @@ import '../../../data/services/sync/sync_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../viewmodels/appearance_settings_viewmodel.dart';
 import '../../widgets/header_screen_widget.dart';
+import '../../../core/app_lifecycle_manager.dart';
+import '../../viewmodels/login_viewmodel.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -134,10 +136,16 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Future<void> _showConnectionInfo(BuildContext context, WidgetRef ref) async {
-    // Navigate to connection information screen
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const ConnectionInfoScreen()),
-    );
+    // Navigate via GoRouter so it works on desktop/web/mobile
+    // ignore: use_build_context_synchronously
+    if (context.mounted) {
+      context.go('/settings/connection');
+    } else {
+      // In unlikely case context isn't mounted yet, schedule post-frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/settings/connection');
+      });
+    }
   }
 
   Future<void> _showDisconnectConfirmation(
@@ -187,31 +195,46 @@ class SettingsScreen extends ConsumerWidget {
 
       result.when(
         success: (_) async {
+          // Stop background services cleanly
+          try { await AppLifecycleManager.instance.onAccountRemoved(); } catch (_) {}
+
+          // Reset login view-model so router guards don't think we're still logged-in
+          try { ref.read(loginViewModelProvider.notifier).reset(); } catch (_) {}
+
           // Invalidate all relevant providers to clear cached data
-          ref.invalidate(taskListProvider);
-          ref.invalidate(calendarListProvider);
-          ref.invalidate(externalCalendarListProvider);
-          ref.invalidate(externalEventListProvider);
-          ref.invalidate(enabledExternalCalendarListProvider);
-          ref.invalidate(enabledExternalEventListProvider);
-          ref.invalidate(hasActiveAccountProvider);
-          ref.invalidate(activeAccountProvider);
-          ref.invalidate(syncStatusStreamProvider);
-          ref.invalidate(currentSyncStatusProvider);
-          ref.invalidate(userRepositoryProvider);
-          ref.invalidate(accountRepositoryProvider);
-          ref.invalidate(calendarRepositoryProvider);
-          ref.invalidate(taskRepositoryProvider);
-          ref.invalidate(externalAccountRepositoryProvider);
-          ref.invalidate(externalCalendarRepositoryProvider);
-          ref.invalidate(externalEventRepositoryProvider);
-          ref.invalidate(syncServiceProvider);
+          try {
+            ref.invalidate(taskListProvider);
+            ref.invalidate(calendarListProvider);
+            ref.invalidate(externalCalendarListProvider);
+            ref.invalidate(externalEventListProvider);
+            ref.invalidate(enabledExternalCalendarListProvider);
+            ref.invalidate(enabledExternalEventListProvider);
+            ref.invalidate(hasActiveAccountProvider);
+            ref.invalidate(activeAccountProvider);
+            ref.invalidate(syncStatusStreamProvider);
+            ref.invalidate(currentSyncStatusProvider);
+            ref.invalidate(monitoringStatusViewModelProvider);
+            ref.invalidate(userRepositoryProvider);
+            ref.invalidate(accountRepositoryProvider);
+            ref.invalidate(calendarRepositoryProvider);
+            ref.invalidate(taskRepositoryProvider);
+            ref.invalidate(externalAccountRepositoryProvider);
+            ref.invalidate(externalCalendarRepositoryProvider);
+            ref.invalidate(externalEventRepositoryProvider);
+            ref.invalidate(syncServiceProvider);
+
+            // Bump session epoch to force GoRouter refresh
+            ref.read(sessionEpochProvider.notifier).state++;
+          } catch (_) {
+            // Ignore errors if ref is no longer available (widget disposed)
+          }
 
           // Restart the app
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.of(
-              context,
-            ).pushNamedAndRemoveUntil('/', (route) => false);
+            if (context.mounted) {
+              AppLogger.debug("SettingsScreen: logout completed, go to /");
+              context.go('/');
+            }
           });
         },
         failure: (failure) {
