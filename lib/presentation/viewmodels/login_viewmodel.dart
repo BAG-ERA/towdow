@@ -543,15 +543,15 @@ class LoginViewModel extends StateNotifier<LoginState> {
         providerType: serverUrl == "https://api.towdow.app" ? 'towdow_cloud' : 'towdow_self_hosted',
         serverUrl: serverUrl,
         // Use email or preferred username when available to avoid empty username on web
-        username: emailFromToken ?? '--',
+        username: emailFromToken ?? '',
         accessToken: tokenData['access_token'],
         refreshToken: tokenData['refresh_token'],
         tokenExpiry: DateTime.now().add(Duration(seconds: tokenData['expires_in'] ?? 3600)),
         clientId: clientId,
         issuerUrl: issuerUrl,
-        firstName: firstNameFromToken ?? '--',
-        lastName: lastNameFromToken ?? '--',
-        email: emailFromToken ?? '--', // Use extracted email or fallback
+        firstName: firstNameFromToken ?? '',
+        lastName: lastNameFromToken ?? '',
+        email: emailFromToken ?? '', // Use extracted email or fallback
         createdAt: DateTime.now(),
         lastSyncAt: DateTime.now(),
         isActive: true,
