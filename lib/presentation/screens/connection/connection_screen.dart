@@ -1,4 +1,4 @@
-﻿// Connection screen for CalDAV account setup
+// Connection screen for CalDAV account setup
 // Onboarding screen for configuring server connections
 
 import 'package:flutter/material.dart';
@@ -63,6 +63,11 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             try { await ref.read(hasActiveAccountProvider.future); } catch (_) {}
             // Determine destination similar to listener logic, but prioritize target project from magic link
             final account = await ref.read(activeAccountProvider.future);
+            AppLogger.debug('ConnectionScreen: Retrieved account after refresh - username: ${account?.username}, email: ${account?.email}');
+            
+            if (account == null) {
+              AppLogger.warning('ConnectionScreen: Account is still null after refresh, waiting longer...');
+            }
             if (account != null && mounted && !_handledPostAuthNavigation) {
                           _handledPostAuthNavigation = true;
               // Try to read target project path saved by main.dart from the initial magic link
@@ -215,6 +220,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
       _didSetupListen = true;
       ref.listen<LoginState>(loginViewModelProvider, (previous, current) {
         if (!mounted) return;
+        AppLogger.debug('ConnectionScreen: Login state changed - account: ${current.account != null}, isConfiguring: ${current.isConfiguringAccount}');
         if (current.account != null && !_handledPostAuthNavigation) {
           // If account is in configuration, go to setup screen first
           if (current.isConfiguringAccount == true) {
