@@ -114,19 +114,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/account-setup';
       }
 
-      // Leave setup once first sync is completed; choose deterministic exit
-      if (state.uri.path == '/account-setup' && loginState.account != null && (monitoring?.hasCompletedFirstSync ?? false)) {
-        final account = loginState.account!;
-        final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
-        // Default to /projects if returning status is unknown; use /projects for offline too
-        String destination = '/projects';
-        if (!isOffline) {
-          final returning = loginState.isReturningUser;
-          if (returning == true) destination = '/today';
-        }
-        if (kDebugMode) debugPrint("[ROUTING] redirect '/account-setup' -> '$destination' (first sync completed)");
-        return destination;
-      }
 
       // Redirect root path:
       // - On web: if a targetProjectPath exists in localStorage, go to that project; otherwise go to /projects
@@ -197,8 +184,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null; // stay on connect when not authenticated
       }
 
-      // Skip account check if already on setup screen
+      // Handle account-setup screen: only allow if there's an account that needs setup
       if (state.uri.path == '/account-setup') {
+        // If no account exists, redirect to connect screen
+        if (loginState.account == null) {
+          return '/connect';
+        }
+        // If account exists but first sync is completed, redirect away from setup
+        if (loginState.account != null && (monitoring?.hasCompletedFirstSync ?? false)) {
+          final account = loginState.account!;
+          final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
+          String destination = '/projects';
+          if (!isOffline) {
+            final returning = loginState.isReturningUser;
+            if (returning == true) destination = '/today';
+          }
+          AppLogger.debug("[ROUTING] redirect '/account-setup' -> '$destination' (first sync completed)");
+          return destination;
+        }
+        // Stay on account-setup if account exists but first sync not completed
         return null;
       }
 

@@ -202,33 +202,39 @@ class SettingsScreen extends ConsumerWidget {
           try { ref.read(loginViewModelProvider.notifier).reset(); } catch (_) {}
 
           // Invalidate all relevant providers to clear cached data
-          ref.invalidate(taskListProvider);
-          ref.invalidate(calendarListProvider);
-          ref.invalidate(externalCalendarListProvider);
-          ref.invalidate(externalEventListProvider);
-          ref.invalidate(enabledExternalCalendarListProvider);
-          ref.invalidate(enabledExternalEventListProvider);
-          ref.invalidate(hasActiveAccountProvider);
-          ref.invalidate(activeAccountProvider);
-          ref.invalidate(syncStatusStreamProvider);
-          ref.invalidate(currentSyncStatusProvider);
-          ref.invalidate(userRepositoryProvider);
-          ref.invalidate(accountRepositoryProvider);
-          ref.invalidate(calendarRepositoryProvider);
-          ref.invalidate(taskRepositoryProvider);
-          ref.invalidate(externalAccountRepositoryProvider);
-          ref.invalidate(externalCalendarRepositoryProvider);
-          ref.invalidate(externalEventRepositoryProvider);
-          ref.invalidate(syncServiceProvider);
+          try {
+            ref.invalidate(taskListProvider);
+            ref.invalidate(calendarListProvider);
+            ref.invalidate(externalCalendarListProvider);
+            ref.invalidate(externalEventListProvider);
+            ref.invalidate(enabledExternalCalendarListProvider);
+            ref.invalidate(enabledExternalEventListProvider);
+            ref.invalidate(hasActiveAccountProvider);
+            ref.invalidate(activeAccountProvider);
+            ref.invalidate(syncStatusStreamProvider);
+            ref.invalidate(currentSyncStatusProvider);
+            ref.invalidate(monitoringStatusViewModelProvider);
+            ref.invalidate(userRepositoryProvider);
+            ref.invalidate(accountRepositoryProvider);
+            ref.invalidate(calendarRepositoryProvider);
+            ref.invalidate(taskRepositoryProvider);
+            ref.invalidate(externalAccountRepositoryProvider);
+            ref.invalidate(externalCalendarRepositoryProvider);
+            ref.invalidate(externalEventRepositoryProvider);
+            ref.invalidate(syncServiceProvider);
 
-          // Bump session epoch to force GoRouter refresh
-          try { ref.read(sessionEpochProvider.notifier).state++; } catch (_) {}
+            // Bump session epoch to force GoRouter refresh
+            ref.read(sessionEpochProvider.notifier).state++;
+          } catch (_) {
+            // Ignore errors if ref is no longer available (widget disposed)
+          }
 
           // Restart the app
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.of(
-              context,
-            ).pushNamedAndRemoveUntil('/', (route) => false);
+            if (context.mounted) {
+              AppLogger.debug("SettingsScreen: logout completed, go to /");
+              context.go('/');
+            }
           });
         },
         failure: (failure) {
