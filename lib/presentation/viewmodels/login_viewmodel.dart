@@ -214,6 +214,9 @@ class LoginViewModel extends StateNotifier<LoginState> {
       // Save account
       await _accountRepository.save(account);
 
+      AppLogger.debug('LoginViewModel: Account saved - username: ${account.username}, email: ${account.email}, firstName: ${account.firstName}');
+
+
       // Set account and enter configuration phase (UI can show setup view)
       state = state.copyWith(
         account: account,
@@ -453,13 +456,15 @@ class LoginViewModel extends StateNotifier<LoginState> {
 
       final tokenData = jsonDecode(bodyStr);
 
-      // Try to extract profile fields from id_token claims
-      String? emailFromIdToken;
-      String? firstNameFromIdToken;
-      String? lastNameFromIdToken;
+      // Try to extract profile fields from id_token claims first
+      String? emailFromToken;
+      String? firstNameFromToken;
+      String? lastNameFromToken;
+      
       try {
         final idToken = tokenData['id_token'] as String?;
         if (idToken != null && idToken.isNotEmpty) {
+          AppLogger.debug('Login: Found id_token, extracting claims');
           final parts = idToken.split('.');
           if (parts.length >= 2) {
             final payload = parts[1]
@@ -469,16 +474,68 @@ class LoginViewModel extends StateNotifier<LoginState> {
             final normalized = payload + '=' * ((4 - payload.length % 4) % 4);
             final decoded = utf8.decode(base64.decode(normalized));
             final claims = jsonDecode(decoded) as Map<String, dynamic>;
-            emailFromIdToken = claims['email'] as String?;
-            firstNameFromIdToken = claims['given_name'] as String?;
-            lastNameFromIdToken = claims['family_name'] as String?;
+            emailFromToken = claims['email'] as String?;
+            firstNameFromToken = claims['given_name'] as String?;
+            lastNameFromToken = claims['family_name'] as String?;
+            
+            AppLogger.debug('Login: Extracted from id_token - email: $emailFromToken, firstName: $firstNameFromToken, lastName: $lastNameFromToken');
+          }
+        } else {
+          AppLogger.debug('Login: No id_token found, trying to extract from access_token');
+          
+          // Fallback: try to extract user info from access token
+          final accessToken = tokenData['access_token'] as String?;
+          if (accessToken != null && accessToken.isNotEmpty) {
+            try {
+              // Access tokens are usually opaque, but some providers include user info
+              // Try to decode as JWT first
+              final parts = accessToken.split('.');
+              if (parts.length >= 2) {
+                final payload = parts[1]
+                    .replaceAll('-', '+')
+                    .replaceAll('_', '/');
+                final normalized = payload + '=' * ((4 - payload.length % 4) % 4);
+                final decoded = utf8.decode(base64.decode(normalized));
+                final claims = jsonDecode(decoded) as Map<String, dynamic>;
+                emailFromToken = claims['email'] as String?;
+                firstNameFromToken = claims['given_name'] as String?;
+                lastNameFromToken = claims['family_name'] as String?;
+                
+                AppLogger.debug('Login: Extracted from access_token - email: $emailFromToken, firstName: $firstNameFromToken, lastName: $lastNameFromToken');
+              }
+            } catch (e) {
+              AppLogger.debug('Login: Access token is not a JWT, will use fallback values');
+            }
           }
         }
-        else{
-          AppLogger.warning("Login: idToken empty or null");
-        }
       } catch (e, stackTrace) {
-        AppLogger.warning('Login: Failed to decode id_token claims on web', e, stackTrace);
+        AppLogger.warning('Login: Failed to decode token claims on web', e, stackTrace);
+      }
+
+      // If we still don't have user info, try to fetch from userinfo endpoint
+      if (emailFromToken == null || firstNameFromToken == null || lastNameFromToken == null) {
+        try {
+          AppLogger.debug('Login: Attempting to fetch user info from userinfo endpoint');
+          final accessToken = tokenData['access_token'] as String?;
+          if (accessToken != null) {
+            final userInfoEndpoint = "$issuerUrl/protocol/openid-connect/userinfo";
+            final response = await http.get(
+              Uri.parse(userInfoEndpoint),
+              headers: {'Authorization': 'Bearer $accessToken'},
+            );
+            
+            if (response.statusCode == 200) {
+              final userInfo = jsonDecode(response.body) as Map<String, dynamic>;
+              emailFromToken ??= userInfo['email'] as String?;
+              firstNameFromToken ??= userInfo['given_name'] as String?;
+              lastNameFromToken ??= userInfo['family_name'] as String?;
+              
+              AppLogger.debug('Login: Fetched from userinfo endpoint - email: $emailFromToken, firstName: $firstNameFromToken, lastName: $lastNameFromToken');
+            }
+          }
+        } catch (e, stackTrace) {
+          AppLogger.warning('Login: Failed to fetch user info from userinfo endpoint', e, stackTrace);
+        }
       }
 
       final account = CaldavAccount(
@@ -486,25 +543,33 @@ class LoginViewModel extends StateNotifier<LoginState> {
         providerType: serverUrl == "https://api.towdow.app" ? 'towdow_cloud' : 'towdow_self_hosted',
         serverUrl: serverUrl,
         // Use email or preferred username when available to avoid empty username on web
-        username: emailFromIdToken ?? '--',
+        username: emailFromToken ?? '--',
         accessToken: tokenData['access_token'],
         refreshToken: tokenData['refresh_token'],
         tokenExpiry: DateTime.now().add(Duration(seconds: tokenData['expires_in'] ?? 3600)),
         clientId: clientId,
         issuerUrl: issuerUrl,
-        firstName: firstNameFromIdToken ?? '--',
-        lastName: lastNameFromIdToken ?? '--',
-        email: emailFromIdToken,
+        firstName: firstNameFromToken ?? '--',
+        lastName: lastNameFromToken ?? '--',
+        email: emailFromToken ?? '--', // Use extracted email or fallback
         createdAt: DateTime.now(),
         lastSyncAt: DateTime.now(),
         isActive: true,
       );
 
+      // Debug logging for web authentication
+      AppLogger.debug('Login: Creating account with data - username: ${account.username}, email: ${account.email}, firstName: ${account.firstName}');
+
       await _accountRepository.save(account);
+      
+      // Debug logging after save
+      AppLogger.debug('Login: Account saved successfully - username: ${account.username}, email: ${account.email}, firstName: ${account.firstName}');
 
       // Enter configuration phase and expose account to UI
       if (!mounted) return;
+      AppLogger.debug('Login: Updating state with account - username: ${account.username}, email: ${account.email}');
       state = state.copyWith(account: account, isConfiguringAccount: true, isLoading: false);
+      AppLogger.debug('Login: State updated - account: ${state.account != null}, isConfiguring: ${state.isConfiguringAccount}');
 
       // Notify lifecycle to start main services (starts CalDAV monitor)
       AppLogger.info('Login: waiting Account to be configured configured');
