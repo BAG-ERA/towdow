@@ -1,5 +1,5 @@
 // Deep link parser
-// Converts incoming URIs (towdow:// and https://towdow.app) into DeepLinkTarget
+// Converts incoming URIs (towdow://, https://towdow.app, and https://web.towdow.app) into DeepLinkTarget
 
 import 'package:equatable/equatable.dart';
 import '../../services/deeplink/deep_link_models.dart';
@@ -19,12 +19,12 @@ class DeepLinkParser extends Equatable {
       return null;
     }
 
-    // Accept custom scheme towdow:// and web https://towdow.app
+    // Accept custom scheme towdow:// and web https://towdow.app and https://web.towdow.app
     if (uri.scheme == 'towdow') {
       return _parseTowdowScheme(uri);
     }
-    if (uri.scheme == 'https' && (uri.host == 'towdow.app' || uri.host == 'www.towdow.app')) {
-      // Map https://towdow.app/<path> to same route segments
+    if (uri.scheme == 'https' && (uri.host == 'towdow.app' || uri.host == 'www.towdow.app' || uri.host == 'web.towdow.app')) {
+      // Map https://towdow.app/<path> and https://web.towdow.app/<path> to same route segments
       return _parsePath(uri.pathSegments, uri.queryParameters);
     }
     return null;
