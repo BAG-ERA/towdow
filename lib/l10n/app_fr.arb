@@ -456,6 +456,17 @@
   "failedToAddAttendee": "Échec de l'ajout du participant : {error}",
   "@failedToAddAttendee": {"placeholders": {"error": {"type": "String"}}},
   "failedToAddSuggestedAttendee": "Échec de l'ajout du participant : {error}",
-  "@failedToAddSuggestedAttendee": {"placeholders": {"error": {"type": "String"}}}
+  "@failedToAddSuggestedAttendee": {"placeholders": {"error": {"type": "String"}}},
+  "addCompletionRequirement": "Ajouter une exigence de validation",
+  "checklist": "Checklist",
+  "checklistSubtitle": "Éléments cochables multiples",
+  "singleSelect": "Sélection unique",
+  "singleSelectSubtitle": "Choisir une option",
+  "freeField": "Champ libre",
+  "freeFieldSubtitle": "Saisie de texte",
+  "file": "Fichier",
+  "fileSubtitle": "Pièces jointes",
+  "media": "Média",
+  "mediaSubtitle": "Photos et vidéos"
 }
 

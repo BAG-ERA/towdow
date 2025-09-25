@@ -510,6 +510,17 @@
   "failedToAddAttendee": "Failed to add attendee: {error}",
   "@failedToAddAttendee": {"placeholders": {"error": {"type": "String"}}},
   "failedToAddSuggestedAttendee": "Failed to add attendee: {error}",
-  "@failedToAddSuggestedAttendee": {"placeholders": {"error": {"type": "String"}}}
+  "@failedToAddSuggestedAttendee": {"placeholders": {"error": {"type": "String"}}},
+  "addCompletionRequirement": "Add completion requirement",
+  "checklist": "Checklist",
+  "checklistSubtitle": "Multiple checkable items",
+  "singleSelect": "Single Select",
+  "singleSelectSubtitle": "Choose one option",
+  "freeField": "Free Field",
+  "freeFieldSubtitle": "Text input",
+  "file": "File",
+  "fileSubtitle": "File attachments",
+  "media": "Media",
+  "mediaSubtitle": "Photos and videos"
 }
 
