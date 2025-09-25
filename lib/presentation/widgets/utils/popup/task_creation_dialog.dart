@@ -178,10 +178,10 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                 
                 EnhancedTextField(
                   controller: descriptionController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Description (optional)',
                     hintText: AppLocalizations.of(context)!.taskDetailsHint,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                   maxLines: 3,
                   onChanged: (_) => setState(() {}),
