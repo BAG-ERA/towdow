@@ -491,6 +491,25 @@
   "failedToDownloadFile": "Failed to download file",
   "media": "Media",
   "mediaFiles": "Media Files",
-  "addMedia": "Add media"
+  "addMedia": "Add media",
+  "emailAddress": "Email Address",
+  "emailAddressHint": "attendee@example.com",
+  "invalidEmailFormat": "Invalid email format",
+  "allSuggestedAttendeesAdded": "All suggested attendees are already added",
+  "addingAttendee": "Adding...",
+  "addAttendeeButton": "Add Attendee",
+  "removeAttendeeTooltip": "Remove attendee",
+  "removeAttendeeDialogTitle": "Remove Attendee",
+  "removeAttendeeDialogContent": "Remove {name} from this task?",
+  "@removeAttendeeDialogContent": {"placeholders": {"name": {"type": "String"}}},
+  "removeAttendeeButton": "Remove",
+  "attendeeAddedSuccess": "✅ Added {name}",
+  "@attendeeAddedSuccess": {"placeholders": {"name": {"type": "String"}}},
+  "attendeeRemovedSuccess": "✅ Removed {name}",
+  "@attendeeRemovedSuccess": {"placeholders": {"name": {"type": "String"}}},
+  "failedToAddAttendee": "Failed to add attendee: {error}",
+  "@failedToAddAttendee": {"placeholders": {"error": {"type": "String"}}},
+  "failedToAddSuggestedAttendee": "Failed to add attendee: {error}",
+  "@failedToAddSuggestedAttendee": {"placeholders": {"error": {"type": "String"}}}
 }
 

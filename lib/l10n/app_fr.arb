@@ -437,6 +437,25 @@
   "attachMedia": "Joindre un média",
   "noNotesYet": "Aucune note pour le moment",
   "newNote": "Nouvelle note",
-  "deleteNote": "Supprimer la note"
+  "deleteNote": "Supprimer la note",
+  "emailAddress": "Adresse e-mail",
+  "emailAddressHint": "participant@exemple.com",
+  "invalidEmailFormat": "Format d'e-mail invalide",
+  "allSuggestedAttendeesAdded": "Tous les participants suggérés sont déjà ajoutés",
+  "addingAttendee": "Ajout...",
+  "addAttendeeButton": "Ajouter un participant",
+  "removeAttendeeTooltip": "Retirer le participant",
+  "removeAttendeeDialogTitle": "Retirer le participant",
+  "removeAttendeeDialogContent": "Retirer {name} de cette tâche ?",
+  "@removeAttendeeDialogContent": {"placeholders": {"name": {"type": "String"}}},
+  "removeAttendeeButton": "Retirer",
+  "attendeeAddedSuccess": "✅ Ajouté {name}",
+  "@attendeeAddedSuccess": {"placeholders": {"name": {"type": "String"}}},
+  "attendeeRemovedSuccess": "✅ Retiré {name}",
+  "@attendeeRemovedSuccess": {"placeholders": {"name": {"type": "String"}}},
+  "failedToAddAttendee": "Échec de l'ajout du participant : {error}",
+  "@failedToAddAttendee": {"placeholders": {"error": {"type": "String"}}},
+  "failedToAddSuggestedAttendee": "Échec de l'ajout du participant : {error}",
+  "@failedToAddSuggestedAttendee": {"placeholders": {"error": {"type": "String"}}}
 }
 
