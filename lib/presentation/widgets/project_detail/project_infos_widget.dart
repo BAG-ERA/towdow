@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import 'dart:async';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/providers/providers.dart';
@@ -104,7 +105,7 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
                       IconButton(
                         onPressed: onCollapse,
                         icon: const Icon(Icons.keyboard_double_arrow_left),
-                        tooltip: 'Collapse project details',
+                        tooltip: AppLocalizations.of(context)!.collapseProjectDetails,
                       ),
                   ],
                 ),
@@ -186,15 +187,15 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
                   Expanded(
                     child: _buildDetailRow(
                       context,
-                      'Created at', 
-                      project.flowitStartedAt != null ? _formatProjectDate(project.flowitStartedAt!) : 'Unknown'
+                      AppLocalizations.of(context)!.createdAt, 
+                      project.flowitStartedAt != null ? _formatProjectDate(project.flowitStartedAt!) : AppLocalizations.of(context)!.unknown
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildDetailRow(
                       context,
-                      'Status', 
+                      AppLocalizations.of(context)!.status, 
                       project.flowitStatus ?? 'ONGOING'
                     ),
                   ),
@@ -215,7 +216,7 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
                       Expanded(
                         child: _buildDetailRow(
                           context,
-                          'Progress',
+                          AppLocalizations.of(context)!.progress,
                           '$progressPercentage%'
                         ),
                       ),
@@ -223,7 +224,7 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
                       Expanded(
                         child: _buildDetailRow(
                           context,
-                          'Tasks',
+                          AppLocalizations.of(context)!.tasks,
                           '$completedTasks/$totalTasks'
                         ),
                       ),
@@ -233,22 +234,22 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
                 loading: () => Row(
                   children: [
                     Expanded(
-                      child: _buildDetailRow(context, 'Progress', '...'),
+                      child: _buildDetailRow(context, AppLocalizations.of(context)!.progress, '...'),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: _buildDetailRow(context, 'Tasks', '...'),
+                      child: _buildDetailRow(context, AppLocalizations.of(context)!.tasks, '...'),
                     ),
                   ],
                 ),
                 error: (_, __) => Row(
                   children: [
                     Expanded(
-                      child: _buildDetailRow(context, 'Progress', '0%'),
+                      child: _buildDetailRow(context, AppLocalizations.of(context)!.progress, '0%'),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: _buildDetailRow(context, 'Tasks', '0/0'),
+                      child: _buildDetailRow(context, AppLocalizations.of(context)!.tasks, '0/0'),
                     ),
                   ],
                 ),
@@ -260,7 +261,7 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
           
           // Second block: Details section
           Text(
-            'Details',
+            AppLocalizations.of(context)!.details,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -276,13 +277,13 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
           const SizedBox(height: 12),
           
                     // Project Owner
-          _buildDetailRow(context, 'Owner', 
+          _buildDetailRow(context, AppLocalizations.of(context)!.owner, 
             project.flowitOwner != null && project.flowitOwner!.isNotEmpty ? project.flowitOwner! : '-'
           ),
           const SizedBox(height: 8),
           
           // Author
-          _buildDetailRow(context, 'Author', 
+          _buildDetailRow(context, AppLocalizations.of(context)!.author, 
             project.flowitAuthor != null && project.flowitAuthor!.isNotEmpty
                 ? project.flowitAuthor!
                 : '-'
@@ -325,7 +326,7 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDetailRow(context, 'Members', membersList.isNotEmpty ? membersList.join(', ') : 'No members'),
+                      _buildDetailRow(context, AppLocalizations.of(context)!.members, membersList.isNotEmpty ? membersList.join(', ') : AppLocalizations.of(context)!.noMembers),
                       // Only show "Manage sharing" if project is not shared with me (i.e., I own it)
                       if (!isSharedWithMe) ...[
                         const SizedBox(height: 4),
@@ -337,7 +338,7 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
                             );
                           },
                           child: Text(
-                            'Manage sharing',
+                            AppLocalizations.of(context)!.manageSharing,
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.primary,
                               decoration: TextDecoration.underline,
@@ -358,8 +359,8 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDetailRow(context, 'Members', 
-                    currentUser.isNotEmpty ? currentUser : 'No members'
+                  _buildDetailRow(context, AppLocalizations.of(context)!.members, 
+                    currentUser.isNotEmpty ? currentUser : AppLocalizations.of(context)!.noMembers
                   ),
                   const SizedBox(height: 4),
                   GestureDetector(
@@ -370,7 +371,7 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
                       );
                     },
                     child: Text(
-                      'Manage sharing',
+                      AppLocalizations.of(context)!.manageSharing,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
                         decoration: TextDecoration.underline,
@@ -388,8 +389,8 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDetailRow(context, 'Members', 
-                    currentUser.isNotEmpty ? currentUser : 'No members'
+                  _buildDetailRow(context, AppLocalizations.of(context)!.members, 
+                    currentUser.isNotEmpty ? currentUser : AppLocalizations.of(context)!.noMembers
                   ),
                   const SizedBox(height: 4),
                   GestureDetector(
@@ -400,7 +401,7 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
                       );
                     },
                     child: Text(
-                      'Manage sharing',
+                      AppLocalizations.of(context)!.manageSharing,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
                         decoration: TextDecoration.underline,
@@ -417,7 +418,7 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
           
           // Third block: Description section
           Text(
-            'Description',
+            AppLocalizations.of(context)!.description,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -436,10 +437,10 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
           EnhancedTextField(
             controller: _descriptionController,
             maxLines: null,
-            decoration: const InputDecoration(
-              hintText: 'No description provided',
+            decoration: InputDecoration(
+              hintText: AppLocalizations.of(context)!.noDescriptionProvided,
               border: InputBorder.none,
-              contentPadding: EdgeInsets.fromLTRB(0, 12, 12, 12),
+              contentPadding: const EdgeInsets.fromLTRB(0, 12, 12, 12),
               isDense: true,
             ),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -544,7 +545,7 @@ class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Attendees without project access',
+                        AppLocalizations.of(context)!.attendeesWithoutProjectAccess,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: Theme.of(context).colorScheme.error,

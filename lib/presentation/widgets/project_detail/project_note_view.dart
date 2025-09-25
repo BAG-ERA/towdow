@@ -6,9 +6,9 @@ import 'dart:ui';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/models/journal.dart';
 import '../../../data/models/attachment.dart';
 import '../../../data/providers/providers_viewmodels.dart';
@@ -16,9 +16,6 @@ import '../../widgets/utils/editable_title.dart';
 import '../../widgets/utils/enhanced_text_field.dart';
 import '../../../data/providers/providers_services_core.dart';
 import '../../../data/providers/providers.dart';
-import '../../../core/logger.dart';
-import '../utils/image_thumbnail.dart';
-import '../utils/full_screen_image_viewer.dart';
 import '../attachment/journal_file_attachment_list.dart';
 import '../attachment/journal_media_attachment_list.dart';
 
@@ -123,7 +120,7 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
                                 _scheduleAutosave(noteVm, immediate: true);
                               },
                               isInAppBar: false,
-                              hintText: 'Note title',
+                              hintText: AppLocalizations.of(context)!.noteTitle,
                               showActionButtons: false,
                             ),
                             const SizedBox(height: 12),
@@ -150,10 +147,10 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
                                     : Row(
                                         key: const ValueKey('saved'),
                                         mainAxisSize: MainAxisSize.min,
-                                        children: const [
+                                        children: [
                                           Icon(Icons.check_circle, size: 16, color: Colors.green),
                                           SizedBox(width: 6),
-                                          Text('Saved'),
+                                          Text(AppLocalizations.of(context)!.saved),
                                         ],
                                       ),
                                ),
@@ -238,13 +235,13 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
                 IconButton(
                   onPressed: () => _pickAndAttachFile(),
                   icon: const Icon(Icons.attach_file, size: 16),
-                  tooltip: 'Attach file',
+                  tooltip: AppLocalizations.of(context)!.attachFile,
                   style: IconButton.styleFrom(minimumSize: const Size(32, 32), padding: EdgeInsets.zero),
                 ),
                 IconButton(
                   onPressed: () => _pickAndAttachMedia(),
                   icon: const Icon(Icons.perm_media, size: 16),
-                  tooltip: 'Attach media',
+                  tooltip: AppLocalizations.of(context)!.attachMedia,
                   style: IconButton.styleFrom(minimumSize: const Size(32, 32), padding: EdgeInsets.zero),
                 ),
                 const Spacer(),
@@ -252,7 +249,7 @@ class _ProjectNoteViewState extends ConsumerState<ProjectNoteView> {
                   onPressed: () {
                     setState(() { _isEditingDesc = false; });
                   },
-                  child: const Text('Done'),
+                  child: Text(AppLocalizations.of(context)!.done),
                 ),
               ],
             )

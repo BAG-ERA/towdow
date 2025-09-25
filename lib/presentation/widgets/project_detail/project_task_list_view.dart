@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../task_item/task_item.dart';
 import '../utils/overlay_draggable_task.dart';
 import '../../../data/models/task.dart';
@@ -53,7 +54,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    isSearchActive ? 'No Matching Tasks' : 'No Tasks Yet',
+                    isSearchActive ? AppLocalizations.of(context)!.noMatchingTasks : AppLocalizations.of(context)!.noTasksYet,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
@@ -61,8 +62,8 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
                   const SizedBox(height: 8),
                   Text(
                     isSearchActive 
-                      ? 'Try adjusting your search or filters'
-                      : 'Add your first task to get started',
+                      ? AppLocalizations.of(context)!.tryAdjustingSearchOrFilters
+                      : AppLocalizations.of(context)!.addFirstTaskToGetStarted,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
@@ -120,7 +121,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
                   children: [
                     // Overdue tasks section
                     if (overdueTasks.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'Overdue', 'overdue', overdueTasks.length, context.chartTheme.colors.error),
+                      _buildSectionHeader(context, AppLocalizations.of(context)!.overdue, 'overdue', overdueTasks.length, context.chartTheme.colors.error),
                       const SizedBox(height: 8),
                       _buildResponsiveTaskGrid(context, 'overdue', overdueTasks),
                       if (pendingTasks.isNotEmpty || completedTasks.isNotEmpty)
@@ -129,7 +130,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
                     
                     // Pending tasks section
                     if (pendingTasks.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'To Be Done', 'pending', pendingTasks.length, context.chartTheme.colors.warning),
+                      _buildSectionHeader(context, AppLocalizations.of(context)!.toBeDone, 'pending', pendingTasks.length, context.chartTheme.colors.warning),
                       const SizedBox(height: 8),
                       _buildResponsiveTaskGrid(context, 'pending', pendingTasks),
                       if (completedTasks.isNotEmpty)
@@ -138,7 +139,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
                     
                     // Completed tasks section
                     if (completedTasks.isNotEmpty) ...[
-                      _buildSectionHeader(context, 'Done', 'completed', completedTasks.length, context.chartTheme.colors.success),
+                      _buildSectionHeader(context, AppLocalizations.of(context)!.done, 'completed', completedTasks.length, context.chartTheme.colors.success),
                       const SizedBox(height: 8),
                       _buildResponsiveTaskGrid(context, 'completed', completedTasks),
                     ],
@@ -149,13 +150,13 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
           ],
         );
       },
-      loading: () => const Center(
+      loading: () => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Loading tasks...'),
+            Text(AppLocalizations.of(context)!.loadingTasks),
           ],
         ),
       ),
@@ -170,7 +171,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Failed to load tasks',
+              AppLocalizations.of(context)!.failedToLoadTasks,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Theme.of(context).colorScheme.error,
               ),
@@ -185,7 +186,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
             ElevatedButton.icon(
               onPressed: widget.onTasksRefresh,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
+              label: Text(AppLocalizations.of(context)!.retry),
             ),
           ],
         ),
@@ -221,7 +222,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          child: const Text('Expand All', style: TextStyle(fontSize: 12)),
+          child: Text(AppLocalizations.of(context)!.expandAll, style: const TextStyle(fontSize: 12)),
         ),
         const SizedBox(width: 8),
         TextButton(
@@ -232,7 +233,7 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          child: const Text('Collapse All', style: TextStyle(fontSize: 12)),
+          child: Text(AppLocalizations.of(context)!.collapseAll, style: const TextStyle(fontSize: 12)),
         ),
               ],
       );

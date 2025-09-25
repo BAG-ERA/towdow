@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/models/journal.dart';
 // repo accessed via provider only, no direct symbol here
 import '../../../data/providers/providers_viewmodels.dart';
@@ -78,7 +79,7 @@ class ProjectNotesQuickPanel extends ConsumerWidget {
               tiles.add(Padding(
                 padding: const EdgeInsets.all(8),
                 child: Text(
-                  'No notes yet',
+                  AppLocalizations.of(context)!.noNotesYet,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ));
@@ -92,7 +93,7 @@ class ProjectNotesQuickPanel extends ConsumerWidget {
                   child: TextButton.icon(
                     onPressed: onCreateNew,
                     icon: const Icon(Icons.note_add_rounded),
-                    label: const Text('New note'),
+                    label: Text(AppLocalizations.of(context)!.newNote),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
@@ -142,16 +143,16 @@ class _NoteRow extends StatelessWidget {
       trailing: IconButton(
         icon: const Icon(Icons.delete_outline, size: 16),
         color: Theme.of(context).colorScheme.error,
-        tooltip: 'Delete note',
+        tooltip: AppLocalizations.of(context)!.deleteNote,
         onPressed: () async {
           final confirmed = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('Delete note'),
+              title: Text(AppLocalizations.of(context)!.deleteNote),
               content: const Text('Are you sure you want to delete this note?'),
               actions: [
-                TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-                FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Delete')),
+                TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(AppLocalizations.of(context)!.cancel)),
+                FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(AppLocalizations.of(context)!.delete)),
               ],
             ),
           );
