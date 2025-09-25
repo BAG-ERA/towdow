@@ -390,6 +390,11 @@
   "noDomainSelected": "Aucun domaine sélectionné",
   "selectDomainForProject": "Sélectionnez un domaine pour ce projet :",
   "noDomain": "Aucun domaine",
-  "createNewDomain": "Créer un nouveau domaine"
+  "createNewDomain": "Créer un nouveau domaine",
+  "towDowCloudDialogTitle": "TowDow Cloud",
+  "connectingToTowDowCloud": "Connexion à TowDow Cloud...",
+  "signInToTowDowCloud": "Se connecter à TowDow Cloud",
+  "towDowCloudRedirectMessage": "Vous serez redirigé vers la page de connexion sécurisée de TowDow. Après vous être connecté, vous reviendrez ici automatiquement.",
+  "continueWithTowDowCloud": "Continuer avec TowDow Cloud"
 }
 
