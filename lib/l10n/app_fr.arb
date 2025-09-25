@@ -377,6 +377,19 @@
   "startOffline": "Démarrer hors‑ligne",
   "accountSetupTitle": "Configuration du compte",
   "accountSetupHeading": "Préparation de votre espace de travail…",
-  "accountSetupSubtitle": "Nous configurons vos calendriers, vos paramètres de synchronisation et préparons votre première session. Cela ne devrait prendre qu’un instant."
+  "accountSetupSubtitle": "Nous configurons vos calendriers, vos paramètres de synchronisation et préparons votre première session. Cela ne devrait prendre qu'un instant.",
+  "createNewProjectTitle": "Créer un nouveau projet",
+  "projectsHelpText": "Les projets aident à organiser et suivre les tâches vers des objectifs spécifiques.",
+  "projectNameLabel": "Nom du projet *",
+  "projectNameHint": "ex. Refonte du site web, Campagne marketing",
+  "descriptionLabel": "Description (optionnel)",
+  "descriptionHint": "Décrivez les objectifs et buts du projet",
+  "domainOptional": "Domaine (optionnel)",
+  "selectedDomain": "Sélectionné : {domain}",
+  "@selectedDomain": {"placeholders": {"domain": {"type": "String"}}},
+  "noDomainSelected": "Aucun domaine sélectionné",
+  "selectDomainForProject": "Sélectionnez un domaine pour ce projet :",
+  "noDomain": "Aucun domaine",
+  "createNewDomain": "Créer un nouveau domaine"
 }
 

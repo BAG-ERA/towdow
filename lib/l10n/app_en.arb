@@ -377,6 +377,19 @@
   "startOffline": "Start offline",
   "accountSetupTitle": "Setting up your account",
   "accountSetupHeading": "Preparing your workspace…",
-  "accountSetupSubtitle": "We’re setting up your calendars, syncing settings, and preparing your first session. This should only take a moment."
+  "accountSetupSubtitle": "We're setting up your calendars, syncing settings, and preparing your first session. This should only take a moment.",
+  "createNewProjectTitle": "Create New Project",
+  "projectsHelpText": "Projects help organize and track tasks towards specific goals.",
+  "projectNameLabel": "Project name *",
+  "projectNameHint": "e.g., Website Redesign, Marketing Campaign",
+  "descriptionLabel": "Description (optional)",
+  "descriptionHint": "Describe the project goals and objectives",
+  "domainOptional": "Domain (optional)",
+  "selectedDomain": "Selected: {domain}",
+  "@selectedDomain": {"placeholders": {"domain": {"type": "String"}}},
+  "noDomainSelected": "No domain selected",
+  "selectDomainForProject": "Select a domain for this project:",
+  "noDomain": "No domain",
+  "createNewDomain": "Create new domain"
 }
 
