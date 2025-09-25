@@ -69,6 +69,9 @@ void main() {
     setUp(() async {
       storageService = LocalStorageService();
       await storageService.initialize();
+      
+      // Clear all data before each test to ensure clean state
+      await storageService.clearAllData();
     });
 
     tearDown(() async {
