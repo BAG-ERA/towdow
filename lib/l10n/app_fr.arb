@@ -531,6 +531,9 @@
   "failedToDownloadFile": "Échec du téléchargement du fichier",
   "mediaFiles": "Fichiers multimédias",
   "addMedia": "Ajouter des médias",
-  "projectCreatedByTowDow": "Projet créé par TowDow"
+  "projectCreatedByTowDow": "Projet créé par TowDow",
+  "addStepDialogTitle": "Ajouter une étape",
+  "stepNameLabel": "Nom de l'étape",
+  "markAsFinalStep": "Marquer comme étape finale"
 }
 

@@ -560,6 +560,9 @@
   "closeNote": "Close note",
   "search": "Search",
   "searchTasksHint": "Search tasks...",
-  "projectCreatedByTowDow": "Project created by TowDow"
+  "projectCreatedByTowDow": "Project created by TowDow",
+  "addStepDialogTitle": "Add Step",
+  "stepNameLabel": "Step name",
+  "markAsFinalStep": "Mark as final step"
 }
 
