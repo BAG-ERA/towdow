@@ -69,11 +69,12 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
       child: AlertDialog(
         title: const Text('Create New Project'),
         content: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          width: MediaQuery.of(context).size.width > 500 ? 400 : MediaQuery.of(context).size.width * 0.9,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Text(
                 'Projects help organize and track tasks towards specific goals.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -140,6 +141,7 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
             ],
           ),
         ),
+      ),
         actions: [
           TextButton(
             onPressed: isLoading ? null : () => Navigator.of(context).pop(),
