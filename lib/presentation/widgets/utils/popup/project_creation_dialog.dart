@@ -272,7 +272,7 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
     final vm = ref.read(projectCreationViewModelProvider.notifier);
     await vm.createProject(
       name: projectName,
-      description: projectDescription.isEmpty ? 'Project created by FlowIt' : projectDescription,
+      description: projectDescription.isEmpty ? AppLocalizations.of(context)!.projectCreatedByTowDow : projectDescription,
       domain: selectedDomain,
     );
 

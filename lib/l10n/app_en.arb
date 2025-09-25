@@ -536,6 +536,7 @@
   "hideNotes": "Hide notes",
   "closeNote": "Close note",
   "search": "Search",
-  "searchTasksHint": "Search tasks..."
+  "searchTasksHint": "Search tasks...",
+  "projectCreatedByTowDow": "Project created by TowDow"
 }
 
