@@ -19,6 +19,7 @@ import '../../viewmodels/appearance_settings_viewmodel.dart';
 import '../../widgets/header_screen_widget.dart';
 import '../../../core/app_lifecycle_manager.dart';
 import '../../viewmodels/login_viewmodel.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -103,6 +104,7 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsSection(
             title: AppLocalizations.of(context)!.about,
             children: [
+              _VersionDisplayItem(),
               _SettingsItem(
                 title: AppLocalizations.of(context)!.aboutUs,
                 subtitle: AppLocalizations.of(context)!.aboutUsSubtitle,
@@ -359,6 +361,31 @@ class _SettingsItem extends StatelessWidget {
           () {
             // Feature coming soon - no action needed
           },
+    );
+  }
+}
+
+class _VersionDisplayItem extends StatelessWidget {
+  const _VersionDisplayItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<PackageInfo>(
+      future: PackageInfo.fromPlatform(),
+      builder: (context, snapshot) {
+        String versionText = 'Unknown';
+        if (snapshot.hasData) {
+          final packageInfo = snapshot.data!;
+          versionText = '${packageInfo.version}+${packageInfo.buildNumber}';
+        }
+        
+        return ListTile(
+          leading: const Icon(Icons.info_outline_rounded),
+          title: const Text('Version'),
+          subtitle: Text(versionText),
+          trailing: null, // No arrow for version display
+        );
+      },
     );
   }
 }
