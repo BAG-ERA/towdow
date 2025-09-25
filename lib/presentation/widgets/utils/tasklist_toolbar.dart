@@ -90,7 +90,6 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
     }
     
     return Container(
-      height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
