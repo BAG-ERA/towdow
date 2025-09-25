@@ -521,6 +521,21 @@
   "file": "File",
   "fileSubtitle": "File attachments",
   "media": "Media",
-  "mediaSubtitle": "Photos and videos"
+  "mediaSubtitle": "Photos and videos",
+  "moveTask": "Move Task",
+  "movingTask": "Moving: {taskSummary}",
+  "@movingTask": {"placeholders": {"taskSummary": {"type": "String"}}},
+  "selectDestinationCalendar": "Select destination calendar:",
+  "errorLoadingCalendars": "Error loading calendars: {error}",
+  "@errorLoadingCalendars": {"placeholders": {"error": {"type": "String"}}},
+  "noOtherCalendarsAvailable": "No other calendars available",
+  "deleteTask": "Delete Task",
+  "areYouSureDeleteTask": "Are you sure you want to delete \"{taskSummary}\"?",
+  "@areYouSureDeleteTask": {"placeholders": {"taskSummary": {"type": "String"}}},
+  "delete": "Delete",
+  "hideNotes": "Hide notes",
+  "closeNote": "Close note",
+  "search": "Search",
+  "searchTasksHint": "Search tasks..."
 }
 

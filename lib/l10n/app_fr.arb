@@ -467,6 +467,21 @@
   "file": "Fichier",
   "fileSubtitle": "Pièces jointes",
   "media": "Média",
-  "mediaSubtitle": "Photos et vidéos"
+  "mediaSubtitle": "Photos et vidéos",
+  "moveTask": "Déplacer la tâche",
+  "movingTask": "Déplacement : {taskSummary}",
+  "@movingTask": {"placeholders": {"taskSummary": {"type": "String"}}},
+  "selectDestinationCalendar": "Sélectionner le calendrier de destination :",
+  "errorLoadingCalendars": "Erreur lors du chargement des calendriers : {error}",
+  "@errorLoadingCalendars": {"placeholders": {"error": {"type": "String"}}},
+  "noOtherCalendarsAvailable": "Aucun autre calendrier disponible",
+  "deleteTask": "Supprimer la tâche",
+  "areYouSureDeleteTask": "Êtes-vous sûr de vouloir supprimer \"{taskSummary}\" ?",
+  "@areYouSureDeleteTask": {"placeholders": {"taskSummary": {"type": "String"}}},
+  "delete": "Supprimer",
+  "hideNotes": "Masquer les notes",
+  "closeNote": "Fermer la note",
+  "search": "Rechercher",
+  "searchTasksHint": "Rechercher des tâches..."
 }
 
