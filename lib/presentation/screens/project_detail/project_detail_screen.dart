@@ -230,8 +230,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                             : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
                         label: Text(
                           _openedNote != null
-                              ? 'Close note'
-                              : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                              ? AppLocalizations.of(context)!.closeNote
+                              : (_showNotesPanel ? AppLocalizations.of(context)!.hideNotes : AppLocalizations.of(context)!.showNotes),
                         ),
                       ),
                     ),
@@ -279,7 +279,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     // Minimal inline creation; could be replaced with a dedicated dialog later
     final repo = ref.read(journalRepositoryProvider);
     final j = Journal.createNew(
-      summary: 'Note',
+      summary: AppLocalizations.of(context)!.note,
       description: '',
       projectPath: widget.projectPath,
     );
@@ -335,7 +335,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Failed to load project: $error',
+                      '${AppLocalizations.of(context)!.failedToLoadProject}: $error',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onErrorContainer,
                       ),
@@ -376,7 +376,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   RotatedBox(
                     quarterTurns: 1,
                     child: Text(
-                      'Show Project Detail',
+                      AppLocalizations.of(context)!.showProjectDetail,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
@@ -391,7 +391,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 IconButton(
                   onPressed: () => setState(() => _showNotesPanel = true),
                   icon: const Icon(Icons.notes_rounded),
-                  tooltip: 'Show notes',
+                  tooltip: AppLocalizations.of(context)!.showNotes,
                 ),
               if (_showNotesPanel || _openedNote != null)
                 IconButton(
@@ -404,7 +404,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     }
                   }),
                   icon: const Icon(Icons.close_rounded),
-                  tooltip: 'Close notes',
+                  tooltip: AppLocalizations.of(context)!.closeNote,
                 ),
             ],
           ),
@@ -452,16 +452,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                       final completed = tasks.where((t) => t.status == 'COMPLETED').length;
                                       final total = tasks.length;
                                       return Text(
-                                        'Tasks $completed/$total',
+                                        AppLocalizations.of(context)!.tasksCount(completed, total),
                                         style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                                       );
                                     },
                                     loading: () => Text(
-                                      'Tasks ...',
+                                      AppLocalizations.of(context)!.tasksLoading,
                                       style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                                     ),
                                     error: (_, __) => Text(
-                                      'Tasks 0/0',
+                                      AppLocalizations.of(context)!.tasksEmpty,
                                       style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                                     ),
                                   ),
@@ -503,7 +503,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'Project not found: ${widget.projectPath}',
+                                    '${AppLocalizations.of(context)!.projectNotFound}: ${widget.projectPath}',
                                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                           color: Theme.of(context).colorScheme.onErrorContainer,
                                         ),
@@ -543,7 +543,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'Failed to load project: $error',
+                              '${AppLocalizations.of(context)!.failedToLoadProject}: $error',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     color: Theme.of(context).colorScheme.onErrorContainer,
                                   ),
@@ -718,8 +718,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                         switchOutCurve: Curves.easeIn,
                         child: Text(
                           _openedNote != null
-                              ? 'Close note'
-                              : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                              ? AppLocalizations.of(context)!.closeNote
+                              : (_showNotesPanel ? AppLocalizations.of(context)!.hideNotes : AppLocalizations.of(context)!.showNotes),
                           key: ValueKey(_openedNote != null
                               ? 'label_close'
                               : (_showNotesPanel ? 'label_hide' : 'label_show')),
@@ -903,8 +903,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final columns = [
       KanbanColumn(
         id: 'overdue',
-        title: 'Overdue',
-        subtitle: '${overdueTasks.length} tasks',
+        title: AppLocalizations.of(context)!.overdue,
+        subtitle: AppLocalizations.of(context)!.tasksCountSimple(overdueTasks.length),
         tasks: overdueTasks,
                  color: context.chartTheme.colors.error,
         icon: Icons.warning_rounded,
@@ -920,15 +920,15 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       KanbanColumn(
         id: 'soon',
         title: AppLocalizations.of(context)!.soon,
-        subtitle: 'Next 2 days',
+        subtitle: AppLocalizations.of(context)!.nextTwoDays,
         tasks: soonTasks,
                  color: context.chartTheme.colors.warning,
         icon: Icons.schedule_rounded,
       ),
       KanbanColumn(
         id: 'next_week',
-        title: 'Next Week',
-        subtitle: '${nextWeekTasks.length} tasks',
+        title: AppLocalizations.of(context)!.nextWeek,
+        subtitle: AppLocalizations.of(context)!.tasksCountSimple(nextWeekTasks.length),
         tasks: nextWeekTasks,
                  color: context.chartTheme.colors.primary,
         icon: Icons.date_range_rounded,
@@ -936,7 +936,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       KanbanColumn(
         id: 'later',
         title: AppLocalizations.of(context)!.later,
-        subtitle: '${laterTasks.length} tasks',
+        subtitle: AppLocalizations.of(context)!.tasksCountSimple(laterTasks.length),
         tasks: laterTasks,
                  color: context.chartTheme.colors.tertiary,
         icon: Icons.event_rounded,
@@ -944,7 +944,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       KanbanColumn(
         id: 'anytime',
         title: AppLocalizations.of(context)!.anytime,
-        subtitle: '${anytimeTasks.length} tasks',
+        subtitle: AppLocalizations.of(context)!.tasksCountSimple(anytimeTasks.length),
         tasks: anytimeTasks,
         color: Colors.grey,
         icon: Icons.inbox_rounded,
@@ -1015,8 +1015,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: Text(AppLocalizations.of(context)!.addTaskFor(_formatAttendeeEmail(attendee))),
         content: TextField(
           controller: textController,
-          decoration: const InputDecoration(
-            hintText: 'Enter task summary',
+          decoration: InputDecoration(
+            hintText: AppLocalizations.of(context)!.enterTaskSummary,
           ),
           autofocus: true,
         ),
@@ -1097,8 +1097,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     columns.add(
       KanbanColumn(
         id: '__no_attendees__',
-        title: 'No Attendees',
-        subtitle: '${unassignedTasks.length} tasks',
+        title: AppLocalizations.of(context)!.noAttendees,
+        subtitle: AppLocalizations.of(context)!.tasksCountSimple(unassignedTasks.length),
         tasks: unassignedTasks,
         color: Colors.grey,
         icon: Icons.person_off_rounded,
@@ -1119,7 +1119,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         KanbanColumn(
           id: attendee,
           title: _formatAttendeeEmail(attendee),
-          subtitle: '$progressPercentage% complete',
+          subtitle: AppLocalizations.of(context)!.progressComplete(progressPercentage),
           tasks: attendeeTasks,
           color: _getAttendeeColor(attendee),
           icon: Icons.person_rounded,
@@ -1183,8 +1183,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         title: Text(AppLocalizations.of(context)!.addUnassignedTask),
         content: TextField(
           controller: textController,
-          decoration: const InputDecoration(
-            hintText: 'Enter task summary',
+          decoration: InputDecoration(
+            hintText: AppLocalizations.of(context)!.enterTaskSummary,
           ),
           autofocus: true,
         ),

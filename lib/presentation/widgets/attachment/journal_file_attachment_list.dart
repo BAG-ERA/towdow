@@ -10,6 +10,7 @@ import '../../../core/result.dart';
 import '../../../data/models/journal.dart';
 import '../../../data/models/attachment.dart';
 import '../../../data/providers/providers.dart';
+import '../../../l10n/app_localizations.dart';
 
 class JournalFileAttachmentList extends ConsumerStatefulWidget {
   final Journal journal;
@@ -57,7 +58,7 @@ class _JournalFileAttachmentListState extends ConsumerState<JournalFileAttachmen
             ),
             const SizedBox(width: 4),
             Text(
-              'Files',
+              AppLocalizations.of(context)!.files,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -79,7 +80,7 @@ class _JournalFileAttachmentListState extends ConsumerState<JournalFileAttachmen
             IconButton(
               onPressed: _uploadFile,
               icon: const Icon(Icons.add, size: 16),
-              tooltip: 'Add file',
+              tooltip: AppLocalizations.of(context)!.addFile,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(
                 minWidth: 24,
@@ -140,7 +141,7 @@ class _JournalFileAttachmentListState extends ConsumerState<JournalFileAttachmen
           IconButton(
             onPressed: () => _downloadFile(attachment),
             icon: const Icon(Icons.download, size: 16),
-            tooltip: 'Download file',
+            tooltip: AppLocalizations.of(context)!.downloadFile,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(
               minWidth: 24,
@@ -193,7 +194,7 @@ class _JournalFileAttachmentListState extends ConsumerState<JournalFileAttachmen
       AppLogger.error('JournalFileAttachmentList: File upload failed', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload file: $e')),
+          SnackBar(content: Text('${AppLocalizations.of(context)!.failedToUploadFile}: $e')),
         );
       }
     }
@@ -214,7 +215,7 @@ class _JournalFileAttachmentListState extends ConsumerState<JournalFileAttachmen
       }
 
       final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save File',
+        dialogTitle: AppLocalizations.of(context)!.saveFile,
         fileName: attachment.filename,
         type: FileType.any,
       );
@@ -225,7 +226,7 @@ class _JournalFileAttachmentListState extends ConsumerState<JournalFileAttachmen
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('File saved successfully')),
+            SnackBar(content: Text(AppLocalizations.of(context)!.fileSavedSuccessfully)),
           );
         }
       }
@@ -233,7 +234,7 @@ class _JournalFileAttachmentListState extends ConsumerState<JournalFileAttachmen
       AppLogger.error('JournalFileAttachmentList: File download failed', e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to download file: $e')),
+          SnackBar(content: Text('${AppLocalizations.of(context)!.failedToDownloadFile}: $e')),
         );
       }
     }

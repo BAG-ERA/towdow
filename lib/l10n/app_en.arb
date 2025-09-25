@@ -15,7 +15,6 @@
   "today": "Today",
   "soon": "Soon",
   "anytime": "Anytime",
-  "nextWeek": "Next week",
   "later": "Later",
   "language": "Language",
   "languageSystem": "System default",
@@ -437,6 +436,61 @@
   "attachMedia": "Attach media",
   "noNotesYet": "No notes yet",
   "newNote": "New note",
-  "deleteNote": "Delete note"
+  "deleteNote": "Delete note",
+  "closeNote": "Close note",
+  "hideNotes": "Hide notes",
+  "showNotes": "Show notes",
+  "showProjectDetail": "Show Project Detail",
+  "failedToLoadProject": "Failed to load project",
+  "tasksCount": "Tasks {completed}/{total}",
+  "@tasksCount": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "tasksLoading": "Tasks ...",
+  "tasksEmpty": "Tasks 0/0",
+  "note": "Note",
+  "nextWeek": "Next Week",
+  "nextTwoDays": "Next 2 days",
+  "noAttendees": "No Attendees",
+  "tasksCountSimple": "{count} tasks",
+  "@tasksCountSimple": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "progressComplete": "{percentage}% complete",
+  "@progressComplete": {
+    "placeholders": {
+      "percentage": {
+        "type": "int"
+      }
+    }
+  },
+  "enterTaskSummary": "Enter task summary",
+  "files": "Files",
+  "addFile": "Add file",
+  "local": "Local",
+  "cloud": "Cloud",
+  "download": "Download",
+  "remove": "Remove",
+  "saveFile": "Save File",
+  "removeFile": "Remove File",
+  "removeFileConfirmation": "Are you sure you want to remove this file? This action cannot be undone.",
+  "downloadFile": "Download file",
+  "fileSavedSuccessfully": "File saved successfully",
+  "failedToUploadFile": "Failed to upload file",
+  "failedToDownloadFile": "Failed to download file",
+  "media": "Media",
+  "mediaFiles": "Media Files",
+  "addMedia": "Add media"
 }
 
