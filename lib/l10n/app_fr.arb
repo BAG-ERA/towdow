@@ -510,8 +510,17 @@
   "showNotes": "Afficher les notes",
   "showProjectDetail": "Afficher les détails du projet",
   "failedToLoadProject": "Échec du chargement du projet",
-  "tasksCount": "{count} tâche{count, plural, =1{} other{s}}",
-  "@tasksCount": {"placeholders": {"count": {"type": "int"}}},
+  "tasksCount": "Tâches {completed}/{total}",
+  "@tasksCount": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "tasksLoading": "Chargement des tâches...",
   "tasksEmpty": "Aucune tâche",
   "note": "Note",
