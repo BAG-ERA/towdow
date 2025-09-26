@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../core/result.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
 import '../../../data/models/task_calendar.dart';
@@ -160,8 +161,8 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
                         : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
                     label: Text(
                       _openedNote != null
-                          ? 'Close note'
-                          : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                          ? AppLocalizations.of(context)!.closeNote
+                          : (_showNotesPanel ? AppLocalizations.of(context)!.hideNotes : AppLocalizations.of(context)!.showNotes),
                     ),
                   ),
                 ),
@@ -379,7 +380,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
                       switchInCurve: Curves.easeOut,
                       switchOutCurve: Curves.easeIn,
                       child: Text(
-                        _openedNote != null ? 'Close note' : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                        _openedNote != null ? AppLocalizations.of(context)!.closeNote : (_showNotesPanel ? AppLocalizations.of(context)!.hideNotes : AppLocalizations.of(context)!.showNotes),
                         key: ValueKey(_openedNote != null ? 'wf_label_close' : (_showNotesPanel ? 'wf_label_hide' : 'wf_label_show')),
                       ),
                     ),
@@ -567,7 +568,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
             IconButton(
               onPressed: () => setState(() => _showNotesPanel = true),
               icon: const Icon(Icons.notes_rounded),
-              tooltip: 'Show notes',
+              tooltip: AppLocalizations.of(context)!.showNotes,
             ),
           if (_showNotesPanel || _openedNote != null)
             IconButton(

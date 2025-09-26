@@ -11,6 +11,7 @@ import '../../../../data/models/task.dart';
 import '../../../../data/models/attendee.dart';
 import '../../../../data/providers/providers.dart';
 import '../../../../data/models/requirement.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'due_date_dialog.dart';
 import 'category_dialog.dart';
 import 'attendee_dialog.dart';
@@ -82,7 +83,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         }
       },
       child: AlertDialog(
-        title: const Text('Create Task'),
+        title: Text(AppLocalizations.of(context)!.createTask),
         content: SizedBox(
           width: 480,
           child: SingleChildScrollView(
@@ -104,7 +105,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Keep dialog open for creating multiple tasks',
+                      AppLocalizations.of(context)!.keepDialogOpen,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
@@ -167,7 +168,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                     });
                   },
                   icon: const Icon(Icons.expand_more),
-                  label: const Text('Show more options'),
+                  label: Text(AppLocalizations.of(context)!.showMoreOptions),
                 ),
               ],
               
@@ -177,10 +178,10 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                 
                 EnhancedTextField(
                   controller: descriptionController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Description (optional)',
-                    hintText: 'Add details about what needs to be done',
-                    border: OutlineInputBorder(),
+                    hintText: AppLocalizations.of(context)!.taskDetailsHint,
+                    border: const OutlineInputBorder(),
                   ),
                   maxLines: 3,
                   onChanged: (_) => setState(() {}),
@@ -192,7 +193,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.calendar_today_rounded),
                   title: Text(selectedDue == null 
-                    ? 'No due date' 
+                    ? AppLocalizations.of(context)!.noDueDate
                     : 'Due: ${selectedDue!.day}/${selectedDue!.month}/${selectedDue!.year}'
                   ),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded),
@@ -206,7 +207,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.label_rounded),
                   title: Text(selectedCategories.isEmpty 
-                    ? 'No categories' 
+                    ? AppLocalizations.of(context)!.noCategories
                     : '${selectedCategories.length} categor${selectedCategories.length == 1 ? 'y' : 'ies'} selected'
                   ),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded),
@@ -220,8 +221,10 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.person_add_rounded),
                   title: Text(selectedAttendees.isEmpty 
-                    ? 'No attendees' 
-                    : '${selectedAttendees.length} attendee${selectedAttendees.length == 1 ? '' : 's'} selected'
+                    ? AppLocalizations.of(context)!.noAttendees
+                    : selectedAttendees.length == 1 
+                      ? '${selectedAttendees.length} ${AppLocalizations.of(context)!.attendeeSelected}'
+                      : '${selectedAttendees.length} ${AppLocalizations.of(context)!.attendeesSelected}'
                   ),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded),
                   onTap: () => _showAttendeeDialog(),
@@ -235,7 +238,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                     });
                   },
                   icon: const Icon(Icons.expand_less),
-                  label: const Text('Show fewer options'),
+                  label: Text(AppLocalizations.of(context)!.showFewerOptions),
                 ),
               ],
             ],
@@ -245,7 +248,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
         actions: [
           TextButton(
             onPressed: isLoading ? null : () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton(
             onPressed: isLoading || !_canCreate() ? null : _createTask,
@@ -255,7 +258,7 @@ class _TaskCreationDialogState extends ConsumerState<TaskCreationDialog> {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Create'),
+                : Text(AppLocalizations.of(context)!.create),
           ),
         ],
       ),
@@ -460,9 +463,9 @@ class _ProfileSelector extends ConsumerWidget {
       child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Add Profile', style: Theme.of(context).textTheme.titleMedium),
+            Text(AppLocalizations.of(context)!.addProfile, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 2),
-            Text('A profile is a skillset or responsibility needed for this task', style: Theme.of(context).textTheme.bodySmall),
+            Text(AppLocalizations.of(context)!.profileDescription, style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 6),
             reqsAsync.when(
               data: (reqs) {
@@ -470,10 +473,10 @@ class _ProfileSelector extends ConsumerWidget {
                 if (items.isEmpty) {
                   return Align(
                     alignment: Alignment.centerLeft,
-                    child: OutlinedButton.icon(
+                    child:                     OutlinedButton.icon(
                       onPressed: () => _showCreateProfileDialog(context, ref),
                       icon: const Icon(Icons.add),
-                      label: const Text('Create profile'),
+                      label: Text(AppLocalizations.of(context)!.createProfile),
                     ),
                   );
                 }
@@ -482,7 +485,7 @@ class _ProfileSelector extends ConsumerWidget {
                   children: [
                     DropdownButtonFormField<String>(
                       isExpanded: true,
-                      decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Select profile'),
+                      decoration: InputDecoration(border: const OutlineInputBorder(), labelText: AppLocalizations.of(context)!.selectProfile),
                       items: [
                         ...items.map((r) => DropdownMenuItem<String>(value: r.id, child: Text(r.name))).toList(),
                         // No direct widget item for button; provide separate inline action below
@@ -498,7 +501,7 @@ class _ProfileSelector extends ConsumerWidget {
                     TextButton.icon(
                       onPressed: () => _showCreateProfileDialog(context, ref),
                       icon: const Icon(Icons.add),
-                      label: const Text('Create profile'),
+                      label: Text(AppLocalizations.of(context)!.createProfile),
                     ),
                     const SizedBox(height: 6),
                     if (selectedIds.isNotEmpty)
@@ -538,21 +541,21 @@ class _ProfileSelector extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Create Profile'),
+        title: Text(AppLocalizations.of(context)!.createProfileDialogTitle),
         content: SizedBox(
           width: 400,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Create a new profile (requirement) for this workflow'),
+              Text(AppLocalizations.of(context)!.createProfileDialogDescription),
               const SizedBox(height: 12),
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Profile name *',
-                  hintText: 'e.g., Lawyer, Sales, IT',
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: AppLocalizations.of(context)!.profileNameLabel,
+                  hintText: AppLocalizations.of(context)!.profileNameHint,
                 ),
                 autofocus: true,
               ),
@@ -560,7 +563,7 @@ class _ProfileSelector extends ConsumerWidget {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(AppLocalizations.of(context)!.cancel)),
           FilledButton(
             onPressed: () async {
               final name = nameController.text.trim();
@@ -576,7 +579,7 @@ class _ProfileSelector extends ConsumerWidget {
               final next = {...selectedIds}..add(id);
               onChanged(next.toList());
             },
-            child: const Text('Create'),
+            child: Text(AppLocalizations.of(context)!.create),
           ),
         ],
       ),
@@ -601,14 +604,14 @@ class _AssigneeQuickAdd extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Attribute Task to someone', style: Theme.of(context).textTheme.titleMedium),
+            Text(AppLocalizations.of(context)!.attributeTaskToSomeone, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 2),
-            Text('Every time we run this process this person will have this task (can be changed later)', style: Theme.of(context).textTheme.bodySmall),
+            Text(AppLocalizations.of(context)!.attributeTaskDescription, style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 6),
             OutlinedButton.icon(
               onPressed: onTapAdd,
               icon: const Icon(Icons.person_add),
-              label: const Text('Add person'),
+              label: Text(AppLocalizations.of(context)!.addPerson),
             ),
             const SizedBox(height: 6),
             if (selected.isNotEmpty)

@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 import '../../../data/providers/providers.dart';
 import '../../../data/models/task.dart';
@@ -51,7 +52,7 @@ class ProjectBottleneckView extends ConsumerWidget {
     if (state.isEmpty) {
       return Center(
         child: Text(
-          'No steps to display',
+          AppLocalizations.of(context)!.noStepsToDisplay,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       );
@@ -186,7 +187,7 @@ class _StepColumnWidget extends StatelessWidget {
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text('Not available', style: Theme.of(context).textTheme.labelSmall),
+                    child: Text(AppLocalizations.of(context)!.notAvailable, style: Theme.of(context).textTheme.labelSmall),
                   ),
               ],
             ),
@@ -349,7 +350,7 @@ class _EmptyStepBody extends StatelessWidget {
         children: [
           Icon(Icons.inbox_outlined, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
           const SizedBox(width: 8),
-          Text('No tasks in this step', style: Theme.of(context).textTheme.bodySmall),
+          Text(AppLocalizations.of(context)!.noTasksInThisStep, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

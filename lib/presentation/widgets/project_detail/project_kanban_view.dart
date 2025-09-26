@@ -100,14 +100,14 @@ class ProjectKanbanView extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No Matching Tasks',
+              AppLocalizations.of(context)!.noMatchingTasks,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Try adjusting your search or filters',
+              AppLocalizations.of(context)!.tryAdjustingSearchOrFilters,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
@@ -134,7 +134,7 @@ class ProjectKanbanView extends ConsumerWidget {
         columns.add(
           KanbanColumn(
             id: 'uncategorized',
-            title: 'Uncategorized',
+            title: AppLocalizations.of(context)!.uncategorized,
             subtitle: '${uncategorizedTasks.length} tasks',
             tasks: uncategorizedTasks,
             color: Colors.grey,

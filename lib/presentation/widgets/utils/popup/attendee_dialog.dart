@@ -58,7 +58,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
     // Basic email format validation
     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
     if (!emailRegex.hasMatch(email)) {
-      setState(() => _emailWarning = 'Invalid email format');
+      setState(() => _emailWarning = AppLocalizations.of(context)!.invalidEmailFormat);
     } else {
       setState(() => _emailWarning = null);
     }
@@ -81,7 +81,12 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
           children: [
             Icon(Icons.person_add_rounded),
             SizedBox(width: 12),
-            Text(AppLocalizations.of(context)!.addAttendee),
+            Flexible(
+              child: Text(
+                AppLocalizations.of(context)!.addAttendee,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         content: SizedBox(
@@ -167,7 +172,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
             icon: const Icon(Icons.remove_circle_rounded, size: 16, color: Colors.red),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-            tooltip: 'Remove attendee',
+            tooltip: AppLocalizations.of(context)!.removeAttendeeTooltip,
           ),
         ],
       ),
@@ -188,7 +193,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
-          'All suggested attendees are already added',
+          AppLocalizations.of(context)!.allSuggestedAttendeesAdded,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontStyle: FontStyle.italic,
@@ -231,8 +236,8 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
           TextFormField(
             controller: _emailController,
             decoration: InputDecoration(
-              labelText: 'Email Address',
-              hintText: 'attendee@example.com',
+              labelText: AppLocalizations.of(context)!.emailAddress,
+              hintText: AppLocalizations.of(context)!.emailAddressHint,
               prefixIcon: const Icon(Icons.email_rounded),
               filled: true,
               fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -275,20 +280,20 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
             textInputAction: TextInputAction.done,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Email is required';
+                return AppLocalizations.of(context)!.emailRequired;
               }
               
               // Check for duplicates
               final email = value.trim().toLowerCase();
               final isDuplicate = widget.task.attendees.any((a) => a.email.toLowerCase() == email);
               if (isDuplicate) {
-                return 'This attendee is already added';
+                return AppLocalizations.of(context)!.alreadyAddedAttendee;
               }
               
               // Basic email validation
               final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
               if (!emailRegex.hasMatch(email)) {
-                return 'Please enter a valid email address';
+                return AppLocalizations.of(context)!.pleaseEnterValidEmail;
               }
               
               return null;
@@ -310,7 +315,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.person_add_rounded),
-              label: Text(_isLoading ? 'Adding...' : 'Add Attendee'),
+              label: Text(_isLoading ? AppLocalizations.of(context)!.addingAttendee : AppLocalizations.of(context)!.addAttendeeButton),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -365,7 +370,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
               children: [
                 const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                 const SizedBox(width: 12),
-                Expanded(child: Text('✅ Added ${newAttendee.effectiveDisplayName}')),
+                Expanded(child: Text(AppLocalizations.of(context)!.attendeeAddedSuccess(newAttendee.effectiveDisplayName))),
               ],
             ),
             backgroundColor: Colors.green,
@@ -378,7 +383,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add attendee: $e'),
+            content: Text(AppLocalizations.of(context)!.failedToAddAttendee(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -436,7 +441,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
               children: [
                 const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                 const SizedBox(width: 12),
-                Expanded(child: Text('✅ Added ${newAttendee.effectiveDisplayName}')),
+                Expanded(child: Text(AppLocalizations.of(context)!.attendeeAddedSuccess(newAttendee.effectiveDisplayName))),
               ],
             ),
             backgroundColor: Colors.green,
@@ -449,7 +454,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add attendee: $e'),
+            content: Text(AppLocalizations.of(context)!.failedToAddSuggestedAttendee(e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -463,17 +468,17 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove Attendee'),
-        content: Text('Remove ${attendee.effectiveDisplayName} from this task?'),
+        title: Text(AppLocalizations.of(context)!.removeAttendeeDialogTitle),
+        content: Text(AppLocalizations.of(context)!.removeAttendeeDialogContent(attendee.effectiveDisplayName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Remove'),
+            child: Text(AppLocalizations.of(context)!.removeAttendeeButton),
           ),
         ],
       ),
@@ -504,7 +509,7 @@ class _AttendeeDialogState extends ConsumerState<AttendeeDialog> {
               children: [
                 const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                 const SizedBox(width: 12),
-                Expanded(child: Text('✅ Removed ${attendee.effectiveDisplayName}')),
+                Expanded(child: Text(AppLocalizations.of(context)!.attendeeRemovedSuccess(attendee.effectiveDisplayName))),
               ],
             ),
             backgroundColor: Colors.green,

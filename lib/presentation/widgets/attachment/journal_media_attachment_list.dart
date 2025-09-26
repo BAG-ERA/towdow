@@ -14,6 +14,7 @@ import '../utils/image_thumbnail.dart';
 import '../utils/full_screen_image_viewer.dart';
 import '../../../core/logger.dart';
 import '../../../core/result.dart';
+import '../../../l10n/app_localizations.dart';
 
 class JournalMediaAttachmentList extends ConsumerStatefulWidget {
   final Journal journal;
@@ -83,7 +84,7 @@ class _JournalMediaAttachmentListState extends ConsumerState<JournalMediaAttachm
             ),
             const SizedBox(width: 4),
             Text(
-              mediaAttachments.length == 1 ? 'Media' : 'Media Files',
+              mediaAttachments.length == 1 ? AppLocalizations.of(context)!.media : AppLocalizations.of(context)!.mediaFiles,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -105,7 +106,7 @@ class _JournalMediaAttachmentListState extends ConsumerState<JournalMediaAttachm
             IconButton(
               onPressed: _uploadMedia,
               icon: const Icon(Icons.add, size: 16),
-              tooltip: 'Add media',
+              tooltip: AppLocalizations.of(context)!.addMedia,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(
                 minWidth: 24,

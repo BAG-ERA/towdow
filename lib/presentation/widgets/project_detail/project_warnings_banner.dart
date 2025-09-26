@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 
 import '../../../data/models/task_calendar.dart';
 import '../../../data/models/task.dart';
@@ -106,7 +107,7 @@ class _ProjectWarningsBannerState extends ConsumerState<ProjectWarningsBanner> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Attendees without project access',
+                          AppLocalizations.of(context)!.attendeesWithoutProjectAccess,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: Theme.of(context).colorScheme.error,
@@ -117,7 +118,7 @@ class _ProjectWarningsBannerState extends ConsumerState<ProjectWarningsBanner> {
                         visualDensity: VisualDensity.compact,
                         iconSize: 18,
                         splashRadius: 18,
-                        tooltip: 'Dismiss',
+                        tooltip: AppLocalizations.of(context)!.dismiss,
                         onPressed: () => setState(() => _dismissed = true),
                         icon: const Icon(Icons.close_rounded),
                       ),
