@@ -6,6 +6,9 @@
 
 set -euo pipefail
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(dirname "$0")"
+
 # Check if COMMIT_ID argument is provided
 if [ $# -eq 0 ]; then
     echo "Error: COMMIT_ID argument is required"
@@ -16,7 +19,7 @@ fi
 COMMIT_ID="$1"
 
 echo "update commit in app.towdow.TowDow/app.towdow.TowDow.yml"
-sed -i "s/__COMMIT_ID__/${COMMIT_ID}/g" app.towdow.TowDow/app.towdow.TowDow.yml
+sed -i "s/__COMMIT_ID__/${COMMIT_ID}/g" "${SCRIPT_DIR}/app.towdow.TowDow/app.towdow.TowDow.yml"
 
 echo "Starting Flatpak CI build..."
 
@@ -39,7 +42,7 @@ flatpak-builder \
     --install \
     --install-deps-from=flathub \
     build \
-    app.towdow.TowDow.yml
+    "${SCRIPT_DIR}/app.towdow.TowDow/app.towdow.TowDow.yml"
 
 echo "Flatpak build completed successfully"
 
