@@ -1,9 +1,9 @@
-id: app.towdow.towdow_app
+id: app.towdow.TowDow
 runtime: org.freedesktop.Platform
-runtime-version: '24.08'
+runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 sdk-extensions:
-  - org.freedesktop.Sdk.Extension.llvm19
+  - org.freedesktop.Sdk.Extension.llvm20
 command: towdow_app
 finish-args:
   # X11 + XShm access
@@ -18,7 +18,7 @@ finish-args:
   # Needs to save files locally
   - --filesystem=xdg-documents
 modules:
-  - name: towdow_app
+  - name: TowDow
     buildsystem: simple
     build-options:
       arch:
@@ -34,20 +34,17 @@ modules:
         PUB_CACHE: /run/build/towdow_app/.pub-cache
     build-commands:
       - flutter --version
-      - flutter pub get
       - dart run build_runner build --delete-conflicting-outputs
       - flutter gen-l10n
-      - flutter build linux --release
+      - flutter build linux --release --no-pub
       - install -D $BUNDLE_PATH/towdow_app /app/bin/towdow_app
       - cp -r $BUNDLE_PATH/lib /app/bin/lib
       - cp -r $BUNDLE_PATH/data /app/bin/data
     sources:
-#      - type: git
-#        url: https://gitlab.com/towdow/towdow-flutter.git
-      - type: dir
-        paht: .
+      - type: git
+        url: https://gitlab.com/towdow/towdow-flutter.git
+        commit: 5647367146bdd9b69d50981400dcddbd2b145c90
       - type: git
         url: https://github.com/flutter/flutter.git
-#        tag: 3.35.2
-        tag: 3.32.7
+        tag: 3.35.3
         dest: flutter
