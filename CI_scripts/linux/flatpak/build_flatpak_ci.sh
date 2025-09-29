@@ -2,9 +2,21 @@
 
 # Flatpak CI build script for TowDow
 # Simplified version for GitLab CI integration
-# Usage: build_flatpak_ci.sh
+# Usage: build_flatpak_ci.sh <COMMIT_ID>
 
 set -euo pipefail
+
+# Check if COMMIT_ID argument is provided
+if [ $# -eq 0 ]; then
+    echo "Error: COMMIT_ID argument is required"
+    echo "Usage: $0 <COMMIT_ID>"
+    exit 1
+fi
+
+COMMIT_ID="$1"
+
+echo "update commit in app.towdow.TowDow/app.towdow.TowDow.yml"
+sed -i "s/__COMMIT_ID__/${COMMIT_ID}/g" app.towdow.TowDow/app.towdow.TowDow.yml
 
 echo "Starting Flatpak CI build..."
 

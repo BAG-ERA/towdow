@@ -174,7 +174,7 @@ build_flatpak:
     - echo "FLATPAK_JOB_ID=$CI_JOB_ID" > build.env
     - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
   script:
-    - bash CI_scripts/linux/build_flatpak_ci.sh
+    - bash CI_scripts/linux/flatpak/build_flatpak_ci.sh $CI_COMMIT_SHA
     - flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak app.towdow.TowDow stable
 
 build_android:
