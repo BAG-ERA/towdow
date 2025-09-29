@@ -28,10 +28,10 @@ modules:
         aarch64:
           env:
             BUNDLE_PATH: build/linux/arm64/release/bundle
-      append-path: /usr/lib/sdk/llvm19/bin:/run/build/towdow_app/flutter/bin
-      prepend-ld-library-path: /usr/lib/sdk/llvm19/lib
+      append-path: /usr/lib/sdk/llvm20/bin:/run/build/TowDow/flutter/bin
+      prepend-ld-library-path: /usr/lib/sdk/llvm20/lib
       env:
-        PUB_CACHE: /run/build/towdow_app/.pub-cache
+        PUB_CACHE: /run/build/TowDow/.pub-cache
     build-commands:
       - flutter --version
       - dart run build_runner build --delete-conflicting-outputs
