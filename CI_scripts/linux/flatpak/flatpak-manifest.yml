@@ -50,6 +50,6 @@ modules:
       - pubspec-sources.json
       - type: git
         url: https://gitlab.com/towdow/towdow-flutter.git
-        commit: __COMMIT_ID__
+        commit: c5b053a7c4d8aba0c7f90b3e7840c39075ed96cf
     modules:
       - flutter-sdk-3.35.3.json
