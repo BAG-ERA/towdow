@@ -50,15 +50,6 @@ modules:
       - pubspec-sources.json
       - type: git
         url: https://gitlab.com/towdow/towdow-flutter.git
-        tag: v1.0.0  # Use proper version tags
-      - type: file
-        path: data/app.towdow.TowDow.desktop
-        dest-filename: app.towdow.TowDow.desktop
-      - type: file
-        path: data/app.towdow.TowDow.metainfo.xml
-        dest-filename: app.towdow.TowDow.metainfo.xml
-      - type: dir
-        path: data/icons
-        dest: icons
+        commit: __COMMIT_ID__
     modules:
       - flutter-sdk-3.35.3.json
