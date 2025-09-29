@@ -191,7 +191,7 @@ abstract class BaseCloudAuthDialogState<T extends BaseCloudAuthDialog> extends C
             if (!loginState.isLoading)
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text(AppLocalizations.of(context)!.cancel),
               ),
           ],
         );

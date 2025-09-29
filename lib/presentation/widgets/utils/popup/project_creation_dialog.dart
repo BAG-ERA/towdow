@@ -9,6 +9,7 @@ import '../../../../core/logger.dart';
 import '../../../../core/result.dart';
 import '../../../../core/theme/chart_theme_usage.dart';
 import '../../../../data/providers/providers.dart';
+import '../../../../l10n/app_localizations.dart';
 import 'domain_creation_dialog.dart';
 import '../enhanced_text_field.dart';
 import '../../../viewmodels/project_creation_viewmodel.dart';
@@ -67,15 +68,16 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
         }
       },
       child: AlertDialog(
-        title: const Text('Create New Project'),
+        title: Text(AppLocalizations.of(context)!.createNewProjectTitle),
         content: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          width: MediaQuery.of(context).size.width > 500 ? 400 : MediaQuery.of(context).size.width * 0.9,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Text(
-                'Projects help organize and track tasks towards specific goals.',
+                AppLocalizations.of(context)!.projectsHelpText,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
@@ -83,10 +85,10 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
               const SizedBox(height: 16),
               EnhancedTextField(
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Project name *',
-                  hintText: 'e.g., Website Redesign, Marketing Campaign',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.projectNameLabel,
+                  hintText: AppLocalizations.of(context)!.projectNameHint,
+                  border: const OutlineInputBorder(),
                 ),
                 autofocus: true,
                 onChanged: (_) => setState(() {}),
@@ -97,10 +99,10 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
               
               EnhancedTextField(
                 controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description (optional)',
-                  hintText: 'Describe the project goals and objectives',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.descriptionLabel,
+                  hintText: AppLocalizations.of(context)!.descriptionHint,
+                  border: const OutlineInputBorder(),
                 ),
                 maxLines: 3,
                 onChanged: (_) => setState(() {}),
@@ -115,19 +117,19 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
                     const Icon(Icons.folder_outlined, size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      'Domain (optional)',
+                      AppLocalizations.of(context)!.domainOptional,
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                   ],
                 ),
                 subtitle: selectedDomain != null 
                     ? Text(
-                        'Selected: $selectedDomain',
+                        AppLocalizations.of(context)!.selectedDomain(selectedDomain!),
                         style: context.domainNameStyle.copyWith(
                           fontSize: 12,
                         ),
                       )
-                    : const Text('No domain selected'),
+                    : Text(AppLocalizations.of(context)!.noDomainSelected),
                 initiallyExpanded: isDomainSectionExpanded,
                 onExpansionChanged: (expanded) => setState(() => isDomainSectionExpanded = expanded),
                 children: [
@@ -140,10 +142,11 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
             ],
           ),
         ),
+      ),
         actions: [
           TextButton(
             onPressed: isLoading ? null : () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton(
             onPressed: isLoading || !_canCreate() ? null : _createProject,
@@ -153,7 +156,7 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Create'),
+                : Text(AppLocalizations.of(context)!.create),
           ),
         ],
       ),
@@ -178,7 +181,7 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Select a domain for this project:',
+              AppLocalizations.of(context)!.selectDomainForProject,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
@@ -187,7 +190,7 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
             
             // No domain option
             RadioListTile<String?>(
-              title: const Text('No domain'),
+              title: Text(AppLocalizations.of(context)!.noDomain),
               value: null,
               groupValue: selectedDomain,
               onChanged: (value) => setState(() => selectedDomain = value),
@@ -214,7 +217,7 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
                 TextButton.icon(
                   onPressed: _showCreateDomainDialog,
                   icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Create new domain'),
+                  label: Text(AppLocalizations.of(context)!.createNewDomain),
                 ),
               ],
             ),
@@ -269,7 +272,7 @@ class _ProjectCreationDialogState extends ConsumerState<ProjectCreationDialog> {
     final vm = ref.read(projectCreationViewModelProvider.notifier);
     await vm.createProject(
       name: projectName,
-      description: projectDescription.isEmpty ? 'Project created by FlowIt' : projectDescription,
+      description: projectDescription.isEmpty ? AppLocalizations.of(context)!.projectCreatedByTowDow : projectDescription,
       domain: selectedDomain,
     );
 

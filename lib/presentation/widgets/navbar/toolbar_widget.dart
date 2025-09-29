@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../data/providers/providers.dart';
 import '../utils/buttons/create_project_or_domain_button.dart';
 
+
 class ToolbarWidget extends ConsumerWidget {
   const ToolbarWidget({super.key, this.isIconOnly = false});
 

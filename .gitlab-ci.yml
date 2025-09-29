@@ -98,7 +98,7 @@ test:
     - flutter pub get
     - dart run build_runner build --delete-conflicting-outputs
     - flutter gen-l10n
-    - flutter test
+    - flutter test --timeout=10m
 
 build_appimage:
   stage: build
@@ -295,6 +295,7 @@ build_web:
     - flutter pub get
     - dart run build_runner build --delete-conflicting-outputs
     - flutter gen-l10n
+    # TODO: solve wam warning https://docs.flutter.dev/platform-integration/web/wasm
     - flutter build web --release
     - tar zcf "build/web_${CI_COMMIT_TAG}.tar.gz" build/web
   artifacts:

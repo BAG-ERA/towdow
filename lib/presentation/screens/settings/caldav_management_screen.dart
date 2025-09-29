@@ -116,30 +116,6 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                 child: _buildCalendarList(state, viewModel),
               ),
 
-              // Action buttons
-              if (state.hasChanges && !state.isLoading)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      TextButton(
-                        onPressed: () async {
-                           await viewModel.resetChanges();
-                        },
-                         child: Text(AppLocalizations.of(context)!.reset),
-                      ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          await viewModel.saveChanges();
-                        },
-                        icon: const Icon(Icons.save_rounded),
-                       label: Text(AppLocalizations.of(context)!.saveSelections(state.selectedCalendars.length)),
-                      ),
-                    ],
-                  ),
-                ),
             ],
           ),
         );
@@ -238,29 +214,6 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
 
     return Column(
       children: [
-        // Select All / Deselect All buttons
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              TextButton.icon(
-                onPressed: () {
-                  viewModel.selectAllCalendars();
-                },
-                icon: const Icon(Icons.select_all_rounded),
-                 label: Text(AppLocalizations.of(context)!.selectAll),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: () {
-                  viewModel.deselectAllCalendars();
-                },
-                icon: const Icon(Icons.deselect_rounded),
-                 label: Text(AppLocalizations.of(context)!.deselectAll),
-              ),
-            ],
-          ),
-        ),
         // Search bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -322,15 +275,11 @@ class _CalDAVManagementScreenState extends ConsumerState<CalDAVManagementScreen>
                   itemCount: viewModel.filteredCalendars.length,
                   itemBuilder: (context, index) {
                     final calendar = viewModel.filteredCalendars[index];
-              final isSelected = viewModel.isCalendarSelected(calendar);
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
-                  leading: Checkbox(
-                    value: isSelected,
-                    onChanged: (_) => viewModel.toggleCalendarSelection(calendar),
-                  ),
+                  leading: Icon(Icons.event_note_rounded, color: Theme.of(context).colorScheme.primary),
                   title: Text(
                     calendar.displayName,
                     style: const TextStyle(fontWeight: FontWeight.w500),

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/logger.dart';
 import '../../../../data/providers/providers.dart';
+import '../../../../l10n/app_localizations.dart';
 
 class StepDialog extends ConsumerStatefulWidget {
   final String projectPath;
@@ -85,7 +86,7 @@ class _StepDialogState extends ConsumerState<StepDialog> {
         }
       },
       child: AlertDialog(
-        title: const Text('Add Step'),
+        title: Text(AppLocalizations.of(context)!.addStepDialogTitle),
         content: SizedBox(
           width: 420,
           child: Column(
@@ -93,9 +94,9 @@ class _StepDialogState extends ConsumerState<StepDialog> {
             children: [
               TextField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Step name',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.stepNameLabel,
+                  border: const OutlineInputBorder(),
                 ),
                 autofocus: true,
                 onChanged: (_) => setState(() {}),
@@ -105,7 +106,7 @@ class _StepDialogState extends ConsumerState<StepDialog> {
               CheckboxListTile(
                 value: _endWorkflow,
                 onChanged: (v) => setState(() => _endWorkflow = v ?? false),
-                title: const Text('Mark as final step'),
+                title: Text(AppLocalizations.of(context)!.markAsFinalStep),
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
               ),
@@ -115,13 +116,13 @@ class _StepDialogState extends ConsumerState<StepDialog> {
         actions: [
           TextButton(
             onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton(
             onPressed: _canCreate ? _submit : null,
             child: _isSubmitting
                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Create'),
+                : Text(AppLocalizations.of(context)!.create),
           ),
         ],
       ),

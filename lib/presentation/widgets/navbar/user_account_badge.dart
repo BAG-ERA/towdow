@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../data/models/caldav_account.dart';
 import '../../../data/providers/providers.dart';
 import '../adaptive_app_layout.dart';
+import '../../../core/logger.dart';
 
 class UserAccountBadge extends ConsumerWidget {
   const UserAccountBadge({super.key});
@@ -20,14 +21,24 @@ class UserAccountBadge extends ConsumerWidget {
 
     return accountAsync.when(
       data: (account) {
-        if (account == null) return const SizedBox.shrink();
+        AppLogger.debug('UserAccountBadge: account data received - ${account?.username}, ${account?.email}, ${account?.firstName}');
+        if (account == null) {
+          AppLogger.debug('UserAccountBadge: Account is null, returning SizedBox.shrink()');
+          return const SizedBox.shrink();
+        }
         if (!isDesktop) {
           return _buildMobileGear(context, ref);
         }
         return _buildBadge(context, ref, account);
       },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      loading: () {
+        AppLogger.debug('UserAccountBadge: loading state');
+        return const SizedBox.shrink();
+      },
+      error: (error, stack) {
+        AppLogger.debug('UserAccountBadge: error state - $error');
+        return const SizedBox.shrink();
+      },
     );
   }
 

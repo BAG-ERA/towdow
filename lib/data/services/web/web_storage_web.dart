@@ -1,13 +1,12 @@
-@JS()
-library web_storage_interop;
-
-import 'package:js/js.dart';
-import 'package:js/js_util.dart';
-
-@JS('localStorage.clear')
-external void _clearLocalStorage();
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 Future<void> clearLocalStorage() async {
-  _clearLocalStorage();
+  try {
+    web.window.localStorage.clear();
+  } catch (_) {}
+  try {
+    web.window.sessionStorage.clear();
+  } catch (_) {}
 }
 

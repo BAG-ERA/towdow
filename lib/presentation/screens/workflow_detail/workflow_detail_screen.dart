@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../core/result.dart';
 import '../../widgets/utils/styled_tab_bar.dart';
 import '../../../data/models/task_calendar.dart';
@@ -39,9 +40,13 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
   Widget build(BuildContext context) {
     final tasksAsync = ref.watch(projectTasksProvider(widget.workflowPath));
     final encoded = widget.workflowPath.replaceAll('@', '%40');
-    final projectAsync = ref.watch(calendarListProvider).whenData(
-      (cals) => cals.cast<TaskCalendar?>().firstWhere((c) => c?.path == encoded, orElse: () => null),
-    );
+    final projectAsync = ref.watch(calendarListProvider).whenData((cals) {
+      try {
+        return cals.firstWhere((c) => c.path == encoded);
+      } catch (_) {
+        return null;
+      }
+    });
 
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
 
@@ -156,8 +161,8 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
                         : (_showNotesPanel ? Icons.expand_more_rounded : Icons.notes_rounded)),
                     label: Text(
                       _openedNote != null
-                          ? 'Close note'
-                          : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                          ? AppLocalizations.of(context)!.closeNote
+                          : (_showNotesPanel ? AppLocalizations.of(context)!.hideNotes : AppLocalizations.of(context)!.showNotes),
                     ),
                   ),
                 ),
@@ -375,7 +380,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
                       switchInCurve: Curves.easeOut,
                       switchOutCurve: Curves.easeIn,
                       child: Text(
-                        _openedNote != null ? 'Close note' : (_showNotesPanel ? 'Hide notes' : 'Show notes'),
+                        _openedNote != null ? AppLocalizations.of(context)!.closeNote : (_showNotesPanel ? AppLocalizations.of(context)!.hideNotes : AppLocalizations.of(context)!.showNotes),
                         key: ValueKey(_openedNote != null ? 'wf_label_close' : (_showNotesPanel ? 'wf_label_hide' : 'wf_label_show')),
                       ),
                     ),
@@ -563,7 +568,7 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
             IconButton(
               onPressed: () => setState(() => _showNotesPanel = true),
               icon: const Icon(Icons.notes_rounded),
-              tooltip: 'Show notes',
+              tooltip: AppLocalizations.of(context)!.showNotes,
             ),
           if (_showNotesPanel || _openedNote != null)
             IconButton(

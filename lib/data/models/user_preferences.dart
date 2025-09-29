@@ -32,8 +32,7 @@ class UserPreferences extends HiveObject {
   @HiveField(8)
   final String? userPrincipal; // User principal for constructing project paths
 
-  @HiveField(9)
-  final List<String> excludedProjects; // Projects explicitly excluded from sync (NEW approach)
+  // Removed excludedProjects: all projects are synchronized by default
 
   // UI appearance: global font scale preference ('small' | 'medium' | 'large')
   @HiveField(10)
@@ -48,7 +47,6 @@ class UserPreferences extends HiveObject {
     this.sharedWithMeProjects = const [],
     this.etag,
     this.userPrincipal,
-    this.excludedProjects = const [], // Default: no projects excluded (sync all)
     this.fontScale,
   });
 
@@ -62,7 +60,6 @@ class UserPreferences extends HiveObject {
     List<SharedWithMeProject>? sharedWithMeProjects,
     String? etag,
     String? userPrincipal,
-    List<String>? excludedProjects,
     String? fontScale,
   }) {
     return UserPreferences(
@@ -74,7 +71,6 @@ class UserPreferences extends HiveObject {
       sharedWithMeProjects: sharedWithMeProjects ?? this.sharedWithMeProjects,
       etag: etag ?? this.etag,
       userPrincipal: userPrincipal ?? this.userPrincipal,
-      excludedProjects: excludedProjects ?? this.excludedProjects,
       fontScale: fontScale ?? this.fontScale,
     );
   }
@@ -88,7 +84,6 @@ class UserPreferences extends HiveObject {
       defaultProjectView: 'list',
       customSettings: const {},
       sharedWithMeProjects: const [],
-      excludedProjects: const [], // New users: sync all projects by default
       fontScale: 'medium',
     );
   }
@@ -130,29 +125,6 @@ class UserPreferences extends HiveObject {
 
 
   
-  /// Check if a project should be synced (not excluded)
-  bool shouldSyncProject(String projectPath) {
-    return !excludedProjects.contains(projectPath);
-  }
-  
-  /// Exclude a project from sync
-  UserPreferences excludeProject(String projectPath) {
-    if (excludedProjects.contains(projectPath)) {
-      return this; // Already excluded
-    }
-    return copyWith(excludedProjects: [...excludedProjects, projectPath]);
-  }
-  
-  /// Include a project in sync (remove from excluded list)
-  UserPreferences includeProject(String projectPath) {
-    final updatedExcluded = excludedProjects.where((path) => path != projectPath).toList();
-    return copyWith(excludedProjects: updatedExcluded);
-  }
-  
-  /// Set the entire excluded projects list
-  UserPreferences withExcludedProjects(List<String> projects) {
-    return copyWith(excludedProjects: projects);
-  }
 
   /// Update shared with me projects list
   UserPreferences withSharedWithMeProjects(List<SharedWithMeProject> projects) {
@@ -186,6 +158,6 @@ class UserPreferences extends HiveObject {
 
   @override
   String toString() {
-    return 'UserPreferences(projectOrder: $projectOrder, theme: $preferredTheme, fontScale: $fontScale, notifications: $enableNotifications, excludedProjects: ${excludedProjects.length}, sharedWithMe: ${sharedWithMeProjects.length})';
+    return 'UserPreferences(projectOrder: $projectOrder, theme: $preferredTheme, fontScale: $fontScale, notifications: $enableNotifications, sharedWithMe: ${sharedWithMeProjects.length})';
   }
 } 

@@ -16,6 +16,7 @@ import '../../viewmodels/attachment_viewmodel.dart';
 import '../utils/image_thumbnail.dart';
 import '../utils/full_screen_image_viewer.dart';
 import '../../../core/logger.dart';
+import '../../../l10n/app_localizations.dart';
 
 class TaskMediaAttachmentList extends ConsumerStatefulWidget {
   final Task task;
@@ -95,7 +96,7 @@ class _TaskMediaAttachmentListState extends ConsumerState<TaskMediaAttachmentLis
             ),
             const SizedBox(width: 4),
             Text(
-              mediaAttachments.length == 1 ? 'Media' : 'Media Files',
+              mediaAttachments.length == 1 ? AppLocalizations.of(context)!.media : AppLocalizations.of(context)!.mediaFiles,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,

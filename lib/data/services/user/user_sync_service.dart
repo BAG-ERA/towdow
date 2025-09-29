@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import '../../../core/result.dart';
 import '../../../core/logger.dart';
 import '../../models/user_preferences.dart';
@@ -26,7 +27,7 @@ class UserSyncService {
   final ExternalCalendarRepository _externalCalendarRepository;
   final AccountRepository _accountRepository;
   
-  Timer? _periodicWatcher;
+  // Removed periodic timer: periodic sync is now orchestrated elsewhere
   DateTime? _lastSyncTime;
   
   // Callback to notify when preferences are updated from server
@@ -246,19 +247,86 @@ class UserSyncService {
     }
   }
 
-  /// Download user preferences and external credentials from S3
-  Future<Result<bool>> downloadUserData() async {
+  /// Upload only user preferences to S3 (no external credentials)
+  Future<Result<void>> uploadUserPreferences() async {
     try {
-      AppLogger.info('UserSyncService: Starting user data download');
+      AppLogger.info('UserSyncService: Starting user preferences upload');
+      if (!await isSyncAvailable()) {
+        return Result.failure(Failure(
+          message: 'User sync not available for this account type',
+          exception: Exception('Sync not available'),
+        ));
+      }
+      final accountResult = await _accountRepository.getActiveAccount();
+      final account = accountResult.when(success: (acc) => acc, failure: (_) => null);
+      if (account == null) {
+        return Result.failure(Failure(
+          message: 'No active account for S3 sync',
+          exception: Exception('No account'),
+        ));
+      }
+      final s3Service = S3StorageService(account: account);
+      final preferencesResult = await _uploadUserPreferences(s3Service);
+      if (preferencesResult is Error<void>) {
+        return preferencesResult;
+      }
+      _lastSyncTime = DateTime.now();
+      return const Result.success(null);
+    } catch (e, st) {
+      AppLogger.error('UserSyncService: Failed to upload user preferences only', e, st);
+      return Result.failure(Failure(
+        message: 'Failed to upload user preferences only: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: st,
+      ));
+    }
+  }
+
+  /// Upload only external credentials to S3 (no user preferences)
+  Future<Result<void>> uploadExternalCredentialsOnly() async {
+    try {
+      AppLogger.info('UserSyncService: Starting external credentials upload');
+      if (!await isSyncAvailable()) {
+        return Result.failure(Failure(
+          message: 'User sync not available for this account type',
+          exception: Exception('Sync not available'),
+        ));
+      }
+      final accountResult = await _accountRepository.getActiveAccount();
+      final account = accountResult.when(success: (acc) => acc, failure: (_) => null);
+      if (account == null) {
+        return Result.failure(Failure(
+          message: 'No active account for S3 sync',
+          exception: Exception('No account'),
+        ));
+      }
+      final s3Service = S3StorageService(account: account);
+      final credentialsResult = await _uploadExternalCredentials(s3Service);
+      if (credentialsResult is Error<void>) {
+        return credentialsResult;
+      }
+      _lastSyncTime = DateTime.now();
+      return const Result.success(null);
+    } catch (e, st) {
+      AppLogger.error('UserSyncService: Failed to upload external credentials only', e, st);
+      return Result.failure(Failure(
+        message: 'Failed to upload external credentials only: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: st,
+      ));
+    }
+  }
+
+  /// Download user preferences  from S3
+  Future<Result<bool>> downloadUserPreferences() async {
+    try {
+      AppLogger.info('UserSyncService: Starting user preferences download');
       
       // Check if sync is available
       if (!await isSyncAvailable()) {
         AppLogger.info('UserSyncService: Sync not available for this account type');
         return Result.success(false);
       }
-
-      // Note: Shared projects update removed from download to keep downloads read-only
-      // Shared projects should be updated through separate sync operations, not during download
 
       // Get active account for S3 access
       final accountResult = await _accountRepository.getActiveAccount();
@@ -277,8 +345,6 @@ class UserSyncService {
       // Get S3 storage service
       final s3Service = S3StorageService(account: account);
 
-      bool hasData = false;
-
       // Download user preferences
       final preferencesResult = await _downloadUserPreferences(s3Service);
       final preferencesDownloaded = preferencesResult.when(
@@ -289,6 +355,54 @@ class UserSyncService {
         },
       );
 
+      if (preferencesDownloaded) {
+        _lastSyncTime = DateTime.now();
+        AppLogger.info('UserSyncService: User preferences download completed successfully');
+      } else {
+        AppLogger.info('UserSyncService: No user preferences found on server');
+      }
+
+      return Result.success(preferencesDownloaded);
+
+    } catch (e, stackTrace) {
+      AppLogger.error('UserSyncService: Failed to download user preferences', e, stackTrace);
+      return Result.failure(Failure(
+        message: 'Failed to download user data: $e',
+        exception: e is Exception ? e : Exception(e.toString()),
+        stackTrace: stackTrace,
+      ));
+    }
+  }
+
+
+  /// Download user external credentials from S3
+  Future<Result<bool>> downloadExternalCredentials() async {
+    try {
+      AppLogger.info('UserSyncService: Starting external credential download');
+
+      // Check if sync is available
+      if (!await isSyncAvailable()) {
+        AppLogger.info('UserSyncService: Sync not available for this account type');
+        return Result.success(false);
+      }
+
+      // Get active account for S3 access
+      final accountResult = await _accountRepository.getActiveAccount();
+      final account = accountResult.when(
+        success: (acc) => acc,
+        failure: (_) => null,
+      );
+
+      if (account == null) {
+        return Result.failure(Failure(
+          message: 'No active account available',
+          exception: Exception('No account'),
+        ));
+      }
+
+      // Get S3 storage service
+      final s3Service = S3StorageService(account: account);
+
       // Download external credentials
       final credentialsResult = await _downloadExternalCredentials(s3Service);
       final credentialsDownloaded = credentialsResult.when(
@@ -298,17 +412,15 @@ class UserSyncService {
           return false;
         },
       );
-
-      hasData = preferencesDownloaded || credentialsDownloaded;
       
-      if (hasData) {
+      if (credentialsDownloaded) {
         _lastSyncTime = DateTime.now();
         AppLogger.info('UserSyncService: User data download completed successfully');
       } else {
         AppLogger.info('UserSyncService: No user data found on server');
       }
 
-      return Result.success(hasData);
+      return Result.success(credentialsDownloaded);
 
     } catch (e, stackTrace) {
       AppLogger.error('UserSyncService: Failed to download user data', e, stackTrace);
@@ -320,30 +432,25 @@ class UserSyncService {
     }
   }
 
-  /// Start periodic watcher for file updates TODO: remove it
-  void startPeriodicSync({Duration interval = const Duration(hours: 1)}) {
-    _periodicWatcher?.cancel();
-    _periodicWatcher = Timer.periodic(interval, (_) async {
-      final result = await downloadUserData();
-      result.when(
-        success: (hasUpdates) {
-          if (hasUpdates) {
-            AppLogger.info('UserSyncService: Periodic sync found updates');
-          }
-        },
-        failure: (failure) {
-          AppLogger.warning('UserSyncService: Periodic sync failed: ${failure.message}');
-        },
-      );
-    });
-    AppLogger.info('UserSyncService: Started periodic sync (every ${interval.inHours} hours)');
-  }
-
-  /// Stop periodic watcher
-  void stopPeriodicSync() {
-    _periodicWatcher?.cancel();
-    _periodicWatcher = null;
-    AppLogger.info('UserSyncService: Stopped periodic sync');
+  Future<bool> hasFileEtagChanged(
+      S3StorageService s3Service,
+      String key,
+      bool isPrivate, {
+      required Future<String?> Function() getLocalEtag,
+    }) async {
+    // Optimization: Prefer using already available ETag info to avoid recomputing hashes
+    // 1) Compare locally stored ETag with remote ETag (no hashing on the common no-change path)
+    final localEtag = await getLocalEtag();
+    final remoteEtagRes = await s3Service.getCurrentEtag(
+      key: key,
+      isPrivate: isPrivate,
+    );
+    final remoteEtag = remoteEtagRes.when(success: (e) => e, failure: (_) => null);
+    if (localEtag != null && remoteEtag != null && localEtag == remoteEtag) {
+      AppLogger.debug('UserSyncService: $key unchanged (local ETag matches remote), skipping upload');
+      return false;
+    }
+    return true;
   }
 
   /// Upload user preferences to S3
@@ -354,6 +461,20 @@ class UserSyncService {
         success: (preferences) async {
           final data = _serializeUserPreferences(preferences);
           final dataBytes = Uint8List.fromList(utf8.encode(data));
+
+          final etagChanged = await hasFileEtagChanged(
+            s3Service,
+            _getUserPreferencesPath(s3Service),
+            true,
+            getLocalEtag: () async {
+              final res = await _userRepository.getEtag();
+              return res.when(success: (e) => e, failure: (_) => null);
+            },
+          );
+          if (!etagChanged) {
+            return const Result.success(null);
+          }
+
           // Upload then persist fresh ETag locally to avoid unnecessary download cycles
           final uploadResult = await s3Service.uploadFile(
             key: _getUserPreferencesPath(s3Service),
@@ -405,7 +526,7 @@ class UserSyncService {
       final downloadResult = await s3Service.downloadFile(
         key: _getUserPreferencesPath(s3Service),
         isPrivate: true,
-        symmetricKey: 'dummy-key', // TODO: Use proper encryption key when encryption is implemented
+        symmetricKey: 'no-key', // no encryption -> no key
         skipDecryption: true, // Skip decryption for user preferences
       );
       return await downloadResult.when(
@@ -496,7 +617,21 @@ class UserSyncService {
             success: (calendars) async {
               final data = _serializeExternalCredentials(accounts, calendars);
               final dataBytes = Uint8List.fromList(utf8.encode(data));
-              // Upload then persist fresh credentials file ETag locally to avoid unnecessary download cycles
+
+              final etagChanged = await hasFileEtagChanged(
+                s3Service,
+                _getExternalCredentialsPath(s3Service),
+                true,
+                getLocalEtag: () async {
+                  final res = await _externalAccountRepository.getCredentialsFileEtag();
+                  return res.when(success: (e) => e, failure: (_) => null);
+                },
+              );
+              if (!etagChanged) {
+                return const Result.success(null);
+              }
+
+              // Upload then persist fresh credentials file ETag and plaintext hash locally
               final uploadResult = await s3Service.uploadFile(
                 key: _getExternalCredentialsPath(s3Service),
                 data: dataBytes,
@@ -568,16 +703,16 @@ class UserSyncService {
               failure: (_) => null,
             );
             
-            // Save each account (no longer need to save individual etags)
+            // Save each account from server without triggering local upload side-effects
             for (final account in accounts) {
-              await _externalAccountRepository.save(account);
+              await _externalAccountRepository.saveWithoutSync(account);
             }
             
             // Save each calendar
             for (final calendar in calendars) {
               await _externalCalendarRepository.save(calendar);
             }
-            
+
             // Save the global credentials file etag
             if (currentEtag != null) {
               await _externalAccountRepository.setCredentialsFileEtag(currentEtag);
@@ -617,13 +752,11 @@ class UserSyncService {
   String _serializeUserPreferences(UserPreferences preferences) {
     final json = {
       'version': 1,
-      'lastUpdated': DateTime.now().toIso8601String(),
       'projectOrder': preferences.projectOrder,
       'preferredTheme': preferences.preferredTheme,
       'enableNotifications': preferences.enableNotifications,
       'defaultProjectView': preferences.defaultProjectView,
       'customSettings': preferences.customSettings,
-      'excludedProjects': preferences.excludedProjects,
       'userPrincipal': preferences.userPrincipal,
       'sharedWithMeProjects': preferences.sharedWithMeProjects.map((project) => {
         'projectId': project.projectId,
@@ -659,7 +792,6 @@ class UserSyncService {
       enableNotifications: json['enableNotifications'] as bool?,
       defaultProjectView: json['defaultProjectView'] as String?,
       customSettings: json['customSettings'] as Map<String, dynamic>?,
-      excludedProjects: (json['excludedProjects'] as List<dynamic>?)?.cast<String>() ?? [],
       userPrincipal: json['userPrincipal'] as String?,
       sharedWithMeProjects: sharedProjects,
     );
@@ -669,7 +801,6 @@ class UserSyncService {
   String _serializeExternalCredentials(List<ExternalCaldavAccount> accounts, List<ExternalCalendar> calendars) {
     final json = {
       'version': 1,
-      'lastUpdated': DateTime.now().toIso8601String(),
       'accounts': accounts.map((account) => account.toJson()).toList(),
       'calendars': calendars.map((calendar) => calendar.toJson()).toList(),
     };
@@ -734,6 +865,6 @@ class UserSyncService {
 
   /// Dispose resources
   void dispose() {
-    stopPeriodicSync();
+    // No periodic watcher to clean up anymore
   }
 } 

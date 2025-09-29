@@ -57,6 +57,7 @@ class FakeS3StorageService extends S3StorageService {
   Future<Result<S3FileInfo>> getFileInfo({
     required String key,
     required bool isPrivate,
+    bool suppressNotFoundWarning = false,
   }) async {
     final info = _filesByKey[key];
     if (info == null) {
@@ -69,6 +70,7 @@ class FakeS3StorageService extends S3StorageService {
   Future<Result<String?>> getCurrentEtag({
     required String key,
     required bool isPrivate,
+    bool suppressNotFoundWarning = false,
   }) async {
     final info = _filesByKey[key];
     return Result.success(info?.etag);

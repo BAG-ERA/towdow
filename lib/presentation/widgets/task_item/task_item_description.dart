@@ -179,7 +179,7 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: _saveDescription,
+                  onPressed: () => _saveDescription(),
                   child: Text(AppLocalizations.of(context)!.save),
                 ),
               ],
@@ -206,9 +206,27 @@ class _TaskItemDescriptionState extends ConsumerState<TaskItemDescription> {
     });
   }
 
-  void _saveDescription() {
+  Future<void> _saveDescription() async {
+    // Preserve latest task state (e.g., recently added validators) to avoid overwriting
+    // when saving only the description from a potentially stale widget.task snapshot.
+    final taskRepository = ref.read(taskRepositoryProvider);
+    Task baseTask = widget.task;
+    try {
+      final fetched = await taskRepository.getById(widget.task.uid);
+      await fetched.when(
+        success: (t) async {
+          if (t != null) baseTask = t;
+        },
+        failure: (_) async {
+          // Fallback to current widget.task if repository lookup fails
+        },
+      );
+    } catch (_) {
+      // Ignore and fallback to widget.task
+    }
+
     if (widget.onTaskUpdated != null) {
-      final updatedTask = widget.task.copyWith(
+      final updatedTask = baseTask.copyWith(
         description: _controller.text.trim(),
         lastModified: DateTime.now(),
       );

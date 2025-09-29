@@ -3,6 +3,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
+import 'dart:async';
 import '../../../data/models/task_calendar.dart';
 import '../../../data/providers/providers.dart';
 import '../utils/editable_title.dart';
@@ -12,7 +14,7 @@ import '../../../data/models/task.dart';
 import '../../../data/repositories/account_repository.dart';
 import '../../../core/result.dart';
 
-class ProjectInfosWidget extends ConsumerWidget {
+class ProjectInfosWidget extends ConsumerStatefulWidget {
   final TaskCalendar project;
   final AsyncValue<List<Task>> tasksAsync;
   final Function(TaskCalendar) onProjectUpdated;
@@ -27,12 +29,47 @@ class ProjectInfosWidget extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProjectInfosWidget> createState() => _ProjectInfosWidgetState();
+}
+
+class _ProjectInfosWidgetState extends ConsumerState<ProjectInfosWidget> {
+  late final TextEditingController _descriptionController;
+  Timer? _descriptionDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _descriptionController = TextEditingController(text: widget.project.description);
+  }
+
+  @override
+  void didUpdateWidget(covariant ProjectInfosWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Keep controller in sync with external updates without fighting user typing
+    if (widget.project.description != _descriptionController.text) {
+      _descriptionController.text = widget.project.description;
+    }
+  }
+
+  @override
+  void dispose() {
+    _descriptionDebounce?.cancel();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) { // note: WidgetRef is now member of ConsumerState
+    final ref = this.ref;
+    final project = widget.project;
+    final tasksAsync = widget.tasksAsync;
+    final onProjectUpdated = widget.onProjectUpdated;
+    final onCollapse = widget.onCollapse;
     // Check if we're on mobile (same breakpoint as AdaptiveAppLayout)
     final isDesktop = MediaQuery.of(context).size.width >= 800.0;
     
     // Check if project is shared with me
-    final sharedByAsync = ref.watch(projectSharedByProvider(project.uid));
+    final sharedByAsync = ref.watch(projectSharedByProvider(widget.project.uid));
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -68,7 +105,7 @@ class ProjectInfosWidget extends ConsumerWidget {
                       IconButton(
                         onPressed: onCollapse,
                         icon: const Icon(Icons.keyboard_double_arrow_left),
-                        tooltip: 'Collapse project details',
+                        tooltip: AppLocalizations.of(context)!.collapseProjectDetails,
                       ),
                   ],
                 ),
@@ -150,15 +187,15 @@ class ProjectInfosWidget extends ConsumerWidget {
                   Expanded(
                     child: _buildDetailRow(
                       context,
-                      'Created at', 
-                      project.flowitStartedAt != null ? _formatProjectDate(project.flowitStartedAt!) : 'Unknown'
+                      AppLocalizations.of(context)!.createdAt, 
+                      project.flowitStartedAt != null ? _formatProjectDate(project.flowitStartedAt!) : AppLocalizations.of(context)!.unknown
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildDetailRow(
                       context,
-                      'Status', 
+                      AppLocalizations.of(context)!.status, 
                       project.flowitStatus ?? 'ONGOING'
                     ),
                   ),
@@ -179,7 +216,7 @@ class ProjectInfosWidget extends ConsumerWidget {
                       Expanded(
                         child: _buildDetailRow(
                           context,
-                          'Progress',
+                          AppLocalizations.of(context)!.progress,
                           '$progressPercentage%'
                         ),
                       ),
@@ -187,7 +224,7 @@ class ProjectInfosWidget extends ConsumerWidget {
                       Expanded(
                         child: _buildDetailRow(
                           context,
-                          'Tasks',
+                          AppLocalizations.of(context)!.tasks,
                           '$completedTasks/$totalTasks'
                         ),
                       ),
@@ -197,22 +234,22 @@ class ProjectInfosWidget extends ConsumerWidget {
                 loading: () => Row(
                   children: [
                     Expanded(
-                      child: _buildDetailRow(context, 'Progress', '...'),
+                      child: _buildDetailRow(context, AppLocalizations.of(context)!.progress, '...'),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: _buildDetailRow(context, 'Tasks', '...'),
+                      child: _buildDetailRow(context, AppLocalizations.of(context)!.tasks, '...'),
                     ),
                   ],
                 ),
                 error: (_, __) => Row(
                   children: [
                     Expanded(
-                      child: _buildDetailRow(context, 'Progress', '0%'),
+                      child: _buildDetailRow(context, AppLocalizations.of(context)!.progress, '0%'),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: _buildDetailRow(context, 'Tasks', '0/0'),
+                      child: _buildDetailRow(context, AppLocalizations.of(context)!.tasks, '0/0'),
                     ),
                   ],
                 ),
@@ -224,7 +261,7 @@ class ProjectInfosWidget extends ConsumerWidget {
           
           // Second block: Details section
           Text(
-            'Details',
+            AppLocalizations.of(context)!.details,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -240,13 +277,13 @@ class ProjectInfosWidget extends ConsumerWidget {
           const SizedBox(height: 12),
           
                     // Project Owner
-          _buildDetailRow(context, 'Owner', 
+          _buildDetailRow(context, AppLocalizations.of(context)!.owner, 
             project.flowitOwner != null && project.flowitOwner!.isNotEmpty ? project.flowitOwner! : '-'
           ),
           const SizedBox(height: 8),
           
           // Author
-          _buildDetailRow(context, 'Author', 
+          _buildDetailRow(context, AppLocalizations.of(context)!.author, 
             project.flowitAuthor != null && project.flowitAuthor!.isNotEmpty
                 ? project.flowitAuthor!
                 : '-'
@@ -256,60 +293,63 @@ class ProjectInfosWidget extends ConsumerWidget {
           // Members - Always displayed
           sharedByAsync.when(
             data: (sharedBy) {
-              final membersList = <String>[];
               final isSharedWithMe = sharedBy.isNotEmpty;
-              
-              // Add shared members
-              if (project.sharedWithEmails.isNotEmpty) {
-                membersList.addAll(project.sharedWithEmails);
-              }
-              
-              // Add current user (project owner or shared with me)
-              if (isSharedWithMe) {
-                // Project is shared with me, add the sharer to the list
-                if (!membersList.contains(sharedBy)) {
-                  membersList.add(sharedBy);
-                }
-                // Also add current user to the list when project is shared with me
-                final currentUser = project.flowitOwner ?? project.flowitAuthor ?? '';
-                if (currentUser.isNotEmpty && !membersList.contains(currentUser)) {
-                  membersList.add(currentUser);
-                }
-              } else {
-                // Project is owned by me, add myself to the list
-                final currentUser = project.flowitOwner ?? project.flowitAuthor ?? '';
-                if (currentUser.isNotEmpty && !membersList.contains(currentUser)) {
-                  membersList.add(currentUser);
-                }
-              }
-              
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDetailRow(context, 'Members', 
-                    membersList.isNotEmpty ? membersList.join(', ') : 'No members'
-                  ),
-                  // Only show "Manage sharing" if project is not shared with me (i.e., I own it)
-                  if (!isSharedWithMe) ...[
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => ProjectSharingDialog(project: project),
-                        );
-                      },
-                      child: Text(
-                        'Manage sharing',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          decoration: TextDecoration.underline,
-                          fontWeight: FontWeight.w500,
+              // Get current user email from account repository to avoid relying on project metadata
+              final accountRepository = ref.watch(accountRepositoryProvider);
+              return FutureBuilder<String?>(
+                future: _getCurrentUserEmail(accountRepository),
+                builder: (context, snapshot) {
+                  final currentUserEmail = snapshot.data ?? '';
+                  final membersList = <String>[];
+
+                  // Add users this project is shared with (targets)
+                  if (project.sharedWithEmails.isNotEmpty) {
+                    membersList.addAll(project.sharedWithEmails);
+                  }
+
+                  if (isSharedWithMe) {
+                    // Add the sharer/owner
+                    if (!membersList.contains(sharedBy)) {
+                      membersList.add(sharedBy);
+                    }
+                    // Add the logged-in user
+                    if (currentUserEmail.isNotEmpty && !membersList.contains(currentUserEmail)) {
+                      membersList.add(currentUserEmail);
+                    }
+                  } else {
+                    // Owned by me: add the logged-in user
+                    if (currentUserEmail.isNotEmpty && !membersList.contains(currentUserEmail)) {
+                      membersList.add(currentUserEmail);
+                    }
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDetailRow(context, AppLocalizations.of(context)!.members, membersList.isNotEmpty ? membersList.join(', ') : AppLocalizations.of(context)!.noMembers),
+                      // Only show "Manage sharing" if project is not shared with me (i.e., I own it)
+                      if (!isSharedWithMe) ...[
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => ProjectSharingDialog(project: project),
+                            );
+                          },
+                          child: Text(
+                            AppLocalizations.of(context)!.manageSharing,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                ],
+                      ],
+                    ],
+                  );
+                },
               );
             },
             loading: () {
@@ -319,8 +359,8 @@ class ProjectInfosWidget extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDetailRow(context, 'Members', 
-                    currentUser.isNotEmpty ? currentUser : 'No members'
+                  _buildDetailRow(context, AppLocalizations.of(context)!.members, 
+                    currentUser.isNotEmpty ? currentUser : AppLocalizations.of(context)!.noMembers
                   ),
                   const SizedBox(height: 4),
                   GestureDetector(
@@ -331,7 +371,7 @@ class ProjectInfosWidget extends ConsumerWidget {
                       );
                     },
                     child: Text(
-                      'Manage sharing',
+                      AppLocalizations.of(context)!.manageSharing,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
                         decoration: TextDecoration.underline,
@@ -349,8 +389,8 @@ class ProjectInfosWidget extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDetailRow(context, 'Members', 
-                    currentUser.isNotEmpty ? currentUser : 'No members'
+                  _buildDetailRow(context, AppLocalizations.of(context)!.members, 
+                    currentUser.isNotEmpty ? currentUser : AppLocalizations.of(context)!.noMembers
                   ),
                   const SizedBox(height: 4),
                   GestureDetector(
@@ -361,7 +401,7 @@ class ProjectInfosWidget extends ConsumerWidget {
                       );
                     },
                     child: Text(
-                      'Manage sharing',
+                      AppLocalizations.of(context)!.manageSharing,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
                         decoration: TextDecoration.underline,
@@ -378,7 +418,7 @@ class ProjectInfosWidget extends ConsumerWidget {
           
           // Third block: Description section
           Text(
-            'Description',
+            AppLocalizations.of(context)!.description,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -395,24 +435,27 @@ class ProjectInfosWidget extends ConsumerWidget {
           
           // Description content in enhanced text field
           EnhancedTextField(
-            controller: TextEditingController(text: project.description),
+            controller: _descriptionController,
             maxLines: null,
-            decoration: const InputDecoration(
-              hintText: 'No description provided',
+            decoration: InputDecoration(
+              hintText: AppLocalizations.of(context)!.noDescriptionProvided,
               border: InputBorder.none,
-              contentPadding: EdgeInsets.fromLTRB(0, 12, 12, 12),
+              contentPadding: const EdgeInsets.fromLTRB(0, 12, 12, 12),
               isDense: true,
             ),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
             ),
             onChanged: (value) {
-              // Update description as user types
-              final updatedProject = project.copyWith(
-                description: value,
-                lastModified: DateTime.now(),
-              );
-              onProjectUpdated(updatedProject);
+              // Debounce updates to avoid full view reload on every keystroke
+              _descriptionDebounce?.cancel();
+              _descriptionDebounce = Timer(const Duration(milliseconds: 600), () {
+                final updatedProject = project.copyWith(
+                  description: value,
+                  lastModified: DateTime.now(),
+                );
+                onProjectUpdated(updatedProject);
+              });
             },
           ),
         ],
@@ -422,6 +465,8 @@ class ProjectInfosWidget extends ConsumerWidget {
 
   /// Build warning widget for attendees without project access
   Widget _buildAttendeeAccessWarning(BuildContext context, WidgetRef ref) {
+    final tasksAsync = widget.tasksAsync;
+    final project = widget.project;
     return tasksAsync.when(
       data: (tasks) {
         // Get current user email from account repository
@@ -500,7 +545,7 @@ class ProjectInfosWidget extends ConsumerWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Attendees without project access',
+                        AppLocalizations.of(context)!.attendeesWithoutProjectAccess,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: Theme.of(context).colorScheme.error,

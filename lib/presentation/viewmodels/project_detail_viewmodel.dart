@@ -18,9 +18,10 @@ import '../../data/repositories/calendar_repository.dart';
 import '../../data/repositories/step_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import '../../data/repositories/user_repository.dart';
-import '../../data/services/sync/sync_service.dart';
+import '../../data/services/sync/sync_service.dart'; // TODO: remove direct access to service
 import 'commands/attendee_commands.dart';
 import '../../data/providers/providers.dart';
+import '../../data/models/shared_with_me_project.dart';
 
 class ProjectDetailState {
   final String projectPath;
@@ -67,10 +68,12 @@ class ProjectDetailViewModel extends StateNotifier<ProjectDetailState> {
     _calendarSub = _calendarRepository.watchCalendars().listen((calendars) async {
       try {
         final encodedProjectPath = state.projectPath.replaceAll('@', '%40');
-        final calendar = calendars.cast<TaskCalendar?>().firstWhere(
-          (cal) => cal?.path == encodedProjectPath,
-          orElse: () => null,
-        );
+        TaskCalendar? calendar;
+        try {
+          calendar = calendars.firstWhere((cal) => cal.path == encodedProjectPath);
+        } catch (_) {
+          calendar = null;
+        }
         state = state.copyWith(project: AsyncValue.data(calendar));
       } catch (e, st) {
         AppLogger.error('ProjectDetailViewModel: Error finding project ${state.projectPath}', e, st);
@@ -91,10 +94,9 @@ class ProjectDetailViewModel extends StateNotifier<ProjectDetailState> {
       final result = await _calendarRepository.save(updatedProject);
       return await result.when(
         success: (_) async {
-          // Invalidate dependent streams by invalidating known providers
+          // Optimistically update local state to avoid full view refresh.
           try {
-            _ref.invalidate(calendarRepositoryProvider);
-            _ref.invalidate(taskRepositoryProvider);
+            state = state.copyWith(project: AsyncValue.data(updatedProject));
           } catch (_) {}
           // Fire-and-forget sync
           unawaited(syncProjectToServer(updatedProject));
@@ -133,8 +135,17 @@ class ProjectDetailViewModel extends StateNotifier<ProjectDetailState> {
       final preferencesResult = await _userRepository.getUserPreferences();
       return await preferencesResult.when(
         success: (preferences) async {
-          final sharedProject = preferences.getSharedProject(project.uid);
-          if (sharedProject != null && !sharedProject.ack) {
+          // UserPreferences.sharedWithMeProjects store projectId as a PATH.
+          // Try to find a matching entry by comparing UID extracted from the path.
+          SharedWithMeProject? match;
+          try {
+            match = preferences.sharedWithMeProjects.firstWhere(
+              (p) => _extractUidFromPath(p.projectId) == project.uid,
+            );
+          } catch (_) {
+            match = null;
+          }
+          if (match != null && !match.ack) {
             AppLogger.info('ProjectDetailVM: Auto-acknowledging shared project ${project.displayName}');
             final ackResult = await _userRepository.acknowledgeSharedProject(project.uid);
             return ackResult;
@@ -150,6 +161,13 @@ class ProjectDetailViewModel extends StateNotifier<ProjectDetailState> {
       AppLogger.error('ProjectDetailVM: Exception during shared project acknowledgment', e, st);
       return Result.failure(Failure(message: e.toString(), exception: e is Exception ? e : Exception('$e'), stackTrace: st));
     }
+  }
+
+  String _extractUidFromPath(String path) {
+    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    if (segments.isEmpty) return '';
+    final last = segments.last;
+    return last.isEmpty && segments.length > 1 ? segments[segments.length - 2] : last;
   }
 
   Future<Result<void>> handleAttendeeTaskMove(Task task, String columnId) async {

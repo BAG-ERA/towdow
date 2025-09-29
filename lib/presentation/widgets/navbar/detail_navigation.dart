@@ -106,22 +106,98 @@ class _ProjectListContentState extends ConsumerState<_ProjectListContent> {
   }
   
   void _updateDomainGroups() {
-    // Use the ViewModel's filtered domain groups to exclude archived projects
+    // Use the ViewModel's unfiltered domain groups for navigation
+    // Navigation should show all domains regardless of list filter
+    // but still apply status filter (ongoing vs archived)
     final domainGroups = <String, List<TaskCalendar>>{};
     
-    // Get the filtered domain groups from the ViewModel
-    final filteredDomainGroups = ref.read(
-      widget.isWorkflowDetail ? workflowListViewModelProvider.notifier : projectListViewModelProvider.notifier
-    ).filteredDomainGroups;
+    // Get the unfiltered domain groups from the ViewModel state
+    final allDomainGroups = widget.state.domainGroups;
     
     // Convert ProjectWithStats to TaskCalendar and group by domain
-    for (final domainGroup in filteredDomainGroups) {
-      final projects = domainGroup.projects.map((p) => p.project).toList();
-      domainGroups[domainGroup.domain] = projects;
+    // Apply status filter to projects within each domain
+    for (final domainGroup in allDomainGroups) {
+      final filteredProjects = domainGroup.projects
+          .where((p) => _matchesStatusFilter(p.project, widget.state.filter))
+          .map((p) => p.project)
+          .toList();
+      
+      // Only include domain if it has projects after status filtering
+      if (filteredProjects.isNotEmpty) {
+        domainGroups[domainGroup.domain] = filteredProjects;
+      }
     }
     
     _domainGroups = domainGroups;
-    _sortedDomains = filteredDomainGroups.map((dg) => dg.domain).toList();
+    
+    // Sort domains with active project's domain first
+    _sortedDomains = _sortDomainsWithActiveFirst(domainGroups);
+  }
+  
+  /// Sort domains with the domain containing the active project first
+  List<String> _sortDomainsWithActiveFirst(Map<String, List<TaskCalendar>> domainGroups) {
+    final domains = domainGroups.keys.toList();
+    
+    // Get current route safely - only if context is available
+    String? currentLocation;
+    try {
+      currentLocation = GoRouterState.of(context).uri.path;
+    } catch (e) {
+      // Context not available yet, just sort alphabetically
+      domains.sort();
+      return domains;
+    }
+    
+    // Find the domain containing the active project
+    String? activeDomain;
+    for (final domain in domains) {
+      final projects = domainGroups[domain]!;
+      final hasActiveProject = projects.any((project) {
+        final projectRoute = widget.isWorkflowDetail 
+            ? '/workflow/${Uri.encodeComponent(project.path)}'
+            : '/project/${Uri.encodeComponent(project.path)}';
+        return currentLocation == projectRoute;
+      });
+      
+      if (hasActiveProject) {
+        activeDomain = domain;
+        break;
+      }
+    }
+    
+    // Sort domains: active domain first, then alphabetically
+    if (activeDomain != null) {
+      domains.remove(activeDomain);
+      domains.sort();
+      return [activeDomain, ...domains];
+    } else {
+      // No active project found, sort alphabetically
+      domains.sort();
+      return domains;
+    }
+  }
+  
+  /// Check if a project matches the current status filter
+  bool _matchesStatusFilter(TaskCalendar project, ProjectFilter filter) {
+    switch (filter) {
+      case ProjectFilter.all:
+        return true;
+      case ProjectFilter.active:
+        // Active projects are all projects except TEMPLATE, STOPPED, ARCHIVE
+        final status = project.flowitStatus?.toUpperCase() ?? 'ONGOING';
+        return status != 'TEMPLATE' && status != 'STOPPED' && status != 'ARCHIVE';
+      case ProjectFilter.completed:
+        // Completed projects are STOPPED or ARCHIVE
+        final status = project.flowitStatus?.toUpperCase() ?? 'ONGOING';
+        return status == 'STOPPED' || status == 'ARCHIVE';
+      case ProjectFilter.inProgress:
+        // For inProgress, we need to check if project has tasks with progress
+        // Since we don't have stats here, we'll use a simple heuristic
+        return project.flowitStatus?.toUpperCase() == 'ONGOING';
+      case ProjectFilter.notStarted:
+        // For notStarted, we'll use a simple heuristic
+        return project.flowitStatus?.toUpperCase() == 'ONGOING';
+    }
   }
 
   @override

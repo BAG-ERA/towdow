@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 import '../../../core/logger.dart';
 
 /// Connection status
@@ -16,8 +17,8 @@ enum ConnectionStatus {
 class ConnectionMonitorService {
   final Connectivity _connectivity = Connectivity();
   
-  // State
-  ConnectionStatus _currentStatus = ConnectionStatus.unknown;
+  // State (start connected better getting a network error than being stuck while waiting for first connectivity check)
+  ConnectionStatus _currentStatus = ConnectionStatus.connected;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _connectivityCheckTimer;
   
@@ -26,8 +27,9 @@ class ConnectionMonitorService {
   final _connectionRestoredController = StreamController<void>.broadcast();
   
   // Configuration
-  static const Duration _checkInterval = Duration(seconds: 10);
-  // Simple, interface-only connectivity check (no reachability probes)
+  static const Duration _checkInterval = Duration(seconds: 60);
+  static const Duration _httpTimeout = Duration(seconds: 10);
+  static const String _probeUrl = 'https://api.towdow.app/docs';
   
   /// Stream of connection status changes
   Stream<ConnectionStatus> get statusStream => _statusController.stream;
@@ -80,21 +82,46 @@ class ConnectionMonitorService {
   /// Check actual internet connectivity
   Future<void> _checkConnectivity() async {
     try {
-      AppLogger.debug('ConnectionMonitorService: Checking connectivity...');
+      // AppLogger.debug('ConnectionMonitorService: Checking connectivity...');
       
       // First check if we have network interface connectivity
       final connectivityResults = await _connectivity.checkConnectivity();
-      AppLogger.debug('ConnectionMonitorService: Network interface results: $connectivityResults');
+      // AppLogger.debug('ConnectionMonitorService: Network interface results: $connectivityResults');
       
       if (connectivityResults.contains(ConnectivityResult.none) || connectivityResults.isEmpty) {
         AppLogger.debug('ConnectionMonitorService: No network interface available');
         _updateStatus(ConnectionStatus.disconnected);
-      } else {
-        _updateStatus(ConnectionStatus.connected);
+        return;
       }
-    } catch (e) {
+      
+      // We have a network interface, verify actual internet reachability via HTTP probe
+      final hasInternet = await _hasInternetAccess();
+      if (hasInternet) {
+        _updateStatus(ConnectionStatus.connected);
+      } else {
+        _updateStatus(ConnectionStatus.disconnected);
+      }
+    } catch (e, st) {
       AppLogger.warning('ConnectionMonitorService: Failed to check connectivity: $e');
+      AppLogger.debug('ConnectionMonitorService: Stacktrace for connectivity check failure: $st');
       _updateStatus(ConnectionStatus.unknown);
+    }
+  }
+  
+  /// Performs a lightweight HTTP request to validate internet connectivity
+  Future<bool> _hasInternetAccess() async {
+    try {
+      final uri = Uri.parse(_probeUrl);
+      final response = await http.get(uri).timeout(_httpTimeout);
+      // AppLogger.debug('ConnectionMonitorService: Probe response: ${response.statusCode}');
+      // Common captive portal check endpoints return 204 on success; accept 204 or any 2xx as online
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } on TimeoutException {
+      AppLogger.debug('ConnectionMonitorService: HTTP probe timed out');
+      return false;
+    } catch (e) {
+      AppLogger.debug('ConnectionMonitorService: HTTP probe failed: $e');
+      return false;
     }
   }
 

@@ -1,12 +1,15 @@
 // Local storage service using Hive for offline-first data persistence
 // Provides generic CRUD operations for all FlowIt models
 
+import 'dart:io';
+import 'package:path/path.dart' as path;
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../core/result.dart';
 import '../../../core/logger.dart';
 import '../../models/caldav_account.dart';
+import '../../../web/web_utils.dart';
 
 class LocalStorageService {
   static const String tasksBoxName = 'tasks';
@@ -31,6 +34,8 @@ class LocalStorageService {
   
   // User preferences queue box
   static const String userPreferencesQueueBoxName = 'user_preferences_queue'; // For storing user preferences queue items
+  // External account queue box
+  static const String externalAccountQueueBoxName = 'external_account_queue'; // For storing external account queue items
 
   // Box references
   late Box _tasksBox;
@@ -55,6 +60,8 @@ class LocalStorageService {
   
   // User preferences queue box reference
   late Box _userPreferencesQueueBox;
+  // External account queue box reference
+  late Box _externalAccountQueueBox;
 
   // Initialize all Hive boxes
   Future<Result<void>> initialize() async {
@@ -62,16 +69,38 @@ class LocalStorageService {
       // AppLogger.info('LocalStorageService: Initializing Hive boxes');
 
 
-      // In test environment, Hive is already initialized
+
+
       if (!Hive.isBoxOpen(tasksBoxName)) {
         // Initialize Hive with a platform-specific path
         if (kIsWeb) {
           await Hive.initFlutter();
         } else {
-          final appDocumentDir = await getApplicationDocumentsDirectory();
-          Hive.init(appDocumentDir.path);
-        }
+          // Choose platform-appropriate persistent data directory
+          Directory baseDir;
+          if (Platform.isLinux) {
+            // Use ~/.local/share/towdow
+            final home = Platform.environment['HOME'] ?? Directory.current.path;
+            baseDir = Directory(path.join(home, '.local', 'share', 'towdow'));
+          } else if (Platform.isWindows) {
+            // Use AppData\\Roaming\\TowDow (Application Support)
+            final appSupport = await getApplicationSupportDirectory();
+            baseDir = Directory(path.join(appSupport.path, 'TowDow'));
+          } else if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
+            // Use Application Support directory on mobile and macOS
+            baseDir = await getApplicationSupportDirectory();
+          } else {
+            // Fallback to documents dir
+            baseDir = await getApplicationDocumentsDirectory();
+          }
 
+          final towdowDir = Directory(baseDir.path);
+          if (!await towdowDir.exists()) {
+            await towdowDir.create(recursive: true);
+          }
+          AppLogger.info('LocalStorageService: Using directory: ${towdowDir.path}');
+          Hive.init(towdowDir.path);
+        }
       }
       
       // Try to open boxes, but handle corrupted data gracefully
@@ -86,6 +115,7 @@ class LocalStorageService {
       await _initializeBoxSafely(statusesBoxName, 'statuses');
       await _initializeBoxSafely(userPreferencesBoxName, 'user_preferences');
       await _initializeBoxSafely(userPreferencesQueueBoxName, 'user_preferences_queue');
+      await _initializeBoxSafely(externalAccountQueueBoxName, 'external_account_queue');
       
       // Initialize external calendar boxes
       await _initializeBoxSafely(externalAccountsBoxName, 'external_accounts');
@@ -108,6 +138,7 @@ class LocalStorageService {
       _statusesBox = Hive.box(statusesBoxName);
       _userPreferencesBox = Hive.box(userPreferencesBoxName);
       _userPreferencesQueueBox = Hive.box(userPreferencesQueueBoxName);
+      _externalAccountQueueBox = Hive.box(externalAccountQueueBoxName);
       
       // Assign external calendar boxes
       _externalAccountsBox = Hive.box(externalAccountsBoxName);
@@ -177,7 +208,7 @@ class LocalStorageService {
 
   // Helper method to get a generic path message for a Hive box file
   String _getBoxPathMessage(String boxName) {
-    return 'fichiers Hive locaux ($boxName.hive dans le dossier Documents)';
+    return 'fichiers Hive locaux ($boxName.hive dans le dossier de données de l\'application)';
   }
 
   /// Clear all boxes safely on web and optionally refresh page via platform channel
@@ -200,6 +231,7 @@ class LocalStorageService {
         offlineFilesBoxName,
         fileUploadQueueBoxName,
         userPreferencesQueueBoxName,
+        externalAccountQueueBoxName,
       ];
 
       for (final boxName in boxNames) {
@@ -211,6 +243,15 @@ class LocalStorageService {
           } catch (e) {
             AppLogger.warning('LocalStorageService: Failed to clear box $boxName: $e');
           }
+        }
+      }
+
+      // Additionally clear browser storages when running on web
+      if (kIsWeb) {
+        try {
+          WebLocalStorage.clearAll();
+        } catch (e) {
+          AppLogger.warning('LocalStorageService: Failed to clear browser local/session storage: $e');
         }
       }
 
@@ -388,6 +429,7 @@ class LocalStorageService {
       await clear(statusesBoxName);
       await clear(userPreferencesBoxName);
       await clear(userPreferencesQueueBoxName);
+      await clear(externalAccountQueueBoxName);
       
       // Clear external calendar data
       await clear(externalAccountsBoxName);
@@ -426,6 +468,7 @@ class LocalStorageService {
         statusesBoxName,
         userPreferencesBoxName,
         userPreferencesQueueBoxName,
+        externalAccountQueueBoxName,
         externalAccountsBoxName,
         externalCalendarsBoxName,
         externalEventsBoxName,
@@ -495,6 +538,8 @@ class LocalStorageService {
         return _userPreferencesBox;
       case userPreferencesQueueBoxName:
         return _userPreferencesQueueBox;
+      case externalAccountQueueBoxName:
+        return _externalAccountQueueBox;
       case externalAccountsBoxName:
         return _externalAccountsBox;
       case externalCalendarsBoxName:

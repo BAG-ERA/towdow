@@ -1,4 +1,4 @@
-﻿// Main FlowIt application widget
+// Main FlowIt application widget
 // Configures Material theme, routing, and global app setup
 
 import 'package:flutter/material.dart';
@@ -7,21 +7,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/connection/connection_screen.dart';
+import 'presentation/screens/account_setup/account_setup_screen.dart';
+import 'data/providers/providers_viewmodels.dart';
 import 'presentation/screens/settings/settings_screen.dart';
 import 'presentation/screens/projects_list/projects_list_screen.dart';
 import 'presentation/screens/workflows_list/workflow_list_screen.dart';
 import 'presentation/screens/workflow_detail/workflow_detail_screen.dart';
 import 'presentation/screens/navigation/nav_screen.dart';
+import 'presentation/screens/settings/connection_info_screen.dart';
 
 import 'presentation/screens/project_detail/project_detail_screen.dart';
 import 'presentation/viewmodels/appearance_settings_viewmodel.dart';
 import 'presentation/widgets/adaptive_app_layout.dart';
+import 'presentation/viewmodels/login_viewmodel.dart';
 import 'presentation/providers/home_providers.dart';
 import 'data/providers/providers.dart';
 import 'core/theme/chart_theme.dart';
-import 'core/update/gitlab_update_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
+import 'core/logger.dart';
+import 'web/web_utils.dart';
+import 'presentation/viewmodels/monitoring_status_viewmodel.dart';
 
 // ChangeNotifier wrapper for AsyncValue to make GoRouter reactive
 class AsyncValueNotifier<T> extends ChangeNotifier {
@@ -59,19 +65,96 @@ bool _isDesktopPlatform() {
       defaultTargetPlatform == TargetPlatform.macOS;
 }
 
+// Notifier to refresh GoRouter on LoginState changes (e.g., isConfiguringAccount flips)
+final loginRouterRefreshNotifierProvider = Provider<ValueNotifier<int>>((ref) {
+  final notifier = ValueNotifier<int>(0);
+  // Any change in LoginState will bump the notifier value, triggering router refresh
+  ref.listen<LoginState>(loginViewModelProvider, (previous, next) {
+    notifier.value++;
+  });
+  return notifier;
+});
+
+final firstSyncRouterRefreshNotifierProvider = Provider<ValueNotifier<int>>((ref) {
+  final notifier = ValueNotifier<int>(0);
+  ref.listen<MonitoringState>(monitoringStatusViewModelProvider, (previous, next) {
+    notifier.value++;
+  });
+  return notifier;
+});
+
 final routerProvider = Provider<GoRouter>((ref) {
   final accountNotifier = ref.watch(accountStatusNotifierProvider);
   final sessionEpoch = ref.watch(sessionEpochProvider);
 
       return GoRouter(
     navigatorKey: globalNavigatorKey,
-    initialLocation: '/nav',
-    refreshListenable: Listenable.merge([accountNotifier, ValueNotifier(sessionEpoch)]),
+    // On web, start from the browser URL (supports magic-link query handling in main.dart)
+    // On other platforms, keep mobile landing on /nav
+    initialLocation: kIsWeb ? '/' : '/nav',
+    refreshListenable: Listenable.merge([
+          accountNotifier,
+          ref.watch(loginRouterRefreshNotifierProvider),
+          ref.watch(firstSyncRouterRefreshNotifierProvider),
+          ValueNotifier(sessionEpoch),
+        ]),
     redirect: (context, state) {
+      // Observe first-sync completion to gate account_setup during first run
+      MonitoringState? monitoring;
+      try {
+        monitoring = ref.read(monitoringStatusViewModelProvider);
+      } catch (_) {}
       final isDesktop = _isDesktopPlatform();
+      // Observe login state to avoid race-condition redirects after auth
+      final loginState = ref.read(loginViewModelProvider);
 
-      // Redirect root path to nav on mobile, projects on desktop
+      // Gate solely on first-sync completion for authenticated users
+      final needsFirstSync = (monitoring?.hasCompletedFirstSync == false);
+      if (loginState.account != null && needsFirstSync && state.uri.path != '/account-setup') {
+        return '/account-setup';
+      }
+
+
+      // Redirect root path:
+      // - On web: if a targetProjectPath exists in localStorage, go to that project; otherwise go to /projects
+      // - On desktop: go to /today
+      // - On mobile (non-web): go to /nav
       if (state.uri.path == '/') {
+        // If there's no active account, always go to the connection screen
+        final accountCheck = accountNotifier.asyncValue;
+        if (accountCheck.hasValue) {
+          final hasAccount = accountCheck.value ?? false;
+          if (!hasAccount && loginState.account == null) {
+            return '/connect';
+          }
+        } else if (accountCheck.hasError) {
+          if (loginState.account == null) return '/connect';
+        }
+
+        if (kIsWeb) {
+          // Check localStorage for a target project path (set by magic link or previous intent)
+          try {
+            // Lazy import to avoid platform issues
+            // ignore: avoid_web_libraries_in_flutter
+            // We use the conditional export wrapper
+            // import is at top-level: web/web_utils.dart
+          } catch (_) {}
+          String? target;
+          try {
+            // Access via conditional export class
+            // Import is declared at file top
+            // ignore: unnecessary_statements
+            target = WebLocalStorage.getItem('targetProjectPath');
+          } catch (_) {
+            target = null;
+          }
+          if (target != null && target.isNotEmpty) {
+            final destination = '/project/${Uri.encodeComponent(target)}';
+            if (kDebugMode) debugPrint("[ROUTING] redirect '/' -> 'destination' (web targetProjectPath)");
+            return destination;
+          }
+          return '/projects';
+        }
         return isDesktop ? '/today' : '/nav';
       }
 
@@ -80,8 +163,52 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/today';
       }
       
-      // Skip account check if already on connection screen
+      // Handle connection screen explicitly:
+      // - If account is being configured, go to setup
+      // - If an account is already active, send to root and let existing logic route appropriately
+      // - Otherwise, allow staying on the connection screen
       if (state.uri.path == '/connect') {
+        if (loginState.account != null && (monitoring?.hasCompletedFirstSync == false)) {
+          return '/account-setup';
+        }
+        // If we already have an account (either via loginState or provider), redirect away from connect
+        final asyncHasAccount = accountNotifier.asyncValue;
+        bool knownHasAccount = false;
+        if (asyncHasAccount.hasValue) {
+          knownHasAccount = asyncHasAccount.value ?? false;
+        }
+        if (knownHasAccount || (loginState.account != null)) {
+          // Redirect to root; root logic decides final destination per platform/web context
+          return '/';
+        }
+        return null; // stay on connect when not authenticated
+      }
+
+      // Handle account-setup screen: only allow if there's an account that needs setup
+      if (state.uri.path == '/account-setup') {
+        // If no account exists, redirect to connect screen
+        if (loginState.account == null) {
+          return '/connect';
+        }
+        // If account exists but first sync is completed, redirect away from setup
+        if (loginState.account != null && (monitoring?.hasCompletedFirstSync ?? false)) {
+          final account = loginState.account!;
+          final isOffline = account.serverUrl.startsWith('https://localhost') || account.serverUrl.startsWith('http://localhost');
+          String destination = '/projects';
+          if (!isOffline) {
+            final returning = loginState.isReturningUser;
+            if (returning == true) destination = '/today';
+          }
+          AppLogger.debug("[ROUTING] redirect '/account-setup' -> '$destination' (first sync completed)");
+          return destination;
+        }
+        // Stay on account-setup if account exists but first sync not completed
+        return null;
+      }
+
+      // During and right after authentication, allow navigation to proceed even
+      // if hasActiveAccountProvider hasn't refreshed yet to avoid race.
+      if (loginState.isLoading || loginState.account != null) {
         return null;
       }
       
@@ -187,6 +314,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/settings', state: state, child: const SettingsScreen()),
           ),
+          GoRoute(
+            path: '/settings/connection',
+            pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/settings', state: state, child: const ConnectionInfoScreen()),
+          ),
           
           GoRoute(
             path: '/projects',
@@ -214,6 +345,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/connect',
         pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/connect', state: state, child: const ConnectionScreen()),
       ),
+      GoRoute(
+        path: '/account-setup',
+        pageBuilder: (context, state) => _buildPageForPlatformRoute(path: '/account-setup', state: state, child: const AccountSetupScreen()),
+      ),
     ],
   );
 });
@@ -229,10 +364,6 @@ class _FlowItAppState extends ConsumerState<FlowItApp> {
   @override
   void initState() {
     super.initState();
-    // Kick the update check right after first frame, using global navigator
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      GitLabUpdateService().checkAndPromptIfNeeded(); // no context needed
-    });
   }
 
   @override
@@ -406,7 +537,7 @@ Page<dynamic> _buildPageForPlatformRoute({required String path, required GoRoute
   final bool isDetail = location.startsWith('/project/') || location.startsWith('/workflow/');
   final bool isList = location == '/projects' || location == '/workflows' ||
       location == '/today' || location == '/soon' || location == '/anytime' ||
-      location == '/next-week' || location == '/later' || location == '/settings' || location == '/';
+      location == '/next-week' || location == '/later' || location == '/settings' || location.startsWith('/settings/') || location == '/';
   final bool goingToNav = path == '/nav';
   final bool comingFromNav = location == '/nav';
 

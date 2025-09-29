@@ -71,7 +71,8 @@ class _MobileDelayedDraggableTaskState extends State<MobileDelayedDraggableTask>
   void deactivate() {
     // Reset all state when widget is deactivated
     _dragDelayTimer?.cancel();
-    _animationController.reset();
+    // Stop animation safely during deactivate to avoid notifying AnimatedBuilder during build
+    _stopAndResetAnimationSafely();
     _isDragging = false;
     _isDragDelayed = false;
     _dragStartPosition = null;
@@ -89,6 +90,25 @@ class _MobileDelayedDraggableTaskState extends State<MobileDelayedDraggableTask>
     _dragStartPosition = null;
     _hasMoved = false;
     super.dispose();
+  }
+
+  // Stop the animation without notifying listeners in the middle of a build,
+  // then reset the value to 0.0 on the next frame. This avoids the
+  // "setState()/markNeedsBuild called during build" exceptions that can occur
+  // when an AnimatedBuilder is listening to this controller.
+  void _stopAndResetAnimationSafely() {
+    // Stop immediately; canceled: true prevents completing the animation.
+    _animationController.stop(canceled: true);
+    // Schedule the value reset after the current frame to avoid notifying
+    // AnimatedBuilder during the build/deactivate phase.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        _animationController.value = 0.0;
+      } catch (_) {
+        // Controller might have been disposed; ignore.
+      }
+    });
   }
 
   void _startDelayTimer() {
@@ -187,8 +207,8 @@ class _MobileDelayedDraggableTaskState extends State<MobileDelayedDraggableTask>
       _hasMoved = false;
     });
 
-    // Reset animation
-    _animationController.reset();
+    // Reset animation safely
+    _stopAndResetAnimationSafely();
 
     // Call external callback
     widget.onDragEnd?.call(details);
@@ -223,7 +243,8 @@ class _MobileDelayedDraggableTaskState extends State<MobileDelayedDraggableTask>
               // Cancel drag if user moved during delay period
               _dragDelayTimer?.cancel();
               _isDragDelayed = false;
-              _animationController.reset();
+              // Reset animation safely to avoid build-phase notifications
+              _stopAndResetAnimationSafely();
               AppLogger.debug('MobileDelayedDraggable: Cancelled drag due to movement during delay (distance: ${distance.toStringAsFixed(2)}px) - Timer cancelled');
             }
           }
@@ -232,7 +253,8 @@ class _MobileDelayedDraggableTaskState extends State<MobileDelayedDraggableTask>
           AppLogger.debug('MobileDelayedDraggable: Touch ended on mobile');
           // Destroy draggable when touch ends
           _dragDelayTimer?.cancel();
-          _animationController.reset();
+          // Reset animation safely to avoid build-phase notifications
+          _stopAndResetAnimationSafely();
           setState(() {
             _isDragging = false;
             _isDragDelayed = false;

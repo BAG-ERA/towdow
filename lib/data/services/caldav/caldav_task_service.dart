@@ -81,11 +81,21 @@ class CalDavTaskService {
     </C:comp-filter>
   </C:filter>
 </C:calendar-query>''';
+      AppLogger.debug("caldav_task_service fetch tasks for project $calendarPath");
       final res = await _client.report(calendarPath, reportQuery);
       return res.when(
         success: (r) async {
           if (r.statusCode == 207) {
             final tasks = VTODOParser.parseTasksFromResponse(r.body);
+            AppLogger.debug("caldav_task_service fetched ${tasks.length} tasks for project $calendarPath");
+            // Log each fetched task's key fields for traceability
+            for (final t in tasks) {
+              try {
+                AppLogger.debug("caldav_task_service task fetched: uid=${t.uid}, summary='${t.summary}', status=${t.status}");
+              } catch (_) {
+                // Avoid crashing on logging issues
+              }
+            }
             return Result.success(tasks);
           }
           return Result.failure(Failure(message: 'HTTP ${r.statusCode}'));

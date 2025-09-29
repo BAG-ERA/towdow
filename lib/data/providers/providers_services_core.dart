@@ -18,6 +18,7 @@ import '../services/sync/connection_monitor_service.dart';
 import '../services/sync/sync_orchestrator_service.dart';
 import '../services/sync/sync_service.dart';
 import '../services/user/user_preferences_queue_service.dart';
+import '../services/user/external_account_queue_service.dart';
 import '../services/user/user_sync_service.dart';
 import '../services/user/users_api_service.dart';
 import '../services/share/share_service.dart';
@@ -214,6 +215,14 @@ final userPreferencesQueueServiceProvider = Provider<UserPreferencesQueueService
   );
 });
 
+final externalAccountQueueServiceProvider = Provider<ExternalAccountQueueService>((ref) {
+  return ExternalAccountQueueService(
+    externalAccountRepository: ref.watch(externalAccountRepositoryProvider),
+    userSyncService: ref.watch(userSyncServiceProvider),
+    localStorage: ref.watch(localStorageServiceProvider),
+  );
+});
+
 final userPreferencesQueueSetupProvider = Provider<void>((ref) {
   final userRepository = ref.watch(userRepositoryProvider);
   final userPreferencesQueueService = ref.watch(userPreferencesQueueServiceProvider);
@@ -341,12 +350,19 @@ final availableDomainsProvider = FutureProvider<List<String>>((ref) async {
 });
 
 // Project sharing notification providers
-final projectSharedNotificationProvider = Provider.family<AsyncValue<bool>, String>((ref, projectId) {
+final projectSharedNotificationProvider = Provider.family<AsyncValue<bool>, String>((ref, projectUid) {
   final userPreferencesAsync = ref.watch(userPreferencesProvider);
   return userPreferencesAsync.when(
     data: (prefs) {
-      final sharedProject = prefs.getSharedProject(projectId);
-      final hasNotification = sharedProject != null && !sharedProject.ack;
+      // sharedWithMeProjects stores projectId as a PATH, not UID. We must match by UID.
+      bool hasNotification = false;
+      for (final p in prefs.sharedWithMeProjects) {
+        final uid = _extractUidFromPath(p.projectId);
+        if (uid == projectUid) {
+          hasNotification = !p.ack;
+          break;
+        }
+      }
       return AsyncValue.data(hasNotification);
     },
     loading: () => const AsyncValue.loading(),
@@ -354,18 +370,31 @@ final projectSharedNotificationProvider = Provider.family<AsyncValue<bool>, Stri
   );
 });
 
-final projectSharedByProvider = Provider.family<AsyncValue<String>, String>((ref, projectId) {
+final projectSharedByProvider = Provider.family<AsyncValue<String>, String>((ref, projectUid) {
   final userPreferencesAsync = ref.watch(userPreferencesProvider);
   return userPreferencesAsync.when(
     data: (prefs) {
-      final sharedProject = prefs.getSharedProject(projectId);
-      final sourceEmail = sharedProject?.sourceUserEmail ?? '';
-      return AsyncValue.data(sourceEmail);
+      String sharedBy = '';
+      for (final p in prefs.sharedWithMeProjects) {
+        final uid = _extractUidFromPath(p.projectId);
+        if (uid == projectUid) {
+          sharedBy = p.sourceUserEmail;
+          break;
+        }
+      }
+      return AsyncValue.data(sharedBy);
     },
     loading: () => const AsyncValue.loading(),
     error: (err, st) => AsyncValue.error(err, st),
   );
 });
+
+String _extractUidFromPath(String path) {
+  final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+  if (segments.isEmpty) return '';
+  final last = segments.last;
+  return last.isEmpty && segments.length > 1 ? segments[segments.length - 2] : last;
+}
 
 // CalDAV Monitor provider with DI
 final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
@@ -380,6 +409,7 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
   final syncService = ref.watch(syncServiceProvider);
   final userSyncService = ref.watch(userSyncServiceProvider);
   final userPreferencesQueueService = ref.watch(userPreferencesQueueServiceProvider);
+  final externalAccountQueueService = ref.watch(externalAccountQueueServiceProvider);
 
   AppLogger.debug('Providers: Creating CalDAVMonitor with injected UserSyncService');
 
@@ -394,6 +424,7 @@ final caldavMonitorProvider = Provider<CalDAVMonitor>((ref) {
     syncService: syncService,
     userSyncService: userSyncService,
     userPreferencesQueueService: userPreferencesQueueService,
+    externalAccountQueueService: externalAccountQueueService,
     taskRepository: taskRepository,
   );
 });

@@ -14,7 +14,6 @@ import '../data/services/user/user_sync_service.dart';
 import '../data/repositories/account_repository.dart';
 import 'logger.dart';
 import 'result.dart';
-import 'update/gitlab_update_service.dart';
 
 enum FlowItAppState {
   initial,
@@ -89,7 +88,7 @@ class AppLifecycleManager {
       // Always start external calendar sync service (independent of main account)
       if (_externalSyncService != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Starting ExternalCalendarSyncService (always)');
-        _externalSyncService!.startBackgroundSync();
+        _externalSyncService!.startExternalAccountBackgroundSync();
         AppLogger.info('AppLifecycleManager: ExternalCalendarSyncService started successfully (independent)');
       }
 
@@ -250,13 +249,12 @@ class AppLifecycleManager {
           success: (acc) async {
             final enableUserSync = acc != null && acc.providerType == 'towdow_cloud';
             if (enableUserSync) {
-              AppLogger.debug('AppLifecycleManager: Starting UserSyncService periodic sync');
-              _userSyncService!.startPeriodicSync(interval: const Duration(hours: 2)); // Check every 2 hours for user data updates
+              // Periodic user sync removed (handled by SyncOrchestrator/ConnectionMonitor)
 
               // Fetch shared projects on startup
               AppLogger.debug('AppLifecycleManager: Fetching shared projects on startup');
               try {
-                final sharedProjectsResult = await _userSyncService!.updateSharedProjects();
+                final sharedProjectsResult = await _userSyncService!.updateSharedProjects(duringDownload: true);
                 sharedProjectsResult.when(
                   success: (_) {
                     AppLogger.info('AppLifecycleManager: Shared projects fetched successfully on startup');
@@ -321,7 +319,7 @@ class AppLifecycleManager {
 
   /// Called when account configuration changes
   Future<void> onAccountConfigured() async {
-    // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account configured, starting main services');
+    AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Account configured, starting main services');
     
     if (!hasServices) {
       AppLogger.warning('AppLifecycleManager: Cannot start services - services not initialized');
@@ -431,7 +429,7 @@ class AppLifecycleManager {
       // Update shared projects when app resumes
       if (_userSyncService != null) {
         // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Updating shared projects on app resume');
-        _userSyncService!.updateSharedProjects().then((result) {
+        _userSyncService!.updateSharedProjects(duringDownload: true).then((result) {
           result.when(
             success: (_) {
               // AppLogger.debug('AppLifecycleManager: Shared projects updated successfully on app resume');
@@ -445,8 +443,7 @@ class AppLifecycleManager {
         });
       }
       
-      // Check for app updates when app resumes
-      GitLabUpdateService().checkAndPromptIfNeeded();
+      // Removed update check on resume
     }
   }
 
@@ -490,7 +487,7 @@ class AppLifecycleManager {
         // Since we don't have direct access to _syncTimer, we'll periodically restart it
         // This is safer than checking the sync flag which is only true during active sync
         try {
-          _externalSyncService!.startBackgroundSync(); // This will cancel existing timer and restart
+          _externalSyncService!.startExternalAccountBackgroundSync(); // This will cancel existing timer and restart
           // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] Ensured external calendar sync service is running');
         } catch (e) {
           AppLogger.warning('AppLifecycleManager: Failed to ensure external calendar sync is running: $e');

@@ -17,6 +17,7 @@ import 'package:towdow_app/data/services/sync/sync_service.dart';
 import 'package:towdow_app/data/services/sync/connection_monitor_service.dart';
 import 'package:towdow_app/data/services/user/user_sync_service.dart';
 import 'package:towdow_app/data/services/user/user_preferences_queue_service.dart';
+import 'package:towdow_app/data/services/user/external_account_queue_service.dart';
 import 'package:towdow_app/data/services/webdav_client.dart';
 import '../helpers/monitor_test_doubles.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,6 +36,7 @@ import 'caldav_monitor_test.mocks.dart';
   SyncService,
   UserSyncService,
   UserPreferencesQueueService,
+  ExternalAccountQueueService,
   WebDAVClient,
 ])
 void main() {
@@ -56,6 +58,7 @@ void main() {
     late MockSyncService mockSyncService;
     late MockUserSyncService mockUserSyncService;
     late MockUserPreferencesQueueService mockUserPreferencesQueueService;
+    late MockExternalAccountQueueService mockExternalAccountQueueService;
 
     setUp(() {
       mockAccountRepository = MockAccountRepository();
@@ -68,6 +71,7 @@ void main() {
       mockSyncService = MockSyncService();
       mockUserSyncService = MockUserSyncService();
       mockUserPreferencesQueueService = MockUserPreferencesQueueService();
+      mockExternalAccountQueueService = MockExternalAccountQueueService();
 
       // Build DI ref with fakes (no calendars by default)
       fixtureAccount = CaldavAccount(
@@ -102,20 +106,35 @@ void main() {
         syncService: mockSyncService,
         userSyncService: mockUserSyncService,
         userPreferencesQueueService: mockUserPreferencesQueueService,
+        externalAccountQueueService: mockExternalAccountQueueService,
       );
 
       // Default stubs to avoid hitting real services during monitor loops
       // Do not count user prefs queue as a change in default path
       when(mockUserPreferencesQueueService.processQueue())
           .thenAnswer((_) async => const Result.failure(Failure(message: 'skip')));
+      when(mockExternalAccountQueueService.processQueue())
+          .thenAnswer((_) async => const Result.failure(Failure(message: 'skip')));
       when(mockUserRepository.getEtag())
           .thenAnswer((_) async => const Result.success(null));
       when(mockExternalAccountRepository.getCredentialsFileEtag())
           .thenAnswer((_) async => const Result.success(null));
-      when(mockUserSyncService.downloadUserData())
+      when(mockUserSyncService.downloadUserPreferences())
           .thenAnswer((_) async => const Result.success(false));
       when(mockUserSyncService.uploadUserData())
           .thenAnswer((_) async => const Result.success(null));
+      // Provide default stubs for SyncService methods invoked by CalDAVMonitor
+      when(mockSyncService.updateCalendarList(any))
+          .thenAnswer((_) async => false);
+      when(mockSyncService.syncAllActiveCaldav()).thenAnswer(
+        (_) async => Result.success(SyncResult(
+          success: true,
+          syncedItems: 0,
+          failedItems: 0,
+          errors: const [],
+          syncTime: DateTime(2024, 1, 1),
+        )),
+      );
 
       // Default connection status to connected unless overridden per test
       when(mockConnectionMonitorService.currentStatus)
@@ -352,6 +371,7 @@ void main() {
           syncService: mockSyncService,
           userSyncService: mockUserSyncService,
           userPreferencesQueueService: mockUserPreferencesQueueService,
+          externalAccountQueueService: mockExternalAccountQueueService,
         );
 
         when(mockConnectionMonitorService.currentStatus).thenReturn(ConnectionStatus.connected);

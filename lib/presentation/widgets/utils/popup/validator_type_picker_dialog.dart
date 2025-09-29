@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../../data/providers/providers.dart';
 
 /// Presents an AlertDialog with the available validator types.
@@ -23,7 +24,7 @@ class ValidatorTypePickerDialog extends ConsumerWidget {
     final fileFeaturesEnabled = ref.watch(fileFeaturesEnabledProvider);
 
     return AlertDialog(
-      title: const Text('Add completion requirement'),
+      title: Text(AppLocalizations.of(context)!.addCompletionRequirement),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -31,38 +32,38 @@ class ValidatorTypePickerDialog extends ConsumerWidget {
             _entry(
               context,
               icon: Icons.checklist,
-              title: 'Checklist',
-              subtitle: 'Multiple checkable items',
+              title: AppLocalizations.of(context)!.checklist,
+              subtitle: AppLocalizations.of(context)!.checklistSubtitle,
               value: 'checklist',
             ),
             _entry(
               context,
               icon: Icons.radio_button_checked,
-              title: 'Single Select',
-              subtitle: 'Choose one option',
+              title: AppLocalizations.of(context)!.singleSelect,
+              subtitle: AppLocalizations.of(context)!.singleSelectSubtitle,
               value: 'single_select',
             ),
             _entry(
               context,
               icon: Icons.text_fields,
-              title: 'Free Field',
-              subtitle: 'Text input',
+              title: AppLocalizations.of(context)!.freeField,
+              subtitle: AppLocalizations.of(context)!.freeFieldSubtitle,
               value: 'free_field',
             ),
             if (fileFeaturesEnabled)
               _entry(
                 context,
                 icon: Icons.attach_file,
-                title: 'File',
-                subtitle: 'File attachments',
+                title: AppLocalizations.of(context)!.file,
+                subtitle: AppLocalizations.of(context)!.fileSubtitle,
                 value: 'file',
               ),
             if (fileFeaturesEnabled)
               _entry(
                 context,
                 icon: Icons.perm_media,
-                title: 'Media',
-                subtitle: 'Photos and videos',
+                title: AppLocalizations.of(context)!.media,
+                subtitle: AppLocalizations.of(context)!.mediaSubtitle,
                 value: 'media',
               ),
           ],
@@ -71,7 +72,7 @@ class ValidatorTypePickerDialog extends ConsumerWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(AppLocalizations.of(context)!.cancel),
         ),
       ],
     );

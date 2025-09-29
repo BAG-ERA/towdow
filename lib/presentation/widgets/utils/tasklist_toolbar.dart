@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:towdow_app/l10n/app_localizations.dart';
 import '../../../data/providers/providers.dart';
 import 'buttons/create_task_button.dart';
 
@@ -90,7 +91,6 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
     }
     
     return Container(
-      height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -130,7 +130,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
         const SizedBox(width: 16),
         
         // Create task button
-        CreateTaskButton.compact(
+        CreateTaskButton(
           projectCalendarUid: widget.projectPath,
           workflowVariant: widget.workflowVariant,
         ),
@@ -186,7 +186,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Search',
+                  AppLocalizations.of(context)!.search,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
@@ -200,7 +200,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
         const Spacer(),
         
         // Create task button
-        CreateTaskButton.compact(
+        CreateTaskButton(
           projectCalendarUid: widget.projectPath,
           workflowVariant: widget.workflowVariant,
         ),
@@ -226,7 +226,7 @@ class _TaskListToolbarState extends ConsumerState<TaskListToolbar> {
         focusNode: _searchFocusNode,
         style: theme.textTheme.bodyMedium,
         decoration: InputDecoration(
-          hintText: 'Search tasks...',
+          hintText: AppLocalizations.of(context)!.searchTasksHint,
           hintStyle: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

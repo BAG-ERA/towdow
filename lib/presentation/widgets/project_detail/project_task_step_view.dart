@@ -100,7 +100,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                     if ((tasksByStep['unassigned'] ?? const <Task>[]).isNotEmpty) ...[
                       StepContainer(
                         stepId: 'unassigned',
-                        title: 'Unassigned',
+                        title: AppLocalizations.of(context)!.unassigned,
                         count: tasksByStep['unassigned']!.length,
                         onExpandAll: _expandAllTasks,
                         onCollapseAll: _collapseAllTasks,
@@ -174,14 +174,14 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                           if (mounted) ref.invalidate(projectStepsProvider(widget.projectPath));
                         },
                         markAsFinalLabel: (steps[idx].endWorkflow && steps[idx].status == StepStatus.completed)
-                            ? 'Mark workflow as completed'
+                            ? AppLocalizations.of(context)!.markWorkflowAsCompleted
                             : null,
                         onDelete: () async {
                           final confirmed = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: Text(AppLocalizations.of(context)!.areYouSureDelete(steps[idx].name)),
-                              content: Text('Are you sure you want to delete "${steps[idx].name}"? Tasks assigned to this step will become unassigned.'),
+                              content: Text(AppLocalizations.of(context)!.areYouSureDelete(steps[idx].name)),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.of(context).pop(false),
@@ -279,7 +279,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Failed to load tasks',
+              AppLocalizations.of(context)!.failedToLoadTasks,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Theme.of(context).colorScheme.error,
                   ),
@@ -446,7 +446,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
           Icon(Icons.inbox_outlined, size: 20, color: color.withValues(alpha: 0.7)),
           const SizedBox(width: 8),
           Text(
-            'No tasks',
+            AppLocalizations.of(context)!.noTasks,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
@@ -482,7 +482,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'No steps defined yet',
+                  AppLocalizations.of(context)!.noStepsDefinedYet,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Theme.of(context).colorScheme.onSurface,
@@ -490,7 +490,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Create steps in your workflow to organize tasks by stages.',
+                  AppLocalizations.of(context)!.createStepsInWorkflow,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
@@ -547,7 +547,7 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
   }
 
   Future<void> _addTaskInStep(BuildContext context, WidgetRef ref, String? stepId) async {
-    final result = await showDialog<String>(
+    await showDialog<String>(
       context: context,
       builder: (context) => TaskCreationDialog(
         projectPath: widget.projectPath,

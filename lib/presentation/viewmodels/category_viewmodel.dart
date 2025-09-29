@@ -4,6 +4,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'dart:async';
 
 import '../../core/logger.dart';
 import '../../core/result.dart';
@@ -31,11 +32,16 @@ abstract class CategoryViewModelState with _$CategoryViewModelState {
 /// Handles CRUD operations for categories with proper state management
 class CategoryViewModel extends StateNotifier<CategoryViewModelState> {
   final CategoryRepository _categoryRepository;
+  StreamSubscription<List<Category>>? _projectCategoriesSub;
   
   CategoryViewModel(this._categoryRepository) : super(const CategoryViewModelState());
   
   /// Initialize the view model and load categories
   Future<void> initialize([String? projectPath]) async {
+    // Cancel any previous subscription when re-initializing (e.g., switching projects)
+    await _projectCategoriesSub?.cancel();
+    _projectCategoriesSub = null;
+
     state = state.copyWith(isLoading: true, error: null, currentProjectPath: projectPath);
     
     try {
@@ -44,6 +50,15 @@ class CategoryViewModel extends StateNotifier<CategoryViewModelState> {
       await initResult.when(
         success: (_) async {
           await _loadCategories();
+          // After initial load, start watching project-specific category updates if a project is set
+          if (state.currentProjectPath != null) {
+            _projectCategoriesSub = _categoryRepository
+                .watchProjectCategories(state.currentProjectPath!)
+                .listen((categories) {
+              // Update only the projectCategories to avoid flicker of global list
+              state = state.copyWith(projectCategories: categories);
+            });
+          }
         },
         failure: (failure) async {
           state = state.copyWith(
@@ -249,8 +264,18 @@ class CategoryViewModel extends StateNotifier<CategoryViewModelState> {
   /// Set the current project path and reload project categories
   Future<void> setProjectPath(String? projectPath) async {
     if (state.currentProjectPath != projectPath) {
+      // Switch stream subscription to the new project
+      await _projectCategoriesSub?.cancel();
+      _projectCategoriesSub = null;
       state = state.copyWith(currentProjectPath: projectPath, isLoading: true);
       await _loadCategories();
+      if (projectPath != null) {
+        _projectCategoriesSub = _categoryRepository
+            .watchProjectCategories(projectPath)
+            .listen((categories) {
+          state = state.copyWith(projectCategories: categories);
+        });
+      }
     }
   }
   
@@ -263,6 +288,12 @@ class CategoryViewModel extends StateNotifier<CategoryViewModelState> {
   /// Clear any error state
   void clearError() {
     state = state.copyWith(error: null);
+  }
+  
+  @override
+  void dispose() {
+    _projectCategoriesSub?.cancel();
+    super.dispose();
   }
   
   /// Check if a category is available for the current project

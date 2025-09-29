@@ -237,12 +237,12 @@ class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Delete Task'),
-          content: Text('Are you sure you want to delete "${widget.task.summary}"?'),
+          title: Text(AppLocalizations.of(context)!.deleteTask),
+          content: Text(AppLocalizations.of(context)!.areYouSureDeleteTask(widget.task.summary)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+              child: Text(AppLocalizations.of(context)!.cancel),
             ),
             ElevatedButton(
               onPressed: () {
@@ -253,7 +253,7 @@ class _TaskItemToolbarState extends ConsumerState<TaskItemToolbar> {
                 backgroundColor: Theme.of(context).colorScheme.error,
                 foregroundColor: Theme.of(context).colorScheme.onError,
               ),
-              child: const Text('Delete'),
+              child: Text(AppLocalizations.of(context)!.delete),
             ),
           ],
         ),

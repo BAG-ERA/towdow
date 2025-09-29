@@ -11,6 +11,7 @@ import '../../../data/models/task.dart';
 import '../../../data/models/attachment.dart';
 import '../../../data/providers/providers_project.dart';
 import '../../../data/providers/providers_viewmodels.dart';
+import '../../../l10n/app_localizations.dart';
 
 class TaskFileAttachmentList extends ConsumerStatefulWidget {
   final Task task;
@@ -67,7 +68,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
             ),
             const SizedBox(width: 4),
             Text(
-              'Files',
+              AppLocalizations.of(context)!.files,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -89,7 +90,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
             IconButton(
               onPressed: _uploadFile,
               icon: const Icon(Icons.add, size: 16),
-              tooltip: 'Add file',
+              tooltip: AppLocalizations.of(context)!.addFile,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(
                 minWidth: 24,
@@ -204,7 +205,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
                           borderRadius: BorderRadius.circular(2),
                         ),
                         child: Text(
-                          'Local',
+                          AppLocalizations.of(context)!.local,
                           style: TextStyle(
                             fontSize: 8,
                             color: Theme.of(context).colorScheme.onTertiaryContainer,
@@ -220,7 +221,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
                           borderRadius: BorderRadius.circular(2),
                         ),
                         child: Text(
-                          'Cloud',
+                          AppLocalizations.of(context)!.cloud,
                           style: TextStyle(
                             fontSize: 8,
                             color: Theme.of(context).colorScheme.onPrimaryContainer,
@@ -246,23 +247,23 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
             },
             itemBuilder: (context) => [
               if (s3Key != null)
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'download',
                   child: Row(
                     children: [
                       Icon(Icons.download, size: 16),
                       SizedBox(width: 8),
-                      Text('Download'),
+                      Text(AppLocalizations.of(context)!.download),
                     ],
                   ),
                 ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'remove',
                 child: Row(
                   children: [
                     Icon(Icons.delete, size: 16),
                     SizedBox(width: 8),
-                    Text('Remove'),
+                    Text(AppLocalizations.of(context)!.remove),
                   ],
                 ),
               ),
@@ -355,7 +356,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
 
     // Show file picker dialog to choose save location
     final savePath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save File',
+      dialogTitle: AppLocalizations.of(context)!.saveFile,
       fileName: fileName,
       type: FileType.any,
     );
@@ -376,12 +377,12 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove File'),
-        content: const Text('Are you sure you want to remove this file? This action cannot be undone.'),
+        title: Text(AppLocalizations.of(context)!.removeFile),
+        content: Text(AppLocalizations.of(context)!.removeFileConfirmation),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -389,7 +390,7 @@ class _TaskFileAttachmentListState extends ConsumerState<TaskFileAttachmentList>
               backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
-            child: const Text('Remove'),
+            child: Text(AppLocalizations.of(context)!.remove),
           ),
         ],
       ),
