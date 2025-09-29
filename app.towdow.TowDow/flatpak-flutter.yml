@@ -43,7 +43,7 @@ modules:
     sources:
       - type: git
         url: https://gitlab.com/towdow/towdow-flutter.git
-        commit: b95d646acd91662bb7772f773fff54e9db2b9ed1
+        commit: dd397cdc14392db7ad95d376d22d28267c4888c5
       - type: git
         url: https://github.com/flutter/flutter.git
         tag: 3.35.3
