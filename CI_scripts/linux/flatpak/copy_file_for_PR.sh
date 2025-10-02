@@ -1,21 +1,82 @@
 #!/bin/bash
 
 # Script to prepare files for Flathub PR submission
-# Usage: ./copy_file_for_PR.sh [flathub_repo_dir] [version]
+# Usage: ./copy_file_for_PR.sh --flathub-repo <path> --version <version> --commit-id <sha>
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+echo "SCRIPT_DIR: $SCRIPT_DIR"
 
-# Default values
-FLATHUB_REPO_DIR="${1:-/home/maxime/work/external_repos/flathub}"
-VERSION="${2:-1.0.0}"
+# Initialize variables
+FLATHUB_REPO_DIR=""
+VERSION=""
+COMMIT_SHA=""
 APP_ID="app.towdow.TowDow"
+
+# Function to show usage
+show_usage() {
+    echo "❌ Error: All parameters are required"
+    echo "Usage: $0 --flathub-repo <path> --version <version> --commit-id <sha>"
+    echo ""
+    echo "Parameters:"
+    echo "  --flathub-repo: Path to the Flathub repository directory"
+    echo "  --version: Version number for the application"
+    echo "  --commit-id: Git commit SHA for the version"
+    echo ""
+    echo "Example:"
+    echo "  $0 --flathub-repo /home/user/flathub --version 1.0.0 --commit-id abc123def456"
+    exit 1
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --flathub-repo)
+            FLATHUB_REPO_DIR="$2"
+            shift 2
+            ;;
+        --version)
+            VERSION="$2"
+            shift 2
+            ;;
+        --commit-id)
+            COMMIT_SHA="$2"
+            shift 2
+            ;;
+        *)
+            echo "❌ Error: Unknown parameter '$1'"
+            show_usage
+            ;;
+    esac
+done
+
+# Validate all required parameters are provided
+if [[ -z "$FLATHUB_REPO_DIR" ]]; then
+    echo "❌ Error: --flathub-repo parameter is required"
+    show_usage
+fi
+
+if [[ -z "$VERSION" ]]; then
+    echo "❌ Error: --version parameter is required"
+    show_usage
+fi
+
+if [[ -z "$COMMIT_SHA" ]]; then
+    echo "❌ Error: --commit-id parameter is required"
+    show_usage
+fi
+
+# Make variables readonly
+readonly FLATHUB_REPO_DIR
+readonly VERSION
+readonly COMMIT_SHA
+readonly APP_ID
 
 echo "🚀 Preparing Flathub PR files..."
 echo "📁 Flathub repo directory: $FLATHUB_REPO_DIR"
 echo "🏷️  Version: $VERSION"
+echo "🔗 Commit SHA: $COMMIT_SHA"
 echo "📱 App ID: $APP_ID"
 
 # Validate flathub repo directory exists
@@ -33,7 +94,7 @@ mkdir -p "$APP_DIR"
 
 # Copy the Flathub-compliant manifest
 echo "📄 Copying Flathub manifest..."
-cp "$SCRIPT_DIR/flatpak-manifest.yml" "$APP_DIR/"
+cp "$SCRIPT_DIR/app.towdow.TowDow/app.towdow.TowDow.yml" "$APP_DIR/"
 
 # Copy metadata files
 echo "📋 Copying metadata files..."
@@ -47,14 +108,14 @@ cp -r "$SCRIPT_DIR/data/icons/"* "$APP_DIR/icons/"
 
 # Copy additional required files for Flutter builds
 echo "📦 Copying Flutter build files..."
-if [[ -f "$PROJECT_ROOT/pubspec-sources.json" ]]; then
-    cp "$PROJECT_ROOT/pubspec-sources.json" "$APP_DIR/"
+if [[ -f "$SCRIPT_DIR/app.towdow.TowDow/pubspec-sources.json" ]]; then
+    cp "$SCRIPT_DIR/app.towdow.TowDow/pubspec-sources.json" "$APP_DIR/"
 else
     echo "⚠️  Warning: pubspec-sources.json not found. You may need to generate it."
 fi
 
-if [[ -f "$PROJECT_ROOT/flutter-sdk-3.35.3.json" ]]; then
-    cp "$PROJECT_ROOT/flutter-sdk-3.35.3.json" "$APP_DIR/"
+if [[ -f "$SCRIPT_DIR/app.towdow.TowDow/flutter-sdk-3.35.3.json" ]]; then
+    cp "$SCRIPT_DIR/app.towdow.TowDow/flutter-sdk-3.35.3.json" "$APP_DIR/"
 else
     echo "⚠️  Warning: flutter-sdk-3.35.3.json not found. You may need to generate it."
 fi
@@ -62,7 +123,7 @@ fi
 # Update version numbers in files
 echo "🔢 Updating version numbers..."
 sed -i "s/0\.0\.0/$VERSION/g" "$APP_DIR/app.towdow.TowDow.metainfo.xml"
-sed -i "s/v1\.0\.0/v$VERSION/g" "$APP_DIR/flatpak-manifest.yml"
+
 
 # Create a README for the PR
 echo "📝 Creating PR README..."
@@ -75,6 +136,7 @@ Task management and productivity application for individuals and teams.
 
 - **App ID**: $APP_ID
 - **Version**: $VERSION
+- **Commit SHA**: $COMMIT_SHA
 - **License**: AGPL-3.0-or-later
 - **Homepage**: https://towdow.app
 - **Repository**: https://gitlab.com/towdow/towdow-flutter
