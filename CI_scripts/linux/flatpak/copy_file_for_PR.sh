@@ -124,6 +124,9 @@ fi
 echo "🔢 Updating version numbers..."
 sed -i "s/0\.0\.0/$VERSION/g" "$APP_DIR/app.towdow.TowDow.metainfo.xml"
 
+echo "🔢 Updating commit sha"
+sed -i "s/__COMMIT_ID__/$COMMIT_SHA/g" "$APP_DIR/app.towdow.TowDow.yml"
+
 
 # Create a README for the PR
 echo "📝 Creating PR README..."
