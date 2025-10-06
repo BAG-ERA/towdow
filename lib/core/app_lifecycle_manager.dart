@@ -406,10 +406,13 @@ class AppLifecycleManager {
 
   /// Called when app comes to foreground
   void _onAppResumed() {
-    // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] App resumed - ensuring services are running');
+    AppLogger.info('AppLifecycleManager: App resumed');
     
     if (_state == FlowItAppState.backgrounded) {
       _updateState(FlowItAppState.resumed);
+      
+      // Handle app resume
+      _handleAppResume();
       
       // Ensure services are still running
       _ensureServicesRunning();
@@ -447,9 +450,42 @@ class AppLifecycleManager {
     }
   }
 
+  /// Handle app resume events
+  void _handleAppResume() {
+    AppLogger.info('AppLifecycleManager: Handling app resume');
+    
+    try {
+      // Restart connection monitoring
+      if (_connectionMonitorService != null) {
+        AppLogger.debug('AppLifecycleManager: Restarting connection monitoring');
+        _connectionMonitorService!.startMonitoring();
+      }
+      
+      // Start file upload queue processing
+      if (_fileUploadQueueService != null) {
+        AppLogger.debug('AppLifecycleManager: Starting file upload queue processing');
+        _fileUploadQueueService!.startQueueProcessing();
+      }
+      
+      // Restart CalDAV monitoring if needed
+      if (_caldavMonitor != null && !_caldavMonitor!.isMonitoring) {
+        AppLogger.debug('AppLifecycleManager: Restarting CalDAV monitoring');
+        _caldavMonitor!.start();
+      }
+      
+      // Refresh external calendar sync
+      if (_externalSyncService != null) {
+        AppLogger.debug('AppLifecycleManager: Refreshing external calendar sync');
+        _externalSyncService!.startExternalAccountBackgroundSync();
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error('AppLifecycleManager: Resume handling failed', e, stackTrace);
+    }
+  }
+
   /// Called when app goes to background
   void _onAppBackgrounded() {
-    // AppLogger.debug('🚀 AppLifecycleManager: [DIAGNOSIS] App backgrounded - services continue running');
+    AppLogger.info('AppLifecycleManager: App backgrounded');
     
     if (_state == FlowItAppState.ready || _state == FlowItAppState.resumed) {
       _updateState(FlowItAppState.backgrounded);
