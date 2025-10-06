@@ -106,19 +106,41 @@ echo "🎨 Copying icons..."
 mkdir -p "$APP_DIR/icons"
 cp -r "$SCRIPT_DIR/data/icons/"* "$APP_DIR/icons/"
 
-# Copy additional required files for Flutter builds
-echo "📦 Copying Flutter build files..."
-if [[ -f "$SCRIPT_DIR/app.towdow.TowDow/pubspec-sources.json" ]]; then
-    cp "$SCRIPT_DIR/app.towdow.TowDow/pubspec-sources.json" "$APP_DIR/"
-else
-    echo "⚠️  Warning: pubspec-sources.json not found. You may need to generate it."
-fi
+# Function to copy Flutter files with error handling
+copy_flutter_files() {
+    local source_dir="$1"
+    local dest_dir="$2"
+    
+    # Define the list of required Flutter files
+    local flutter_files=(
+        "flutter-sdk-3.35.3.json"
+        "flutter-shared.sh.patch"
+        "package_config.json"
+        "pubspec-sources.json"
+    )
+    
+    echo "📦 Copying Flutter build files..."
+    
+    for file in "${flutter_files[@]}"; do
+        local source_file="$source_dir/$file"
+        local dest_file="$dest_dir/$file"
+        
+        if [[ -f "$source_file" ]]; then
+            echo "  ✓ Copying $file"
+            cp "$source_file" "$dest_file"
+        else
+            echo "❌ Error: Required Flutter file not found: $file"
+            echo "   Expected location: $source_file"
+            echo "   Please ensure all required Flutter files are present before running this script."
+            exit 1
+        fi
+    done
+    
+    echo "✅ All Flutter files copied successfully"
+}
 
-if [[ -f "$SCRIPT_DIR/app.towdow.TowDow/flutter-sdk-3.35.3.json" ]]; then
-    cp "$SCRIPT_DIR/app.towdow.TowDow/flutter-sdk-3.35.3.json" "$APP_DIR/"
-else
-    echo "⚠️  Warning: flutter-sdk-3.35.3.json not found. You may need to generate it."
-fi
+# Copy additional required files for Flutter builds
+copy_flutter_files "$SCRIPT_DIR/app.towdow.TowDow" "$APP_DIR"
 
 # Update version numbers in files
 echo "🔢 Updating version numbers..."
