@@ -176,7 +176,7 @@ build_flatpak:
     - echo "CI_COMMIT_SHA$$CI_COMMIT_SHA" >> build.env
   script:
     - bash CI_scripts/linux/flatpak/build_flatpak_ci.sh $CI_COMMIT_SHA
-    - flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak app.towdow.TowDow stable
+    - flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak app.towdow.TowDow master
 
 build_android:
   stage: build
