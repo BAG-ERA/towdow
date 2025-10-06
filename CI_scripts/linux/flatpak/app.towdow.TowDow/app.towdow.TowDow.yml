@@ -39,15 +39,11 @@ modules:
       - cp -r $BUNDLE_PATH/lib /app/bin/lib
       - cp -r $BUNDLE_PATH/data /app/bin/data
       - null
-      - install -Dm644 CI_scripts/linux/flatpak/data/app.towdow.TowDow.desktop /app/share/applications/app.towdow.TowDow.desktop
-      - install -Dm644 CI_scripts/linux/flatpak/data/app.towdow.TowDow.metainfo.xml
+      - install -Dm644 linux/app.towdow.TowDow.desktop /app/share/applications/app.towdow.TowDow.desktop
+      - install -Dm644 linux/app.towdow.TowDow.metainfo.xml
         /app/share/metainfo/app.towdow.TowDow.metainfo.xml
-      - install -Dm644 CI_scripts/linux/flatpak/data/icons/hicolor/64x64/apps/app.towdow.TowDow.png
-        /app/share/icons/hicolor/64x64/apps/app.towdow.TowDow.png
-      - install -Dm644 CI_scripts/linux/flatpak/data/icons/hicolor/128x128/apps/app.towdow.TowDow.png
-        /app/share/icons/hicolor/128x128/apps/app.towdow.TowDow.png
-      - install -Dm644 CI_scripts/linux/flatpak/data/icons/hicolor/256x256/apps/app.towdow.TowDow.png
-        /app/share/icons/hicolor/256x256/apps/app.towdow.TowDow.png
+      - install -Dm644 linux/icons/hicolor/scalable/apps/Flow-it_icon-Default.svg
+        /app/share/icons/hicolor/scalable/apps/app.towdow.TowDow.svg
     sources:
       - pubspec-sources.json
       - type: git

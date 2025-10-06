@@ -39,7 +39,6 @@ flatpak-builder \
     --force-clean \
     --sandbox \
     --user \
-    --install \
     --install-deps-from=flathub \
     build \
     "${SCRIPT_DIR}/app.towdow.TowDow/app.towdow.TowDow.yml"
