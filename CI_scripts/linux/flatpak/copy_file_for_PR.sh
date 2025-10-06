@@ -138,6 +138,7 @@ copy_flutter_files "$SCRIPT_DIR/app.towdow.TowDow" "$APP_DIR"
 # Update commit sha in manifest
 echo "🔢 Updating commit sha"
 sed -i "s/__COMMIT_ID__/$COMMIT_SHA/g" "$APP_DIR/app.towdow.TowDow.yml"
+sed -i "s/__VERSION__/$VERSION/g" "$APP_DIR/app.towdow.TowDow.yml"
 
 
 # Create a README for the PR
