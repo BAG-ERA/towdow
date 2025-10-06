@@ -56,6 +56,7 @@ echo "Flatpak CI build completed successfully!"
 flatpak build-update-repo --generate-static-deltas repo  || exit $?
 
 echo "Running linter"
+flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest app.towdow.TowDow.yml  || exit $?
 flatpak run --command=flatpak-builder-lint org.flatpak.Builder repo repo || exit $?
 
 echo "Linter succeeded"
