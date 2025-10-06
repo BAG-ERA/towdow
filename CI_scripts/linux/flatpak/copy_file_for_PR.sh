@@ -87,21 +87,21 @@ if [[ ! -d "$FLATHUB_REPO_DIR" ]]; then
     exit 1
 fi
 
-# Create app directory in Flathub repo
-APP_DIR="$FLATHUB_REPO_DIR/apps/$APP_ID"
-echo "📂 Creating app directory: $APP_DIR"
-mkdir -p "$APP_DIR"
+# Files will be placed directly at the top level of the Flathub repo
+# No app subdirectory needed per Flathub requirements
+APP_DIR="$FLATHUB_REPO_DIR"
+echo "📂 Files will be placed at top level of Flathub repo: $APP_DIR"
 
-# Copy the Flathub-compliant manifest
+# Copy the Flathub-compliant manifest to top level
 echo "📄 Copying Flathub manifest..."
 cp "$SCRIPT_DIR/app.towdow.TowDow/app.towdow.TowDow.yml" "$APP_DIR/"
 
-# Copy metadata files
+# Copy metadata files to top level
 echo "📋 Copying metadata files..."
 cp "$SCRIPT_DIR/data/app.towdow.TowDow.desktop" "$APP_DIR/"
 cp "$SCRIPT_DIR/data/app.towdow.TowDow.metainfo.xml" "$APP_DIR/"
 
-# Copy icons
+# Copy icons to top level
 echo "🎨 Copying icons..."
 mkdir -p "$APP_DIR/icons"
 cp -r "$SCRIPT_DIR/data/icons/"* "$APP_DIR/icons/"
@@ -142,9 +142,11 @@ copy_flutter_files() {
 # Copy additional required files for Flutter builds
 copy_flutter_files "$SCRIPT_DIR/app.towdow.TowDow" "$APP_DIR"
 
-# Update version numbers in files
-echo "🔢 Updating version numbers..."
+# Update version numbers and date in files
+echo "🔢 Updating version numbers and date..."
+CURRENT_DATE=$(date +%Y-%m-%d)
 sed -i "s/0\.0\.0/$VERSION/g" "$APP_DIR/app.towdow.TowDow.metainfo.xml"
+sed -i "s/date=\"[^\"]*\"/date=\"$CURRENT_DATE\"/g" "$APP_DIR/app.towdow.TowDow.metainfo.xml"
 
 echo "🔢 Updating commit sha"
 sed -i "s/__COMMIT_ID__/$COMMIT_SHA/g" "$APP_DIR/app.towdow.TowDow.yml"
@@ -194,20 +196,21 @@ EOF
 # Show what was copied
 echo ""
 echo "✅ Files copied successfully!"
-echo "📁 App directory: $APP_DIR"
+echo "📁 Files placed at top level of Flathub repo: $APP_DIR"
 echo ""
-echo "📋 Files in app directory:"
-ls -la "$APP_DIR"
+echo "📋 TowDow-related files in Flathub repo root:"
+ls -la "$APP_DIR" | grep -E "(app\.towdow\.TowDow|icons|README|flutter-sdk|flutter-shared|package_config|pubspec-sources)"
 echo ""
 echo "🎯 Next steps:"
 echo "1. cd $FLATHUB_REPO_DIR"
 echo "2. git checkout -b $APP_ID"
-echo "3. git add apps/$APP_ID/"
-echo "4. git commit -m \"Add $APP_ID task management application\""
-echo "5. git push origin $APP_ID"
-echo "6. Create PR on GitHub: https://github.com/flathub/flathub"
+echo "3. git add app.towdow.TowDow.yml app.towdow.TowDow.desktop app.towdow.TowDow.metainfo.xml app.towdow.TowDow.png icons/ README.md"
+echo "4. git add flutter-sdk-3.35.3.json flutter-shared.sh.patch package_config.json pubspec-sources.json"
+echo "5. git commit -m \"Add $APP_ID task management application\""
+echo "6. git push origin $APP_ID"
+echo "7. Create PR on GitHub: https://github.com/flathub/flathub"
 echo ""
 echo "🔍 To verify the files:"
-echo "  flatpak-builder-lint $APP_DIR/flatpak-manifest.yml"
+echo "  flatpak-builder-lint $APP_DIR/app.towdow.TowDow.yml"
 echo ""
 echo "✨ PR preparation complete!"
