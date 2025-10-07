@@ -2,23 +2,25 @@
 
 # Flatpak CI build script for TowDow
 # Simplified version for GitLab CI integration
-# Usage: build_flatpak_ci.sh <COMMIT_ID>
+# Usage: build_flatpak_ci.sh <TAG> <COMMIT_ID>
 
 set -euo pipefail
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(dirname "$0")"
 
-# Check if COMMIT_ID argument is provided
-if [ $# -eq 0 ]; then
-    echo "Error: COMMIT_ID argument is required"
-    echo "Usage: $0 <COMMIT_ID>"
+# Check if both TAG and COMMIT_ID arguments are provided
+if [ $# -lt 2 ]; then
+    echo "Error: Both TAG and COMMIT_ID arguments are required"
+    echo "Usage: $0 <TAG> <COMMIT_ID>"
     exit 1
 fi
 
-COMMIT_ID="$1"
+TAG="$1"
+COMMIT_ID="$2"
 
 echo "update commit in app.towdow.TowDow/app.towdow.TowDow.yml"
+sed -i "s/__VERSION__/${TAG}/g" "${SCRIPT_DIR}/app.towdow.TowDow/app.towdow.TowDow.yml"
 sed -i "s/__COMMIT_ID__/${COMMIT_ID}/g" "${SCRIPT_DIR}/app.towdow.TowDow/app.towdow.TowDow.yml"
 
 echo "Starting Flatpak CI build..."
@@ -33,8 +35,8 @@ mkdir -p repo
 ostree init --repo=repo --mode=archive-z2
 
 # Build the Flatpak package
-echo "Building Flatpak package..."
-flatpak-builder \
+echo "Building Flatpak package with TAG: ${TAG} and COMMIT_ID: ${COMMIT_ID}..."
+VERSION="${TAG}" flatpak-builder \
     --repo=repo \
     --force-clean \
     --sandbox \
