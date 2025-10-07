@@ -16,7 +16,7 @@ finish-args:
   # Needs to talk to the network:
   - --share=network
   # Needs to save files locally
-  - --filesystem=xdg-documents
+  - --filesystem=xdg-data
   # persist local storage
   - -persist=.local/share/towdow
 modules:
