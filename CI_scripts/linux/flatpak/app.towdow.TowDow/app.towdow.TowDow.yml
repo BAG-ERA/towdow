@@ -31,7 +31,6 @@ modules:
         PUB_CACHE: /run/build/TowDow/.pub-cache
     build-commands:
       - setup-flutter.sh -C .
-      - flutter --version
       - dart run build_runner build --delete-conflicting-outputs
       - flutter gen-l10n
       - sed -i "s/__VERSION__/$VERSION/g" "pubspec.yaml"
