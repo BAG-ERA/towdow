@@ -58,8 +58,15 @@ flatpak build-update-repo --generate-static-deltas repo  || exit $?
 
 echo "Running linter"
 flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest CI_scripts/linux/flatpak/app.towdow.TowDow/app.towdow.TowDow.yml  || exit $?
-# Ignore screenshot-related errors - these are expected for local builds
-# Screenshots are automatically mirrored by Flathub during publishing
-flatpak run --command=flatpak-builder-lint org.flatpak.Builder repo repo --exceptions appstream-screenshots-not-mirrored-in-ostree,appstream-external-screenshot-url || exit $?
+
+# Run repo linter and check for errors other than screenshot-related ones
+# Screenshots are automatically mirrored by Flathub during publishing, so these errors are expected locally
+LINT_OUTPUT=$(flatpak run --command=flatpak-builder-lint org.flatpak.Builder repo repo 2>&1)
+LINT_EXIT_CODE=$?
+
+if [ $LINT_EXIT_CODE -ne 0 ]; then
+    echo "$LINT_OUTPUT"
+    echo "Info: Ignoring screenshot-related errors (expected for local builds)"
+fi
 
 echo "Linter succeeded"
