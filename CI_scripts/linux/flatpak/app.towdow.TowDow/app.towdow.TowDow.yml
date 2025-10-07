@@ -33,7 +33,7 @@ modules:
       - setup-flutter.sh -C .
       - dart run build_runner build --delete-conflicting-outputs
       - flutter gen-l10n
-      - sed -i "s/__VERSION__/$VERSION/g" "pubspec.yaml"
+      - sed -i "s/0.0.0/$VERSION/g" "pubspec.yaml"
       - flutter build linux --release --no-pub --build-name=$VERSION
       - install -D $BUNDLE_PATH/towdow_app /app/bin/towdow_app
       - cp -r $BUNDLE_PATH/lib /app/bin/lib
