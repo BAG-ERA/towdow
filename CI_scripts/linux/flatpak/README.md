@@ -5,7 +5,8 @@
 Build the  [app.towdow.TowDow.yml](app.towdow.TowDow/app.towdow.TowDow.yml) file from https://github.com/TheAppgineer/flatpak-flutter
 
 ```shell
-cd CI_scripts/linux/flatpak/app.towdow.TowDow
+cd CI_scripts/linux/flatpak/
+cd app.towdow.TowDow/
 docker run --rm -v "$PWD":/usr/src/flatpak -u `id -u`:`id -g` theappgineer/flatpak-flutter:latest flatpak-flutter.yml
 ```
 

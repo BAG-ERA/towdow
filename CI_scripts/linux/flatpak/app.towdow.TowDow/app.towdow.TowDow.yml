@@ -35,13 +35,10 @@ modules:
       - dart run build_runner build --delete-conflicting-outputs
       - flutter gen-l10n
       - sed -i "s/__VERSION__/$VERSION/g" "pubspec.yaml"
-      - echo "Updated pubspec.yaml version to __VERSION__"
-      - cat pubspec.yaml | grep "version:"
-      - flutter build linux --release --no-pub
+      - flutter build linux --release --no-pub --build-name=$VERSION
       - install -D $BUNDLE_PATH/towdow_app /app/bin/towdow_app
       - cp -r $BUNDLE_PATH/lib /app/bin/lib
       - cp -r $BUNDLE_PATH/data /app/bin/data
-      - null
       - install -Dm644 CI_scripts/linux/flatpak/data/app.towdow.TowDow.desktop /app/share/applications/app.towdow.TowDow.desktop
       - install -Dm644 CI_scripts/linux/flatpak/data/app.towdow.TowDow.metainfo.xml
         /app/share/metainfo/app.towdow.TowDow.metainfo.xml
