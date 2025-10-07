@@ -17,6 +17,8 @@ finish-args:
   - --share=network
   # Needs to save files locally
   - --filesystem=xdg-documents
+  # persist local storage
+  - -persist=.local/share/towdow
 modules:
   - name: TowDow
     buildsystem: simple
