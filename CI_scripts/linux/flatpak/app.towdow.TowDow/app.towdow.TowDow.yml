@@ -33,7 +33,6 @@ modules:
       - dart run build_runner build --delete-conflicting-outputs
       - flutter gen-l10n
       - sed -i "s/0.0.0/__VERSION__/g" "pubspec.yaml"
-      - sed -i "s/final isFlatpak = false;/final isFlatpak = true;/g" lib/data/services/storage/local_storage_service.dart
       - flutter build linux --release --no-pub --build-name=__VERSION__
       - install -D $BUNDLE_PATH/towdow_app /app/bin/towdow_app
       - cp -r $BUNDLE_PATH/lib /app/bin/lib

@@ -79,11 +79,10 @@ class LocalStorageService {
           // Choose platform-appropriate persistent data directory
           Directory baseDir;
           if (Platform.isLinux) {
-            // when building for flatpak this will be changed to true
-            final isFlatpak = false;
-            if (isFlatpak) {
-              final home = Platform.environment['HOME'] ?? Directory.current.path;
-              baseDir = Directory(path.join(home, '.var', 'app', 'app.towdow.TowDow'));
+            if (Platform.environment['XDG_DATA_HOME'] != null){
+              // running in flatpak, use XDG_DATA_HOME for local storage
+              final home = Platform.environment['XDG_DATA_HOME'] ?? Directory.current.path;
+              baseDir = Directory(home);
             }
             else{
               // Use ~/.local/share/towdow
