@@ -79,9 +79,17 @@ class LocalStorageService {
           // Choose platform-appropriate persistent data directory
           Directory baseDir;
           if (Platform.isLinux) {
-            // Use ~/.local/share/towdow
-            final home = Platform.environment['HOME'] ?? Directory.current.path;
-            baseDir = Directory(path.join(home, '.local', 'share', 'towdow'));
+            // when building for flatpak this will be changed to true
+            final isFlatpak = false;
+            if (isFlatpak) {
+              final home = Platform.environment['HOME'] ?? Directory.current.path;
+              baseDir = Directory(path.join(home, '.var', 'app', 'app.towdow.TowDow'));
+            }
+            else{
+              // Use ~/.local/share/towdow
+              final home = Platform.environment['HOME'] ?? Directory.current.path;
+              baseDir = Directory(path.join(home, '.local', 'share', 'towdow'));
+            }
           } else if (Platform.isWindows) {
             // Use AppData\\Roaming\\TowDow (Application Support)
             final appSupport = await getApplicationSupportDirectory();
