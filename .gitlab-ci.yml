@@ -42,6 +42,7 @@ update_metainfo:
   artifacts:
     paths:
       - linux/app.towdow.TowDow.metainfo.xml
+      - linux/packaging/deb/make_config.yaml
     expire_in: 1 week
 
 #build_base_image:

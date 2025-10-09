@@ -1,5 +1,6 @@
 display_name: TowDow
 package_name: towdow
+version: "0.0.0"
 maintainer:
   name: TowDow
   email: towdowapp@gmail.com
