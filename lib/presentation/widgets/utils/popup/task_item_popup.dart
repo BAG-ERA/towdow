@@ -11,7 +11,6 @@ import '../../task_item/task_item_titlebar.dart';
 import '../../task_item/task_item_description.dart';
 import '../../task_item/task_item_validatorlist.dart';
 import '../../task_item/task_item_toolbar.dart';
-import '../task_completion_animation.dart';
 
 class TaskItemPopup extends StatefulWidget {
   final Task task;
@@ -242,13 +241,10 @@ class _TaskItemPopupState extends State<TaskItemPopup> {
       return;
     }
 
-    // Show completion animation
-    await TaskCompletionAnimation.show(context);
-    
-    // Call the completion callback
+    // Call the completion callback (animation will play on the main screen)
     widget.onToggleComplete!.call();
     
-    // Close the popup after animation
+    // Close the popup immediately
     if (mounted) {
       Navigator.of(context).pop();
     }
@@ -609,13 +605,10 @@ class _AnchoredTaskCardState extends State<_AnchoredTaskCard>
       return;
     }
     
-    // Show completion animation
-    await TaskCompletionAnimation.show(context);
-    
-    // Call the completion callback
+    // Call the completion callback (animation will play on the main screen)
     widget.onToggleComplete!.call();
     
-    // Close the popup after animation
+    // Close the popup immediately
     if (mounted) {
       Navigator.of(context).pop();
     }
