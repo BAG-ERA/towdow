@@ -122,6 +122,30 @@ build_appimage:
     reports:
       dotenv: build.env
 
+build_deb:
+  stage: build
+  image: $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
+  needs:
+    - job: update_version
+      artifacts: true
+    - job: test
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  before_script:
+    - echo "BUILD_DEB_JOB_ID=$CI_JOB_ID" > build.env
+    - echo "CI_PIPELINE_IID=$CI_PIPELINE_IID" >> build.env
+    - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+  script:
+    - dart pub global activate fastforge
+    - export PATH=$PATH:$HOME/.pub-cache/bin
+    - bash CI_scripts/linux/build_deb.sh
+  artifacts:
+    paths:
+      - "dist/$CI_COMMIT_TAG/towdow_app-$CI_COMMIT_TAG-linux.deb"
+    expire_in: 1 week
+    reports:
+      dotenv: build.env
+
 build_snapcraft:
   stage: build
   tags:
@@ -324,6 +348,8 @@ release:
       artifacts: true
     - job: prepare_release
       artifacts: true
+    - job: build_deb
+      artifacts: true
   rules:
     - if: '$CI_COMMIT_TAG'
   script:
@@ -354,6 +380,8 @@ release:
           url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/runner/Release/towdow_app-$CI_COMMIT_TAG.msix"
         - name: "TowDow Windows msix no version"
           url: "$CI_PROJECT_URL/-/jobs/$WINDOWS_JOB_ID/artifacts/file/build/windows/x64/runner/Release/towdow_app.msix"
+        - name: "TowDow .deb package"
+          url: "$CI_PROJECT_URL/-/jobs/$BUILD_DEB_JOB_ID/artifacts/file/dist/$CI_COMMIT_TAG/towdow_app-$CI_COMMIT_TAG-linux.deb"
 
 deploy_web:
   stage: release

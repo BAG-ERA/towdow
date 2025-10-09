@@ -1,0 +1,64 @@
+display_name: TowDow
+package_name: towdow
+maintainer:
+  name: TowDow
+  email: towdowapp@gmail.com
+priority: optional
+section: x11
+installed_size: 6604
+essential: false
+icon: assets/icons/logo/Flow-it_Default.png
+
+# Runtime dependencies based on ldd analysis
+dependencies:
+  # Core GTK3 (brings many dependencies transitively)
+  - libgtk-3-0
+  - libglib2.0-0
+  - libgdk-pixbuf-2.0-0
+  # Plugins requirements
+  - libsecret-1-0
+  - xdg-utils
+  # X11 libraries for window management and screen operations
+  - libx11-6
+  - libxi6
+  - libxrandr2
+  - libxinerama1
+  - libxcursor1
+  - libxcomposite1
+  - libxdamage1
+  - libxfixes3
+  - libxext6
+  # Graphics and text rendering
+  - libcairo2
+  - libpango-1.0-0
+  - libatk1.0-0
+  - libepoxy0
+  # Wayland support
+  - libwayland-client0
+  - libwayland-cursor0
+  - libwayland-egl1
+  - libxkbcommon0
+  # System libraries
+  - libblkid1
+  - liblzma5
+
+postinstall_scripts:
+  - echo "Installed TowDow"
+# Temporarily commented due to fastforge parsing bug
+# postuninstall_scripts:
+#   - echo "Care for any feedback, send us a my: towdowapp@gmail.com"
+
+keywords:
+  - Task management
+  - Workflow
+  - Project management
+
+generic_name: TowDow
+
+categories:
+  - Productivity
+
+startup_notify: true
+# You can also specify [metainfo](https://freedesktop.org/software/appstream/docs/chap-Quickstart.html) file
+# which contains metadata of the app.
+# metainfo: linux/packaging/myappid.appdata.xml
