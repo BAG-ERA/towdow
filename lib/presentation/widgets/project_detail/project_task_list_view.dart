@@ -339,13 +339,17 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
   }
 
   Future<void> _toggleTaskComplete(BuildContext context, WidgetRef ref, Task task) async {
-    // Show completion animation if marking task as complete
+    // Start task update immediately (optimistic UI)
+    final taskViewModel = ref.read(taskViewModelProvider.notifier);
+    final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+    // Show completion animation in parallel to mask any update delay
     if (task.status != 'COMPLETED') {
       await TaskCompletionAnimation.show(context);
     }
 
-    final taskViewModel = ref.read(taskViewModelProvider.notifier);
-    await taskViewModel.toggleTaskCompletion(task);
+    // Ensure task update completes
+    await updateFuture;
     
     // Refresh the tasks list
     widget.onTasksRefresh?.call();

@@ -404,12 +404,17 @@ class _TaskListTab extends ConsumerWidget {
                                       child: TaskItem(
                                         task: task,
                                         onToggleComplete: () async {
-                                          // Show completion animation if marking task as complete
+                                          // Start task update immediately (optimistic UI)
+                                          final taskViewModel = ref.read(taskViewModelProvider.notifier);
+                                          final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+                                          // Show completion animation in parallel to mask any update delay
                                           if (task.status != 'COMPLETED') {
                                             await TaskCompletionAnimation.show(context);
                                           }
-                                          
-                                          await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
+
+                                          // Ensure task update completes
+                                          await updateFuture;
                                         },
                                         onTaskUpdated: (updatedTask) async {
                                           await ref.read(taskViewModelProvider.notifier).updateTask(updatedTask);

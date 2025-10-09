@@ -12,10 +12,18 @@ import 'package:flutter/material.dart';
 /// This widget shows a circular background with an animated checkmark that scales in
 /// and fades out. It's designed to provide visual feedback when a task is completed.
 /// 
-/// Usage:
+/// Usage (Optimistic UI - animation runs in parallel with task update):
 /// ```dart
-/// await TaskCompletionAnimation.show(context);
-/// // Task completion logic continues after animation
+/// // Start task update immediately
+/// final updateFuture = taskViewModel.toggleTaskCompletion(task);
+/// 
+/// // Show animation in parallel to mask any update delay
+/// if (task.status != 'COMPLETED') {
+///   await TaskCompletionAnimation.show(context);
+/// }
+/// 
+/// // Ensure task update completes
+/// await updateFuture;
 /// ```
 class TaskCompletionAnimation extends StatefulWidget {
   /// The duration of the animation

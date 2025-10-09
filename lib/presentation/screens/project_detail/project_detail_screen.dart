@@ -979,13 +979,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           return;
         }
 
-        // Show completion animation if marking task as complete
+        // Start task update immediately (optimistic UI)
+        final taskViewModel = ref.read(taskViewModelProvider.notifier);
+        final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+        // Show completion animation in parallel to mask any update delay
         if (task.status != 'COMPLETED') {
           await TaskCompletionAnimation.show(context);
         }
 
-        final taskViewModel = ref.read(taskViewModelProvider.notifier);
-        await taskViewModel.toggleTaskCompletion(task);
+        // Ensure task update completes
+        await updateFuture;
         
         // Task updates handled by repository streams - no manual refresh needed
       },
@@ -1143,13 +1147,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       return KanbanBoard(
       columns: columns,
       onTaskToggle: (task) async {
-        // Show completion animation if marking task as complete
+        // Start task update immediately (optimistic UI)
+        final taskViewModel = ref.read(taskViewModelProvider.notifier);
+        final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+        // Show completion animation in parallel to mask any update delay
         if (task.status != 'COMPLETED') {
           await TaskCompletionAnimation.show(context);
         }
 
-        final taskViewModel = ref.read(taskViewModelProvider.notifier);
-        await taskViewModel.toggleTaskCompletion(task);
+        // Ensure task update completes
+        await updateFuture;
         
         // Task updates handled by repository streams - no manual refresh needed
       },
@@ -1281,13 +1289,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           // Navigate to task detail
         },
         onTaskToggle: (task) async {
-          // Show completion animation if marking task as complete
+          // Start task update immediately (optimistic UI)
+          final taskViewModel = ref.read(taskViewModelProvider.notifier);
+          final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+          // Show completion animation in parallel to mask any update delay
           if (task.status != 'COMPLETED') {
             await TaskCompletionAnimation.show(context);
           }
 
-          final taskViewModel = ref.read(taskViewModelProvider.notifier);
-          await taskViewModel.toggleTaskCompletion(task);
+          // Ensure task update completes
+          await updateFuture;
           
           // Task updates handled by repository streams - no manual refresh needed
         },
