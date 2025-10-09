@@ -17,6 +17,7 @@ import '../step_item/step_container.dart';
 import '../step_item/step_tasklist.dart';
 import '../utils/popup/step_dialog.dart';
 import '../utils/popup/task_creation_dialog.dart';
+import '../utils/task_completion_animation.dart';
 // projectProvider removed
 
 class ProjectTaskStepView extends ConsumerStatefulWidget {
@@ -533,6 +534,11 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
         SnackBar(content: Text(AppLocalizations.of(context)!.waitingStepCannotComplete)),
       );
       return;
+    }
+
+    // Show completion animation if marking task as complete
+    if (task.status != 'COMPLETED') {
+      await TaskCompletionAnimation.show(context);
     }
 
     final taskViewModel = ref.read(taskViewModelProvider.notifier);

@@ -31,6 +31,7 @@ import '../../widgets/project_detail/project_warnings_banner.dart';
 import '../../widgets/project_detail/project_notes_quick_panel.dart';
 import '../../widgets/project_detail/project_note_view.dart';
 import '../../widgets/utils/voice_feedback_button.dart';
+import '../../widgets/utils/task_completion_animation.dart';
 
 // ViewModel provider for a specific project
 final projectDetailViewModelProvider = StateNotifierProvider.family<ProjectDetailViewModel, ProjectDetailState, String>((ref, projectPath) {
@@ -972,6 +973,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           return;
         }
 
+        // Show completion animation if marking task as complete
+        if (task.status != 'COMPLETED') {
+          await TaskCompletionAnimation.show(context);
+        }
+
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
         await taskViewModel.toggleTaskCompletion(task);
         
@@ -1131,6 +1137,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       return KanbanBoard(
       columns: columns,
       onTaskToggle: (task) async {
+        // Show completion animation if marking task as complete
+        if (task.status != 'COMPLETED') {
+          await TaskCompletionAnimation.show(context);
+        }
+
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
         await taskViewModel.toggleTaskCompletion(task);
         
@@ -1264,6 +1275,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           // Navigate to task detail
         },
         onTaskToggle: (task) async {
+          // Show completion animation if marking task as complete
+          if (task.status != 'COMPLETED') {
+            await TaskCompletionAnimation.show(context);
+          }
+
           final taskViewModel = ref.read(taskViewModelProvider.notifier);
           await taskViewModel.toggleTaskCompletion(task);
           

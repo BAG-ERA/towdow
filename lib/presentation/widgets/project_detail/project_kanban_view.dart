@@ -12,6 +12,7 @@ import '../../../core/logger.dart';
 import '../../../core/result.dart';
 import '../../widgets/kanban_board.dart';
 import '../utils/popup/task_creation_dialog.dart';
+import '../utils/task_completion_animation.dart';
 import '../../../data/models/step.dart';
 // projectProvider removed; use calendarListProvider to read project state
 
@@ -276,6 +277,11 @@ class ProjectKanbanView extends ConsumerWidget {
             SnackBar(content: Text(AppLocalizations.of(context)!.waitingStepCannotComplete)),
           );
           return;
+        }
+
+        // Show completion animation if marking task as complete
+        if (task.status != 'COMPLETED') {
+          await TaskCompletionAnimation.show(context);
         }
 
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
