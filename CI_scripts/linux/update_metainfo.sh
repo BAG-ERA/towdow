@@ -77,4 +77,12 @@ echo ""
 echo "📋 Updated config version:"
 grep "^version:" "$CONFIG_FILE" || echo "Version line not found in config"
 
+echo ""
+echo "📋 Updated metainfo path in config:"
+grep "^metainfo:" "$CONFIG_FILE" || echo "Metainfo path not found in config"
+
+echo ""
+echo "📋 Full metainfo file content (release section):"
+grep -A 5 -B 1 "<release" "$METAINFO_FILE" || echo "Release section not found"
+
 echo "✅ Metainfo update completed!"

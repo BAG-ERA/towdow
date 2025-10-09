@@ -150,6 +150,14 @@ build_deb:
     - echo "BUILD_DEB_JOB_ID=$CI_JOB_ID" > build.env
     - echo "CI_PIPELINE_IID=$CI_PIPELINE_IID" >> build.env
     - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+    # Verify the updated files are present
+    - echo "🔍 Verifying updated files..."
+    - echo "Version in make_config.yaml:"
+    - grep "^version:" linux/packaging/deb/make_config.yaml || echo "Version not found"
+    - echo "Version in metainfo.xml:"
+    - grep -A 1 "<release" linux/app.towdow.TowDow.metainfo.xml || echo "Release section not found"
+    - echo "Pubspec version:"
+    - grep "^version:" pubspec.yaml || echo "Pubspec version not found"
   script:
     - dart pub global activate fastforge
     - export PATH=$PATH:$HOME/.pub-cache/bin
