@@ -112,4 +112,6 @@ towdow_app-*.AppImage
 towdow_*_amd64.snap
 repo
 towdow*.flatpak
+dist
+CI_scripts/linux/build/
 CI_scripts/linux/flatpak/app.towdow.TowDow/build/
