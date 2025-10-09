@@ -139,17 +139,40 @@ class _ExternalEventsListState extends ConsumerState<ExternalEventsList> {
                 : AnimatedOpacity(
                     duration: const Duration(milliseconds: 250),
                     opacity: 1.0,
-                    child: Column(
-                      children: [
-                        _buildEventsLayout(context),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final screenHeight = MediaQuery.of(context).size.height;
+                        final isMobile = MediaQuery.of(context).size.width < 600;
                         
-                        // Divider after events
-                        Container(
-                          margin: const EdgeInsets.only(top: 8),
-                          height: 1,
-                          color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
-                        ),
-                      ],
+                        // On mobile, limit external calendar height to 30% of screen
+                        final maxHeight = isMobile ? screenHeight * 0.3 : double.infinity;
+                        
+                        final content = Column(
+                          children: [
+                            _buildEventsLayout(context),
+                            
+                            // Divider after events
+                            Container(
+                              margin: const EdgeInsets.only(top: 8),
+                              height: 1,
+                              color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                            ),
+                          ],
+                        );
+                        
+                        if (isMobile) {
+                          return ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: maxHeight,
+                            ),
+                            child: SingleChildScrollView(
+                              child: content,
+                            ),
+                          );
+                        } else {
+                          return content;
+                        }
+                      },
                     ),
                   ),
             ),
