@@ -755,17 +755,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           const VoiceFeedbackButton(),
           // Spacer to push project actions to the right
           const Spacer(),
-          // Sync monitoring status
-          const Padding(
-            padding: EdgeInsets.only(right: 12.0),
-            child: MonitoringStatusWidget(compact: true),
-          ),
           projectAsync.when(
             data: (project) => project != null
                 ? _buildProjectActionButton(context, project)
                 : const SizedBox.shrink(),
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
+          ),
+          // Sync monitoring status
+          const Padding(
+            padding: EdgeInsets.only(left: 12.0),
+            child: MonitoringStatusWidget(compact: true),
           ),
         ],
       ),

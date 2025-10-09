@@ -408,15 +408,15 @@ class _WorkflowDetailScreenState extends ConsumerState<WorkflowDetailScreen> {
           const VoiceFeedbackButton(),
           // Spacer to push workflow actions to the right
           const Spacer(),
-          // Sync monitoring status
-          const Padding(
-            padding: EdgeInsets.only(right: 12.0),
-            child: MonitoringStatusWidget(compact: true),
-          ),
           projectAsync.when(
             data: (project) => project != null ? _buildWorkflowActions(context, project) : const SizedBox.shrink(),
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
+          ),
+          // Sync monitoring status
+          const Padding(
+            padding: EdgeInsets.only(left: 12.0),
+            child: MonitoringStatusWidget(compact: true),
           ),
         ],
       ),
