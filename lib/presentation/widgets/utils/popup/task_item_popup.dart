@@ -1,9 +1,9 @@
 // Popup variant of the Task UI
 // Shows the extended task view in a centered dialog with a dark overlay
 
-import 'package:flutter/material.dart';
 import 'dart:math' as math;
-// no-op
+
+import 'package:flutter/material.dart';
 
 import '../../../../data/models/task.dart';
 import '../../../../data/services/validator_service.dart';
@@ -11,8 +11,9 @@ import '../../task_item/task_item_titlebar.dart';
 import '../../task_item/task_item_description.dart';
 import '../../task_item/task_item_validatorlist.dart';
 import '../../task_item/task_item_toolbar.dart';
+import '../task_completion_animation.dart';
 
-class TaskItemPopup extends StatelessWidget {
+class TaskItemPopup extends StatefulWidget {
   final Task task;
   final Function(Task)? onTaskUpdated;
   final VoidCallback? onTaskDeleted;
@@ -27,87 +28,7 @@ class TaskItemPopup extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isCompleted = task.status == 'COMPLETED';
-
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 820),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TaskItemTitlebar(
-                task: task,
-                isExpanded: true,
-                isCompleted: isCompleted,
-                onToggleComplete: () => _handleTaskCompletion(context),
-                onToggleExpanded: null,
-                onTaskUpdated: onTaskUpdated,
-                trailing: IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 20),
-                  tooltip: 'Close',
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              TaskItemDescription(
-                task: task,
-                onTaskUpdated: onTaskUpdated,
-              ),
-
-              const SizedBox(height: 8),
-
-              TaskItemValidatorList(
-                task: task,
-                onTaskUpdated: onTaskUpdated,
-              ),
-
-              const SizedBox(height: 8),
-
-              TaskItemToolbar(
-                task: task,
-                onTaskUpdated: onTaskUpdated,
-                onTaskDeleted: () {
-                  if (onTaskDeleted != null) {
-                    onTaskDeleted!();
-                  }
-                  // Close the popup after deletion
-                  Navigator.of(context).maybePop();
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _handleTaskCompletion(BuildContext context) {
-    // If no handler provided, do nothing
-    if (onToggleComplete == null) return;
-
-    final validators = ValidatorService.parseValidators(task.flowitValidator);
-    if (validators.isNotEmpty && !ValidatorService.areValidatorsCompleted(validators)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please complete all required completion requirements before marking the task as done'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    onToggleComplete!.call();
-  }
+  State<TaskItemPopup> createState() => _TaskItemPopupState();
 
   static Future<T?> show<T>(
     BuildContext context, {
@@ -237,6 +158,100 @@ class TaskItemPopup extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class _TaskItemPopupState extends State<TaskItemPopup> {
+  @override
+  Widget build(BuildContext context) {
+    final isCompleted = widget.task.status == 'COMPLETED';
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 820),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TaskItemTitlebar(
+                task: widget.task,
+                isExpanded: true,
+                isCompleted: isCompleted,
+                onToggleComplete: () => _handleTaskCompletion(context),
+                onToggleExpanded: null,
+                onTaskUpdated: widget.onTaskUpdated,
+                trailing: IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              TaskItemDescription(
+                task: widget.task,
+                onTaskUpdated: widget.onTaskUpdated,
+              ),
+
+              const SizedBox(height: 8),
+
+              TaskItemValidatorList(
+                task: widget.task,
+                onTaskUpdated: widget.onTaskUpdated,
+              ),
+
+              const SizedBox(height: 8),
+
+              TaskItemToolbar(
+                task: widget.task,
+                onTaskUpdated: widget.onTaskUpdated,
+                onTaskDeleted: () {
+                  if (widget.onTaskDeleted != null) {
+                    widget.onTaskDeleted!();
+                  }
+                  // Close the popup after deletion
+                  Navigator.of(context).maybePop();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleTaskCompletion(BuildContext context) async {
+    // If no handler provided, do nothing
+    if (widget.onToggleComplete == null) return;
+
+    final validators = ValidatorService.parseValidators(widget.task.flowitValidator);
+    if (validators.isNotEmpty && !ValidatorService.areValidatorsCompleted(validators)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please complete all required completion requirements before marking the task as done'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Show completion animation
+    await TaskCompletionAnimation.show(context);
+    
+    // Call the completion callback
+    widget.onToggleComplete!.call();
+    
+    // Close the popup after animation
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 }
 
@@ -469,22 +484,18 @@ class _AnchoredTaskCard extends StatefulWidget {
 }
 
 class _AnchoredTaskCardState extends State<_AnchoredTaskCard>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   // AnimatedSize handles the height growth to content height
   bool _expanded = false;
 
   @override
   void initState() {
     super.initState();
+    
     // Trigger the size animation on next frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _expanded = true);
     });
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   @override
@@ -583,7 +594,7 @@ class _AnchoredTaskCardState extends State<_AnchoredTaskCard>
     );
   }
 
-  void _handleTaskCompletion(BuildContext context) {
+  Future<void> _handleTaskCompletion(BuildContext context) async {
     if (widget.onToggleComplete == null) return;
     final validators = ValidatorService.parseValidators(widget.task.flowitValidator);
     if (validators.isNotEmpty && !ValidatorService.areValidatorsCompleted(validators)) {
@@ -597,7 +608,17 @@ class _AnchoredTaskCardState extends State<_AnchoredTaskCard>
       );
       return;
     }
+    
+    // Show completion animation
+    await TaskCompletionAnimation.show(context);
+    
+    // Call the completion callback
     widget.onToggleComplete!.call();
+    
+    // Close the popup after animation
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 }
 
