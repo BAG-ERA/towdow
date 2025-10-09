@@ -32,6 +32,18 @@ update_version:
       - pubspec.yaml
     expire_in: 1 week
 
+update_metainfo:
+  stage: version
+  image: alpine:latest
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - bash CI_scripts/linux/update_metainfo.sh
+  artifacts:
+    paths:
+      - linux/app.towdow.TowDow.metainfo.xml
+    expire_in: 1 week
+
 #build_base_image:
 #  stage: prepare
 #  image: docker:latest
@@ -127,6 +139,8 @@ build_deb:
   image: $CUSTOM_IMAGE_NAME:$CUSTOM_IMAGE_TAG
   needs:
     - job: update_version
+      artifacts: true
+    - job: update_metainfo
       artifacts: true
     - job: test
   rules:
