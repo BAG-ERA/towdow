@@ -1,0 +1,8 @@
+# Fastforge distribution configuration
+# https://fastforge.dev/
+
+# Disable automatic flutter clean to preserve generated files
+package:
+  clean: false
+
+output: dist/
