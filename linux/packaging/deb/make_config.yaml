@@ -7,7 +7,7 @@ priority: optional
 section: x11
 installed_size: 6604
 essential: false
-icon: assets/icons/logo/Flow-it_Default.png
+icon: assets/icons/logo/Flow-it_icon-Default.png
 
 # Runtime dependencies based on ldd analysis
 dependencies:
