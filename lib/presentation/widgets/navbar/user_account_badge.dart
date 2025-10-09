@@ -10,6 +10,7 @@ import '../../../data/models/caldav_account.dart';
 import '../../../data/providers/providers.dart';
 import '../adaptive_app_layout.dart';
 import '../../../core/logger.dart';
+import '../common/monitoring_status_widget.dart';
 
 class UserAccountBadge extends ConsumerWidget {
   const UserAccountBadge({super.key});
@@ -140,30 +141,34 @@ class UserAccountBadge extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Tooltip(
-          message: AppLocalizations.of(context)!.settings,
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              onTap: () {
-                context.go('/settings');
-                _closeDrawerIfMobile(context, ref);
-              },
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Tooltip(
+            message: AppLocalizations.of(context)!.settings,
+            child: Material(
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Icon(
-                  Icons.settings_rounded,
-                  size: 20,
-                  color: colorScheme.onSurfaceVariant,
+              child: InkWell(
+                onTap: () {
+                  context.go('/settings');
+                  _closeDrawerIfMobile(context, ref);
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Icon(
+                    Icons.settings_rounded,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+          const SizedBox(width: 8),
+          const MonitoringStatusWidget(compact: true),
+        ],
       ),
     );
   }

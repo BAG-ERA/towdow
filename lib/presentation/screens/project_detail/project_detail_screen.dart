@@ -31,6 +31,7 @@ import '../../widgets/project_detail/project_warnings_banner.dart';
 import '../../widgets/project_detail/project_notes_quick_panel.dart';
 import '../../widgets/project_detail/project_note_view.dart';
 import '../../widgets/utils/voice_feedback_button.dart';
+import '../../widgets/common/monitoring_status_widget.dart';
 import '../../widgets/utils/task_completion_animation.dart';
 
 // ViewModel provider for a specific project
@@ -761,6 +762,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 : const SizedBox.shrink(),
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
+          ),
+          // Sync monitoring status
+          const Padding(
+            padding: EdgeInsets.only(left: 12.0),
+            child: MonitoringStatusWidget(compact: true),
           ),
         ],
       ),
