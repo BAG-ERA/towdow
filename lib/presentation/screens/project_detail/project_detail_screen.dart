@@ -31,6 +31,7 @@ import '../../widgets/project_detail/project_warnings_banner.dart';
 import '../../widgets/project_detail/project_notes_quick_panel.dart';
 import '../../widgets/project_detail/project_note_view.dart';
 import '../../widgets/utils/voice_feedback_button.dart';
+import '../../widgets/common/monitoring_status_widget.dart';
 
 // ViewModel provider for a specific project
 final projectDetailViewModelProvider = StateNotifierProvider.family<ProjectDetailViewModel, ProjectDetailState, String>((ref, projectPath) {
@@ -754,6 +755,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           const VoiceFeedbackButton(),
           // Spacer to push project actions to the right
           const Spacer(),
+          // Sync monitoring status
+          const Padding(
+            padding: EdgeInsets.only(right: 12.0),
+            child: MonitoringStatusWidget(compact: true),
+          ),
           projectAsync.when(
             data: (project) => project != null
                 ? _buildProjectActionButton(context, project)
