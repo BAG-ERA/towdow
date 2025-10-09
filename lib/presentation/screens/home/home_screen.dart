@@ -18,6 +18,7 @@ import '../../../core/logger.dart';
 import '../../widgets/header_screen_widget.dart';
 import '../../widgets/common/monitoring_status_widget.dart';
 import '../../widgets/utils/buttons/create_task_button.dart';
+import '../../widgets/utils/task_completion_animation.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -403,6 +404,11 @@ class _TaskListTab extends ConsumerWidget {
                                       child: TaskItem(
                                         task: task,
                                         onToggleComplete: () async {
+                                          // Show completion animation if marking task as complete
+                                          if (task.status != 'COMPLETED') {
+                                            await TaskCompletionAnimation.show(context);
+                                          }
+                                          
                                           await ref.read(taskViewModelProvider.notifier).toggleTaskCompletion(task);
                                         },
                                         onTaskUpdated: (updatedTask) async {
