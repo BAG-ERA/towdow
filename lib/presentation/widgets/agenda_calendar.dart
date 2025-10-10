@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task.dart';
 import 'task_item/task_item.dart';
 import '../../core/theme/chart_theme.dart';
+import '../../../data/providers/providers.dart';
+import 'utils/task_completion_animation.dart';
 
 class AgendaCalendar extends ConsumerStatefulWidget {
   final List<Task> tasks;
@@ -288,7 +290,19 @@ class _AgendaCalendarState extends ConsumerState<AgendaCalendar> {
                           child: TaskItem(
                             task: task,
                             onTap: widget.onTaskTap != null ? () => widget.onTaskTap!(task) : null,
-                            onToggleComplete: widget.onTaskToggle != null ? () => widget.onTaskToggle!(task) : null,
+                            onToggleComplete: () async {
+                              // Start task update immediately (optimistic UI)
+                              final taskViewModel = ref.read(taskViewModelProvider.notifier);
+                              final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+                              // Show completion animation in parallel to mask any update delay
+                              if (task.status != 'COMPLETED') {
+                                await TaskCompletionAnimation.show(context);
+                              }
+
+                              // Ensure task update completes
+                              await updateFuture;
+                            },
                             onTaskUpdated: widget.onTaskUpdated != null ? (updatedTask) => widget.onTaskUpdated!(updatedTask) : null,
                             onTaskDeleted: widget.onTaskDeleted != null ? () => widget.onTaskDeleted!(task) : null,
                           ),

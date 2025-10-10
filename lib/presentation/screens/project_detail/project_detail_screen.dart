@@ -1288,21 +1288,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         onTaskTap: (task) {
           // Navigate to task detail
         },
-        onTaskToggle: (task) async {
-          // Start task update immediately (optimistic UI)
-          final taskViewModel = ref.read(taskViewModelProvider.notifier);
-          final updateFuture = taskViewModel.toggleTaskCompletion(task);
-
-          // Show completion animation in parallel to mask any update delay
-          if (task.status != 'COMPLETED') {
-            await TaskCompletionAnimation.show(context);
-          }
-
-          // Ensure task update completes
-          await updateFuture;
-          
-          // Task updates handled by repository streams - no manual refresh needed
-        },
+        // onTaskToggle is now handled internally by AgendaCalendar with animation
         onTaskUpdated: (task) async {
           await ref.read(taskViewModelProvider.notifier).updateTask(task);
           
