@@ -184,7 +184,7 @@ build_snapcraft:
     - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
   script:
     - snapcraft --version
-    - bash CI_scripts/linux/build_snapcraft_from_appimage.sh
+    - bash CI_scripts/linux/build_snapcraft_frsnapom_appimage.sh
   artifacts:
     when: always
     paths:
@@ -202,8 +202,6 @@ build_flatpak:
   rules:
     - if: '$CI_COMMIT_TAG'
   needs:
-    - job: build_appimage
-      artifacts: true
     - job: test
   cache:
     key: flatpak-$CI_COMMIT_REF_SLUG
@@ -220,14 +218,12 @@ build_flatpak:
     reports:
       dotenv: build.env
   before_script:
-    - sed -i "s/0\.0\.0/${CI_COMMIT_TAG}/g" app.towdow.TowDow.yaml
-    - sed -i "s/0\.0\.0/${CI_COMMIT_TAG}/g" CI_scripts/linux/flatpak/data/app.towdow.TowDow.metainfo.xml
     - echo "FLATPAK_JOB_ID=$CI_JOB_ID" > build.env
     - echo "CI_COMMIT_TAG=$CI_COMMIT_TAG" >> build.env
+    - echo "CI_COMMIT_SHA$$CI_COMMIT_SHA" >> build.env
   script:
-    - flatpak-builder --repo=repo build-dir app.towdow.TowDow.yaml  --force-clean --default-branch=stable
-    - flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak app.towdow.TowDow stable
-    - ostree --repo=repo refs
+    - bash CI_scripts/linux/flatpak/build_flatpak_ci.sh $CI_COMMIT_TAG $CI_COMMIT_SHA
+    - flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak app.towdow.TowDow master
 
 build_android:
   stage: build

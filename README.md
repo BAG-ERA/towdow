@@ -10,6 +10,8 @@ Upload the MSI generated in the release (https://gitlab.com/towdow/towdow-flutte
 
 ### Flatpak
 
+https://github.com/TheAppgineer/flatpak-flutter
+
 ### Snapcraft
 
 1. login ```snapcraft login``` (use login from vault _TowDow ubuntu / snapcraft_) 
