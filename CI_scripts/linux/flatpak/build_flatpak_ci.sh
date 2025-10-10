@@ -40,7 +40,6 @@ VERSION="${TAG}" flatpak-builder \
     --repo=repo \
     --force-clean \
     --sandbox \
-    --user \
     --install-deps-from=flathub \
     build \
     "${SCRIPT_DIR}/app.towdow.TowDow/app.towdow.TowDow.yml"
