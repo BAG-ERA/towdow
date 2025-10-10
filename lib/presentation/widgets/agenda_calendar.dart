@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/task.dart';
 import 'task_item/task_item.dart';
 import '../../core/theme/chart_theme.dart';
-import '../../../data/providers/providers.dart';
+import '../../data/providers/providers.dart';
 import 'utils/task_completion_animation.dart';
 
 class AgendaCalendar extends ConsumerStatefulWidget {
