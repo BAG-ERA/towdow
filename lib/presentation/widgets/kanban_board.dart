@@ -306,36 +306,38 @@ class KanbanColumnWidget extends ConsumerWidget {
       return _buildCollapsedColumn(context);
     }
     
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Column Header
-          DraggableColumnHeader(
-            columnId: column.id,
-            title: column.title,
-            subtitle: column.subtitle,
-            color: column.color,
-            icon: column.icon,
-            taskCount: column.tasks.length,
-            isCollapsed: column.isCollapsed,
-            onToggleCollapse: column.onToggleCollapse,
-            onColumnHide: onColumnHide,
-            isDragging: draggingColumnId == column.id,
-            isReorderingColumns: isReorderingColumns,
-            onDragStarted: onColumnDragStarted,
-            onDragEnded: () => onColumnDragEnded?.call(),
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+            ),
           ),
-          
-          // Tasks List
-          Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Column Header
+              DraggableColumnHeader(
+                columnId: column.id,
+                title: column.title,
+                subtitle: column.subtitle,
+                color: column.color,
+                icon: column.icon,
+                taskCount: column.tasks.length,
+                isCollapsed: column.isCollapsed,
+                onToggleCollapse: column.onToggleCollapse,
+                onColumnHide: onColumnHide,
+                isDragging: draggingColumnId == column.id,
+                isReorderingColumns: isReorderingColumns,
+                onDragStarted: onColumnDragStarted,
+                onDragEnded: () => onColumnDragEnded?.call(),
+              ),
+              
+              // Tasks List
+              Expanded(
             child: onTaskMoved != null
                 ? DragTarget<Task>(
                     onAcceptWithDetails: (details) {
@@ -386,7 +388,12 @@ class KanbanColumnWidget extends ConsumerWidget {
                                 ),
                               )
                             : ListView.builder(
-                                padding: const EdgeInsets.all(8),
+                                padding: EdgeInsets.only(
+                                  left: 8,
+                                  right: 8,
+                                  top: 8,
+                                  bottom: column.onAddTask != null ? 64 : 8,
+                                ),
                                 itemCount: column.tasks.length,
                                 itemBuilder: (context, index) {
                                   final task = column.tasks[index];
@@ -453,7 +460,12 @@ class KanbanColumnWidget extends ConsumerWidget {
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.all(8),
+                        padding: EdgeInsets.only(
+                          left: 8,
+                          right: 8,
+                          top: 8,
+                          bottom: column.onAddTask != null ? 64 : 8,
+                        ),
                         itemCount: column.tasks.length,
                         itemBuilder: (context, index) {
                           final task = column.tasks[index];
@@ -470,23 +482,28 @@ class KanbanColumnWidget extends ConsumerWidget {
                         },
                       ),
           ),
-          
-          // Add Task Button
-          if (column.onAddTask != null)
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: OutlinedButton.icon(
-                onPressed: column.onAddTask,
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Add Task'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: column.color,
-                  side: BorderSide(color: column.color.withValues(alpha: 0.5)),
-                ),
+            ],
+          ),
+        ),
+        
+        // Add Task Button - Positioned absolutely at the bottom
+        if (column.onAddTask != null)
+          Positioned(
+            left: 8,
+            right: 8,
+            bottom: 8,
+            child: OutlinedButton.icon(
+              onPressed: column.onAddTask,
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Add Task'),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                foregroundColor: column.color,
+                side: BorderSide(color: column.color.withValues(alpha: 0.5)),
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 

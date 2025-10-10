@@ -17,6 +17,7 @@ import '../step_item/step_container.dart';
 import '../step_item/step_tasklist.dart';
 import '../utils/popup/step_dialog.dart';
 import '../utils/popup/task_creation_dialog.dart';
+import '../utils/task_completion_animation.dart';
 // projectProvider removed
 
 class ProjectTaskStepView extends ConsumerStatefulWidget {
@@ -535,8 +536,17 @@ class _ProjectTaskStepViewState extends ConsumerState<ProjectTaskStepView> {
       return;
     }
 
+    // Start task update immediately (optimistic UI)
     final taskViewModel = ref.read(taskViewModelProvider.notifier);
-    await taskViewModel.toggleTaskCompletion(task);
+    final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+    // Show completion animation in parallel to mask any update delay
+    if (task.status != 'COMPLETED') {
+      await TaskCompletionAnimation.show(context);
+    }
+
+    // Ensure task update completes
+    await updateFuture;
     widget.onTasksRefresh?.call();
   }
 

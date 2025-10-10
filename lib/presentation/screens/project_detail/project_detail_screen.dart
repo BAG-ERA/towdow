@@ -32,6 +32,7 @@ import '../../widgets/project_detail/project_notes_quick_panel.dart';
 import '../../widgets/project_detail/project_note_view.dart';
 import '../../widgets/utils/voice_feedback_button.dart';
 import '../../widgets/common/monitoring_status_widget.dart';
+import '../../widgets/utils/task_completion_animation.dart';
 
 // ViewModel provider for a specific project
 final projectDetailViewModelProvider = StateNotifierProvider.family<ProjectDetailViewModel, ProjectDetailState, String>((ref, projectPath) {
@@ -560,7 +561,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   
                   // Content based on selected tab
                       SizedBox(
-                        height: MediaQuery.of(context).size.height * 0.7, // Give content a reasonable height
+                        height: MediaQuery.of(context).size.height * 0.7 - 80, // Account for bottom toolbar
                         child: _buildTabContent(context, ref, tasksAsync),
                       ),
                     ],
@@ -978,8 +979,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           return;
         }
 
+        // Start task update immediately (optimistic UI)
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
-        await taskViewModel.toggleTaskCompletion(task);
+        final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+        // Show completion animation in parallel to mask any update delay
+        if (task.status != 'COMPLETED') {
+          await TaskCompletionAnimation.show(context);
+        }
+
+        // Ensure task update completes
+        await updateFuture;
         
         // Task updates handled by repository streams - no manual refresh needed
       },
@@ -1137,8 +1147,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       return KanbanBoard(
       columns: columns,
       onTaskToggle: (task) async {
+        // Start task update immediately (optimistic UI)
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
-        await taskViewModel.toggleTaskCompletion(task);
+        final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+        // Show completion animation in parallel to mask any update delay
+        if (task.status != 'COMPLETED') {
+          await TaskCompletionAnimation.show(context);
+        }
+
+        // Ensure task update completes
+        await updateFuture;
         
         // Task updates handled by repository streams - no manual refresh needed
       },
@@ -1269,12 +1288,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         onTaskTap: (task) {
           // Navigate to task detail
         },
-        onTaskToggle: (task) async {
-          final taskViewModel = ref.read(taskViewModelProvider.notifier);
-          await taskViewModel.toggleTaskCompletion(task);
-          
-          // Task updates handled by repository streams - no manual refresh needed
-        },
+        // onTaskToggle is now handled internally by AgendaCalendar with animation
         onTaskUpdated: (task) async {
           await ref.read(taskViewModelProvider.notifier).updateTask(task);
           

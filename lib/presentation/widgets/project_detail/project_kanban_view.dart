@@ -12,6 +12,7 @@ import '../../../core/logger.dart';
 import '../../../core/result.dart';
 import '../../widgets/kanban_board.dart';
 import '../utils/popup/task_creation_dialog.dart';
+import '../utils/task_completion_animation.dart';
 import '../../../data/models/step.dart';
 // projectProvider removed; use calendarListProvider to read project state
 
@@ -278,8 +279,17 @@ class ProjectKanbanView extends ConsumerWidget {
           return;
         }
 
+        // Start task update immediately (optimistic UI)
         final taskViewModel = ref.read(taskViewModelProvider.notifier);
-        await taskViewModel.toggleTaskCompletion(task);
+        final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+        // Show completion animation in parallel to mask any update delay
+        if (task.status != 'COMPLETED') {
+          await TaskCompletionAnimation.show(context);
+        }
+
+        // Ensure task update completes
+        await updateFuture;
         
         // Refresh the tasks list
         onTasksRefresh?.call();

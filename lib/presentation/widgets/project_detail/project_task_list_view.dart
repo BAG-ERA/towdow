@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:towdow_app/l10n/app_localizations.dart';
 import '../task_item/task_item.dart';
 import '../utils/overlay_draggable_task.dart';
+import '../utils/task_completion_animation.dart';
 import '../../../data/models/task.dart';
 import '../../../data/providers/providers.dart';
 import '../../../core/logger.dart';
@@ -338,8 +339,17 @@ class _ProjectTaskListViewState extends ConsumerState<ProjectTaskListView> {
   }
 
   Future<void> _toggleTaskComplete(BuildContext context, WidgetRef ref, Task task) async {
+    // Start task update immediately (optimistic UI)
     final taskViewModel = ref.read(taskViewModelProvider.notifier);
-    await taskViewModel.toggleTaskCompletion(task);
+    final updateFuture = taskViewModel.toggleTaskCompletion(task);
+
+    // Show completion animation in parallel to mask any update delay
+    if (task.status != 'COMPLETED') {
+      await TaskCompletionAnimation.show(context);
+    }
+
+    // Ensure task update completes
+    await updateFuture;
     
     // Refresh the tasks list
     widget.onTasksRefresh?.call();
