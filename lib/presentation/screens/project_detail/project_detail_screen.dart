@@ -561,7 +561,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   
                   // Content based on selected tab
                       SizedBox(
-                        height: MediaQuery.of(context).size.height * 0.7, // Give content a reasonable height
+                        height: MediaQuery.of(context).size.height * 0.7 - 80, // Account for bottom toolbar
                         child: _buildTabContent(context, ref, tasksAsync),
                       ),
                     ],
