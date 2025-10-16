@@ -36,13 +36,20 @@ ostree init --repo=repo --mode=archive-z2
 
 # Build the Flatpak package
 echo "Building Flatpak package with TAG: ${TAG} and COMMIT_ID: ${COMMIT_ID}..."
+# Save the current directory and get absolute path to project root
+PROJECT_ROOT="$(pwd)"
+# Change to the manifest directory to ensure proper relative path resolution
+cd "${SCRIPT_DIR}/app.towdow.TowDow"
 VERSION="${TAG}" flatpak-builder \
-    --repo=repo \
+    --repo="${PROJECT_ROOT}/repo" \
     --force-clean \
     --sandbox \
+    --disable-rofiles-fuse \
     --install-deps-from=flathub \
-    build \
-    "${SCRIPT_DIR}/app.towdow.TowDow/app.towdow.TowDow.yml"
+    "${PROJECT_ROOT}/build" \
+    app.towdow.TowDow.yml
+# Return to the original directory
+cd "${PROJECT_ROOT}"
 
 echo "Flatpak build completed successfully"
 
@@ -56,7 +63,7 @@ echo "Flatpak CI build completed successfully!"
 flatpak build-update-repo --generate-static-deltas repo  || exit $?
 
 echo "Running linter"
-flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest CI_scripts/linux/flatpak/app.towdow.TowDow/app.towdow.TowDow.yml  || exit $?
+flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest "${SCRIPT_DIR}/app.towdow.TowDow/app.towdow.TowDow.yml"  || exit $?
 
 # Run repo linter and check for errors other than screenshot-related ones
 # Screenshots are automatically mirrored by Flathub during publishing, so these errors are expected locally
