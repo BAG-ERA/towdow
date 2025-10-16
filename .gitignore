@@ -105,8 +105,6 @@ windows/flutter/generated_plugin_registrant.cc
 windows/flutter/generated_plugins.cmake
 test/services/*.mocks.dart
 test/viewmodels/*.mocks.dart
-flutter-sdk-3.32.6.json
-flutter-shared.sh.patch
 squashfs-root
 towdow_app-*.AppImage
 towdow_*_amd64.snap
