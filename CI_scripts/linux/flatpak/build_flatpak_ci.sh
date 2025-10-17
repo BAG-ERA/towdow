@@ -62,6 +62,9 @@ echo "Flatpak CI build completed successfully!"
 # Finalize repo (appstream compose + deltas)
 flatpak build-update-repo --generate-static-deltas repo  || exit $?
 
+echo "installing linter"
+flatpak install flathub org.flatpak.Builder -y
+
 echo "Running linter"
 flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest "${SCRIPT_DIR}/app.towdow.TowDow/app.towdow.TowDow.yml"  || exit $?
 
