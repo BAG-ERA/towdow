@@ -40,10 +40,10 @@ echo "Building Flatpak package with TAG: ${TAG} and COMMIT_ID: ${COMMIT_ID}..."
 PROJECT_ROOT="$(pwd)"
 # Change to the manifest directory to ensure proper relative path resolution
 cd "${SCRIPT_DIR}/app.towdow.TowDow"
+# Note: --sandbox is removed for CI/Docker environments where namespace creation may be restricted
 VERSION="${TAG}" flatpak-builder \
     --repo="${PROJECT_ROOT}/repo" \
     --force-clean \
-    --sandbox \
     --disable-rofiles-fuse \
     --install-deps-from=flathub \
     "${PROJECT_ROOT}/build" \
