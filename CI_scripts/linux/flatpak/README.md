@@ -21,9 +21,30 @@ You need to update the commit id if you want to regenerate these files.
 
 ## Building the app
 
-```shell
+1. set CI_COMMIT_TAG and CI_COMMIT_SHA variables
+2. run CI script to build repo
+   ```shell
+   bash CI_scripts/linux/flatpak/build_flatpak_ci.sh $CI_COMMIT_TAG $CI_COMMIT_SHA
+   ```
+3. create flatpak file
+   ```
+   flatpak build-bundle repo towdow.$CI_COMMIT_TAG.flatpak app.towdow.TowDow master
+   ```
+## deploying to flatpak 
 
-```
+1. build the flatpak repo (see above)
+2. run the linter
+   ```shell
+   flatpak install flathub org.flatpak.Builder -y
+   flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest "${SCRIPT_DIR}/app.towdow.TowDow/app.towdow.TowDow.yml"  || exit $?
+   ```
+3. run script to update flathub repo 
+   ```
+   bash CI_scripts/linux/flatpak/copy_file_for_PR.sh --flathub-repo __PATH_TO_FLATHUB_REPO__ --version $CI_COMMIT_TAG --commit-id $CI_COMMIT_SHA
+   # ex for maxime PC:
+   bash CI_scripts/linux/flatpak/copy_file_for_PR.sh --flathub-repo ~/work/external_repos/flathub/ --version $CI_COMMIT_TAG --commit-id $CI_COMMIT_SHA
+   ```
+4. create a new Pull Request or push to existing PR
 
 
 ## Troubleshooting
